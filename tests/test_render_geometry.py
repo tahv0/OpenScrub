@@ -1,5 +1,6 @@
 """Geometry is rejected before coverage/native acquisition, not by a backend."""
 from types import SimpleNamespace
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,6 +16,7 @@ def boundary(monkeypatch, where, dets, cum=((0, 0),), bands=((0, 0),), **kw):
     def acquired(*a, **k):
         pytest.fail("native acquisition or coverage happened before validation")
     monkeypatch.setattr(o.cv2, "VideoCapture", acquired)
+    monkeypatch.setattr(o, "_RenderDelivery", acquired)
     if where.startswith("run"):
         monkeypatch.setattr(o, "apply_coverage", acquired)
         args = SimpleNamespace(output="out", video="in", preview=False,
@@ -79,27 +81,44 @@ def tiny_video(tmp_path):
     return src
 
 
-@pytest.mark.parametrize("preview", [False, True])
-def test_actual_frame_derived_overflow(tmp_path, monkeypatch, preview):
+@pytest.mark.parametrize("kind,preview", [("fallback", False), ("fallback", True),
+                                           ("sdr", False), ("hdr", False)])
+@pytest.mark.parametrize("present", [False, True])
+def test_actual_frame_derived_overflow(tmp_path, monkeypatch, kind, preview, present):
+    from test_render_resources import owners, assert_closed
     src = tiny_video(tmp_path)
-    monkeypatch.setattr(o, "nvenc_available", lambda *a: None)
-    # Observe the real frame calculation; keep this G test independent of R cleanup.
-    captures, writers = [], []
-    capture, writer = o.cv2.VideoCapture, o.cv2.VideoWriter
-    def cap(*a):
-        result = capture(*a); captures.append(result); return result
-    def sink(*a):
-        result = writer(*a); writers.append(result); return result
-    monkeypatch.setattr(o.cv2, "VideoCapture", cap)
-    monkeypatch.setattr(o.cv2, "VideoWriter", sink)
-    try:
-        with pytest.raises(ValueError, match=r"geometry.*detection 1.*frame 0.*drift"):
-            o.render(str(src), str(tmp_path / "out.avi"),
-                     [detection(aoff=(-1e308, 0))], [(1e308, 0)], [(0, 0)],
-                     1, 0, "box", preview)
-    finally:
-        for resource in captures + writers:
-            resource.release()
+    output, report = tmp_path / "out.mp4", tmp_path / "report.json"
+    if present:
+        output.write_bytes(b"previous video")
+        report.write_bytes(b"previous report")
+    if kind == "fallback":
+        monkeypatch.setattr(o, "nvenc_available", lambda *a: None)
+    args = o.build_parser().parse_args([str(src), "--output", str(output),
+                                       "--report", str(report)])
+    args.encoder, args.preview, args.pad = "x264", preview, 0
+    if kind == "hdr":
+        args.hdr_source, args.hdr_encoder = str(src), "libx265"
+    state = dict(detections=[detection(aoff=(-1e308, 0))],
+                 cum=[(1e308, 0)], bands=[(0, 0)], fps=1, stats={})
+    real_exit = o._RenderDelivery.__exit__
+    exits = []
+    with owners(monkeypatch) as observed:
+        def exit_after_resources(delivery, *error):
+            # Native shutdown must precede P stage cleanup, even with traceback held.
+            assert_closed(observed)
+            exits.append(delivery.video_stage)
+            return real_exit(delivery, *error)
+        monkeypatch.setattr(o._RenderDelivery, "__exit__", exit_after_resources)
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*frame 0.*drift") as held:
+            o.run_render(args, state)
+        assert held.value.__traceback__ is not None
+        assert_closed(observed)
+        assert len(exits) == 1
+        assert output.exists() is present and report.exists() is present
+        if present:
+            assert output.read_bytes() == b"previous video"
+            assert report.read_bytes() == b"previous report"
+        assert not list(tmp_path.glob(".render-*"))
 
 
 @pytest.mark.parametrize("coverage", ["tight", "box", "concealed"])
@@ -147,6 +166,7 @@ def test_direct_options_before_acquisition(monkeypatch, field, value, hdr):
     def acquired(*a):
         pytest.fail("native acquisition before option validation")
     monkeypatch.setattr(o.cv2, "VideoCapture", acquired)
+    monkeypatch.setattr(o, "_RenderDelivery", acquired)
     args = dict(src="in", dst="out", detections=[detection()], cum=[(0, 0)],
                 bands=[(0, 0)], fps=1, pad=0, mode="box")
     args[field] = value
@@ -158,23 +178,23 @@ def test_direct_options_before_acquisition(monkeypatch, field, value, hdr):
 
 
 @pytest.mark.parametrize("hdr", [False, True])
-def test_bad_metadata_releases_capture(monkeypatch, hdr):
+def test_bad_metadata_releases_capture(tmp_path, monkeypatch, hdr):
     class Capture:
-        released = False
+        releases = 0
         def get(self, key):
             return np.nan
         def release(self):
-            self.released = True
+            self.releases += 1
     cap = Capture()
     monkeypatch.setattr(o.cv2, "VideoCapture", lambda *a: cap)
-    args = dict(src="in", dst="out", detections=[], cum=[(0, 0)], bands=[(0, 0)],
+    args = dict(src="in", dst=str(tmp_path / "out.mp4"), detections=[], cum=[(0, 0)], bands=[(0, 0)],
                 fps=1, pad=0, mode="box")
     with pytest.raises(ValueError, match=r"geometry.*video dimensions/count"):
         if hdr:
             o.render_hdr(**args, encoder="libx265", tags={})
         else:
             o.render(**args, preview=False)
-    assert cap.released
+    assert cap.releases == 1
 
 
 @pytest.mark.parametrize("preview", [False, True])
@@ -237,10 +257,13 @@ def test_polygon_fallback_not_preempted_by_primary_guard(hdr):
 
 @pytest.mark.parametrize("start,end,expected", [(-1, 2, (-1, 2)), (0, 0, None),
                                                 (2, -1, (2, None))])
-def test_existing_clip_policy(monkeypatch, start, end, expected):
+def test_existing_clip_policy(tmp_path, monkeypatch, start, end, expected):
     observed = []
-    monkeypatch.setattr(o, "_render", lambda *a, **kw: observed.append(kw["clip"]))
-    args = SimpleNamespace(output="out", video="in", preview=False, report=None,
+    def into(*a, **kw):
+        observed.append(kw["clip"])
+        Path(a[1]).write_bytes(b"bounded stage sentinel")
+    monkeypatch.setattr(o, "_render_into", into)
+    args = SimpleNamespace(output=str(tmp_path / "out.mp4"), video="in", preview=False, report=None,
                            pad=0, mode="box", encoder="cpu", clip_start=start,
                            clip_end=end)
     o.run_render(args, dict(detections=[], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
@@ -263,28 +286,34 @@ def test_band_derived_overflow():
 
 @pytest.mark.parametrize("hdr", [False, True])
 @pytest.mark.parametrize("pad", [0, 1])
-def test_run_coverage_rounding_keeps_legal_empty_box(monkeypatch, hdr, pad):
+def test_run_coverage_rounding_keeps_legal_empty_box(tmp_path, monkeypatch, hdr, pad):
     observed = []
-    name = "_render_hdr" if hdr else "_render"
-    monkeypatch.setattr(o, name, lambda *a, **kw: observed.append(a[2][0].cbox),
-                        raising=False)
+    name = "_render_hdr_into" if hdr else "_render_into"
+    stages = []
+    def into(*a, **kw):
+        observed.append(a[2][0].cbox)
+        stages.append(a[1])
+        Path(a[1]).write_bytes(b"bounded stage sentinel")
+    monkeypatch.setattr(o, name, into)
     d = detection((.1, .1, .2, .2), dense=True, track=1)
-    args = SimpleNamespace(output="out", video="in", preview=False, report=None,
+    args = SimpleNamespace(output=str(tmp_path / "out.mp4"), video="in", preview=False, report=None,
                            pad=pad, mode="box", encoder="cpu", coverage="concealed",
                            hdr_source="in" if hdr else None, hdr_encoder="libx265")
     o.run_render(args, dict(detections=[d], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
     assert observed == [(0, 0, 0, 0)]
+    assert len(stages) == 1 and Path(args.output).read_bytes() == b"bounded stage sentinel"
+    assert not list(tmp_path.glob(".render-*"))
 
 
 def metadata_capture(monkeypatch, width=16, height=16, count=1):
     class Capture:
-        released = False
+        releases = 0
         def get(self, field):
             return {cv2.CAP_PROP_FRAME_WIDTH: width,
                     cv2.CAP_PROP_FRAME_HEIGHT: height,
                     cv2.CAP_PROP_FRAME_COUNT: count}[field]
         def release(self):
-            self.released = True
+            self.releases += 1
     cap = Capture()
     monkeypatch.setattr(o.cv2, "VideoCapture", lambda *a: cap)
     return cap
@@ -292,18 +321,18 @@ def metadata_capture(monkeypatch, width=16, height=16, count=1):
 
 @pytest.mark.parametrize("hdr", [False, True])
 @pytest.mark.parametrize("count", [1, -1])
-def test_renderer_admits_finite_negative_frame_count(monkeypatch, hdr, count):
+def test_renderer_admits_finite_negative_frame_count(tmp_path, monkeypatch, hdr, count):
     cap = metadata_capture(monkeypatch, count=count)
     class EncoderReached(Exception):
         pass
     def reached(*a, **kw):
         if hdr:
-            assert cap.released  # metadata capture closes before HDR decoding
+            assert cap.releases == 1  # metadata capture closes before HDR decoding
             assert kw["bufsize"] == 16 * 16 * 6
         raise EncoderReached()
     monkeypatch.setattr(o, "nvenc_available", reached)
     monkeypatch.setattr(o.subprocess, "Popen", reached)
-    args = dict(src="in", dst="out", detections=[], cum=[(0, 0)],
+    args = dict(src="in", dst=str(tmp_path / "out.mp4"), detections=[], cum=[(0, 0)],
                 bands=[(0, 0)], fps=1, pad=0, mode="box")
     try:
         with pytest.raises(EncoderReached):
@@ -311,8 +340,9 @@ def test_renderer_admits_finite_negative_frame_count(monkeypatch, hdr, count):
                 o.render_hdr(**args, encoder="libx265", tags={})
             else:
                 o.render(**args, preview=False)
+        assert cap.releases == 1
     finally:
-        cap.release()  # harness ownership at the deliberate acquisition fault
+        cap.release()  # harness cleanup follows production assertions
 
 
 @pytest.mark.parametrize("hdr", [False, True])
@@ -320,17 +350,38 @@ def test_renderer_admits_finite_negative_frame_count(monkeypatch, hdr, count):
                                          ("height", 0), ("height", -1),
                                          ("width", np.nan), ("height", np.inf),
                                          ("count", np.nan), ("count", np.inf)])
-def test_renderer_rejects_unusable_metadata(monkeypatch, hdr, field, value):
+def test_renderer_rejects_unusable_metadata(tmp_path, monkeypatch, hdr, field, value):
     cap = metadata_capture(monkeypatch, **{field: value})
     def acquired(*a, **kw):
         pytest.fail("native decoder/encoder acquired with unusable metadata")
     monkeypatch.setattr(o, "nvenc_available", acquired)
     monkeypatch.setattr(o.subprocess, "Popen", acquired)
-    args = dict(src="in", dst="out", detections=[], cum=[(0, 0)],
+    args = dict(src="in", dst=str(tmp_path / "out.mp4"), detections=[], cum=[(0, 0)],
                 bands=[(0, 0)], fps=1, pad=0, mode="box")
     with pytest.raises(ValueError, match=r"geometry.*video dimensions/count"):
         if hdr:
             o.render_hdr(**args, encoder="libx265", tags={})
         else:
             o.render(**args, preview=False)
-    assert cap.released
+    assert cap.releases == 1
+
+
+@pytest.mark.parametrize("hdr", [False, True])
+def test_metadata_geometry_primary_retains_single_release_diagnostic(tmp_path, monkeypatch, hdr):
+    cap = metadata_capture(monkeypatch, width=np.nan)
+    release = cap.release
+    def failed_release():
+        release()
+        raise OSError("metadata release sentinel")
+    monkeypatch.setattr(cap, "release", failed_release)
+    args = dict(src="in", dst=str(tmp_path / "out.mp4"), detections=[],
+                cum=[(0, 0)], bands=[(0, 0)], fps=1, pad=0, mode="box")
+    with pytest.raises(ValueError, match=r"geometry.*video dimensions/count") as held:
+        if hdr:
+            o.render_hdr(**args, encoder="libx265", tags={})
+        else:
+            o.render(**args, preview=False)
+    assert cap.releases == 1
+    assert held.value.__traceback__ is not None
+    assert held.value.render_cleanup_errors == ("OSError: metadata release sentinel",)
+    assert not list(tmp_path.glob(".render-*"))

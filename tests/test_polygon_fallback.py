@@ -214,7 +214,7 @@ def observe_render(monkeypatch, path):
     children, streams, captures, frames = [], [], [], []
     original_popen = subprocess.Popen
     original_capture = cv2.VideoCapture
-    target = scrub.render_hdr if path == "hdr" else scrub.render
+    target = scrub._render_hdr_into if path == "hdr" else scrub._render_into
     lines, start = inspect.getsourcelines(target)
     write_line = next(start + i for i, line in enumerate(lines)
                       if ("enc.stdin.write(" if path == "hdr" else "proc.stdin.write(") in line)

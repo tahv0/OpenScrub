@@ -183,7 +183,7 @@ def _observe_encoder(monkeypatch, owner):
     def trace(frame, event, arg):
         if frame.f_code is owner.__code__:
             if event == "line" and frame.f_lineno in writes:
-                data = frame.f_locals["buf"] if owner is openscrub.render_hdr else frame.f_locals["frame"]
+                data = frame.f_locals["buf"] if owner is openscrub._render_hdr_into else frame.f_locals["frame"]
                 captured.append(data.tobytes())
             return trace
         return None
@@ -255,7 +255,7 @@ def test_report_run_render_hdr_exact_encoder_input(masked, hdr_source, tmp_path,
     state = _report_state(tmp_path)
     if not masked:
         state["detections"] = []
-    with _observe_encoder(monkeypatch, openscrub.render_hdr) as (captured, children):
+    with _observe_encoder(monkeypatch, openscrub._render_hdr_into) as (captured, children):
         result = openscrub.run_render(_args(source, output, True), state)
         _assert_children_finished(children)
         assert result == {"synthetic": True, "output": str(output)}
@@ -289,7 +289,7 @@ def test_report_run_render_sdr_control(hdr_source, tmp_path, monkeypatch):
     finally:
         cap.release()
     expected[:, (5, 5, 6), (6, 7, 6)] = 0
-    with _observe_encoder(monkeypatch, openscrub.render) as (captured, children):
+    with _observe_encoder(monkeypatch, openscrub._render_into) as (captured, children):
         openscrub.run_render(_args(source, output, False), _report_state(tmp_path))
         _assert_children_finished(children)
         assert len(captured) == 3
