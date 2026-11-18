@@ -30,12 +30,16 @@ results.scenarios.push('native selectors present');
 if(process.env.TASK150_RED==='1')return;
 const status=async s=>assert.equal(await page.locator('#reviewFilterStatus').innerText(),s);
 const filter=async(type,output)=>{await page.locator('#reviewType').selectOption(type??'');await page.locator('#reviewOutput').selectOption(output)};
+// Locate through actual scheduler geometry; virtualization intentionally has no offscreen card nodes.
+const placeCard=async id=>{await page.evaluate(i=>{const s=REVIEW_SCHED;s.layout();const section=s.sections.find(x=>x.ids.includes(i));if(!section)throw Error('card unavailable '+i);const n=section.ids.indexOf(i),top=section.el.getBoundingClientRect().top+scrollY+section.prefix[Math.floor(n/section.columns)]*section.scale;scrollTo(0,Math.max(0,top-100));s.layout()},id);await page.locator('#det'+id).waitFor()};
+const cardAction=async id=>{await placeCard(+id.slice(2));await page.locator('#'+id).click()};
+
 if(process.env.TASK150_TOUCH_ONLY==='1'){
  await page.evaluate(async flags=>{for(const [i,value]of Object.entries(flags))EDITS.enabled[i]=value;await loadReview()},Object.fromEntries(initial.map(r=>[r.i,!r.enabled])));
  await filter('','blur');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'blur')).map(c=>c.id).sort((a,b)=>a-b)),[0,4,7,8]);await status('4 of 7 cards match');
  await filter('','visible');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'visible')).map(c=>c.id).sort((a,b)=>a-b)),[0,3,6,9]);
  await page.locator('#reviewType').click();await page.keyboard.press('Home');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await page.locator('#reviewType').inputValue(),'face');
- await page.locator('#reviewOutput').selectOption('blur');await page.locator('#kb0').click();await status('1 of 7 cards match');assert.match(await page.locator('#reviewFilterHint').innerText(),/outside your zones/);assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
+ await page.locator('#reviewOutput').selectOption('blur');await cardAction('kb0');await status('1 of 7 cards match');assert.match(await page.locator('#reviewFilterHint').innerText(),/outside your zones/);assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
  await page.evaluate(()=>openJob('empty'));await page.locator('#reviewOutput').waitFor();await status('0 of 0 cards match');assert.equal(await page.locator('#reviewFilterEmpty').innerText(),'No detections in this job.');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();
  results.scenarios.push('opposite pending overlay, native Detection type pointer/keyboard, collapsed-zone-only matches and no detections');
 }
@@ -46,18 +50,18 @@ await filter('email','blur');await status('0 of 7 cards match');assert.equal(awa
 await page.locator('#reviewFilterReset').click();await status('7 of 7 cards match');assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewFilterReset');
 results.scenarios.push('seven-card mixed/type/empty/reset counts');
 await page.locator('#reviewOutput').focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await status('4 of 7 cards match');
-await page.locator('#kb3').focus();await page.keyboard.press('Enter');await status('3 of 7 cards match');assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewOutput');
-await page.locator('#bb0').focus();await page.keyboard.press('Enter');assert.equal(await page.evaluate(()=>document.activeElement.id),'bb0');
+await placeCard(3);await page.locator('#kb3').focus();await page.keyboard.press('Enter');await status('3 of 7 cards match');assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewOutput');
+await placeCard(0);await page.locator('#bb0').focus();await page.keyboard.press('Enter');assert.equal(await page.evaluate(()=>document.activeElement.id),'bb0');
 results.scenarios.push('native keyboard, disappearing-control focus fallback and retained-card focus');
 await page.locator('#reviewFilterReset').click();await page.locator('#reviewZones summary').click();await page.locator('#det8').waitFor({state:'visible'});
 await page.evaluate(()=>{selSet.add(8);document.getElementById('det8').classList.add('selected')});await page.locator('#reviewZones summary').click();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);await page.locator('#reviewZones summary').click();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
 await filter('email','all');assert.equal(await page.locator('#reviewZones').isVisible(),false);await filter('','all');assert.equal(await page.locator('#reviewZones').getAttribute('open'),'');
 results.scenarios.push('zone collapse selection pruning and open preference retained across hiding');
 await page.locator('#reviewZones summary').click();
-await filter('face','all');const target=page.locator('#det0');await target.scrollIntoViewIfNeeded();let b=await target.boundingBox();
+await filter('face','all');await placeCard(0);const target=page.locator('#det0');await target.scrollIntoViewIfNeeded();let b=await target.boundingBox();
 await page.mouse.move(b.x+3,b.y+3);await page.mouse.down();await page.mouse.move(b.x+b.width-3,b.y+b.height-3,{steps:4});await page.mouse.up();
 assert.deepEqual(await page.evaluate(()=>[...selSet]),[0]);await page.locator('.selmenu .mkeep').click();assert.deepEqual(await page.evaluate(()=>[EN[0],EN[1],EN[2]]),[false,false,false]);
-await page.locator('#bb0').click();b=await target.boundingBox();await page.mouse.move(b.x+3,b.y+3);await page.mouse.down();await page.mouse.move(b.x+30,b.y+30);await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
+await cardAction('bb0');b=await target.boundingBox();await page.mouse.move(b.x+3,b.y+3);await page.mouse.down();await page.mouse.move(b.x+30,b.y+30);await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
 await page.locator('#det0 img').click();await page.locator('#lb img').waitFor();assert.match(await page.locator('#lb img').getAttribute('src'),/detframe\/0$/);await page.keyboard.press('Escape');assert.equal(await page.locator('#lb').count(),0);
 await page.locator('#reviewFilterReset').click();
 results.scenarios.push('native marquee full-group selected action, Escape cancels active marquee, enlarged original preview');
@@ -76,7 +80,7 @@ assert.deepEqual(requests.slice(boundary).filter(r=>/\/(detections|report|mediai
 assert.equal(await page.evaluate(()=>BE.drag?.kind),'move');await page.mouse.up();assert.equal(await page.evaluate(()=>BE.drag),null);
 results.scenarios.push('editor object/node, selection, pending geometry/time/manual/audio and actual unfinished pointer gesture retained; zero metadata/save/render requests');
 await page.evaluate(()=>{BE.drag=null;MAN.length=0;BE.adds.length=0;BE.ov={};BE.times={};BE.audio=[];BE.audioLoaded=false});
-hold=true;await page.locator('#kb0').click();await page.evaluate(()=>{window.saving=saveAndRender()});await page.waitForFunction(()=>EDITS.busy);await page.locator('#bb0').click();await filter('plate','visible');hold=false;release();await page.evaluate(()=>window.saving);assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);assert.equal(requests.filter(r=>r.path.endsWith('/render')).length,0);await status('1 of 7 cards match');
+hold=true;await cardAction('kb0');await page.evaluate(()=>{window.saving=saveAndRender()});await page.waitForFunction(()=>EDITS.busy);await cardAction('bb0');await filter('plate','visible');hold=false;release();await page.evaluate(()=>window.saving);assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);assert.equal(requests.filter(r=>r.path.endsWith('/render')).length,0);await status('1 of 7 cards match');
 fail=true;await page.evaluate(()=>saveAndRender());assert.match(await page.locator('#reviewSaveStatus').innerText(),/controlled busy/);await page.locator('#reviewFilterReset').click();assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);
 await page.evaluate(()=>openJob('B'));await page.locator('#reviewType').waitFor();assert.equal(await page.locator('#reviewType').inputValue(),'');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewOutput').inputValue(),'all');
 results.scenarios.push('held-save newer intent, failed save, A→B→A reset and owning draft');
@@ -107,7 +111,7 @@ rows=structuredClone(initial);await page.evaluate(()=>{openJob('B');openJob('A')
 await page.setViewportSize({width:390,height:844});await page.locator('#reviewFilterReset').click();await page.screenshot({path:root+'/mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.locator('#reviewOutput').selectOption('visible');// A is all true from pending bb0; B3 was kept, C4/5 and E7 remain false, Z8 is false, D6/Z9 true. Thus B/C/E/Z8 match.
 await status('4 of 7 cards match');
 results.scenarios.push('390px layout and native controls');
-await page.locator('#reviewFilterReset').click();await page.locator('#det0').scrollIntoViewIfNeeded();const touch=await page.context().newCDPSession(page);
+await page.locator('#reviewFilterReset').click();await placeCard(0);await page.locator('#det0').scrollIntoViewIfNeeded();const touch=await page.context().newCDPSession(page);
 const touchGeometry=await page.evaluate(()=>{const e=document.getElementById('detwrap');scrollTo(0,e.getBoundingClientRect().top+scrollY);return {container:'window/vertical',scrollY,max:document.documentElement.scrollHeight-innerHeight,wrap:e.getBoundingClientRect().toJSON()}});assert.ok(touchGeometry.max>touchGeometry.scrollY+150);const scrollBefore=touchGeometry.scrollY;
 results.touchGeometry=touchGeometry;fs.writeFileSync(root+'/touch-precondition.json',JSON.stringify(touchGeometry,null,2));
 await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:190,y:700}]});
