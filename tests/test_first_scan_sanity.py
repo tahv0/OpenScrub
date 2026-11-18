@@ -102,7 +102,7 @@ def assert_scan_report(state, document, digest, tmp_path, *, has_email,
                   "regions": int(has_email), "recalls": 0,
                   "remembered": int(has_email), "zone_dropped": {}},
     }
-    # All Detection fields and report-only choices are pinned, including order.
+    # Detection fields, report-only values, and Detection list order are pinned.
     assert document["detections"] == ([{
         "t_start": 0., "t_end": 2.3, "cbox": [8, 8, 78, 28],
         "category": "email", "text": "alice@example.invalid", "confidence": .99,
