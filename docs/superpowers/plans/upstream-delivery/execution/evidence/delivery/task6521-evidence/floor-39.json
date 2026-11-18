@@ -1,0 +1,75 @@
+{
+  "task": "task6521",
+  "scratch": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs39",
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+  "source_kind": "git",
+  "base": "a3c3193e8dff41ec0588e66443398048a5c15ece",
+  "head": "c7f9dcc29affe5da363094b8646b3064966e52ed",
+  "policy": "frozen",
+  "files": {
+    "openscrub.py": "d3f87fb77b8f855c730caea5c78c7e7ccb5c8c83a0c0ead40872e4c77f0d33eb",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "pyproject.toml": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b",
+    "requirements.txt": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+    "face_models.json": "406434d10478ba15845c509c3b9cc292874935e87cf2e6f07a5396598d9d700b",
+    "person_models.json": "8abc33e5c1d03e43fa4dcedb4d2052ff363f2f1c1fa3630b67b0339f6cdd0685",
+    "plate_models.json": "4637fabd1e5f7bc6f9c69f495070e071d14e381e0f0a33c63974cdb5241d6a87",
+    "tests/test_polygon_fallback.py": "6842b75029bba052ca88caac89f5520156dc09cb97a771a31043757100ffda33"
+  },
+  "modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_vault": "openscrub_vault.py"
+  },
+  "python": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "python_version": [
+    3,
+    9,
+    25
+  ],
+  "min_free_bytes": 2000000000,
+  "configure_app": true,
+  "prerequisites": [
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py",
+      "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py",
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/README.md",
+      "sha256": "1dec8419daf134313cd85312aabf8bd94b63093fc562fa5bf831ce92214109af"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "sha256": "84c920f304e265c53096e42d83309c6f7b829988f937a7dd15c24eebcb63f59a",
+      "executable": true
+    }
+  ],
+  "environment": {
+    "PATH": "/tmp/openscrub-baseline-20261116/tools/usr/bin:/usr/bin:/bin",
+    "LD_LIBRARY_PATH": "/tmp/openscrub-baseline-20261116/tools/usr/lib/x86_64-linux-gnu:/tmp/openscrub-baseline-20261116/tools/usr/lib/x86_64-linux-gnu/pulseaudio",
+    "TESSDATA_PREFIX": "/tmp/openscrub-baseline-20261116/tools/usr/share/tesseract-ocr/5/tessdata"
+  }
+}

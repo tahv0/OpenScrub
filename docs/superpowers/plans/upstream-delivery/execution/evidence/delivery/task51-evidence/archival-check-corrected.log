@@ -1,0 +1,2 @@
+{"head": "ac0f5e4661701e954e04dbc95eb00d9317c04cc6", "base": "b70d42011168192cdf7a9ef93a5e9419a92a1cdb", "clean": true, "only_change": "tests/test_live_preview.py", "other_tracked_files_byte_identical": 113, "existing_owner_ast_unchanged": true, "python39_grammar": "pass", "diff_check": "pass", "sdist_tests_recursive_inclusion": true, "requires_python": ">=3.9"}
+Evidence manifest, both passing raw logs, exclusions and final source state verified.

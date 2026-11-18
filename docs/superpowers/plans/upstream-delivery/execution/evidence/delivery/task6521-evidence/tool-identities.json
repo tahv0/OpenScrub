@@ -1,0 +1,25 @@
+{
+  "ffmpeg": {
+    "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+    "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+    "version": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers"
+  },
+  "ffprobe": {
+    "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+    "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+    "version": "ffprobe version 8.0.1-3ubuntu2 Copyright (c) 2007-2025 the FFmpeg developers"
+  },
+  "encoder_query": {
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "-hide_banner",
+      "-encoders"
+    ],
+    "sha256": "052a59b75c923b307a9ad84cab23e59b56e4a4c967dba4d716a8f205244a4b58",
+    "required_lines": [
+      " V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)",
+      " V....D libx264rgb           libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 RGB (codec h264)",
+      " V....D libx265              libx265 H.265 / HEVC (codec hevc)"
+    ]
+  }
+}

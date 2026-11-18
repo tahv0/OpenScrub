@@ -1,5 +1,7 @@
 # Stage render output and publish the owned video/report pair
 
+Candidate: `pr/render-recovery-comment` at `af862c8c9700b7b2b06426e4c4287e469fe28038`.
+
 A failed or cancelled render can overwrite its final video before its report is ready. Render into a private sibling stage, construct the retained report with final-path provenance and staged-byte hashing, then publish video/report and web terminal success under the existing operation/report lock. Ordinary publication failures restore previous bytes/existence; unsuccessful restoration exposes recovery-required state and retains the needed artifacts through vault/restart.
 
 Short frame reads validate their admitted source owner's mutation epoch, retry once after overlap and return409 after repeated invalidation. Streams open one descriptor under the owning short lock, use descriptor-derived Range/conditional metadata and retain FILES ownership through actual response close. Untransferred responses also close when recovery revalidation raises.
@@ -8,4 +10,6 @@ Public signatures, defaults, masks/audio, raw report fields, legacy publishers a
 
 Validation: full569 and actual Python3.9 affected293 passed at64647f2 before the final response-handoff fix. Finala132081 passed56 response/source-lifetime checks on each actual Python3.12/3.9, including real descriptors and exactly-once lease release after recovery409. Final offline sdist→extracted-source wheel→installed CLI/defaults and actual Cheroot GET/HEAD/Range/conditional/early-close-delete checks passed. The [delivery report](../evidence/delivery/task-1633-report.md) and [fix report](../evidence/delivery/task-1633-fix1-report.md) retain commands, source identities, owning regressions and limits.
 
-Base:`8768e86dc1cd57720fd1c22eb6b539ae6bda6cde` (declared reviewed report/lifetime/serializer plus N09/R prerequisites). Head:`a132081f1e609ed19deb4477044ee1c9b77871cc`. Independent whole-task and scoped fix review approved the candidate. G/C01 combined acceptance and unavailable platform/runtime checks remain separate. No publication performed.
+Base:`8768e86dc1cd57720fd1c22eb6b539ae6bda6cde` (declared reviewed report/lifetime/serializer plus N09/R prerequisites). Head:`af862c8c9700b7b2b06426e4c4287e469fe28038`. Independent whole-task and scoped fix review approved the candidate. G/C01 combined acceptance and unavailable platform/runtime checks remain separate. No publication performed.
+
+Readiness descendant: `pr/render-recovery-comment` at `af862c8c9700b7b2b06426e4c4287e469fe28038`, based on retained original `a132081f1e609ed19deb4477044ee1c9b77871cc`. The recovery ExitStack comment now accurately describes expendable staging cleanup while necessary recovery artifacts remain. Complete AST/docstrings/non-comment tokens are unchanged; functional/package evidence stays attributed to the original runtime-tested source. [Follow-up report](../evidence/delivery/task-16331-report.md) and [independent approval](../evidence/delivery/task-16331-review.md). This is an update to the same focused contribution, with no external publication.

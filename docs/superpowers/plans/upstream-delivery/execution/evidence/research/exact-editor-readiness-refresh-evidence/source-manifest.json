@@ -1,0 +1,761 @@
+{
+  "scope": "immutable Git source metadata only; no product execution",
+  "refs": {
+    "standalone": {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "tree": "ed743d1b79b8b3ebf8d7f65aa11a12cf0894360e",
+      "files": [
+        {
+          "path": "openscrub_web.py",
+          "present": true,
+          "bytes": 287531,
+          "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2",
+          "blob": "137091183f66e99350153b38ce060b02f95e55f0",
+          "lines": 4814,
+          "selected_definitions": [
+            {
+              "name": "_source_job_locked",
+              "line": 344,
+              "end_line": 356
+            },
+            {
+              "name": "_reserve_files_locked",
+              "line": 359,
+              "end_line": 367
+            },
+            {
+              "name": "_select_render_input",
+              "line": 370,
+              "end_line": 415
+            },
+            {
+              "name": "_request_source_path",
+              "line": 418,
+              "end_line": 430
+            },
+            {
+              "name": "_job_video",
+              "line": 433,
+              "end_line": 441
+            },
+            {
+              "name": "_update_job_source",
+              "line": 444,
+              "end_line": 456
+            },
+            {
+              "name": "_new_job",
+              "line": 495,
+              "end_line": 521
+            },
+            {
+              "name": "_report_current",
+              "line": 802,
+              "end_line": 812
+            },
+            {
+              "name": "_edit_gate",
+              "line": 815,
+              "end_line": 818
+            },
+            {
+              "name": "_operation_valid",
+              "line": 821,
+              "end_line": 826
+            },
+            {
+              "name": "_begin_operation",
+              "line": 829,
+              "end_line": 834
+            },
+            {
+              "name": "_finish_operation",
+              "line": 837,
+              "end_line": 846
+            },
+            {
+              "name": "_prepare_work",
+              "line": 861,
+              "end_line": 871
+            },
+            {
+              "name": "_run_job",
+              "line": 954,
+              "end_line": 1117
+            },
+            {
+              "name": "enforce_vault_lock",
+              "line": 1181,
+              "end_line": 1201
+            },
+            {
+              "name": "_finish_file_response",
+              "line": 1205,
+              "end_line": 1214
+            },
+            {
+              "name": "_release_failed_request",
+              "line": 1218,
+              "end_line": 1223
+            },
+            {
+              "name": "_load_job_report",
+              "line": 1507,
+              "end_line": 1509
+            },
+            {
+              "name": "_frame_at",
+              "line": 1512,
+              "end_line": 1520
+            },
+            {
+              "name": "job_detframe",
+              "line": 1561,
+              "end_line": 1579
+            },
+            {
+              "name": "job_boxes_at",
+              "line": 1583,
+              "end_line": 1606
+            },
+            {
+              "name": "job_thumb",
+              "line": 1610,
+              "end_line": 1657
+            },
+            {
+              "name": "job_frame_at",
+              "line": 1661,
+              "end_line": 1685
+            },
+            {
+              "name": "_valid_manual_creation",
+              "line": 1702,
+              "end_line": 1716
+            },
+            {
+              "name": "job_save_edits",
+              "line": 1720,
+              "end_line": 1812
+            },
+            {
+              "name": "job_track_object",
+              "line": 1816,
+              "end_line": 1934
+            },
+            {
+              "name": "_rehydrate_jobs",
+              "line": 4445,
+              "end_line": 4546
+            }
+          ],
+          "planned_identifier_occurrences": {
+            "edit_sample": [],
+            "geometry_preconditions": [],
+            "row_context_eq": [],
+            "timeline_eq": [],
+            "source_ref": [],
+            "readySample": [],
+            "strict_seed": []
+          }
+        },
+        {
+          "path": "openscrub.py",
+          "present": true,
+          "bytes": 416014,
+          "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+          "blob": "9a9c82d7eb8075510e5c2dbbbe63be3c943a399f",
+          "lines": 8635,
+          "selected_definitions": [
+            {
+              "name": "_grab_frame",
+              "line": 1704,
+              "end_line": 1801
+            },
+            {
+              "name": "_track_person_dense",
+              "line": 1919,
+              "end_line": 2437
+            },
+            {
+              "name": "track_manual_region",
+              "line": 2440,
+              "end_line": 2716
+            },
+            {
+              "name": "write_report",
+              "line": 6286,
+              "end_line": 6346
+            },
+            {
+              "name": "_decode_report",
+              "line": 6358,
+              "end_line": 6380
+            },
+            {
+              "name": "probe_vfr",
+              "line": 6402,
+              "end_line": 6430
+            },
+            {
+              "name": "normalize_vfr",
+              "line": 6510,
+              "end_line": 6694
+            },
+            {
+              "name": "run_scan",
+              "line": 7175,
+              "end_line": 8448
+            },
+            {
+              "name": "run_render",
+              "line": 8451,
+              "end_line": 8520
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/lifetimes.py",
+          "present": true,
+          "bytes": 2934,
+          "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+          "blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+          "lines": 104,
+          "selected_definitions": [
+            {
+              "name": "_JobFiles",
+              "line": 10,
+              "end_line": 21
+            },
+            {
+              "name": "FileOwners",
+              "line": 24,
+              "end_line": 39
+            },
+            {
+              "name": "_Lease",
+              "line": 42,
+              "end_line": 70
+            },
+            {
+              "name": "OwnedIterable",
+              "line": 73,
+              "end_line": 104
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/reports.py",
+          "present": true,
+          "bytes": 1830,
+          "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+          "blob": "a46d324fc198d01c9e11460a506d7c77b70c1760",
+          "lines": 40,
+          "selected_definitions": [
+            {
+              "name": "atomic_report",
+              "line": 7,
+              "end_line": 40
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/render_delivery.py",
+          "present": false
+        },
+        {
+          "path": "openscrub_internal/job_logs.py",
+          "present": false
+        },
+        {
+          "path": "openscrub_internal/opencv_compat.py",
+          "present": false
+        },
+        {
+          "path": "pyproject.toml",
+          "present": true,
+          "bytes": 4147,
+          "sha256": "190c4a010c88bff8ec83035d38760ef60ab772784c9b1fc90415327746c504a0",
+          "blob": "c297247bd41669a27d505bb940d39a07c91f4315",
+          "lines": 125
+        },
+        {
+          "path": "openscrub_update.py",
+          "present": true,
+          "bytes": 9255,
+          "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+          "blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+          "lines": 246,
+          "selected_definitions": []
+        },
+        {
+          "path": "Dockerfile",
+          "present": true,
+          "bytes": 5043,
+          "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+          "blob": "4fa7c30fcd70fed78cb574a1d78e384ca1dde9dd",
+          "lines": 101
+        },
+        {
+          "path": "Dockerfile.cuda",
+          "present": true,
+          "bytes": 9391,
+          "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+          "blob": "3098e9e4e7fad8b934bb9457fd581cbc245f91ac",
+          "lines": 173
+        },
+        {
+          "path": "Dockerfile.intel",
+          "present": true,
+          "bytes": 7118,
+          "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+          "blob": "b8527e243702e91d9fa8da8d603e41a87ec5663a",
+          "lines": 135
+        },
+        {
+          "path": "windows/openscrub.spec",
+          "present": true,
+          "bytes": 3374,
+          "sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+          "blob": "b9e72bd15ec57f9c7b7c0b207d4caab5c79cfac2",
+          "lines": 85
+        }
+      ]
+    },
+    "combined": {
+      "commit": "c205ef5379778f63313b519411a2d5e37d07cba5",
+      "tree": "b33669e6b39d7acadabf1890a9acadb5133f11ee",
+      "files": [
+        {
+          "path": "openscrub_web.py",
+          "present": true,
+          "bytes": 345152,
+          "sha256": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856",
+          "blob": "57b3bda1ec5b58bdcf5cdf2baf7a74e0ca46f0d2",
+          "lines": 5958,
+          "selected_definitions": [
+            {
+              "name": "_source_job_locked",
+              "line": 349,
+              "end_line": 362
+            },
+            {
+              "name": "_reserve_files_locked",
+              "line": 365,
+              "end_line": 375
+            },
+            {
+              "name": "_select_render_input",
+              "line": 378,
+              "end_line": 425
+            },
+            {
+              "name": "_request_source_path",
+              "line": 428,
+              "end_line": 442
+            },
+            {
+              "name": "_job_video",
+              "line": 445,
+              "end_line": 453
+            },
+            {
+              "name": "_update_job_source",
+              "line": 456,
+              "end_line": 472
+            },
+            {
+              "name": "_new_job",
+              "line": 511,
+              "end_line": 537
+            },
+            {
+              "name": "_report_current",
+              "line": 891,
+              "end_line": 901
+            },
+            {
+              "name": "_recovery_gate",
+              "line": 904,
+              "end_line": 906
+            },
+            {
+              "name": "_publish_job_report_locked",
+              "line": 909,
+              "end_line": 913
+            },
+            {
+              "name": "_edit_gate",
+              "line": 916,
+              "end_line": 920
+            },
+            {
+              "name": "_operation_valid",
+              "line": 923,
+              "end_line": 928
+            },
+            {
+              "name": "_begin_operation",
+              "line": 931,
+              "end_line": 936
+            },
+            {
+              "name": "_finish_operation",
+              "line": 939,
+              "end_line": 948
+            },
+            {
+              "name": "_prepare_work",
+              "line": 964,
+              "end_line": 974
+            },
+            {
+              "name": "_run_job",
+              "line": 1057,
+              "end_line": 1263
+            },
+            {
+              "name": "enforce_vault_lock",
+              "line": 1327,
+              "end_line": 1349
+            },
+            {
+              "name": "_finish_file_response",
+              "line": 1353,
+              "end_line": 1367
+            },
+            {
+              "name": "_release_failed_request",
+              "line": 1371,
+              "end_line": 1376
+            },
+            {
+              "name": "_load_job_report",
+              "line": 1682,
+              "end_line": 1684
+            },
+            {
+              "name": "_capture_frame_source",
+              "line": 1687,
+              "end_line": 1709
+            },
+            {
+              "name": "_frame_source_current",
+              "line": 1712,
+              "end_line": 1730
+            },
+            {
+              "name": "_validated_frame_read",
+              "line": 1733,
+              "end_line": 1745
+            },
+            {
+              "name": "_frame_at",
+              "line": 1748,
+              "end_line": 1758
+            },
+            {
+              "name": "job_detframe",
+              "line": 1799,
+              "end_line": 1817
+            },
+            {
+              "name": "job_boxes_at",
+              "line": 1821,
+              "end_line": 1844
+            },
+            {
+              "name": "job_thumb",
+              "line": 1848,
+              "end_line": 1895
+            },
+            {
+              "name": "job_frame_at",
+              "line": 1899,
+              "end_line": 1924
+            },
+            {
+              "name": "_send_open_file",
+              "line": 1928,
+              "end_line": 1956
+            },
+            {
+              "name": "_send_job_source",
+              "line": 1959,
+              "end_line": 1984
+            },
+            {
+              "name": "_same_json_value",
+              "line": 1999,
+              "end_line": 2019
+            },
+            {
+              "name": "_valid_manual_creation",
+              "line": 2022,
+              "end_line": 2036
+            },
+            {
+              "name": "job_save_edits",
+              "line": 2040,
+              "end_line": 2146
+            },
+            {
+              "name": "job_track_object",
+              "line": 2150,
+              "end_line": 2268
+            },
+            {
+              "name": "_rehydrate_jobs",
+              "line": 5567,
+              "end_line": 5690
+            }
+          ],
+          "planned_identifier_occurrences": {
+            "edit_sample": [],
+            "geometry_preconditions": [],
+            "row_context_eq": [],
+            "timeline_eq": [],
+            "source_ref": [],
+            "readySample": [],
+            "strict_seed": []
+          }
+        },
+        {
+          "path": "openscrub.py",
+          "present": true,
+          "bytes": 436732,
+          "sha256": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9",
+          "blob": "00079d31d8dc1166897414ba621f7f8788d3ab67",
+          "lines": 9017,
+          "selected_definitions": [
+            {
+              "name": "_grab_frame",
+              "line": 1713,
+              "end_line": 1810
+            },
+            {
+              "name": "_track_person_dense",
+              "line": 1928,
+              "end_line": 2446
+            },
+            {
+              "name": "track_manual_region",
+              "line": 2449,
+              "end_line": 2740
+            },
+            {
+              "name": "_report_document",
+              "line": 6610,
+              "end_line": 6671
+            },
+            {
+              "name": "write_report",
+              "line": 6674,
+              "end_line": 6675
+            },
+            {
+              "name": "_decode_report",
+              "line": 6687,
+              "end_line": 6709
+            },
+            {
+              "name": "probe_vfr",
+              "line": 6731,
+              "end_line": 6759
+            },
+            {
+              "name": "normalize_vfr",
+              "line": 6839,
+              "end_line": 7023
+            },
+            {
+              "name": "run_scan",
+              "line": 7539,
+              "end_line": 8817
+            },
+            {
+              "name": "run_render",
+              "line": 8820,
+              "end_line": 8902
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/lifetimes.py",
+          "present": true,
+          "bytes": 3106,
+          "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc",
+          "blob": "1f7eb36d8b1224193f444792e98877d0e801ade2",
+          "lines": 109,
+          "selected_definitions": [
+            {
+              "name": "_JobFiles",
+              "line": 10,
+              "end_line": 24
+            },
+            {
+              "name": "FileOwners",
+              "line": 27,
+              "end_line": 42
+            },
+            {
+              "name": "_Lease",
+              "line": 45,
+              "end_line": 75
+            },
+            {
+              "name": "OwnedIterable",
+              "line": 78,
+              "end_line": 109
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/reports.py",
+          "present": true,
+          "bytes": 2326,
+          "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa",
+          "blob": "9a02766675bc2e06286edfa0e53d778ceb593490",
+          "lines": 51,
+          "selected_definitions": [
+            {
+              "name": "_staged_report",
+              "line": 9,
+              "end_line": 45
+            },
+            {
+              "name": "atomic_report",
+              "line": 48,
+              "end_line": 51
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/render_delivery.py",
+          "present": true,
+          "bytes": 8528,
+          "sha256": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+          "blob": "3daea4e19f3ae4bc5a7ce53e49c91a4ec46594d7",
+          "lines": 203,
+          "selected_definitions": [
+            {
+              "name": "_RenderDelivery",
+              "line": 61,
+              "end_line": 203
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/job_logs.py",
+          "present": true,
+          "bytes": 3813,
+          "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+          "blob": "6c1e41017a195da0c790819904c67f77e47122cb",
+          "lines": 89,
+          "selected_definitions": [
+            {
+              "name": "JobLog",
+              "line": 20,
+              "end_line": 89
+            }
+          ]
+        },
+        {
+          "path": "openscrub_internal/opencv_compat.py",
+          "present": true,
+          "bytes": 7729,
+          "sha256": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5",
+          "blob": "35bbb26d7d94925863954dfe0840a39617729df1",
+          "lines": 162,
+          "selected_definitions": []
+        },
+        {
+          "path": "pyproject.toml",
+          "present": true,
+          "bytes": 4192,
+          "sha256": "3ecd05dbda7fac26ea284a03248c321a301b8268446d94dccc32aa3073fbf652",
+          "blob": "d4a51b0a140b3f76ba114701fb104e8a788eb7ea",
+          "lines": 130
+        },
+        {
+          "path": "openscrub_update.py",
+          "present": true,
+          "bytes": 9255,
+          "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+          "blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+          "lines": 246,
+          "selected_definitions": []
+        },
+        {
+          "path": "Dockerfile",
+          "present": true,
+          "bytes": 5043,
+          "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+          "blob": "4fa7c30fcd70fed78cb574a1d78e384ca1dde9dd",
+          "lines": 101
+        },
+        {
+          "path": "Dockerfile.cuda",
+          "present": true,
+          "bytes": 9391,
+          "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+          "blob": "3098e9e4e7fad8b934bb9457fd581cbc245f91ac",
+          "lines": 173
+        },
+        {
+          "path": "Dockerfile.intel",
+          "present": true,
+          "bytes": 7118,
+          "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+          "blob": "b8527e243702e91d9fa8da8d603e41a87ec5663a",
+          "lines": 135
+        },
+        {
+          "path": "windows/openscrub.spec",
+          "present": true,
+          "bytes": 3374,
+          "sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+          "blob": "b9e72bd15ec57f9c7b7c0b207d4caab5c79cfac2",
+          "lines": 85
+        }
+      ]
+    }
+  },
+  "documents": [
+    {
+      "path": "exact-editor-readiness-refresh-brief.md",
+      "bytes": 2466,
+      "sha256": "8761870160fea20151dcaee1eaa5c1f2c8cfba86ff7e9796ef521f79fecbc89f"
+    },
+    {
+      "path": "exact-editor-backend-source-plan.md",
+      "bytes": 10638,
+      "sha256": "4cd0cce6a57d149737185b5709fc175408c0b35444cb7b249137bd80e90e050f"
+    },
+    {
+      "path": "exact-editor-contract-research.md",
+      "bytes": 63327,
+      "sha256": "879d74137b633bcda9d71024bc58b6490040370b35ec8adeab0b18b84aa8d0a5"
+    },
+    {
+      "path": "exact-sample-feasibility-research.md",
+      "bytes": 27279,
+      "sha256": "a1f4fecf37658f913ce4adae4360cb0d2ff5a12474c00d400543774943410c14"
+    },
+    {
+      "path": "exact-sample-feasibility-evidence/README.md",
+      "bytes": 3574,
+      "sha256": "f84c3b85fc32fbe633fd248f21654551932e4fa8f2d15e18b12f2b74d946e321"
+    },
+    {
+      "path": "thumbnail-identity-contract-research.md",
+      "bytes": 39279,
+      "sha256": "6dadc2f0ad6e758b1018e7f0580484375c31f23da434595ed668ececae84e2d0"
+    },
+    {
+      "path": "plate-quad-contract-research.md",
+      "bytes": 30809,
+      "sha256": "7d6d1828e1d08d71ae280b9ac69c186b6ab4bd80ed26235143efc593f3ec79ff"
+    }
+  ]
+}

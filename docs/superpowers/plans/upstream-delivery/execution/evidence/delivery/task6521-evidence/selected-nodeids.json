@@ -1,0 +1,62 @@
+{
+  "task6521-native-312-1": {
+    "all_count": 557,
+    "actual_media": [
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[bowtie-polys6-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[bowtie-polys6-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[collinear-polys2-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[collinear-polys2-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[concave-polys5-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[concave-polys5-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[missing_coordinate-polys0-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[missing_coordinate-polys0-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[nan-polys1-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[nan-polys1-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[repeated-polys3-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[repeated-polys3-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[two_points-polys4-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[two_points-polys4-sdr]"
+    ],
+    "new_helper_contracts": [
+      "tests/test_polygon_fallback.py::test_media_tools_complete_support",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264 H.264-libx265]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264rgb H.264\\n V....D libx265 HEVC-libx264]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx265 HEVC-libx264]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_executable_skips_before_media[ffmpeg]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_executable_skips_before_media[ffprobe]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure0]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure1]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure2]"
+    ]
+  },
+  "task6521-floor-39-1": {
+    "all_count": 557,
+    "actual_media": [
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[bowtie-polys6-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[bowtie-polys6-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[collinear-polys2-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[collinear-polys2-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[concave-polys5-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[concave-polys5-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[missing_coordinate-polys0-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[missing_coordinate-polys0-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[nan-polys1-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[nan-polys1-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[repeated-polys3-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[repeated-polys3-sdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[two_points-polys4-hdr]",
+      "tests/test_polygon_fallback.py::test_report_to_actual_render_known_box[two_points-polys4-sdr]"
+    ],
+    "new_helper_contracts": [
+      "tests/test_polygon_fallback.py::test_media_tools_complete_support",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264 H.264-libx265]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264rgb H.264\\n V....D libx265 HEVC-libx264]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx265 HEVC-libx264]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_executable_skips_before_media[ffmpeg]",
+      "tests/test_polygon_fallback.py::test_media_tools_missing_executable_skips_before_media[ffprobe]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure0]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure1]",
+      "tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure2]"
+    ]
+  }
+}

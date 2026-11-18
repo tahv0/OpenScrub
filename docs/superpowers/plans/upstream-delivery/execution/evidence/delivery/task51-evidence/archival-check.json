@@ -1,0 +1,24 @@
+{
+  "kind": "non-workload archival-check false positive",
+  "initial_exit": 1,
+  "initial_assertion": "assert 'FAILED' not in text and 'ERROR ' not in text",
+  "cause": "Existing passing test_http_acquisition_failure_never_serves_partial_jpeg[read-error-500] intentionally asserts HTTP500; raw socket output contains INTERNAL SERVER ERROR. A substring is not a pytest verdict.",
+  "raw_initial_output": "archival-check-initial.log",
+  "corrected_exit": 0,
+  "corrected_assertion": "assert 'FAILED' not in text and ' ERRORS ' not in text",
+  "corrected_checks": [
+    "exact28pass/native and2pass/floor summaries",
+    "both date IDs",
+    "all compact manifest hashes",
+    "excluded private paths/media",
+    "post-run static source check"
+  ],
+  "raw_corrected_output": "archival-check-corrected.log",
+  "workloads_rerun": false,
+  "source_changed": false,
+  "logs_changed": false,
+  "original_workload_exits": [
+    0,
+    0
+  ]
+}

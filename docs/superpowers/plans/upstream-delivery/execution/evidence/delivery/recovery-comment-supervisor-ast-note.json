@@ -1,0 +1,25 @@
+{
+  "observations": [
+    {
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ],
+      "source_sha256": "1faa6a16124490fca1f52f7f0fed194ee32d6fab9e8d61e05f71c87c477786ea",
+      "ast_sha256": "eadf1e8fc7714cd7c0bc411b7f7b07d13b6f69efb5f521f4fe0da69a454df594"
+    },
+    {
+      "python": "/usr/bin/python3",
+      "version": [
+        3,
+        14,
+        4
+      ],
+      "source_sha256": "1faa6a16124490fca1f52f7f0fed194ee32d6fab9e8d61e05f71c87c477786ea",
+      "ast_sha256": "8be2ed445312b52fb1dc0331f5241801953ca280b6f65bd9a2220e981882d349"
+    }
+  ],
+  "limit": "Source-only follow-up reproduces retained digest on prepared3.12.16 and confirms schema-sensitive3.14.4 difference. It does not establish which interpreter originally ran the retained proof, whose artifact omitted that field. Within-version completeAST equality and exact source/token proof remain valid."
+}

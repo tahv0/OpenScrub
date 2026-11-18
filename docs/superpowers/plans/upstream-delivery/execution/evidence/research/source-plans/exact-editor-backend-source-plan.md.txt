@@ -8,6 +8,8 @@ Preserve Austin defaults, Python>=3.9, raw report/additive fields, P06 lifetime/
 
 Supervisor creates `pr/exact-editor-samples` from exact reviewed P07b `12919c96c6f7558136b50d7b4d85e5e6b62f1971`. Do not include unrelated candidates. Read `exact-editor-contract-research.md` in full: its **Adopted supervisor rulings** and final compatibility clarification supersede provisional earlier alternatives. Read retained `exact-sample-feasibility-research.md` and its fixture recipes; the 28-capture feasibility study is complete and must not be repeated as new implementation evidence.
 
+Read the source-only refresh `exact-editor-readiness-refresh.md` and supervisor decisions `exact-editor-readiness-adoption.md` before freezing implementation interfaces; these preserve the original standalone base and adopted contract.
+
 ### What, why and delivery order
 
 Independent image/boxes requests currently disagree about the actual frame at specific fractional/EOF times. This first slice adds a single sample response and optional equality preconditions to the existing save transaction. Shared observed-source metadata belongs inside this slice and the existing `_JobFiles` owner, not a separate framework PR. Follow with optional strict tracker seeds, then migrate the ordinary editor and Track together only after P16D resize and actual old-report admission pass. Do not deliver an intermediate UI with tracking disabled or silently fall back to approximate samples.

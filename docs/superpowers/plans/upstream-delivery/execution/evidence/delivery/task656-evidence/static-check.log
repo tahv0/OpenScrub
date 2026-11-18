@@ -1,0 +1,33 @@
+{
+  "head": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7",
+  "changed": [
+    "openscrub_internal/render_delivery.py",
+    "tests/test_first_scan_sanity.py",
+    "tests/test_live_preview.py",
+    "tests/test_polygon_fallback.py"
+  ],
+  "unchanged_count": 165,
+  "production_count": 15,
+  "grammar_count": 69,
+  "modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_internal": "openscrub_internal/__init__.py",
+    "openscrub_internal.job_logs": "openscrub_internal/job_logs.py",
+    "openscrub_internal.lifetimes": "openscrub_internal/lifetimes.py",
+    "openscrub_internal.opencv_compat": "openscrub_internal/opencv_compat.py",
+    "openscrub_internal.render_delivery": "openscrub_internal/render_delivery.py",
+    "openscrub_internal.reports": "openscrub_internal/reports.py",
+    "openscrub_setup": "openscrub_setup.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_vault": "openscrub_vault.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py"
+  },
+  "mapping": {
+    "ac0f5e4661701e954e04dbc95eb00d9317c04cc6": "942c1b92d2cbf3c6e9cfd96afbd7da5718a4b0b2",
+    "af862c8c9700b7b2b06426e4c4287e469fe28038": "5066e03edccadbadc1f55096e6e7fe7fe5fae79e",
+    "bb4e129ae620f72a691971de1010d38d8cf661ad": "115bad52df262278699f089d6784ebde9508d528",
+    "c7f9dcc29affe5da363094b8646b3064966e52ed": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7"
+  },
+  "status": "PASS"
+}

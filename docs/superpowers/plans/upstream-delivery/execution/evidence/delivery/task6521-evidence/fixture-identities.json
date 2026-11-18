@@ -1,0 +1,91 @@
+{
+  "task6521-native-312-1": [
+    {
+      "relative_path": "polygon-media0/hdr.mp4",
+      "size": 3332,
+      "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+    },
+    {
+      "relative_path": "polygon-media0/sdr.mp4",
+      "size": 5255,
+      "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+    },
+    {
+      "relative_path": "polygon-media0/source.yuv",
+      "size": 24576,
+      "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/hdr.mp4",
+      "size": 3332,
+      "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/sdr.mp4",
+      "size": 5255,
+      "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/source.yuv",
+      "size": 24576,
+      "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+    }
+  ],
+  "task6521-floor-39-1": [
+    {
+      "relative_path": "polygon-media0/hdr.mp4",
+      "size": 3332,
+      "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+    },
+    {
+      "relative_path": "polygon-media0/sdr.mp4",
+      "size": 5255,
+      "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+    },
+    {
+      "relative_path": "polygon-media0/source.yuv",
+      "size": 24576,
+      "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/hdr.mp4",
+      "size": 3332,
+      "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/sdr.mp4",
+      "size": 5255,
+      "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+    },
+    {
+      "relative_path": "polygon-mediacurrent/source.yuv",
+      "size": 24576,
+      "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+    }
+  ],
+  "settings": {
+    "dimensions": [
+      64,
+      64
+    ],
+    "frames": 2,
+    "fps": 2,
+    "raw_yuv420p10le": {
+      "Y": 900,
+      "U": 800,
+      "V": 300,
+      "repeat": 2
+    },
+    "hdr_codec": "libx265",
+    "hdr_parameters": "lossless=1:pools=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+    "hdr_color_options": {
+      "-color_primaries": "bt2020",
+      "-color_trc": "smpte2084",
+      "-colorspace": "bt2020nc"
+    },
+    "sdr_source": "testsrc2=size=64x64:rate=2:duration=1",
+    "sdr_codec": "libx264",
+    "sdr_crf": 0,
+    "oracles": "real load_report/render/render_hdr; exact pre-encode full-known-box equivalence, decoded-output equivalence, usable silhouette control"
+  }
+}

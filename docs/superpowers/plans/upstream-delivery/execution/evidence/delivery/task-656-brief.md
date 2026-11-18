@@ -1,0 +1,29 @@
+## Task 656: integrate the reviewed test and comment readiness follow-ups
+
+### Global constraints, what, why and when
+
+Preserve Austin defaults, Python>=3.9, every current C01 report/source/publication/lifetime/mask/browser/log/operation owner and original candidate/donor references. No custom model training/workbench, optional policy, new dependency, runtime behavior, new root production file, environment/helper changes, user-data adoption or external publication. One implementer, then fresh independent review; no nested agents. This is a local assembly gate, not four new upstream PRs: each follow-up belongs in its owning focused contribution before submission.
+
+Execute only after Task51, Task16331, Task116 and Task6521 have independent spec/quality approval. Root creates integration/upstream-focused-readiness in managed /home/tahv0/.codex/worktrees/bde3/OpenScrub from reviewed C01 c205ef5379778f63313b519411a2d5e37d07cba5. Keep the existing c832 documentation worktree intact. Root creates runtime/task656/runs and task656-evidence before dispatch. The working integration/upstream-focused reference stays c205 until review; no original standalone branch is moved.
+
+### Exact inputs and source scope
+
+Apply whole commits using git cherry-pick -x, in order:
+
+1. ac0f5e4661701e954e04dbc95eb00d9317c04cc6 — P05 actual configured HTTP date-only conditional regressions.
+2. af862c8c9700b7b2b06426e4c4287e469fe28038 — P16C-P recovery-stage ownership comment.
+3. bb4e129ae620f72a691971de1010d38d8cf661ad — N12 assertion coverage comment.
+4. c7f9dcc29affe5da363094b8646b3064966e52ed — P16B actual-media prerequisite helper and contracts.
+
+Only tests/test_live_preview.py, openscrub_internal/render_delivery.py, tests/test_first_scan_sanity.py and tests/test_polygon_fallback.py may differ from c205. The production leaf changes comments only: retain its complete AST/docstrings/non-comment tokens. All other production, PAGE/APP_JS/defaults, dependencies, packaging recipes, fixtures and assertions stay byte-identical. Preserve combined observe_render targets _render_into/_render_hdr_into and current HDR local names; do not replace the test file from the older standalone candidate. No new test framework, feature, unrelated correction or copied whole source file. If a real semantic conflict or unexpected runtime failure appears, report its exact source/context to root before expanding scope.
+
+### Steps, checks and review focus
+
+- [ ] Verify exact base, clean assigned branch, whole input identities/approved reports and preserved refs. Apply the four -x commits in sequence and retain original-to-composed mapping and any exact conflict resolution. Source-only conflicts must preserve both reviewed test and combined observer owners.
+- [ ] Freeze a clean combined HEAD. Check four-file scope, all-other-tracked-file equality, complete production AST/docstrings/non-comment-token equality and current combined observer/media/oracle preservation. Record interpreter/AST options, exact source/tool/recipe/adapter identities and git diff --check. No artificial RED is needed for importing already-reviewed tests/comments; original meaningful RED remains at its original task.
+- [ ] Run the complete tests/test_live_preview.py and tests/test_polygon_fallback.py in one serial invocation on actual prepared3.12.16 with unchanged verification helper and source hashes. This covers real Cheroot JPEG/date headers, exact missing-tool/encoder/query contracts before allocation, and every existing actual SDR/HDR render/byte oracle. Actual-media cases must pass with real tools, zero skips.
+- [ ] Run the same two complete owners on actual prepared3.9.25 with distinct owned scratch and active combined source identities. Preserve complete failures and exact counts; no broad full project/browser/benchmark rerun. Root owns any justified bounded follow-up for an observed failure.
+- [ ] Verify Python3.9 grammar and unchanged recursive test/private-package inclusion, current C01 metadata and all prior refs. Existing c205 package evidence remains explicitly at c205; its production AST is equivalent but the comment bytes differ, so do not claim its artifacts were built from the new HEAD. No fresh package/build/startup claim is needed for this comment/test-only assembly gate.
+- [ ] Self-review and write task-656-report.md, task-656-pr.md (local integration record) and compact task656-evidence: complete commands/logs, source/default/AST/fixture/provenance identities, actual results and limitations. No media/export/environment/install/private execution-control files. Root generates the full exact-base diff and assigns fresh independent review before expected-old working-ref advancement and incremental documentation checkpoint.
+
+Use canonical unchanged verification helper and current environment handoff, clean explicit environment/login:false, original-call escalation for owned Cheroot/native phases, no downloads or shared mutable output. All new output is root-assigned workspace scratch. Separately supplied local execution notes define finite sequential phase budgets; never invent a new allowance or reuse/refund a terminal invocation.

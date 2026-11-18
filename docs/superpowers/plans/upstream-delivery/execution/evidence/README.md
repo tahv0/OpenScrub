@@ -102,3 +102,10 @@ The [editor resize handoff](research/source-plans/editor-resize-source-plan.md.t
 ### Fourth-C01 core integration
 
 [Task653 report](delivery/task-653-report.md) and [independent approval](delivery/task-653-review.md) retain exact four-pick provenance and the new real controlled-OCR/FFV1 interaction.119 selected checks pass on each actual3.12/3.9, with complete fields/order, reverse-only onset and fragment tail in accepted/dropped partitions. The local integration reference is117e41a; original branches and prior4b9 remain. Static distribution checks are separate from later built-package/full-C01 acceptance. Storage observations are explicitly guest WSL filesystem counters, without a physical-host headroom claim.
+
+
+### Readiness follow-ups and refreshed source contracts
+
+[Task51](delivery/task-51-report.md), [Task16331](delivery/task-16331-report.md), [Task116](delivery/task-116-report.md) and [Task6521](delivery/task-6521-report.md) have separate independent approvals. They close the preview-header, recovery-comment, scan-comment and optional-media-prerequisite readiness findings. [Task656](delivery/task-656-report.md) combines them with whole-pick provenance and 585 owning tests on each of Python 3.12 and 3.9, without changing executable production content. Its [approval](delivery/task-656-review.md) and [local record](../batches/readiness-followups.md) retain exact scope and old-package attribution.
+
+The [P15 readiness audit](research/review-filter-implementation-readiness.md) and [P10A source refresh](research/exact-editor-readiness-refresh.md) are source-only. [P10A supervisor adoption](research/exact-editor-readiness-adoption.md) records future implementation decisions, not runtime acceptance. Exact dispatch snapshots are under research/source-plans; private development control is excluded.

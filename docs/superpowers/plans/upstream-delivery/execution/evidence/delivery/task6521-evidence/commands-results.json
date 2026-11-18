@@ -1,0 +1,165 @@
+[
+  {
+    "run": "task6521-red-312-1",
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "login": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/adapters/red-312.json",
+      "--run-id",
+      "task6521-red-312-1",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "-k",
+      "media_tools"
+    ],
+    "workload_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "-k",
+      "media_tools",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-red-312-1/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-red-312-1/cache/pytest"
+    ],
+    "result": {
+      "exit": 1,
+      "failed": 8,
+      "passed": 1,
+      "deselected": 548
+    },
+    "log_sha256": "26c8e1fcdd8eff0b24b61a2a001b9bddf718ff8941b3e51dff399457b5779923"
+  },
+  {
+    "run": "task6521-green-312-1",
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "login": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/adapters/green-312.json",
+      "--run-id",
+      "task6521-green-312-1",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "-k",
+      "media_tools"
+    ],
+    "workload_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "-k",
+      "media_tools",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-green-312-1/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-green-312-1/cache/pytest"
+    ],
+    "result": {
+      "exit": 0,
+      "passed": 9,
+      "deselected": 548
+    },
+    "log_sha256": "1163d5deb87a34c7bff03688642080453416b50a6787d550985d1a9411828e9c"
+  },
+  {
+    "run": "task6521-native-312-1",
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "login": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/adapters/native-312.json",
+      "--run-id",
+      "task6521-native-312-1",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q"
+    ],
+    "workload_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-native-312-1/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-native-312-1/cache/pytest"
+    ],
+    "result": {
+      "exit": 0,
+      "passed": 557,
+      "skipped": 0,
+      "seconds": 5.9
+    },
+    "log_sha256": "216249451dce9499dea458c5e5e37c091eed50bcb346cc2f1bcbf4d88e73a6e7"
+  },
+  {
+    "run": "task6521-floor-39-1",
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "login": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/adapters/floor-39.json",
+      "--run-id",
+      "task6521-floor-39-1",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q"
+    ],
+    "workload_argv": [
+      "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py",
+      "-q",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs39/task6521-floor-39-1/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs39/task6521-floor-39-1/cache/pytest"
+    ],
+    "result": {
+      "exit": 0,
+      "passed": 557,
+      "skipped": 0,
+      "seconds": 6.23
+    },
+    "log_sha256": "987ecdd36175a943dd21ac9cd0358507c16597a8560490012147c2dc51b9a4f9"
+  }
+]

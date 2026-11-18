@@ -1,0 +1,3189 @@
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 333-465
+
+333:     # Admission always rechecks after waiting for the transition guard.
+334:     if vault_locked():
+335:         abort(423, "vault is locked or needs recovery — unlock it to access jobs")
+336:     if job is not None:
+337:         with JOBS_LOCK:
+338:             if not any(current is job for current in JOBS.values()):
+339:                 abort(404)
+340:         if FILES.initialize(job).closed:
+341:             abort(409, "job is being deleted")
+342: 
+343: 
+344: def _source_job_locked(canonical, missing_ok=False):
+345:     root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+346:     if not canonical.startswith(root):
+347:         return None
+348:     jid = canonical[len(root):].split(os.sep, 1)[0]
+349:     with JOBS_LOCK:
+350:         source_job = JOBS.get(jid)
+351:     if source_job is None:
+352:         if missing_ok:
+353:             return None
+354:         abort(404, "source job is no longer available")
+355:     _validate_files_locked(source_job)
+356:     return source_job
+357: 
+358: 
+359: def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+360:     source = (os.path.realpath(source if source is not None else job["video"])
+361:               if read_source and job and (source is not None or job.get("video")) else None)
+362:     source_job = _source_job_locked(source) if source else None
+363:     lease = FILES.reserve(job, work)
+364:     lease.source = source
+365:     if source_job is not None and source_job is not job:
+366:         lease.related.append(FILES.reserve(source_job))
+367:     return lease
+368: 
+369: 
+370: def _select_render_input(job, owner):
+371:     """Resolve original-input provenance while the report/current source is owned.
+372: 
+373:     Only source selection is pinned, not the report document or its edits.
+374:     Missing originals keep the engine's fallback to the current input. An
+375:     extant unregistered/deleting job source is never admitted for reading.
+376:     """
+377:     try:
+378:         doc = _load_job_report(job)
+379:         prov = doc.get("provenance", {}) if isinstance(doc, dict) else {}
+380:         original = prov.get("original_input")
+381:     except (OSError, ValueError, TypeError, AttributeError):
+382:         # Keep asynchronous missing/invalid-report errors in run_pipeline.
+383:         original = None
+384:     if original:
+385:         candidate = os.path.realpath(original)
+386:         added = None
+387:         with VAULT_LOCK:
+388:             _validate_files_locked(job)
+389:             source_job = _source_job_locked(candidate, missing_ok=True)
+390:             root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+391:             if source_job is None and candidate.startswith(root):
+392:                 # No live owner exists. Only inspect absence, under the store
+393:                 # admission boundary: never open an orphan/condemned source.
+394:                 if os.path.exists(candidate):
+395:                     abort(404, "source job is no longer available")
+396:                 owner.report_input = True
+397:                 return
+398:             if source_job is not None and all(
+399:                     token.state is not FILES.initialize(source_job)
+400:                     for token in [owner] + owner.related):
+401:                 added = FILES.reserve(source_job)
+402:                 owner.related.append(added)
+403:         selected = False
+404:         try:
+405:             # Live containing jobs are reserved BEFORE this first source stat.
+406:             # External filesystem changes remain outside web coordination.
+407:             if os.path.exists(candidate):
+408:                 owner.source = candidate
+409:                 selected = True
+410:         finally:
+411:             if added is not None and not selected:
+412:                 with VAULT_LOCK:
+413:                     owner.related.remove(added)
+414:                     added.release_locked()
+415:     owner.report_input = True
+416: 
+417: 
+418: def _request_source_path(path):
+419:     """Canonical path used for both admission and actual server-path I/O."""
+420:     canonical = os.path.realpath(path)
+421:     with VAULT_LOCK:
+422:         source_job = _source_job_locked(canonical)
+423:         if source_job is not None:
+424:             lease = FILES.reserve(source_job)
+425:             lease.source = canonical
+426:             if g.get("file_owner") is None:
+427:                 g.file_owner = lease
+428:             else:
+429:                 g.setdefault("file_children", []).append(lease)
+430:     return canonical
+431: 
+432: 
+433: def _job_video(job):
+434:     # Requests use their admitted source even if scan normalization updates
+435:     # the live job while a decoder is waiting. Worker/thread callers snapshot
+436:     # their own lease's source before starting work.
+437:     if has_request_context():
+438:         lease = g.get("file_owner")
+439:         if lease is not None and lease.state is FILES.initialize(job):
+440:             return lease.source or job.get("video")
+441:     return job.get("video")
+442: 
+443: 
+444: def _update_job_source(job, path, owner):
+445:     canonical = os.path.realpath(path)
+446:     with VAULT_LOCK:
+447:         _validate_files_locked(job)
+448:         source_job = _source_job_locked(canonical)
+449:         if source_job is not None and source_job is not job:
+450:             # Reserve before following a changed normalized input. This stays
+451:             # with the worker through its final report/provenance access.
+452:             if owner is not None and all(
+453:                     token.state is not FILES.initialize(source_job)
+454:                     for token in [owner] + owner.related):
+455:                 owner.related.append(FILES.reserve(source_job))
+456:         job["video"] = canonical
+457: 
+458: 
+459: def _own_files(job=None, work=False):
+460:     with VAULT_LOCK:
+461:         _validate_files_locked(job)
+462:         return _reserve_files_locked(job, work)
+463: 
+464: 
+465: def _files_busy_locked(blocking=True):
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 802-846
+
+802: def _report_current(job):
+803:     """Identity lookup only; caller owns report_lock and a file lifetime.
+804: 
+805:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+806:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+807:     """
+808:     with JOBS_LOCK:
+809:         if not any(current is job for current in JOBS.values()):
+810:             abort(404)
+811:         if FILES.initialize(job).closed:
+812:             abort(409, "job is being deleted")
+813: 
+814: 
+815: def _edit_gate(job):
+816:     _report_current(job)
+817:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+818:         abort(409, "job work is queued, running or still cleaning up")
+819: 
+820: 
+821: def _operation_valid(job, owner):
+822:     files = FILES.initialize(job)
+823:     with JOBS_LOCK:
+824:         return (any(current is job for current in JOBS.values()) and not files.closed
+825:                 and owner.operation is not None
+826:                 and files.operation is owner.operation)
+827: 
+828: 
+829: def _begin_operation(job, owner):
+830:     files = FILES.initialize(job)
+831:     owner.operation = threading.Event()
+832:     files.operation = owner.operation
+833:     job["cancel"] = owner.operation
+834:     files.active = owner
+835: 
+836: 
+837: def _finish_operation(job, owner):
+838:     # Release lifecycle ownership outside the report transaction. Keep the
+839:     # mutation gate closed until actual worker cleanup/release has completed.
+840:     owner.release()
+841:     if job is None:  # a cancelled ticket's job may already have been deleted
+842:         return
+843:     files = FILES.initialize(job)
+844:     with files.report_lock:
+845:         if files.active is owner:
+846:             files.active = None
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 954-1008
+
+954: def _run_job(job, action, owner=None):
+955:     if owner is None:
+956:         owner = _prepare_work(job, action)
+957:         try:
+958:             with FILES.initialize(job).report_lock:
+959:                 _begin_operation(job, owner)
+960:             return _run_job(job, action, owner)
+961:         finally:
+962:             _finish_operation(job, owner)
+963:     jid = job["id"]
+964:     files = FILES.initialize(job)
+965:     with files.report_lock:
+966:         if owner.operation is None:  # compatibility with old queue entries
+967:             _begin_operation(job, owner)
+968:         if not _operation_valid(job, owner):
+969:             return
+970:         job["phase"] = "scanning" if action == "scan" else "rendering"
+971:     cb = WebCallbacks(job, owner.operation)
+972:     def publish_report(path, doc):
+973:         with files.report_lock:
+974:             if not _operation_valid(job, owner) or owner.operation.is_set():
+975:                 raise openscrub.PipelineCancelled()
+976:             atomic_report(path, doc)
+977:     cb.publish_report = publish_report
+978:     source = owner.source if owner is not None else job["video"]
+979:     try:
+980:         if action == "scan":
+981:             job["log"].append("— scan started —")
+982:             args = build_args(dict(job, video=source))
+983:             state = openscrub.run_scan(args, cb)
+984:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+985:                                   args, state, publisher=cb.publish_report)
+986:             with files.report_lock:
+987:                 if not _operation_valid(job, owner):
+988:                     return
+989:                 job["stats"] = state["stats"]
+990:             try:
+991:                 prov = _load_job_report(job).get("provenance", {})
+992:                 if (prov.get("vfr_normalized")
+993:                         and os.path.exists(prov.get("input", ""))):
+994:                     _update_job_source(job, prov["input"], owner)
+995:                     job["log"].append(
+996:                         "using CFR-normalized file for previews/thumbnails")
+997:             except Exception:
+998:                 pass
+999:             thumbnail_owner = _own_files(job, work=True)
+1000:             def _pregen(jb=job, video=thumbnail_owner.source):
+1001:                 """One pass through the video with a single decoder:
+1002:                 thumbnails come out in seconds instead of minutes.
+1003:                 Sorting by reference time keeps seeks short and forward-
+1004:                 only, which is what codecs are fast at."""
+1005:                 cap = None
+1006:                 try:
+1007:                     doc = _load_job_report(jb)
+1008:                     rs = doc["render_state"]
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1180-1224
+
+1180: @app.before_request
+1181: def enforce_vault_lock():
+1182:     """Admit file work before intake parsing or a view captures a job."""
+1183:     if request.endpoint == "allowlist":
+1184:         g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+1185:         return
+1186:     if request.path.startswith("/api/jobs"):
+1187:         # Deletion closes admissions itself, without becoming its own busy owner.
+1188:         if request.endpoint == "job_delete":
+1189:             with VAULT_LOCK:
+1190:                 _validate_files_locked()
+1191:             return
+1192:         with VAULT_LOCK:
+1193:             jid = (request.view_args or {}).get("jid")
+1194:             job = JOBS.get(jid) if jid is not None else None
+1195:             if jid is not None and job is None:
+1196:                 abort(404)
+1197:             _validate_files_locked(job)
+1198:             read_source = request.endpoint in {
+1199:                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
+1200:                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+1201:             g.file_owner = _reserve_files_locked(job, read_source=read_source)
+1202: 
+1203: 
+1204: @app.after_request
+1205: def _finish_file_response(response):
+1206:     for child in g.pop("file_children", []):
+1207:         child.release()
+1208:     lease = g.pop("file_owner", None)
+1209:     if lease is not None:
+1210:         if response.direct_passthrough:
+1211:             response.response = OwnedIterable(response.response, lease)
+1212:         else:
+1213:             lease.release()  # detached JSON/JPEG bytes no longer read job files
+1214:     return response
+1215: 
+1216: 
+1217: @app.teardown_request
+1218: def _release_failed_request(error):
+1219:     for child in g.pop("file_children", []):
+1220:         child.release()
+1221:     lease = g.pop("file_owner", None)
+1222:     if lease is not None:
+1223:         lease.release()
+1224: 
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1507-1520
+
+1507: def _load_job_report(job):
+1508:     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+1509:         return json.load(f)
+1510: 
+1511: 
+1512: def _frame_at(job, t, rstate):
+1513:     cap = cv2.VideoCapture(_job_video(job))
+1514:     try:
+1515:         fps = rstate["fps"]
+1516:         cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+1517:         ok, frame = cap.read()
+1518:         return frame if ok else None
+1519:     finally:
+1520:         cap.release()
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1583-1606
+
+1583: def job_boxes_at(jid):
+1584:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1585:     the client can convert edited boxes back to content coordinates."""
+1586:     job = JOBS.get(jid) or abort(404)
+1587:     doc = _load_job_report(job)
+1588:     rs = doc["render_state"]
+1589:     t = float(request.args.get("t", 0))
+1590:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1591:     ox, oy = rs["cum"][fidx]
+1592:     boxes = []
+1593:     want_all = request.args.get("all") == "1"
+1594:     for i, d in enumerate(doc["detections"]):
+1595:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1596:             continue
+1597:         if not want_all and not d.get("enabled", True):
+1598:             continue
+1599:         if True:
+1600:             boxes.append({"i": i, "category": d["category"],
+1601:                           "enabled": d.get("enabled", True),
+1602:                           "text": d.get("text", ""),
+1603:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1604:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1605:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1606:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1661-1685
+
+1661: def job_frame_at(jid):
+1662:     job = JOBS.get(jid) or abort(404)
+1663:     t = max(0.0, float(request.args.get("t", 0)))
+1664:     path = (job["output"] if request.args.get("src") == "output"
+1665:             and job.get("output") else _job_video(job))
+1666:     cap = cv2.VideoCapture(path)
+1667:     # seek by TIMESTAMP, not frame index: the original upload is often VFR
+1668:     # (iPhone), where index = t*fps drifts out of sync with the CFR output
+1669:     # and can overshoot the file entirely (broken compare pane)
+1670:     try:
+1671:         frame = None
+1672:         for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+1673:             cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+1674:             ok, fr = cap.read()
+1675:             if ok:
+1676:                 frame = fr
+1677:                 break   # walk back instead of 404ing at the very end of the file
+1678:             if tt == 0.0:
+1679:                 break
+1680:     finally:
+1681:         cap.release()
+1682:     if frame is None:
+1683:         abort(404)
+1684:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+1685:     return Response(buf.tobytes(), mimetype="image/jpeg")
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1702-1812
+
+1702: def _valid_manual_creation(value):
+1703:     """Only immutable, finite creation records can establish replay equality."""
+1704:     def numbers(items, size):
+1705:         try:
+1706:             return (isinstance(items, list) and len(items) == size
+1707:                     and all(type(v) in (int, float) and math.isfinite(v)
+1708:                             for v in items))
+1709:         except OverflowError:
+1710:             return False
+1711:     return (isinstance(value, dict)
+1712:             and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+1713:             and numbers([value["t_start"], value["t_end"]], 2)
+1714:             and numbers(value["cbox"], 4)
+1715:             and all(type(v) is int for v in value["cbox"])
+1716:             and numbers(value["aoff"], 2))
+1717: 
+1718: 
+1719: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+1720: def job_save_edits(jid):
+1721:     job = JOBS.get(jid) or abort(404)
+1722:     edits = request.get_json(force=True)
+1723:     path = os.path.join(job["dir"], "report.json")
+1724:     with FILES.initialize(job).report_lock:
+1725:         _edit_gate(job)
+1726:         try:
+1727:             doc = _load_job_report(job)
+1728:         except FileNotFoundError:
+1729:             abort(404, "job report not found")
+1730:         enabled = edits.get("enabled", {})
+1731:         for i, d in enumerate(doc["detections"]):
+1732:             if str(i) in enabled:
+1733:                 d["enabled"] = bool(enabled[str(i)])
+1734:         for i, box in (edits.get("box_overrides") or {}).items():
+1735:             i = int(i)
+1736:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1737:                 doc["detections"][i]["cbox"] = [float(v) for v in box]
+1738:         for i, span in (edits.get("time_overrides") or {}).items():
+1739:             i = int(i)
+1740:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1741:                 t0, t1 = float(span[0]), float(span[1])
+1742:                 if t1 > t0 >= 0:
+1743:                     doc["detections"][i]["t_start"] = t0
+1744:                     doc["detections"][i]["t_end"] = t1
+1745:                     doc["detections"][i]["last_seen"] = min(
+1746:                         max(doc["detections"][i].get("last_seen", t0), t0), t1)
+1747:         rs = doc["render_state"]
+1748:         # Read identities from this transaction's latest raw document. Never
+1749:         # reconstruct creation from a row's mutable current geometry/choices.
+1750:         identified = {}
+1751:         for d in doc["detections"]:
+1752:             identity = d.get("manual_id")
+1753:             if isinstance(identity, str):
+1754:                 identified.setdefault(identity, []).append(d)
+1755:         for m in edits.get("manual", []):
+1756:             has_id = "manual_id" in m
+1757:             identity = m.get("manual_id")
+1758:             if has_id and (not isinstance(identity, str) or
+1759:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+1760:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+1761:             try:
+1762:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+1763:                 tref = float(m.get("t_ref", t0))
+1764:                 b = m["screen_box"]
+1765:                 if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+1766:                     raise ValueError("non-finite creation or invalid box")
+1767:                 fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1768:                 ox, oy = rs["cum"][fidx]
+1769:                 creation = {"t_start": t0, "t_end": t1,
+1770:                             "cbox": [int(b[0] - ox), int(b[1] - oy),
+1771:                                      int(b[2] - ox), int(b[3] - oy)],
+1772:                             "aoff": [ox, oy]}
+1773:                 if has_id and not _valid_manual_creation(creation):
+1774:                     raise ValueError("invalid effective creation")
+1775:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+1776:                 if has_id:
+1777:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+1778:                 raise
+1779:             if has_id and identity in identified:
+1780:                 rows = identified[identity]
+1781:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1782:                         or rows[0]["manual_creation"] != creation):
+1783:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1784:                 continue
+1785:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1786:                        last_seen=t0, enabled=True)
+1787:             if has_id:
+1788:                 # Separate lists keep later indexed edits independent of creation.
+1789:                 row.update(manual_id=identity, manual_creation={
+1790:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1791:                 identified[identity] = [row]
+1792:             doc["detections"].append(row)
+1793:         if "audio" in edits:
+1794:             # audio redaction spans (mute/bleep): stored in the report so the
+1795:             # --from-report render applies them and re-renders keep them
+1796:             doc["audio_redactions"] = [
+1797:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1798:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1799:                           else "mute")}
+1800:                 for s in (edits.get("audio") or [])
+1801:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+1802:         atomic_report(path, doc)
+1803:         # suggest allowlisting any string whose EVERY instance was disabled —
+1804:         # the review just taught us it's a recurring false positive
+1805:         per = {}
+1806:         for d in doc["detections"]:
+1807:             if d["category"] in ("name",):
+1808:                 per.setdefault(d["text"], []).append(d.get("enabled", True))
+1809:         suggest = sorted(t for t, states in per.items()
+1810:                          if len(states) >= 2 and not any(states))
+1811:         return jsonify({"ok": True, "total": len(doc["detections"]),
+1812:                         "suggest_allowlist": suggest})
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1830-1858
+
+1830:         abort(400)
+1831:     st = {"state": "running", "added": 0, "error": None}
+1832:     files = FILES.initialize(job)
+1833:     current, operation = job.get("video"), files.operation
+1834:     lease = _own_files(job, work=True)
+1835:     try:
+1836:         with files.report_lock:
+1837:             _edit_gate(job)
+1838:             if job.get("video") != current or files.operation is not operation:
+1839:                 abort(409, "job operation or source changed — retry tracking")
+1840:             if ((files.tracker is not None and not files.tracker.released)
+1841:                     or job.get("trackbg", {}).get("state") == "running"):
+1842:                 abort(409, "tracking already in progress")
+1843:             if job["cancel"].is_set():
+1844:                 if files.work > 1:
+1845:                     abort(409, "cancelled job work is still cleaning up")
+1846:                 job["cancel"].clear()
+1847:             lease.operation = threading.Event()
+1848:             files.operation = lease.operation
+1849:             job["cancel"] = lease.operation
+1850:             files.tracker = lease
+1851:             job["trackbg"] = st
+1852:     except BaseException:
+1853:         lease.release()
+1854:         raise
+1855: 
+1856:     def _run():
+1857:         try:
+1858:             class L(openscrub.Callbacks):
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1870-1934
+
+1870:                                                thresh=0.2)
+1871:                 if det.net is None and det.ort is None:
+1872:                     det = None
+1873:             except Exception:
+1874:                 det = None
+1875:             samples = openscrub.track_manual_region(
+1876:                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+1877:             with files.report_lock:
+1878:                 if (not _operation_valid(job, lease)
+1879:                         or job.get("trackbg") is not st or lease.operation.is_set()):
+1880:                     return
+1881:                 if not samples:
+1882:                     st.update(state="done", added=0,
+1883:                               error="could not track that region — try a "
+1884:                                     "larger box or a frame where it's clearer")
+1885:                     return
+1886:                 doc = _load_job_report(job)
+1887:                 rs = doc["render_state"]
+1888:                 fps = float(rs["fps"]) or 30.0
+1889:                 step = 2.0 / fps
+1890:                 tid = max([d.get("track", -1) for d in doc["detections"]
+1891:                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
+1892:                 new = []
+1893:                 tcls = samples[0][4] if len(samples[0]) > 4 else None
+1894:                 label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+1895:                          if tcls is not None
+1896:                          and 0 <= tcls < len(openscrub.COCO_NAMES)
+1897:                          else "tracked object")
+1898:                 for s in samples:
+1899:                     t, b, score = s[0], s[1], s[2]
+1900:                     poly = s[3] if len(s) > 3 and s[3] else ()
+1901:                     fidx = min(int(t * fps), len(rs["cum"]) - 1)
+1902:                     ox, oy = rs["cum"][fidx]
+1903:                     new.append({
+1904:                         "t_start": t, "t_end": t + step * 1.2,
+1905:                         "cbox": [int(b[0] - ox), int(b[1] - oy),
+1906:                                  int(b[2] - ox), int(b[3] - oy)],
+1907:                         "category": "manual", "text": label,
+1908:                         "confidence": round(float(score), 3),
+1909:                         "aoff": [ox, oy], "last_seen": t,
+1910:                         "dense": True, "track": tid, "enabled": True,
+1911:                         "poly": [[[float(x), float(y)] for x, y in c]
+1912:                                  for c in poly]})
+1913:                 # grace pads: cover the sub-sample sliver at both ends
+1914:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+1915:                 new[-1]["t_end"] += 0.25
+1916:                 doc["detections"].extend(new)
+1917:                 path = os.path.join(job["dir"], "report.json")
+1918:                 atomic_report(path, doc)
+1919:                 job["log"].append(
+1920:                     "      tracked object: %d position(s), %.1f-%.1fs "
+1921:                     "(review card added)" % (len(new),
+1922:                                              new[0]["t_start"], new[-1]["t_end"]))
+1923:                 st.update(state="done", added=len(new))
+1924:         except Exception as e:
+1925:             with files.report_lock:
+1926:                 if _operation_valid(job, lease) and job.get("trackbg") is st:
+1927:                     st.update(state="done", added=0, error=str(e))
+1928: 
+1929:     try:
+1930:         _start_owned_thread(_run, lease)
+1931:     except BaseException:
+1932:         st.update(state="done", added=0, error="tracking could not start")
+1933:         raise
+1934:     return jsonify({"ok": True})
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 3500-3550
+
+3500: 
+3501: async function reviewPost(url,payload){
+3502:  const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+3503:   ...(payload===undefined?{}:{body:JSON.stringify(payload)})});
+3504:  let body;
+3505:  try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
+3506:  if(!response.ok||!body||body.error||body.ok!==true)
+3507:   throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+3508:  return body;
+3509: }
+3510: function acknowledgeMap(current,submitted){
+3511:  for(const [key,value] of Object.entries(submitted))
+3512:   if(sameEdit(current[key],value))delete current[key];
+3513: }
+3514: function acknowledgeAdds(current,refs,submitted){
+3515:  for(let i=current.length-1;i>=0;i--){
+3516:   const index=refs.indexOf(current[i]);
+3517:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3518:  }
+3519: }
+3520: async function saveAndRender(){
+3521:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3522:  if(!id||!d||d.busy)return false;
+3523:  const b=d.editor;
+3524:  try{
+3525:   // Compatibility drafts acquire an identity once, on the original object.
+3526:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+3527:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+3528:  const manRefs=[...d.manual],addRefs=[...b.adds];
+3529:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3530:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3531:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3532:   box_overrides:b.ov,time_overrides:b.times});
+3533:  // Plain review must never wipe audio that the editor has not loaded.
+3534:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3535:  d.audioInFlight=payload.audio!==undefined;
+3536:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3537:  let saved=false;
+3538:  try{
+3539:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3540:   saved=true;d.audioInFlight=false;
+3541:   acknowledgeMap(d.enabled,payload.enabled);
+3542:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3543:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3544:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+3545:   // A switched-away view never opens a confirmation or changes current UI.
+3546:   if(!ownsView(id,gen)){
+3547:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+3548:   }
+3549:   let allowError="";
+3550:   if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 1960-2002
+
+1960:     try:
+1961:         dbox = tuple(float(v) for v in box)
+1962:         darea = max((dbox[2] - dbox[0]) * (dbox[3] - dbox[1]), 1e-9)
+1963:         # the user pointed at something REAL: one unreadable or
+1964:         # motion-blurred frame at exactly t_ref must not kill the track
+1965:         # (a real scan lost a whole window this way). Try t_ref first,
+1966:         # then nearby frames inside the window.
+1967:         best, bsc, seed_t = None, 0.0, t_ref
+1968:         read_fail = 0
+1969:         for dt in (0.0, 0.33, -0.33, 0.66, -0.66, 1.0, -1.0):
+1970:             ts = t_ref + dt
+1971:             if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+1972:                 continue
+1973:             fr0 = _frame(ts)
+1974:             if fr0 is None:
+1975:                 read_fail += 1
+1976:                 continue
+1977:             for d in det.find(fr0):
+1978:                 db = tuple(float(v) for v in d[:4])
+1979:                 ovx = max(0.0, min(dbox[2], db[2]) - max(dbox[0], db[0]))
+1980:                 ovy = max(0.0, min(dbox[3], db[3]) - max(dbox[1], db[1]))
+1981:                 # IoU plus how much of the DRAWN box the object covers —
+1982:                 # a tight torso-only box around a full body seeds cleanly
+1983:                 sc = _iou(dbox, db) + 0.5 * (ovx * ovy) / darea
+1984:                 if sc > bsc:
+1985:                     best, bsc = d, sc
+1986:             if best is not None and bsc >= 0.15:
+1987:                 seed_t = ts
+1988:                 seed_frame = fr0
+1989:                 if dt:
+1990:                     log("      track: seeded %.2fs away from the marked "
+1991:                         "frame (the marked frame had no clear detection)"
+1992:                         % abs(dt))
+1993:                 break
+1994:         if read_fail:
+1995:             log("      track: NOTE — %d frame read(s) failed near t=%.1fs"
+1996:                 % (read_fail, t_ref))
+1997:         if best is None or bsc < 0.15:
+1998:             return []
+1999:         t_ref = seed_t
+2000:         tcls = _cls(best)
+2001:         # The torso-band clothing histogram is a stable identity cue for
+2002:         # PEOPLE (same person measures 0.88+ across seconds, a different
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 2060-2070
+
+2060:             # object (ended a real track mid-window)
+2061:             ref_a = max((seed[2] - seed[0]) * (seed[3] - seed[1]), 1e-9)
+2062:             t = t_ref
+2063:             if direction == 1:  # forward: sequential reads, no re-seeking
+2064:                 # robust prime: positions the decoder just past t_ref's
+2065:                 # frame even when random POS_MSEC seek fails on this file
+2066:                 _grab_frame(cap, t_ref, fps)
+2067:                 rev = None
+2068:             else:
+2069:                 # backward: chunked forward reads served in reverse — a
+2070:                 # per-step backward seek decodes keyframe-to-target every
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 2534-2571
+
+2534:             while t0 - 1e-6 <= t2 <= t1 + 1e-6:
+2535:                 out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
+2536:                 t2 += direction * step
+2537: 
+2538:         vit = _vittrack_factory(log)
+2539:         if vit is not None:
+2540:             fr0 = None
+2541:             for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+2542:                 ts = t_ref + dt
+2543:                 if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+2544:                     continue
+2545:                 fr0 = _frame(ts)
+2546:                 if fr0 is not None:
+2547:                     t_ref = ts
+2548:                     break
+2549:             if fr0 is None:
+2550:                 log("      track: could not READ the video near t=%.1fs — "
+2551:                     "cannot start tracking there (is the clip shorter than "
+2552:                     "expected?)" % t_ref)
+2553:                 return []
+2554:             sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
+2555:             for direction in (1, -1):
+2556:                 trk = vit()
+2557:                 trk.init(sm0, (int(box[0] * scale), int(box[1] * scale),
+2558:                                max(8, int((box[2] - box[0]) * scale)),
+2559:                                max(8, int((box[3] - box[1]) * scale))))
+2560:                 cur = [float(v) for v in box]
+2561:                 held = False
+2562:                 t = t_ref
+2563:                 if direction == 1:  # forward: sequential reads, no re-seeking
+2564:                     # robust prime: positions the decoder just past t_ref's
+2565:                     # frame even when random POS_MSEC seek fails on this file
+2566:                     _grab_frame(cap, t_ref, fps)
+2567:                     rev = None
+2568:                 else:
+2569:                     # backward: chunked forward reads served in reverse — a
+2570:                     # per-step backward seek decodes keyframe-to-target every
+2571:                     # step (from frame ZERO on a single-keyframe export)
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 2638-2659
+
+2638: 
+2639:         # ---- template fallback (no TrackerVit / no model) ----------------
+2640:         def _gray(t):
+2641:             fr = _frame(t)
+2642:             if fr is None:
+2643:                 return None
+2644:             g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+2645:                            fx=scale, fy=scale)
+2646:             return cv2.GaussianBlur(g, (3, 3), 0)
+2647: 
+2648:         g0 = _gray(t_ref)
+2649:         if g0 is None:
+2650:             return []
+2651:         gh, gw = g0.shape[:2]
+2652:         x1 = max(0, int(box[0] * scale)); y1 = max(0, int(box[1] * scale))
+2653:         x2 = min(gw, int(box[2] * scale)); y2 = min(gh, int(box[3] * scale))
+2654:         if x2 - x1 < 8 or y2 - y1 < 8:
+2655:             log("      track: region too small to track reliably")
+2656:             return []
+2657:         tmpl0 = g0[y1:y2, x1:x2]
+2658:         if float(tmpl0.std()) < 4:
+2659:             log("      track: NOTE — region has very little texture; the match "
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 6286-6346
+
+6286: def write_report(path, args, state, output_path=None, publisher=None):
+6287:     prov = {
+6288:         "tool": "openscrub", "version": VERSION,
+6289:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6290:         "input": os.path.abspath(args.video),
+6291:         "input_sha256": state.get("input_sha256"),
+6292:         "original_input": (os.path.abspath(args.original_video)
+6293:                            if getattr(args, "original_video", None) else None),
+6294:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6295:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6296:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6297:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6298:         "zones": getattr(args, "zones_data", None),
+6299:         "windows": getattr(args, "windows_data", None),
+6300:         "settings": _settings_dict(args),
+6301:     }
+6302:     if output_path and os.path.exists(output_path):
+6303:         prov["output"] = os.path.abspath(output_path)
+6304:         prov["output_sha256"] = sha256_file(output_path)
+6305:     source = state.get("source_report")
+6306:     if source is not None:
+6307:         # A render consumes enabled Detection objects, but publishes the full
+6308:         # review document: Keep choices, row positions and unknown fields are
+6309:         # user data, not a serialization of the render subset.
+6310:         doc = dict(source)
+6311:         previous = dict(source.get("provenance", {}))
+6312:         settings = dict(previous.get("settings", {}))
+6313:         settings.update(prov["settings"])
+6314:         prov["settings"] = settings
+6315:         # Output hashes/paths must describe this render, never an older one.
+6316:         previous.pop("output", None)
+6317:         previous.pop("output_sha256", None)
+6318:         previous.update(prov)
+6319:         doc["provenance"] = previous
+6320:     else:
+6321:         doc = {
+6322:             "provenance": prov,
+6323:             "render_state": {
+6324:                 "fps": state["fps"],
+6325:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6326:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6327:             },
+6328:             "detections": ([dict(asdict(d), enabled=True)
+6329:                             for d in state["detections"]]
+6330:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6331:                               for d in state.get("zdropped", [])]),
+6332:         }
+6333:         if state.get("audio_suggestions"):
+6334:             doc["audio_suggestions"] = state["audio_suggestions"]
+6335:         if state.get("audio_transcript"):
+6336:             doc["audio_transcript"] = state["audio_transcript"]
+6337:     aspans = getattr(args, "audio_spans", None)
+6338:     if ((source is None and aspans)
+6339:             or (source is not None and state.get("audio_redactions_overridden"))):
+6340:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6341:         # saved representation, including additive fields on individual spans.
+6342:         doc["audio_redactions"] = [
+6343:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6344:     # Construction and output hashing precede an optional caller-owned final
+6345:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6346:     (publisher or atomic_report)(path, doc)
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 6402-6430
+
+6402: def probe_vfr(path):
+6403:     """-> (is_vfr, avg_fps). Screen recorders (OBS, Game Bar) often produce
+6404:     VFR video; the pipeline's frame->time mapping assumes CFR, so VFR input
+6405:     causes blur-timing drift and audio desync unless normalized first."""
+6406:     if not shutil.which("ffprobe"):
+6407:         return False, None
+6408:     rc, out, _ = 0, "", ""
+6409:     try:
+6410:         p = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+6411:                             "-show_entries",
+6412:                             "stream=r_frame_rate,avg_frame_rate",
+6413:                             "-of", "json", path],
+6414:                            capture_output=True, text=True, timeout=30)
+6415:         rc, out = p.returncode, p.stdout
+6416:     except Exception:
+6417:         return False, None
+6418:     if rc != 0 or not out:
+6419:         return False, None
+6420:     try:
+6421:         st = json.loads(out)["streams"][0]
+6422:         def frac(s):
+6423:             a, _, b = s.partition("/")
+6424:             return float(a) / float(b or 1) if float(b or 1) else 0.0
+6425:         r, avg = frac(st.get("r_frame_rate", "0/1")), frac(st.get("avg_frame_rate", "0/1"))
+6426:     except Exception:
+6427:         return False, None
+6428:     if r <= 0 or avg <= 0:
+6429:         return False, avg or None
+6430:     return abs(r - avg) / max(r, avg) > 0.005, avg
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 6482-6508
+
+6482: def _count_video_frames(path):
+6483:     """Exact decoded frame count (full decode via ffprobe), or None."""
+6484:     try:
+6485:         out = subprocess.run(
+6486:             ["ffprobe", "-v", "error", "-count_frames",
+6487:              "-select_streams", "v:0",
+6488:              "-show_entries", "stream=nb_read_frames",
+6489:              "-of", "csv=p=0", path],
+6490:             capture_output=True, text=True).stdout.strip()
+6491:         return int(out.split(",")[0]) if out else None
+6492:     except Exception:
+6493:         return None
+6494: 
+6495: 
+6496: def _scan_copy_matches(ref, copy, tol=2):
+6497:     """(ok, n_ref, n_copy) — a 1:1 (non-resampling) scan copy must carry
+6498:     exactly the source's frames: the scan reads it by frame INDEX, so a
+6499:     single dropped or duplicated frame silently shifts every detection
+6500:     made after it onto the wrong output frames (misplaced blur — seen on
+6501:     a real GPU box whose NVENC copy desynced). Counting requires a full
+6502:     decode of both files; that cost is nothing next to the scan itself
+6503:     and it is the only check that catches the failure."""
+6504:     n_ref, n_cp = _count_video_frames(ref), _count_video_frames(copy)
+6505:     if n_ref is None or n_cp is None:
+6506:         return True, n_ref, n_cp        # can't measure — don't block
+6507:     return abs(n_ref - n_cp) <= tol, n_ref, n_cp
+6508: 
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 6530-6547
+
+6530:     out_ref = args.output or os.path.splitext(args.video)[0] + "_redacted.mp4"
+6531:     base = os.path.join(os.path.dirname(os.path.abspath(out_ref)),
+6532:                         os.path.splitext(os.path.basename(args.video))[0])
+6533:     src0 = args.video
+6534: 
+6535:     def _cached(path):
+6536:         return (os.path.exists(path)
+6537:                 and os.path.getmtime(path) > os.path.getmtime(src0))
+6538: 
+6539:     def _encode(inp, outp, cfr, tonemap, vargs, extra=None):
+6540:         tmargs = (["-vf", _TONEMAP_VF, "-color_primaries", "bt709",
+6541:                    "-color_trc", "bt709", "-colorspace", "bt709"]
+6542:                   if tonemap else [])
+6543:         attempts = ([["-fps_mode", "cfr", "-r", str(target)],
+6544:                      ["-vsync", "cfr", "-r", str(target)]] if cfr else [[]])
+6545:         stderr_tail = ""
+6546:         for cfrargs in attempts:
+6547:             # Popen + poll, NOT subprocess.run: these encodes (VFR->CFR
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 6588-6602
+
+6588:         cb.log(f"      input is VFR (avg {avg:.2f} fps) — normalizing to CFR "
+6589:                f"{target} fps first")
+6590: 
+6591:     if not is_hdr:
+6592:         fixed = base + ".cfr.mp4"
+6593:         if _cached(fixed):
+6594:             cb.log(f"      reusing existing {os.path.basename(fixed)}")
+6595:         else:
+6596:             _encode(src0, fixed, cfr=True, tonemap=False, vargs=sdr_vargs)
+6597:         args.original_video = src0
+6598:         args.hdr_tonemapped = False
+6599:         args.video = fixed
+6600:         return
+6601: 
+6602:     # ---- HDR input ----
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 7175-7189
+
+7175: def run_scan(args, cb=None):
+7176:     """Scan pass only: OCR + face detection + tracking. Returns a state dict
+7177:     consumed by run_render (and serialized into --report files)."""
+7178:     cb = cb or Callbacks()
+7179:     if not args.video or not os.path.exists(args.video):
+7180:         raise RuntimeError(f"input not found: {args.video}")
+7181:     # normalize attributes that may be absent when args come from an older
+7182:     # embedder (GUI/web) rather than _prep_args
+7183:     for attr, default in (("ignore_regions", []), ("config", None),
+7184:                           ("from_report", None), ("face_expand", 0.15),
+7185:                           ("no_vfr_fix", False)):
+7186:         if not hasattr(args, attr):
+7187:             setattr(args, attr, default)
+7188:     normalize_vfr(args, cb)
+7189:     cats = {c.strip() for c in args.categories.split(",")
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 7340-7354
+
+7340:             "Retry this job — the uploaded file is kept."
+7341:             % ", ".join(sorted(inert)))
+7342: 
+7343:     cb.log(f"[3/4] Scanning (every {args.sample_interval}s or {args.scan_trigger}px of scroll"
+7344:            + (", self-tuning to screen activity and scroll speed)"
+7345:               if getattr(args, "adaptive", "on") != "off" else ")"))
+7346:     cap = cv2.VideoCapture(args.video)
+7347:     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+7348:     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+7349:     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+7350:     vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+7351:     step = max(1, int(round(fps * args.sample_interval)))
+7352:     # ignore zones ride in the zones file under the "ignore" class:
+7353:     # normalized rects where NOTHING is ever detected or blurred. They are
+7354:     # not a detection category — pop before zone filtering. Normalized
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 7590-7628
+
+7590:                   "review the output carefully." if dense_stride > 2
+7591:                   or detect_scale < 1.0 else "."))
+7592:     idx = 0
+7593:     dense_now = []
+7594:     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
+7595:     # manual jobs — exactly the "one person 16 minutes in" case), frames
+7596:     # before the detection window carry no information we need, so SEEK past
+7597:     # them instead of decoding them. cum/bands get zero rows for the skipped
+7598:     # indices (render min-guards its lookups). With tracking ON the frames
+7599:     # must be decoded sequentially — offsets accumulate — so no skip there.
+7600:     if win_start > 1.0 and not track_on:
+7601:         skip_n = max(0, int(win_start * fps) - 1)
+7602:         if _seek_cap(cap, skip_n, fps):
+7603:             cum.extend([(0.0, 0.0)] * skip_n)
+7604:             bands.extend([(0.0, 0.0)] * skip_n)
+7605:             idx = skip_n
+7606:             cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
+7607:                    f"{skip_n} frame(s) before the window are not decoded")
+7608:         else:
+7609:             cap.release()
+7610:             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+7611:             cb.log("      fast-skip unavailable on this file — decoding "
+7612:                    "from the start")
+7613:     while True:
+7614:         if idx % 30 == 0 and cb.cancelled():
+7615:             cap.release()
+7616:             raise PipelineCancelled()
+7617:         ok, frame = cap.read()
+7618:         if not ok:
+7619:             break
+7620:         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
+7621:         cum.append((cx, cy))
+7622: 
+7623:         t_now = idx / fps
+7624:         if not any(w0 <= t_now <= w1 for w0, w1 in dwin):
+7625:             # outside every detection window: no scans, no safety bands
+7626:             # (the user has declared these spans PII-free)
+7627:             if not track_on:
+7628:                 nxt = next((w0 for w0, w1 in dwin if w0 > t_now), None)
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 8438-8448
+
+8438:             nlp=getattr(namer, "nlp", None) if namer else None,
+8439:             custom_res=custom_res, phrases=phrases)
+8440: 
+8441:     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+8442:             "zdropped": zdropped, "audio_suggestions": audio_sugg,
+8443:             "audio_transcript": audio_tx,
+8444:             "input_sha256": sha256_file(args.video),
+8445:             "stats": {"scans": n_scans, "raw_hits": len(raw),
+8446:                       "regions": len(detections), "recalls": n_recalled,
+8447:                       "remembered": len(memory.items) if memory else 0,
+8448:                       "zone_dropped": zone_dropped}}
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_internal/lifetimes.py 1-70
+
+1: """In-process web file ownership. Reserve/inspect only under the web guard.
+2: 
+3: Per-job state also owns the report transaction lock and operation identity.
+4: This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
+5: """
+6: 
+7: import threading
+8: 
+9: 
+10: class _JobFiles:
+11:     def __init__(self):
+12:         self.count = 0
+13:         self.work = 0
+14:         self.closed = False
+15:         self.queued = {}
+16:         self.tracker = None
+17:         # Initialized before a new/rehydrated job enters the registry. Never
+18:         # persisted: one stable transaction boundary per live job identity.
+19:         self.report_lock = threading.Lock()
+20:         self.operation = None
+21:         self.active = None
+22: 
+23: 
+24: class FileOwners:
+25:     def __init__(self, guard):
+26:         self.guard = guard
+27:         self.count = 0
+28: 
+29:     @staticmethod
+30:     def initialize(job):
+31:         return job.setdefault("_files", _JobFiles())
+32: 
+33:     def reserve(self, job=None, work=False):
+34:         state = self.initialize(job) if job is not None else None
+35:         self.count += 1
+36:         if state is not None:
+37:             state.count += 1
+38:             state.work += int(work)
+39:         return _Lease(self, state, work)
+40: 
+41: 
+42: class _Lease:
+43:     def __init__(self, owners, state, work):
+44:         self.owners, self.state, self.work = owners, state, work
+45:         self.released = False
+46:         self.related = []
+47:         self.source = None
+48:         self.report_input = False
+49:         self.operation = None
+50: 
+51:     def release_locked(self):
+52:         if self.released:
+53:             return
+54:         self.released = True
+55:         for lease in self.related:
+56:             lease.release_locked()
+57:         self.owners.count -= 1
+58:         if self.state is not None:
+59:             self.state.count -= 1
+60:             self.state.work -= int(self.work)
+61: 
+62:     def release(self):
+63:         with self.owners.guard:
+64:             self.release_locked()
+65: 
+66:     def __enter__(self):
+67:         return self
+68: 
+69:     def __exit__(self, *exc):
+70:         self.release()
+
+## standalone 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_internal/reports.py 1-45
+
+1: """Publish complete report JSON without truncating the previous report."""
+2: import json
+3: import os
+4: import tempfile
+5: 
+6: 
+7: def atomic_report(path, report) -> None:
+8:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+9: 
+10:     A failure before replacement leaves the previous report intact and raises.
+11:     Readers opening the path see a complete old or new report on filesystems
+12:     supporting atomic replacement. This does not serialize read/apply/write
+13:     transactions or guarantee power-loss durability: the directory is not
+14:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+15:     destination may prevent replacement; that failure is propagated. Temporary
+16:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+17:     are 0600; Windows access restrictions also depend on the directory ACL.
+18:     """
+19:     path = os.path.abspath(path)
+20:     staged = None
+21:     try:
+22:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+23:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+24:                                          dir=os.path.dirname(path),
+25:                                          prefix=".report-", suffix=".tmp",
+26:                                          delete=False) as stream:
+27:             staged = stream.name
+28:             json.dump(report, stream, indent=1)
+29:             stream.flush()
+30:             os.fsync(stream.fileno())
+31:         # Close first: Windows cannot rename an open staging file.
+32:         os.replace(staged, path)
+33:     finally:
+34:         if staged is not None:
+35:             try:
+36:                 os.unlink(staged)
+37:             except OSError:
+38:                 # After replace the name is gone. On cleanup failure leave a
+39:                 # .tmp for vault crash cleanup without masking the write error.
+40:                 pass
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 335-490
+
+335: 
+336: 
+337: def _validate_files_locked(job=None):
+338:     # Admission always rechecks after waiting for the transition guard.
+339:     if vault_locked():
+340:         abort(423, "vault is locked or needs recovery — unlock it to access jobs")
+341:     if job is not None:
+342:         with JOBS_LOCK:
+343:             if not any(current is job for current in JOBS.values()):
+344:                 abort(404)
+345:         if FILES.initialize(job).closed:
+346:             abort(409, "job is being deleted")
+347: 
+348: 
+349: def _source_job_locked(canonical, missing_ok=False):
+350:     root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+351:     if not canonical.startswith(root):
+352:         return None
+353:     jid = canonical[len(root):].split(os.sep, 1)[0]
+354:     with JOBS_LOCK:
+355:         source_job = JOBS.get(jid)
+356:     if source_job is None:
+357:         if missing_ok:
+358:             return None
+359:         abort(404, "source job is no longer available")
+360:     _validate_files_locked(source_job)
+361:     _recovery_gate(source_job)
+362:     return source_job
+363: 
+364: 
+365: def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+366:     source = (os.path.realpath(source if source is not None else job["video"])
+367:               if read_source and job and (source is not None or job.get("video")) else None)
+368:     source_job = _source_job_locked(source) if source else None
+369:     lease = FILES.reserve(job, work)
+370:     lease.source = source
+371:     lease.source_job = source_job
+372:     lease.source_state = FILES.initialize(source_job) if source_job is not None else None
+373:     if source_job is not None and source_job is not job:
+374:         lease.related.append(FILES.reserve(source_job))
+375:     return lease
+376: 
+377: 
+378: def _select_render_input(job, owner):
+379:     """Resolve original-input provenance while the report/current source is owned.
+380: 
+381:     Only source selection is pinned, not the report document or its edits.
+382:     Missing originals keep the engine's fallback to the current input. An
+383:     extant unregistered/deleting job source is never admitted for reading.
+384:     """
+385:     try:
+386:         doc = _load_job_report(job)
+387:         prov = doc.get("provenance", {}) if isinstance(doc, dict) else {}
+388:         original = prov.get("original_input")
+389:     except (OSError, ValueError, TypeError, AttributeError):
+390:         # Keep asynchronous missing/invalid-report errors in run_pipeline.
+391:         original = None
+392:     if original:
+393:         candidate = os.path.realpath(original)
+394:         added = None
+395:         with VAULT_LOCK:
+396:             _validate_files_locked(job)
+397:             source_job = _source_job_locked(candidate, missing_ok=True)
+398:             root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+399:             if source_job is None and candidate.startswith(root):
+400:                 # No live owner exists. Only inspect absence, under the store
+401:                 # admission boundary: never open an orphan/condemned source.
+402:                 if os.path.exists(candidate):
+403:                     abort(404, "source job is no longer available")
+404:                 owner.report_input = True
+405:                 return
+406:             if source_job is not None and all(
+407:                     token.state is not FILES.initialize(source_job)
+408:                     for token in [owner] + owner.related):
+409:                 added = FILES.reserve(source_job)
+410:                 owner.related.append(added)
+411:         selected = False
+412:         try:
+413:             # Live containing jobs are reserved BEFORE this first source stat.
+414:             # External filesystem changes remain outside web coordination.
+415:             if os.path.exists(candidate):
+416:                 owner.source = candidate
+417:                 owner.source_job = source_job
+418:                 owner.source_state = FILES.initialize(source_job) if source_job is not None else None
+419:                 selected = True
+420:         finally:
+421:             if added is not None and not selected:
+422:                 with VAULT_LOCK:
+423:                     owner.related.remove(added)
+424:                     added.release_locked()
+425:     owner.report_input = True
+426: 
+427: 
+428: def _request_source_path(path):
+429:     """Canonical path used for both admission and actual server-path I/O."""
+430:     canonical = os.path.realpath(path)
+431:     with VAULT_LOCK:
+432:         source_job = _source_job_locked(canonical)
+433:         if source_job is not None:
+434:             lease = FILES.reserve(source_job)
+435:             lease.source = canonical
+436:             lease.source_job = source_job
+437:             lease.source_state = FILES.initialize(source_job)
+438:             if g.get("file_owner") is None:
+439:                 g.file_owner = lease
+440:             else:
+441:                 g.setdefault("file_children", []).append(lease)
+442:     return canonical
+443: 
+444: 
+445: def _job_video(job):
+446:     # Requests use their admitted source even if scan normalization updates
+447:     # the live job while a decoder is waiting. Worker/thread callers snapshot
+448:     # their own lease's source before starting work.
+449:     if has_request_context():
+450:         lease = g.get("file_owner")
+451:         if lease is not None and lease.state is FILES.initialize(job):
+452:             return lease.source or job.get("video")
+453:     return job.get("video")
+454: 
+455: 
+456: def _update_job_source(job, path, owner):
+457:     canonical = os.path.realpath(path)
+458:     with VAULT_LOCK:
+459:         _validate_files_locked(job)
+460:         source_job = _source_job_locked(canonical)
+461:         if source_job is not None and source_job is not job:
+462:             # Reserve before following a changed normalized input. This stays
+463:             # with the worker through its final report/provenance access.
+464:             if owner is not None and all(
+465:                     token.state is not FILES.initialize(source_job)
+466:                     for token in [owner] + owner.related):
+467:                 owner.related.append(FILES.reserve(source_job))
+468:         if owner is not None:
+469:             owner.source = canonical
+470:             owner.source_job = source_job
+471:             owner.source_state = FILES.initialize(source_job) if source_job is not None else None
+472:         job["video"] = canonical
+473: 
+474: 
+475: def _own_files(job=None, work=False):
+476:     with VAULT_LOCK:
+477:         _validate_files_locked(job)
+478:         return _reserve_files_locked(job, work)
+479: 
+480: 
+481: def _files_busy_locked(blocking=True):
+482:     if not JOBS_LOCK.acquire(blocking=blocking):
+483:         return True  # shutdown cannot safely inspect the registry now
+484:     try:
+485:         return bool(FILES.count or any(j.get("phase") in _ACTIVE_PHASES
+486:                                        for j in JOBS.values()))
+487:     finally:
+488:         JOBS_LOCK.release()
+489: 
+490: 
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 891-948
+
+891: def _report_current(job):
+892:     """Identity lookup only; caller owns report_lock and a file lifetime.
+893: 
+894:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+895:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+896:     """
+897:     with JOBS_LOCK:
+898:         if not any(current is job for current in JOBS.values()):
+899:             abort(404)
+900:         if FILES.initialize(job).closed:
+901:             abort(409, "job is being deleted")
+902: 
+903: 
+904: def _recovery_gate(job):
+905:     if FILES.initialize(job).recovery_required:
+906:         abort(409, "render delivery requires recovery")
+907: 
+908: 
+909: def _publish_job_report_locked(job, path, doc):
+910:     """Caller owns this job's report transaction and file lifetime."""
+911:     with _staged_report(path, doc) as staged:
+912:         FILES.initialize(job).output_epoch += 1
+913:         os.replace(staged, os.path.abspath(path))
+914: 
+915: 
+916: def _edit_gate(job):
+917:     _recovery_gate(job)
+918:     _report_current(job)
+919:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+920:         abort(409, "job work is queued, running or still cleaning up")
+921: 
+922: 
+923: def _operation_valid(job, owner):
+924:     files = FILES.initialize(job)
+925:     with JOBS_LOCK:
+926:         return (any(current is job for current in JOBS.values()) and not files.closed
+927:                 and owner.operation is not None
+928:                 and files.operation is owner.operation)
+929: 
+930: 
+931: def _begin_operation(job, owner):
+932:     files = FILES.initialize(job)
+933:     owner.operation = threading.Event()
+934:     files.operation = owner.operation
+935:     job["cancel"] = owner.operation
+936:     files.active = owner
+937: 
+938: 
+939: def _finish_operation(job, owner):
+940:     # Release lifecycle ownership outside the report transaction. Keep the
+941:     # mutation gate closed until actual worker cleanup/release has completed.
+942:     owner.release()
+943:     if job is None:  # a cancelled ticket's job may already have been deleted
+944:         return
+945:     files = FILES.initialize(job)
+946:     with files.report_lock:
+947:         if files.active is owner:
+948:             files.active = None
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1057-1145
+
+1057: def _run_job(job, action, owner=None):
+1058:     if owner is None:
+1059:         owner = _prepare_work(job, action)
+1060:         try:
+1061:             with FILES.initialize(job).report_lock:
+1062:                 _begin_operation(job, owner)
+1063:             return _run_job(job, action, owner)
+1064:         finally:
+1065:             _finish_operation(job, owner)
+1066:     jid = job["id"]
+1067:     files = FILES.initialize(job)
+1068:     with files.report_lock:
+1069:         if owner.operation is None:  # compatibility with old queue entries
+1070:             _begin_operation(job, owner)
+1071:         if not _operation_valid(job, owner):
+1072:             return
+1073:         job["phase"] = "scanning" if action == "scan" else "rendering"
+1074:     cb = WebCallbacks(job, owner.operation)
+1075:     def publish_report(path, doc):
+1076:         with files.report_lock:
+1077:             if not _operation_valid(job, owner) or owner.operation.is_set():
+1078:                 raise openscrub.PipelineCancelled()
+1079:             _publish_job_report_locked(job, path, doc)
+1080:     cb.publish_report = publish_report
+1081:     committed = False
+1082:     def publish_render(delivery, summary):
+1083:         nonlocal committed
+1084:         with files.report_lock:
+1085:             _recovery_gate(job)
+1086:             if not _operation_valid(job, owner) or owner.operation.is_set():
+1087:                 raise openscrub.PipelineCancelled()
+1088:             missing = object()
+1089:             keys = ("output", "phase", "progress", "eta", "error")
+1090:             previous = {key: job.get(key, missing) for key in keys}
+1091:             def success():
+1092:                 job["output"] = summary["output"]
+1093:                 job["phase"] = "done"
+1094:                 job["progress"] = 1.0
+1095:                 job["eta"] = None
+1096:                 job["error"] = None
+1097:             def restore():
+1098:                 for key, value in previous.items():
+1099:                     if value is missing:
+1100:                         job.pop(key, None)
+1101:                     else:
+1102:                         job[key] = value
+1103:             def mutate():
+1104:                 files.output_epoch += 1
+1105:             try:
+1106:                 delivery.commit(before_mutation=mutate, publish_success=success,
+1107:                                 restore_success=restore)
+1108:             except _DeliveryRecoveryError as error:
+1109:                 files.recovery_required = True
+1110:                 files.recovery_diagnostics = error.rollback_diagnostics
+1111:                 job.update(phase="error", error="render delivery requires recovery", eta=None)
+1112:                 raise
+1113:             committed = delivery.committed
+1114:     cb.publish_render = publish_render
+1115:     source = owner.source if owner is not None else job["video"]
+1116:     try:
+1117:         if action == "scan":
+1118:             job["log"].append("— scan started —")
+1119:             args = build_args(dict(job, video=source))
+1120:             state = openscrub.run_scan(args, cb)
+1121:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+1122:                                   args, state, publisher=cb.publish_report)
+1123:             with files.report_lock:
+1124:                 if not _operation_valid(job, owner):
+1125:                     return
+1126:                 job["stats"] = state["stats"]
+1127:             try:
+1128:                 prov = _load_job_report(job).get("provenance", {})
+1129:                 if (prov.get("vfr_normalized")
+1130:                         and os.path.exists(prov.get("input", ""))):
+1131:                     _update_job_source(job, prov["input"], owner)
+1132:                     job["log"].append(
+1133:                         "using CFR-normalized file for previews/thumbnails")
+1134:             except Exception:
+1135:                 pass
+1136:             thumbnail_owner = _own_files(job, work=True)
+1137:             def _pregen(jb=job, video=thumbnail_owner.source):
+1138:                 """One pass through the video with a single decoder:
+1139:                 thumbnails come out in seconds instead of minutes.
+1140:                 Sorting by reference time keeps seeks short and forward-
+1141:                 only, which is what codecs are fast at."""
+1142:                 cap = None
+1143:                 try:
+1144:                     doc = _load_job_report(jb)
+1145:                     rs = doc["render_state"]
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1327-1376
+
+1327: def enforce_vault_lock():
+1328:     """Admit file work before intake parsing or a view captures a job."""
+1329:     if request.endpoint == "allowlist":
+1330:         g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+1331:         return
+1332:     if request.path.startswith("/api/jobs"):
+1333:         # Deletion closes admissions itself, without becoming its own busy owner.
+1334:         if request.endpoint == "job_delete":
+1335:             with VAULT_LOCK:
+1336:                 _validate_files_locked()
+1337:             return
+1338:         with VAULT_LOCK:
+1339:             jid = (request.view_args or {}).get("jid")
+1340:             job = JOBS.get(jid) if jid is not None else None
+1341:             if jid is not None and job is None:
+1342:                 abort(404)
+1343:             _validate_files_locked(job)
+1344:             if job is not None and request.endpoint not in {"job_status", "job_log", "job_cancel"}:
+1345:                 _recovery_gate(job)
+1346:             read_source = request.endpoint in {
+1347:                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
+1348:                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+1349:             g.file_owner = _reserve_files_locked(job, read_source=read_source)
+1350: 
+1351: 
+1352: @app.after_request
+1353: def _finish_file_response(response):
+1354:     children = g.pop("file_children", [])
+1355:     lease = g.pop("file_owner", None)
+1356:     if response.direct_passthrough:
+1357:         if lease is None and children:
+1358:             lease = children.pop(0)
+1359:         if lease is not None:
+1360:             lease.related.extend(children)
+1361:             response.response = OwnedIterable(response.response, lease)
+1362:     else:
+1363:         for child in children:
+1364:             child.release()
+1365:         if lease is not None:
+1366:             lease.release()  # detached JSON/JPEG bytes no longer read job files
+1367:     return response
+1368: 
+1369: 
+1370: @app.teardown_request
+1371: def _release_failed_request(error):
+1372:     for child in g.pop("file_children", []):
+1373:         child.release()
+1374:     lease = g.pop("file_owner", None)
+1375:     if lease is not None:
+1376:         lease.release()
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1682-1758
+
+1682: def _load_job_report(job):
+1683:     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+1684:         return json.load(f)
+1685: 
+1686: 
+1687: def _capture_frame_source(job, output=False):
+1688:     """Capture admitted selection and its owners using sequential short locks."""
+1689:     state = FILES.initialize(job)
+1690:     lease = g.get("file_owner") if has_request_context() else None
+1691:     with state.report_lock:
+1692:         _report_current(job)
+1693:         _recovery_gate(job)
+1694:         selected_output = job.get("output") if output else None
+1695:         path = selected_output or _job_video(job)
+1696:         epoch = state.output_epoch
+1697:         source_job = job
+1698:         source_state = state
+1699:         if not selected_output and lease is not None and lease.state is state:
+1700:             source_job, source_state = lease.source_job, lease.source_state
+1701:     source_epoch = None
+1702:     if source_job is not None and source_state is not state:
+1703:         with source_state.report_lock:
+1704:             _report_current(source_job)
+1705:             _recovery_gate(source_job)
+1706:             source_epoch = source_state.output_epoch
+1707:     return dict(job=job, state=state, epoch=epoch, path=path, output=output,
+1708:                 selection=selected_output, source_job=source_job,
+1709:                 source_state=source_state, source_epoch=source_epoch)
+1710: 
+1711: 
+1712: def _frame_source_current(snapshot):
+1713:     job, state = snapshot["job"], snapshot["state"]
+1714:     with state.report_lock:
+1715:         _report_current(job)
+1716:         _recovery_gate(job)
+1717:         selected = job.get("output") if snapshot["output"] else None
+1718:         if (FILES.initialize(job) is not state or state.output_epoch != snapshot["epoch"]
+1719:                 or selected != snapshot["selection"]
+1720:                 or (selected or _job_video(job)) != snapshot["path"]):
+1721:             return False
+1722:     source_job, source_state = snapshot["source_job"], snapshot["source_state"]
+1723:     if source_job is not None and source_state is not state:
+1724:         with source_state.report_lock:
+1725:             _report_current(source_job)
+1726:             _recovery_gate(source_job)
+1727:             if (FILES.initialize(source_job) is not source_state
+1728:                     or source_state.output_epoch != snapshot["source_epoch"]):
+1729:                 return False
+1730:     return True
+1731: 
+1732: 
+1733: def _validated_frame_read(job, output, decode):
+1734:     for attempt in range(2):
+1735:         snapshot = _capture_frame_source(job, output)
+1736:         error = None
+1737:         try:
+1738:             value = decode(snapshot["path"])
+1739:         except Exception as caught:
+1740:             error = caught
+1741:         if _frame_source_current(snapshot):
+1742:             if error is not None:
+1743:                 raise error
+1744:             return value
+1745:     abort(409, "output changed during frame read; retry")
+1746: 
+1747: 
+1748: def _frame_at(job, t, rstate):
+1749:     def decode(path):
+1750:         cap = cv2.VideoCapture(path)
+1751:         try:
+1752:             fps = rstate["fps"]
+1753:             cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+1754:             ok, frame = cap.read()
+1755:             return frame.copy() if ok else None
+1756:         finally:
+1757:             cap.release()
+1758:     return _validated_frame_read(job, False, decode)
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1899-2019
+
+1899: def job_frame_at(jid):
+1900:     job = JOBS.get(jid) or abort(404)
+1901:     t = max(0.0, float(request.args.get("t", 0)))
+1902:     def decode(path):
+1903:         cap = cv2.VideoCapture(path)
+1904:         # Timestamp seeking/backoff preserves VFR and near-end behavior.
+1905:         try:
+1906:             frame = None
+1907:             for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+1908:                 cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+1909:                 ok, fr = cap.read()
+1910:                 if ok:
+1911:                     frame = fr
+1912:                     break
+1913:                 if tt == 0.0:
+1914:                     break
+1915:         finally:
+1916:             cap.release()
+1917:         if frame is None:
+1918:             abort(404)
+1919:         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+1920:         if not ok:
+1921:             abort(404)
+1922:         return buf.tobytes()
+1923:     payload = _validated_frame_read(job, request.args.get("src") == "output", decode)
+1924:     return Response(payload, mimetype="image/jpeg")
+1925: 
+1926: 
+1927: 
+1928: def _send_open_file(path, **options):
+1929:     """One opened generation supplies body, metadata, conditional and Range."""
+1930:     if not path:
+1931:         abort(404)
+1932:     try:
+1933:         stream = open(path, "rb")
+1934:     except FileNotFoundError:
+1935:         abort(404)
+1936:     response = None
+1937:     try:
+1938:         st = os.fstat(stream.fileno())
+1939:         conditional = options.pop("conditional", True)
+1940:         options.setdefault("download_name", os.path.basename(path))
+1941:         # No hash/media read or path-based X-Sendfile; fstat describes exactly
+1942:         # this open inode, even after final names change during transfer.
+1943:         etag = "%x-%x-%x-%x-%x" % (st.st_dev, st.st_ino, st.st_size,
+1944:                                     st.st_mtime_ns, st.st_ctime_ns)
+1945:         response = send_file(stream, conditional=False, etag=etag,
+1946:                              last_modified=st.st_mtime, **options)
+1947:         response.content_length = st.st_size
+1948:         if conditional:
+1949:             response.make_conditional(request.environ, accept_ranges=True,
+1950:                                       complete_length=st.st_size)
+1951:         return response
+1952:     except BaseException:
+1953:         if response is not None:
+1954:             response.close()
+1955:         stream.close()
+1956:         raise
+1957: 
+1958: 
+1959: def _send_job_source(job, **options):
+1960:     for attempt in range(2):
+1961:         snapshot = _capture_frame_source(job)
+1962:         state = snapshot["source_state"] or snapshot["state"]
+1963:         owner = snapshot["source_job"] or job
+1964:         response = error = None
+1965:         try:
+1966:             with state.report_lock:
+1967:                 _report_current(owner)
+1968:                 _recovery_gate(owner)
+1969:                 try:
+1970:                     response = _send_open_file(snapshot["path"], **options)
+1971:                 except Exception as caught:
+1972:                     error = caught
+1973:             if _frame_source_current(snapshot):
+1974:                 if error is not None:
+1975:                     raise error
+1976:                 validated = response
+1977:                 response = None  # hand off only a successfully validated response
+1978:                 return validated
+1979:         finally:
+1980:             # A stale attempt or validation exception still owns its response.
+1981:             # Close after leaving the source lock, before request leases release.
+1982:             if response is not None:
+1983:                 response.close()
+1984:     abort(409, "output changed during frame read; retry")
+1985: 
+1986: 
+1987: @app.route("/api/jobs/<jid>/video")
+1988: def job_video_stream(jid):
+1989:     """Range-aware stream of the job's scan video so review can PLAY the
+1990:     footage with live boxes (issue #17: the box editor was scrub-only,
+1991:     'you cannot play review and see hits'). Serves the same file frame_at
+1992:     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
+1993:     every browser can decode."""
+1994:     job = JOBS.get(jid) or abort(404)
+1995:     return _send_job_source(job, conditional=True)
+1996: 
+1997: 
+1998: 
+1999: def _same_json_value(left, right):
+2000:     """Compare touched JSON values without losing encoder-visible distinctions.
+2001: 
+2002:     Nonfinite or unusual values conservatively require publication. Assignment
+2003:     replaces touched containers; their originals need no copy or normalization.
+2004:     """
+2005:     if type(left) is not type(right):
+2006:         return False
+2007:     if type(left) is float:
+2008:         return (math.isfinite(left) and math.isfinite(right) and left == right
+2009:                 and (left != 0 or math.copysign(1, left) == math.copysign(1, right)))
+2010:     if type(left) in (str, int, bool, type(None)):
+2011:         return left == right
+2012:     if type(left) is list:
+2013:         return (len(left) == len(right)
+2014:                 and all(_same_json_value(a, b) for a, b in zip(left, right)))
+2015:     if type(left) is dict:
+2016:         return (left.keys() == right.keys()
+2017:                 and all(_same_json_value(value, right[key])
+2018:                         for key, value in left.items()))
+2019:     return False
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 2022-2146
+
+2022: def _valid_manual_creation(value):
+2023:     """Only immutable, finite creation records can establish replay equality."""
+2024:     def numbers(items, size):
+2025:         try:
+2026:             return (isinstance(items, list) and len(items) == size
+2027:                     and all(type(v) in (int, float) and math.isfinite(v)
+2028:                             for v in items))
+2029:         except OverflowError:
+2030:             return False
+2031:     return (isinstance(value, dict)
+2032:             and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+2033:             and numbers([value["t_start"], value["t_end"]], 2)
+2034:             and numbers(value["cbox"], 4)
+2035:             and all(type(v) is int for v in value["cbox"])
+2036:             and numbers(value["aoff"], 2))
+2037: 
+2038: 
+2039: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+2040: def job_save_edits(jid):
+2041:     job = JOBS.get(jid) or abort(404)
+2042:     edits = request.get_json(force=True)
+2043:     path = os.path.join(job["dir"], "report.json")
+2044:     with FILES.initialize(job).report_lock:
+2045:         _edit_gate(job)
+2046:         try:
+2047:             doc = _load_job_report(job)
+2048:         except FileNotFoundError:
+2049:             abort(404, "job report not found")
+2050:         # Remember only effective assignment destinations, before their first
+2051:         # assignment. Aliased indices may change then restore the same field.
+2052:         missing = object()
+2053:         touched = {}
+2054:         def assign(target, key, value):
+2055:             destination = (id(target), key)
+2056:             if destination not in touched:
+2057:                 touched[destination] = (target, key, target.get(key, missing))
+2058:             target[key] = value
+2059: 
+2060:         original_count = len(doc["detections"])
+2061:         enabled = edits.get("enabled", {})
+2062:         for i, d in enumerate(doc["detections"]):
+2063:             if str(i) in enabled:
+2064:                 assign(d, "enabled", bool(enabled[str(i)]))
+2065:         for i, box in (edits.get("box_overrides") or {}).items():
+2066:             i = int(i)
+2067:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+2068:                 assign(doc["detections"][i], "cbox", [float(v) for v in box])
+2069:         for i, span in (edits.get("time_overrides") or {}).items():
+2070:             i = int(i)
+2071:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+2072:                 t0, t1 = float(span[0]), float(span[1])
+2073:                 if t1 > t0 >= 0:
+2074:                     assign(doc["detections"][i], "t_start", t0)
+2075:                     assign(doc["detections"][i], "t_end", t1)
+2076:                     assign(doc["detections"][i], "last_seen", min(
+2077:                         max(doc["detections"][i].get("last_seen", t0), t0), t1))
+2078:         rs = doc["render_state"]
+2079:         # Read identities from this transaction's latest raw document. Never
+2080:         # reconstruct creation from a row's mutable current geometry/choices.
+2081:         identified = {}
+2082:         for d in doc["detections"]:
+2083:             identity = d.get("manual_id")
+2084:             if isinstance(identity, str):
+2085:                 identified.setdefault(identity, []).append(d)
+2086:         for m in edits.get("manual", []):
+2087:             has_id = "manual_id" in m
+2088:             identity = m.get("manual_id")
+2089:             if has_id and (not isinstance(identity, str) or
+2090:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+2091:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+2092:             try:
+2093:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+2094:                 tref = float(m.get("t_ref", t0))
+2095:                 b = m["screen_box"]
+2096:                 if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+2097:                     raise ValueError("non-finite creation or invalid box")
+2098:                 fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+2099:                 ox, oy = rs["cum"][fidx]
+2100:                 creation = {"t_start": t0, "t_end": t1,
+2101:                             "cbox": [int(b[0] - ox), int(b[1] - oy),
+2102:                                      int(b[2] - ox), int(b[3] - oy)],
+2103:                             "aoff": [ox, oy]}
+2104:                 if has_id and not _valid_manual_creation(creation):
+2105:                     raise ValueError("invalid effective creation")
+2106:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+2107:                 if has_id:
+2108:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+2109:                 raise
+2110:             if has_id and identity in identified:
+2111:                 rows = identified[identity]
+2112:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+2113:                         or rows[0]["manual_creation"] != creation):
+2114:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+2115:                 continue
+2116:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+2117:                        last_seen=t0, enabled=True)
+2118:             if has_id:
+2119:                 # Separate lists keep later indexed edits independent of creation.
+2120:                 row.update(manual_id=identity, manual_creation={
+2121:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+2122:                 identified[identity] = [row]
+2123:             doc["detections"].append(row)
+2124:         if "audio" in edits:
+2125:             # audio redaction spans (mute/bleep): stored in the report so the
+2126:             # --from-report render applies them and re-renders keep them
+2127:             assign(doc, "audio_redactions", [
+2128:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+2129:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+2130:                           else "mute")}
+2131:                 for s in (edits.get("audio") or [])
+2132:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0])
+2133:         if (len(doc["detections"]) != original_count
+2134:                 or any(original is missing or not _same_json_value(original, target[key])
+2135:                        for target, key, original in touched.values())):
+2136:             _publish_job_report_locked(job, path, doc)
+2137:         # suggest allowlisting any string whose EVERY instance was disabled —
+2138:         # the review just taught us it's a recurring false positive
+2139:         per = {}
+2140:         for d in doc["detections"]:
+2141:             if d["category"] in ("name",):
+2142:                 per.setdefault(d["text"], []).append(d.get("enabled", True))
+2143:         suggest = sorted(t for t, states in per.items()
+2144:                          if len(states) >= 2 and not any(states))
+2145:         return jsonify({"ok": True, "total": len(doc["detections"]),
+2146:                         "suggest_allowlist": suggest})
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 2170-2218
+
+2170:         with files.report_lock:
+2171:             _edit_gate(job)
+2172:             if job.get("video") != current or files.operation is not operation:
+2173:                 abort(409, "job operation or source changed — retry tracking")
+2174:             if ((files.tracker is not None and not files.tracker.released)
+2175:                     or job.get("trackbg", {}).get("state") == "running"):
+2176:                 abort(409, "tracking already in progress")
+2177:             if job["cancel"].is_set():
+2178:                 if files.work > 1:
+2179:                     abort(409, "cancelled job work is still cleaning up")
+2180:                 job["cancel"].clear()
+2181:             lease.operation = threading.Event()
+2182:             files.operation = lease.operation
+2183:             job["cancel"] = lease.operation
+2184:             files.tracker = lease
+2185:             job["trackbg"] = st
+2186:     except BaseException:
+2187:         lease.release()
+2188:         raise
+2189: 
+2190:     def _run():
+2191:         try:
+2192:             class L(openscrub.Callbacks):
+2193:                 def log(self, m):
+2194:                     job["log"].append(m)
+2195:                 def cancelled(self):
+2196:                     return lease.operation.is_set()
+2197:             det = None
+2198:             try:
+2199:                 # same person-model resolution the scan uses: the panel
+2200:                 # selection first, then the engine's default ladder
+2201:                 mid = load_model_select().get("person")
+2202:                 p = find_model_file("%s.onnx" % mid) if mid else None
+2203:                 det = openscrub.PersonDetector(L(), model_path=p,
+2204:                                                thresh=0.2)
+2205:                 if det.net is None and det.ort is None:
+2206:                     det = None
+2207:             except Exception:
+2208:                 det = None
+2209:             samples = openscrub.track_manual_region(
+2210:                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+2211:             with files.report_lock:
+2212:                 if (not _operation_valid(job, lease)
+2213:                         or job.get("trackbg") is not st or lease.operation.is_set()):
+2214:                     return
+2215:                 if not samples:
+2216:                     st.update(state="done", added=0,
+2217:                               error="could not track that region — try a "
+2218:                                     "larger box or a frame where it's clearer")
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 2247-2268
+
+2247:                 # grace pads: cover the sub-sample sliver at both ends
+2248:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+2249:                 new[-1]["t_end"] += 0.25
+2250:                 doc["detections"].extend(new)
+2251:                 path = os.path.join(job["dir"], "report.json")
+2252:                 _publish_job_report_locked(job, path, doc)
+2253:                 job["log"].append(
+2254:                     "      tracked object: %d position(s), %.1f-%.1fs "
+2255:                     "(review card added)" % (len(new),
+2256:                                              new[0]["t_start"], new[-1]["t_end"]))
+2257:                 st.update(state="done", added=len(new))
+2258:         except Exception as e:
+2259:             with files.report_lock:
+2260:                 if _operation_valid(job, lease) and job.get("trackbg") is st:
+2261:                     st.update(state="done", added=0, error=str(e))
+2262: 
+2263:     try:
+2264:         _start_owned_thread(_run, lease)
+2265:     except BaseException:
+2266:         st.update(state="done", added=0, error="tracking could not start")
+2267:         raise
+2268:     return jsonify({"ok": True})
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 3532-3598
+
+3532: let BE=emptyEditor();
+3533: // Display geometry belongs to this DOM mount, never to a retained draft.
+3534: let BE_VIEW=null;
+3535: function beEndGesture(editor,cv){
+3536:  editor.drag=null;editor.addAnchor=null;editor.addFloat=null;
+3537:  if(editor.pointerId!=null){
+3538:   try{cv.releasePointerCapture(editor.pointerId);}catch(e){}
+3539:   delete editor.pointerId;
+3540:  }
+3541: }
+3542: function beUnmount(){
+3543:  const view=BE_VIEW;if(!view)return;
+3544:  BE_VIEW=null;view.observer.disconnect();
+3545:  beEndGesture(view.editor,view.cv);
+3546: }
+3547: // A panel transition may retain the mounted editor. Dispose only its removed
+3548: // subtree, before DOM replacement, so retained video/gestures keep their owner.
+3549: function beUnmountIn(root){
+3550:  const view=BE_VIEW;if(!view||!root?.contains?.(view.cv))return;
+3551:  beUnmount();
+3552:  try{if(view.vid&&!view.vid.paused){view.editor.playing=false;view.vid.pause();}}catch(e){}
+3553: }
+3554: function beMount(img,vid,cv,id,gen,editor){
+3555:  beUnmount();
+3556:  const view={img,vid,cv,id,gen,editor,transform:null};
+3557:  view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
+3558:   document.getElementById("beCv")===cv;
+3559:  view.sync=()=>{
+3560:   if(!view.current())return null;
+3561:   const media=editor.playing?vid:img,r=media.getBoundingClientRect();
+3562:   const sw=media===vid?vid.videoWidth:img.naturalWidth,
+3563:         sh=media===vid?vid.videoHeight:img.naturalHeight;
+3564:   const loaded=media===vid?vid.readyState>=1:img.complete;
+3565:   const valid=loaded&&[sw,sh,r.width,r.height].every(n=>Number.isFinite(n)&&n>0);
+3566:   const old=view.transform;
+3567:   if(!valid){
+3568:    if(old){beEndGesture(editor,cv);view.transform=null;}
+3569:    cv.width=0;cv.height=0;cv.style.width="0px";cv.style.height="0px";
+3570:    return null;
+3571:   }
+3572:   const changed=!old||old.media!==media||old.sw!==sw||old.sh!==sh||
+3573:    old.width!==r.width||old.height!==r.height;
+3574:   if(changed){
+3575:    beEndGesture(editor,cv);
+3576:    // CSS coordinates keep handles/strokes constant. Rounded backing sizes
+3577:    // have their own X/Y ratio, so fractional CSS dimensions lose no scale.
+3578:    const dpr=window.devicePixelRatio||1;
+3579:    cv.width=Math.max(1,Math.round(r.width*dpr));
+3580:    cv.height=Math.max(1,Math.round(r.height*dpr));
+3581:    cv.style.width=r.width+"px";cv.style.height=r.height+"px";
+3582:    view.transform={media,sw,sh,width:r.width,height:r.height,
+3583:     sx:r.width/sw,sy:r.height/sh};
+3584:    editor.scale=r.width/sw;
+3585:    beDraw();
+3586:   }
+3587:   return view.transform;
+3588:  };
+3589:  view.observer=new ResizeObserver(()=>view.sync());
+3590:  BE_VIEW=view;view.observer.observe(img);view.observer.observe(vid);
+3591:  return view;
+3592: }
+3593: async function loadBoxEdit(fromReview){
+3594:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3595:  showPanel(fromReview?"boxedit_rev":"boxedit");
+3596:  const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+3597:  if(!ownsView(id,gen)||BE!==editor)return;
+3598:  // in review: the slot right under the Preview button; on done: the actions slot
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 3645-3657
+
+3645:    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+3646:  const img=document.getElementById("beImg"),bv=document.getElementById("beVid"),
+3647:        cv=document.getElementById("beCv");
+3648:  const view=beMount(img,bv,cv,id,gen,editor);
+3649:  img.onload=()=>{if(view.current()&&!BE.playing){view.sync();beDraw();}};
+3650:  bv.addEventListener("loadedmetadata",()=>{if(view.current())view.sync();});
+3651:  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+3652:  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+3653:  saveStatus(EDITS,EDITS.status);
+3654:  beHook();tlHook();await tlInit();
+3655:  if(ownsView(id,gen)&&BE===editor)beScrub();
+3656: }
+3657: 
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 3856-3892
+
+3856: async function beTrackGo(box){
+3857:  const st=document.getElementById("beTrkSt");st.style.display="inline";
+3858:  st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
+3859:  const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
+3860:   headers:{"Content-Type":"application/json"},
+3861:   body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
+3862:  if(!r.ok){st.textContent="tracking failed to start";return;}
+3863:  const poll=setInterval(async()=>{
+3864:   const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
+3865:   if(d.state!=="running"){
+3866:    clearInterval(poll);
+3867:    st.textContent=d.error?("⚠ "+d.error)
+3868:     :`tracked ✓ ${d.added} position(s) — review card added`;
+3869:    if(!d.error){await tlInit();beScrub();
+3870:     if(document.getElementById("review"))loadReview();}
+3871:   }
+3872:  },1500);
+3873: }
+3874: async function beScrub(){
+3875:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3876:  const sl=document.getElementById("beT");if(!sl)return; // editor was closed
+3877:  if(BE.playing){               // dragging the slider while playing = seek
+3878:   const v=document.getElementById("beVid");
+3879:   if(v)v.currentTime=+sl.value;
+3880:   return;                      // the rAF loop keeps label/boxes in sync
+3881:  }
+3882:  BE.sel=-1;document.getElementById("beRm").style.display="none";
+3883:  document.getElementById("beTimes").style.display="none";
+3884:  BE.t=+document.getElementById("beT").value;
+3885:  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+3886:  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+3887:  if(BE_VIEW)BE_VIEW.sync();
+3888:  const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+3889:  if(!ownsView(id,gen)||BE!==editor)return;
+3890:  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
+3891:  beFilter();beDraw();beTLDraw();
+3892: }
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 3971-3984
+
+3971: function beHook(){
+3972:  const cv=document.getElementById("beCv"),view=BE_VIEW;
+3973:  const pt=e=>{
+3974:   const tr=view&&view.sync();if(!tr||BE.playing)return null;
+3975:   const r=cv.getBoundingClientRect();
+3976:   return[(e.clientX-r.left)/tr.sx,(e.clientY-r.top)/tr.sy];};
+3977:  cv.addEventListener("pointerdown",e=>{
+3978:   const p=pt(e);if(!p)return;
+3979:   cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
+3980:   if(BE.trk){
+3981:    // Track object: same two-click box draw as Add box, but on completion
+3982:    // the region is template-tracked through the active timeline window
+3983:    if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+3984:    else{
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub.py 2449-2517
+
+2449: def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+2450:                         step_frames=2, thr=0.55, scale=0.5,
+2451:                         person_det=None):
+2452:     """Track a user-drawn screen-space box through [t0, t1], starting
+2453:     from its appearance at t_ref and walking both directions. This powers
+2454:     targeted redaction: circle anything the detectors don't know (a
+2455:     tattoo, a badge, a specific person) on one frame, pick the time
+2456:     window, and the blur follows it.
+2457: 
+2458:     Primary engine: cv2.TrackerVit (learned tracker, auto-downloaded
+2459:     pinned model) — survives scale change, turning, and appearance drift
+2460:     that plain template matching cannot (a subject walking toward the
+2461:     camera killed the old matcher in ~1s; VitTrack held the full clip).
+2462:     Fallback engine: multi-scale template matching (NCC on half-scale
+2463:     smoothed grayscale, template refresh gated on confidence >0.80).
+2464: 
+2465:     FAIL CLOSED on loss: when the engine loses the object mid-frame, the
+2466:     box FREEZES in place and coverage continues to the window edge — the
+2467:     blur may go stale but it never silently vanishes (the old behaviour
+2468:     ended the span, un-blurring the subject; a real user hit this).
+2469:     Coverage only ENDS early when the object visibly leaves the frame
+2470:     (frozen box touching the frame edge). Held samples carry score 0.0
+2471:     so review can show where the lock was lost.
+2472: 
+2473:     Returns [(t, (x1, y1, x2, y2), score), ...] sorted by t — screen-space
+2474:     boxes, one per step_frames. Empty if the video/box is unusable."""
+2475:     log = (cb.log if cb else print)
+2476: 
+2477:     def _check_cancelled():
+2478:         if cb is not None and cb.cancelled():
+2479:             raise PipelineCancelled()
+2480: 
+2481:     # Cancellation takes precedence even when the input is unusable.
+2482:     _check_cancelled()
+2483:     cap = cv2.VideoCapture(video)
+2484:     try:
+2485:         if not cap.isOpened():
+2486:             return []
+2487:         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+2488:         step = max(1, int(step_frames)) / fps
+2489:         t_ref = min(max(t_ref, t0), t1)
+2490:         W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
+2491:         H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+2492: 
+2493:         def _frame(t):
+2494:             return _grab_frame(cap, t, fps)
+2495: 
+2496:         def _left_frame(b):
+2497:             # the object is gone only when the box CENTER walks off-screen —
+2498:             # a box mid-dip can balloon to touch every edge while the object
+2499:             # is still dead centre (seen on real footage)
+2500:             cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+2501:             return not (0.02 * W < cx < 0.98 * W and 0.02 * H < cy < 0.98 * H)
+2502: 
+2503:         if (box[2] - box[0]) * scale < 8 or (box[3] - box[1]) * scale < 8:
+2504:             log("      track: region too small to track reliably")
+2505:             return []
+2506: 
+2507:         if person_det is not None:
+2508:             # a drawn box that CONTAINS A PERSON gets detector-driven
+2509:             # tracking: body-tight boxes + silhouettes every frame, immune
+2510:             # to the scale/appearance drift that plagues generic trackers
+2511:             try:
+2512:                 # detector masks are repainted at every sample; at the default
+2513:                 # 2-frame cadence the outline visibly STEPS/flickers at half
+2514:                 # the frame rate (real footage) — detect EVERY frame instead
+2515:                 ps = _track_person_dense(video, box, t_ref, t0, t1,
+2516:                                          person_det, log, step_frames=1,
+2517:                                          cancelled=(cb.cancelled if cb else None))
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub.py 2555-2595
+
+2555:                 out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
+2556:                 t2 += direction * step
+2557: 
+2558:         vit = _vittrack_factory(log)
+2559:         _check_cancelled()
+2560:         if vit is not None:
+2561:             fr0 = None
+2562:             for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+2563:                 ts = t_ref + dt
+2564:                 if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+2565:                     continue
+2566:                 fr0 = _frame(ts)
+2567:                 if fr0 is not None:
+2568:                     t_ref = ts
+2569:                     break
+2570:             if fr0 is None:
+2571:                 log("      track: could not READ the video near t=%.1fs — "
+2572:                     "cannot start tracking there (is the clip shorter than "
+2573:                     "expected?)" % t_ref)
+2574:                 return []
+2575:             sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
+2576:             for direction in (1, -1):
+2577:                 trk = vit()
+2578:                 trk.init(sm0, (int(box[0] * scale), int(box[1] * scale),
+2579:                                max(8, int((box[2] - box[0]) * scale)),
+2580:                                max(8, int((box[3] - box[1]) * scale))))
+2581:                 cur = [float(v) for v in box]
+2582:                 held = False
+2583:                 t = t_ref
+2584:                 if direction == 1:  # forward: sequential reads, no re-seeking
+2585:                     # robust prime: positions the decoder just past t_ref's
+2586:                     # frame even when random POS_MSEC seek fails on this file
+2587:                     _grab_frame(cap, t_ref, fps)
+2588:                     rev = None
+2589:                 else:
+2590:                     # backward: chunked forward reads served in reverse — a
+2591:                     # per-step backward seek decodes keyframe-to-target every
+2592:                     # step (from frame ZERO on a single-keyframe export)
+2593:                     rev = _RevReader(cap, fps)
+2594:                 while True:
+2595:                     if cb is not None and cb.cancelled():
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub.py 2660-2680
+
+2660: 
+2661:         # ---- template fallback (no TrackerVit / no model) ----------------
+2662:         def _gray(t):
+2663:             fr = _frame(t)
+2664:             if fr is None:
+2665:                 return None
+2666:             g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+2667:                            fx=scale, fy=scale)
+2668:             return cv2.GaussianBlur(g, (3, 3), 0)
+2669: 
+2670:         g0 = _gray(t_ref)
+2671:         if g0 is None:
+2672:             return []
+2673:         gh, gw = g0.shape[:2]
+2674:         x1 = max(0, int(box[0] * scale)); y1 = max(0, int(box[1] * scale))
+2675:         x2 = min(gw, int(box[2] * scale)); y2 = min(gh, int(box[3] * scale))
+2676:         if x2 - x1 < 8 or y2 - y1 < 8:
+2677:             log("      track: region too small to track reliably")
+2678:             return []
+2679:         tmpl0 = g0[y1:y2, x1:x2]
+2680:         if float(tmpl0.std()) < 4:
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub.py 6610-6675
+
+6610: def _report_document(args, state, output_path=None, output_bytes_path=None):
+6611:     prov = {
+6612:         "tool": "openscrub", "version": VERSION,
+6613:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6614:         "input": os.path.abspath(args.video),
+6615:         "input_sha256": state.get("input_sha256"),
+6616:         "original_input": (os.path.abspath(args.original_video)
+6617:                            if getattr(args, "original_video", None) else None),
+6618:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6619:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6620:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6621:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6622:         "zones": getattr(args, "zones_data", None),
+6623:         "windows": getattr(args, "windows_data", None),
+6624:         "settings": _settings_dict(args),
+6625:     }
+6626:     output_bytes_path = output_bytes_path or output_path
+6627:     if output_path and os.path.exists(output_bytes_path):
+6628:         prov["output"] = os.path.abspath(output_path)
+6629:         prov["output_sha256"] = sha256_file(output_bytes_path)
+6630:     source = state.get("source_report")
+6631:     if source is not None:
+6632:         # A render consumes enabled Detection objects, but publishes the full
+6633:         # review document: Keep choices, row positions and unknown fields are
+6634:         # user data, not a serialization of the render subset.
+6635:         doc = dict(source)
+6636:         previous = dict(source.get("provenance", {}))
+6637:         settings = dict(previous.get("settings", {}))
+6638:         settings.update(prov["settings"])
+6639:         prov["settings"] = settings
+6640:         # Output hashes/paths must describe this render, never an older one.
+6641:         previous.pop("output", None)
+6642:         previous.pop("output_sha256", None)
+6643:         previous.update(prov)
+6644:         doc["provenance"] = previous
+6645:     else:
+6646:         doc = {
+6647:             "provenance": prov,
+6648:             "render_state": {
+6649:                 "fps": state["fps"],
+6650:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6651:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6652:             },
+6653:             "detections": ([dict(asdict(d), enabled=True)
+6654:                             for d in state["detections"]]
+6655:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6656:                               for d in state.get("zdropped", [])]),
+6657:         }
+6658:         if state.get("audio_suggestions"):
+6659:             doc["audio_suggestions"] = state["audio_suggestions"]
+6660:         if state.get("audio_transcript"):
+6661:             doc["audio_transcript"] = state["audio_transcript"]
+6662:     aspans = getattr(args, "audio_spans", None)
+6663:     if ((source is None and aspans)
+6664:             or (source is not None and state.get("audio_redactions_overridden"))):
+6665:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6666:         # saved representation, including additive fields on individual spans.
+6667:         doc["audio_redactions"] = [
+6668:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6669:     # Construction and output hashing precede an optional caller-owned final
+6670:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6671:     return doc
+6672: 
+6673: 
+6674: def write_report(path, args, state, output_path=None, publisher=None):
+6675:     (publisher or atomic_report)(path, _report_document(args, state, output_path))
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub.py 8864-8902
+
+8864:                "the visually-lossless default)")
+8865:     summary = dict(state["stats"], output=dst)
+8866:     with _RenderDelivery(dst, args.report) as delivery:
+8867:         if getattr(args, "hdr_source", None) and not args.preview:
+8868:             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
+8869:                        state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+8870:                        encoder=args.hdr_encoder,
+8871:                        tags=getattr(args, "hdr_tags", {}),
+8872:                        face_shape=getattr(args, "face_shape", "ellipse"),
+8873:                        mode_map=getattr(args, "mode_map", None),
+8874:                        audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+8875:                        out_quality=out_q,
+8876:                        audio_lanes=getattr(args, "audio_lane_count", None))
+8877:         else:
+8878:             _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
+8879:                    state["bands"],
+8880:                    state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+8881:                    mode_map=getattr(args, "mode_map", None),
+8882:                    draw_scores=bool(getattr(args, "draw_scores", False)),
+8883:                    vcodec=getattr(args, "codec", "h264"),
+8884:                    face_shape=getattr(args, "face_shape", "ellipse"),
+8885:                    encoder=args.encoder, audio_spans=aspans, clip=clip,
+8886:                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8887:                    audio_lanes=getattr(args, "audio_lane_count", None))
+8888:         if args.report:
+8889:             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
+8890:                                     legacy_publisher=(None if getattr(cb, "publish_render", None)
+8891:                                                       else getattr(cb, "publish_report", None)))
+8892:             cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8893:         cb.log("done.")
+8894:         delivery.prepare_rollback()
+8895:         publish = getattr(cb, "publish_render", None)
+8896:         if publish:
+8897:             publish(delivery, summary)
+8898:         else:
+8899:             if cb.cancelled():
+8900:                 raise PipelineCancelled()
+8901:             delivery.commit()
+8902:     return summary
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/lifetimes.py 1-75
+
+1: """In-process web file ownership. Reserve/inspect only under the web guard.
+2: 
+3: Per-job state also owns the report transaction lock and operation identity.
+4: This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
+5: """
+6: 
+7: import threading
+8: 
+9: 
+10: class _JobFiles:
+11:     def __init__(self):
+12:         self.count = 0
+13:         self.work = 0
+14:         self.closed = False
+15:         self.queued = {}
+16:         self.tracker = None
+17:         # Initialized before a new/rehydrated job enters the registry. Never
+18:         # persisted: one stable transaction boundary per live job identity.
+19:         self.report_lock = threading.Lock()
+20:         self.operation = None
+21:         self.active = None
+22:         self.output_epoch = 0
+23:         self.recovery_required = False
+24:         self.recovery_diagnostics = ()
+25: 
+26: 
+27: class FileOwners:
+28:     def __init__(self, guard):
+29:         self.guard = guard
+30:         self.count = 0
+31: 
+32:     @staticmethod
+33:     def initialize(job):
+34:         return job.setdefault("_files", _JobFiles())
+35: 
+36:     def reserve(self, job=None, work=False):
+37:         state = self.initialize(job) if job is not None else None
+38:         self.count += 1
+39:         if state is not None:
+40:             state.count += 1
+41:             state.work += int(work)
+42:         return _Lease(self, state, work)
+43: 
+44: 
+45: class _Lease:
+46:     def __init__(self, owners, state, work):
+47:         self.owners, self.state, self.work = owners, state, work
+48:         self.released = False
+49:         self.related = []
+50:         self.source = None
+51:         self.source_job = None
+52:         self.source_state = None
+53:         self.report_input = False
+54:         self.operation = None
+55: 
+56:     def release_locked(self):
+57:         if self.released:
+58:             return
+59:         self.released = True
+60:         for lease in self.related:
+61:             lease.release_locked()
+62:         self.owners.count -= 1
+63:         if self.state is not None:
+64:             self.state.count -= 1
+65:             self.state.work -= int(self.work)
+66: 
+67:     def release(self):
+68:         with self.owners.guard:
+69:             self.release_locked()
+70: 
+71:     def __enter__(self):
+72:         return self
+73: 
+74:     def __exit__(self, *exc):
+75:         self.release()
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/reports.py 1-52
+
+1: """Publish complete report JSON without truncating the previous report."""
+2: from contextlib import contextmanager
+3: import json
+4: import os
+5: import tempfile
+6: 
+7: 
+8: @contextmanager
+9: def _staged_report(path, report):
+10:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+11: 
+12:     A failure before replacement leaves the previous report intact and raises.
+13:     Readers opening the path see a complete old or new report on filesystems
+14:     supporting atomic replacement. This does not serialize read/apply/write
+15:     transactions or guarantee power-loss durability: the directory is not
+16:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+17:     destination may prevent replacement; that failure is propagated. Temporary
+18:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+19:     are 0600; Windows access restrictions also depend on the directory ACL.
+20:     """
+21:     path = os.path.abspath(path)
+22:     staged = None
+23:     try:
+24:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+25:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+26:                                          dir=os.path.dirname(path),
+27:                                          prefix=".report-", suffix=".tmp",
+28:                                          delete=False) as stream:
+29:             staged = stream.name
+30:             # Consume the public encoder iterator in TextIOWrapper rather than
+31:             # dispatching one Python stream.write call for every JSON token.
+32:             # Tokens remain streamed; a single large string is still one token.
+33:             stream.writelines(json.JSONEncoder(indent=1).iterencode(report))
+34:             stream.flush()
+35:             os.fsync(stream.fileno())
+36:         # Close first: Windows cannot rename an open staging file.
+37:         yield staged
+38:     finally:
+39:         if staged is not None:
+40:             try:
+41:                 os.unlink(staged)
+42:             except OSError:
+43:                 # After replace the name is gone. On cleanup failure leave a
+44:                 # .tmp for vault crash cleanup without masking the write error.
+45:                 pass
+46: 
+47: 
+48: def atomic_report(path, report) -> None:
+49:     """Publish one closed shared-serializer stage."""
+50:     with _staged_report(path, report) as staged:
+51:         os.replace(staged, os.path.abspath(path))
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/render_delivery.py 129-182
+
+129:     def commit(self, *, before_mutation=None, publish_success=None, restore_success=None):
+130:         if self.committed:
+131:             raise RuntimeError('render delivery already committed')
+132:         if not self._prepared:
+133:             raise RuntimeError('render rollback must be prepared before commit')
+134:         if any(_identity(old['path']) != old['identity'] for old in self._old):
+135:             raise RuntimeError('render destination changed before publication')
+136:         attempted = []
+137:         try:
+138:             for old in self._old:
+139:                 attempted.append(old)
+140:                 if before_mutation:
+141:                     before_mutation()
+142:                 if old['role'] == 'video':
+143:                     os.replace(self.video_stage, self.video_path)
+144:                 elif self._legacy is not None:
+145:                     self._legacy(self.report_path, self._doc)
+146:                 else:
+147:                     os.replace(self._report_stage, self.report_path)
+148:             if publish_success:
+149:                 publish_success()
+150:             # Last fallible authoritative action; backups are still present.
+151:             os.unlink(self._descriptor)
+152:             self._descriptor = None
+153:             self.committed = True
+154:         except BaseException as primary:
+155:             diagnostics = []
+156:             if restore_success:
+157:                 try:
+158:                     restore_success()
+159:                 except BaseException as error:
+160:                     diagnostics.append('terminal restoration: ' + type(error).__name__)
+161:             for old in reversed(attempted):
+162:                 try:
+163:                     if before_mutation:
+164:                         before_mutation()
+165:                     if old['backup'] is not None:
+166:                         os.replace(old['backup'], old['path'])
+167:                         old['backup'] = None
+168:                     else:
+169:                         try:
+170:                             os.unlink(old['path'])
+171:                         except FileNotFoundError:
+172:                             pass
+173:                 except BaseException as error:
+174:                     diagnostics.append(old['role'] + ' restoration: ' + type(error).__name__)
+175:             if not diagnostics:
+176:                 try:
+177:                     os.unlink(self._descriptor)
+178:                     self._descriptor = None
+179:                 except BaseException as error:
+180:                     diagnostics.append('descriptor retirement: ' + type(error).__name__)
+181:             if diagnostics:
+182:                 self.recovery_required = True
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/job_logs.py 1-22
+
+1: """Bounded, in-memory job messages with atomic absolute cursor snapshots.
+2: 
+3: Only plain strings are accepted (TypeError otherwise, without conversion).
+4: Lone surrogates become '?' via UTF-8's replacement policy. Normalization
+5: copies at most MAX_ENTRY_BYTES codepoints before encoding, even for enormous
+6: inputs. Payload limits exclude caller inputs, Python overhead, detached
+7: snapshots, JSON escaping, and browser history. No callbacks or job locks run
+8: under the local store lock.
+9: """
+10: from collections import deque
+11: from threading import Lock
+12: from uuid import uuid4
+13: 
+14: MAX_ENTRIES = 2000
+15: MAX_BYTES = 512 * 1024
+16: MAX_ENTRY_BYTES = 8 * 1024
+17: TRUNCATION_SUFFIX = '... [message truncated]'
+18: 
+19: 
+20: class JobLog:
+21:     """One store per constructed job; retry keeps this store and epoch."""
+22: 
+
+## combined c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/job_logs.py 64-89
+
+64: 
+65:     def snapshot(self, cursor=0, epoch=None, *, tail=None):
+66:         """Detach one coherent interval; JSON encoding belongs outside the lock.
+67: 
+68:         Tail snapshots supply metadata. Cursor snapshots prioritize epoch,
+69:         stale, then future resets. `len` is absolute next, never deque length.
+70:         """
+71:         cursor = max(0, cursor)
+72:         with self._lock:
+73:             reset = None
+74:             if tail is not None:
+75:                 start = max(self._base, self._next - tail)
+76:             elif epoch is not None and epoch != self._epoch:
+77:                 start, reset = self._base, 'epoch'
+78:             elif cursor < self._base:
+79:                 start, reset = self._base, 'stale'
+80:             elif cursor > self._next:
+81:                 start, reset = self._base, 'future'
+82:             else:
+83:                 start = cursor
+84:             lines = [text for i, (text, _) in enumerate(self._entries, self._base)
+85:                      if i >= start]
+86:             return {'from': start, 'lines': lines, 'len': self._next,
+87:                     'epoch': self._epoch, 'base': self._base, 'reset': reset,
+88:                     'dropped': self._base, 'truncated': self._truncated,
+89:                     'retained': len(self._entries), 'bytes': self._bytes}
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1088-1101
+
+1088:             if not owner.report_input:  # compatibility with older queue entries
+1089:                 _select_render_input(job, owner)
+1090:             args = build_args(dict(job, video=owner.source), for_render=True)
+1091:             args._report_input = owner.source
+1092:             res = openscrub.run_pipeline(args, cb)
+1093:             with files.report_lock:
+1094:                 if not _operation_valid(job, owner):
+1095:                     return
+1096:                 job["output"] = res["output"]
+1097:                 job["phase"] = "done"
+1098:                 job["progress"] = 1.0
+1099:                 job["eta"] = None
+1100:     except openscrub.PipelineCancelled:
+1101:         with files.report_lock:
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 1369-1443
+
+1369: def _delete_job(job):
+1370:     jid = job["id"]
+1371:     with VAULT_LOCK:
+1372:         _validate_files_locked(job)
+1373:         state = FILES.initialize(job)
+1374:         if state.count or job.get("phase") in _ACTIVE_PHASES:
+1375:             abort(409, "job files are still in use — wait for cleanup")
+1376:         state.closed = True
+1377:         lease = FILES.reserve()  # deletion owns the tree, not an admitted job
+1378:     with lease:
+1379:         with state.report_lock:
+1380:             state.operation = None
+1381:         if _reap_job_dir(job["dir"], jid):
+1382:             with JOBS_LOCK:
+1383:                 JOBS.pop(jid, None)
+1384:             return {"ok": True}
+1385:         try:
+1386:             with open(os.path.join(job["dir"], DELETE_MARKER), "w") as f:
+1387:                 f.write(str(time.time()))
+1388:         except OSError:
+1389:             pass
+1390:         with JOBS_LOCK:
+1391:             JOBS.pop(jid, None)
+1392: 
+1393:     def _retry():
+1394:         for _ in range(10):
+1395:             time.sleep(30)
+1396:             try:
+1397:                 # A retry does not keep the store busy during its sleep. If
+1398:                 # locked, leave the marker for unlock/startup/retention.
+1399:                 retry_lease = _own_files()
+1400:             except Exception:
+1401:                 continue
+1402:             with retry_lease:
+1403:                 if not os.path.isdir(job["dir"]):
+1404:                     return
+1405:                 if _reap_job_dir(job["dir"], jid, retries=1):
+1406:                     print(f"[web] job {jid} delete completed on retry", flush=True)
+1407:                     return
+1408:     threading.Thread(target=_retry, daemon=True).start()
+1409:     return {"ok": True, "pending": True,
+1410:             "note": "some files were still in use; removal will complete automatically"}
+1411: 
+1412: 
+1413: 
+1414: @app.route("/api/jobs/<jid>/retry", methods=["POST"])
+1415: def job_retry(jid):
+1416:     """Re-run a failed or cancelled job's SCAN, reusing the file that is
+1417:     already on the server. Before this existed, the only path after an
+1418:     error was Start scan — which uploaded the same multi-GB file into a
+1419:     fresh job dir on every attempt until the disk filled (issue #16)."""
+1420:     job = JOBS.get(jid) or abort(404)
+1421:     prepared = _prepare_work(job, "scan")
+1422:     ticket = None
+1423:     try:
+1424:         video = prepared.source
+1425:         exists = bool(video and os.path.exists(video))
+1426:         with FILES.initialize(job).report_lock:
+1427:             _report_current(job)
+1428:             if (FILES.initialize(job).active is not None
+1429:                     or FILES.initialize(job).work > 1):
+1430:                 return jsonify({"error": "job work is still cleaning up"}), 409
+1431:             if job["phase"] not in ("error", "cancelled"):
+1432:                 return jsonify({"error": "only a failed or cancelled job can be retried"}), 409
+1433:             if not exists:
+1434:                 return jsonify({"error": "the job's video file is no longer on the server — start a new scan"}), 410
+1435:             job.update(error=None, output=None, progress=0.0, eta=None)
+1436:             job["log"].append("— retrying scan (reusing the file already on the server — nothing is re-uploaded) —")
+1437:             ticket = _reserve_queue_locked(job, "scan", prepared)
+1438:     finally:
+1439:         if ticket is None:
+1440:             prepared.release()
+1441:     enqueue(job, "scan", ticket)
+1442:     return jsonify({"ok": True})
+1443: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py 4445-4546
+
+4445: def _rehydrate_jobs():
+4446:     """Re-register jobs found on disk after a restart. A job with a report
+4447:     is a reviewable job; one with an output file is a finished one — either
+4448:     way the person's work survives the server going down."""
+4449:     n = 0
+4450:     for jid in sorted(os.listdir(JOBS_DIR)):
+4451:         jdir = os.path.join(JOBS_DIR, jid)
+4452:         rep = os.path.join(jdir, "report.json")
+4453:         if not os.path.isdir(jdir):
+4454:             continue
+4455:         if os.path.exists(os.path.join(jdir, DELETE_MARKER)):
+4456:             # the user deleted this job but a file was still held open at
+4457:             # the time — finish the removal instead of resurrecting the
+4458:             # job as a zombie (restarts release whatever held the lock)
+4459:             _reap_job_dir(jdir, jid, retries=1)
+4460:             continue
+4461:         if jid in JOBS:
+4462:             continue
+4463:         if not os.path.exists(rep):
+4464:             # NO report: the scan never completed (crashed or the server
+4465:             # went down mid-scan). If the dir still holds an uploaded
+4466:             # input, surface it as a FAILED job instead of skipping it —
+4467:             # a skipped dir was an invisible orphan the UI could neither
+4468:             # retry nor delete, silently eating an 18 GB upload per
+4469:             # failed attempt (issue #16).
+4470:             up = next((os.path.join(jdir, "input" + e)
+4471:                        for e in sorted(MEDIA_EXTS)
+4472:                        if os.path.exists(os.path.join(jdir, "input" + e))),
+4473:                       None)
+4474:             if not up:
+4475:                 continue
+4476:             try:
+4477:                 size = os.path.getsize(up)
+4478:             except OSError:
+4479:                 size = 0
+4480:             opts = {}
+4481:             try:
+4482:                 with open(os.path.join(jdir, OPTIONS_FILE),
+4483:                           encoding="utf-8") as f:
+4484:                     opts = json.load(f)
+4485:                 if not isinstance(opts, dict):
+4486:                     opts = {}
+4487:             except (OSError, ValueError):
+4488:                 opts = {}
+4489:             job = {
+4490:                 "id": jid, "dir": jdir, "video": up,
+4491:                 "name": os.path.basename(up), "options": opts,
+4492:                 "phase": "error", "progress": 0.0, "size": size,
+4493:                 "log": ["(recovered after server restart — the scan had "
+4494:                         "not completed)"],
+4495:                 "error": "recovered after a server restart before the "
+4496:                          "scan finished — Retry re-runs it with "
+4497:                          + ("its original settings" if opts else
+4498:                             "default settings")
+4499:                          + " (the uploaded file was kept), or "
+4500:                          "Delete frees its disk space",
+4501:                 "output": None, "created": os.path.getmtime(jdir),
+4502:                 "cancel": threading.Event(), "stats": {},
+4503:             }
+4504:             FILES.initialize(job)
+4505:             with JOBS_LOCK:
+4506:                 JOBS[jid] = job
+4507:             n += 1
+4508:             continue
+4509:         try:
+4510:             with open(rep, encoding="utf-8") as f:
+4511:                 prov = json.load(f).get("provenance", {})
+4512:             video = prov.get("input")
+4513:             if not video or not os.path.exists(video):
+4514:                 continue
+4515:             out = os.path.join(jdir, "output.mp4")
+4516:             has_out = os.path.exists(out)
+4517:             job = {
+4518:                 "id": jid, "dir": jdir, "video": video,
+4519:                 "name": os.path.basename(prov.get("original_input")
+4520:                                           or video),
+4521:                 "options": prov.get("settings", {}) or {},
+4522:                 "phase": "done" if has_out else "review",
+4523:                 "progress": 1.0 if has_out else 0.5,
+4524:                 "log": ["(recovered after server restart)"],
+4525:                 "error": None, "output": out if has_out else None,
+4526:                 "created": os.path.getmtime(jdir),
+4527:                 "cancel": threading.Event(), "stats": {},
+4528:             }
+4529:             try:
+4530:                 # original upload size, for the editor's duplicate-upload
+4531:                 # warning (prov input may be the normalized scan copy)
+4532:                 orig = next((os.path.join(jdir, "input" + e)
+4533:                              for e in sorted(MEDIA_EXTS)
+4534:                              if os.path.exists(
+4535:                                  os.path.join(jdir, "input" + e))), video)
+4536:                 job["size"] = os.path.getsize(orig)
+4537:             except OSError:
+4538:                 pass
+4539:             FILES.initialize(job)
+4540:             with JOBS_LOCK:
+4541:                 JOBS[jid] = job
+4542:             n += 1
+4543:         except Exception:
+4544:             continue
+4545:     if n:
+4546:         print(f"  recovered {n} job(s) from {JOBS_DIR}")
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py 8513-8520
+
+8513:                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8514:                audio_lanes=getattr(args, "audio_lane_count", None))
+8515:     if args.report:
+8516:         write_report(args.report, args, state, output_path=dst,
+8517:                      publisher=getattr(cb, "publish_report", None))
+8518:         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8519:     cb.log("done.")
+8520:     return dict(state["stats"], output=dst)
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1082-1115
+
+1082:     def publish_render(delivery, summary):
+1083:         nonlocal committed
+1084:         with files.report_lock:
+1085:             _recovery_gate(job)
+1086:             if not _operation_valid(job, owner) or owner.operation.is_set():
+1087:                 raise openscrub.PipelineCancelled()
+1088:             missing = object()
+1089:             keys = ("output", "phase", "progress", "eta", "error")
+1090:             previous = {key: job.get(key, missing) for key in keys}
+1091:             def success():
+1092:                 job["output"] = summary["output"]
+1093:                 job["phase"] = "done"
+1094:                 job["progress"] = 1.0
+1095:                 job["eta"] = None
+1096:                 job["error"] = None
+1097:             def restore():
+1098:                 for key, value in previous.items():
+1099:                     if value is missing:
+1100:                         job.pop(key, None)
+1101:                     else:
+1102:                         job[key] = value
+1103:             def mutate():
+1104:                 files.output_epoch += 1
+1105:             try:
+1106:                 delivery.commit(before_mutation=mutate, publish_success=success,
+1107:                                 restore_success=restore)
+1108:             except _DeliveryRecoveryError as error:
+1109:                 files.recovery_required = True
+1110:                 files.recovery_diagnostics = error.rollback_diagnostics
+1111:                 job.update(phase="error", error="render delivery requires recovery", eta=None)
+1112:                 raise
+1113:             committed = delivery.committed
+1114:     cb.publish_render = publish_render
+1115:     source = owner.source if owner is not None else job["video"]
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1215-1232
+
+1215:                     else:
+1216:                         job["phase"] = "review"
+1217:                     job["progress"] = 0.5
+1218:                     job["eta"] = None
+1219:             finally:
+1220:                 if next_owner is not None and ticket is None:
+1221:                     next_owner.release()
+1222:             if ticket is not None:
+1223:                 enqueue(job, "render", ticket)
+1224:         elif action == "render":
+1225:             if not owner.report_input:  # compatibility with older queue entries
+1226:                 _select_render_input(job, owner)
+1227:             args = build_args(dict(job, video=owner.source), for_render=True)
+1228:             args._report_input = owner.source
+1229:             res = openscrub.run_pipeline(args, cb)
+1230:             # Compatibility for substituted pipelines which do not use the new
+1231:             # hook. Actual renders publish their terminal fields inside it.
+1232:             if not committed:
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1527-1603
+
+1527: def _delete_job(job):
+1528:     jid = job["id"]
+1529:     with VAULT_LOCK:
+1530:         _validate_files_locked(job)
+1531:         state = FILES.initialize(job)
+1532:         if state.count or job.get("phase") in _ACTIVE_PHASES:
+1533:             abort(409, "job files are still in use — wait for cleanup")
+1534:         state.closed = True
+1535:         lease = FILES.reserve()  # deletion owns the tree, not an admitted job
+1536:     with lease:
+1537:         with state.report_lock:
+1538:             state.operation = None
+1539:         if _reap_job_dir(job["dir"], jid):
+1540:             with JOBS_LOCK:
+1541:                 JOBS.pop(jid, None)
+1542:             return {"ok": True}
+1543:         try:
+1544:             with open(os.path.join(job["dir"], DELETE_MARKER), "w") as f:
+1545:                 f.write(str(time.time()))
+1546:         except OSError:
+1547:             pass
+1548:         with JOBS_LOCK:
+1549:             JOBS.pop(jid, None)
+1550: 
+1551:     def _retry():
+1552:         for _ in range(10):
+1553:             time.sleep(30)
+1554:             try:
+1555:                 # A retry does not keep the store busy during its sleep. If
+1556:                 # locked, leave the marker for unlock/startup/retention.
+1557:                 retry_lease = _own_files()
+1558:             except Exception:
+1559:                 continue
+1560:             with retry_lease:
+1561:                 if not os.path.isdir(job["dir"]):
+1562:                     return
+1563:                 if _reap_job_dir(job["dir"], jid, retries=1):
+1564:                     print(f"[web] job {jid} delete completed on retry", flush=True)
+1565:                     return
+1566:     threading.Thread(target=_retry, daemon=True).start()
+1567:     return {"ok": True, "pending": True,
+1568:             "note": "some files were still in use; removal will complete automatically"}
+1569: 
+1570: 
+1571: 
+1572: @app.route("/api/jobs/<jid>/retry", methods=["POST"])
+1573: def job_retry(jid):
+1574:     """Re-run a failed or cancelled job's SCAN, reusing the file that is
+1575:     already on the server. Before this existed, the only path after an
+1576:     error was Start scan — which uploaded the same multi-GB file into a
+1577:     fresh job dir on every attempt until the disk filled (issue #16)."""
+1578:     job = JOBS.get(jid) or abort(404)
+1579:     prepared = _prepare_work(job, "scan")
+1580:     ticket = None
+1581:     try:
+1582:         video = prepared.source
+1583:         exists = bool(video and os.path.exists(video))
+1584:         with FILES.initialize(job).report_lock:
+1585:             _report_current(job)
+1586:             if (FILES.initialize(job).active is not None
+1587:                     or FILES.initialize(job).work > 1):
+1588:                 return jsonify({"error": "job work is still cleaning up"}), 409
+1589:             if job["phase"] not in ("error", "cancelled"):
+1590:                 return jsonify({"error": "only a failed or cancelled job can be retried"}), 409
+1591:             if not exists:
+1592:                 return jsonify({"error": "the job's video file is no longer on the server — start a new scan"}), 410
+1593:             job.update(error=None, output=None, progress=0.0, eta=None)
+1594:             job["log"].append("— retrying scan (reusing the file already on the server — nothing is re-uploaded) —")
+1595:             ticket = _reserve_queue_locked(job, "scan", prepared)
+1596:     finally:
+1597:         if ticket is None:
+1598:             prepared.release()
+1599:     enqueue(job, "scan", ticket)
+1600:     return jsonify({"ok": True})
+1601: 
+1602: 
+1603: @app.route("/api/jobs/<jid>")
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 1644-1679
+
+1644: def job_cancel(jid):
+1645:     """Cancel a job. The job the worker is RUNNING stops cooperatively at
+1646:     its next checkpoint. Any other active job (still queued, or orphaned by
+1647:     a worker that died) is cancelled on the spot — before, Cancel only set
+1648:     a flag the worker checks mid-scan, so a job the worker never picked up
+1649:     could never be cancelled (or deleted: delete refuses active jobs)."""
+1650:     job = JOBS.get(jid) or abort(404)
+1651:     files = FILES.initialize(job)
+1652:     operation = files.operation  # capture the operation this request cancels
+1653:     if operation is not None:
+1654:         operation.set()  # promptly signal compute, before waiting for report I/O
+1655:     released = []
+1656:     with files.report_lock:
+1657:         _report_current(job)
+1658:         if files.operation is not operation:
+1659:             # That attempt finished/replaced while this request waited. Do not
+1660:             # signal, invalidate or release a newer attempt's queue ownership.
+1661:             return jsonify({"ok": True})
+1662:         if operation is None:
+1663:             job["cancel"].set()  # idle/intake: no running compute to interrupt
+1664:         files.operation = None  # Event.clear cannot revive the captured attempt
+1665:         with JOBS_LOCK:
+1666:             released = list(files.queued.values())
+1667:             files.queued.clear()
+1668:             job["qgen"] = job.get("qgen", 0) + 1
+1669:         if files.active in released:
+1670:             files.active = None
+1671:         if job.get("phase") in _ACTIVE_PHASES:
+1672:             job.update(phase="cancelled", error="cancelled by user", eta=None)
+1673:             job["log"].append("— cancelled —")
+1674:         if job.get("trackbg", {}).get("state") == "running":
+1675:             job["trackbg"] = {"state": "done", "added": 0,
+1676:                               "error": "cancelled by user"}
+1677:     for lease in released:
+1678:         lease.release()
+1679:     return jsonify({"ok": True})
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 4620-4672
+
+4620:  try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
+4621:  if(!response.ok||!body||body.error||body.ok!==true)
+4622:   throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+4623:  return body;
+4624: }
+4625: function acknowledgeMap(current,submitted){
+4626:  for(const [key,value] of Object.entries(submitted))
+4627:   if(sameEdit(current[key],value))delete current[key];
+4628: }
+4629: function acknowledgeAdds(current,refs,submitted){
+4630:  for(let i=current.length-1;i>=0;i--){
+4631:   const index=refs.indexOf(current[i]);
+4632:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+4633:  }
+4634: }
+4635: async function saveAndRender(){
+4636:  const id=CUR,gen=VIEW_GEN,d=EDITS,reviewOwner=REVIEW_SCHED;
+4637:  if(!id||!d||d.busy)return false;
+4638:  const b=d.editor;
+4639:  try{
+4640:   // Compatibility drafts acquire an identity once, on the original object.
+4641:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+4642:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+4643:  const manRefs=[...d.manual],addRefs=[...b.adds];
+4644:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+4645:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+4646:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+4647:   box_overrides:b.ov,time_overrides:b.times});
+4648:  // Plain review must never wipe audio that the editor has not loaded.
+4649:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+4650:  d.audioInFlight=payload.audio!==undefined;
+4651:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+4652:  let saved=false;
+4653:  try{
+4654:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+4655:   saved=true;d.audioInFlight=false;
+4656:   acknowledgeMap(d.enabled,payload.enabled);
+4657:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+4658:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+4659:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+4660:   // A switched-away view never opens a confirmation or changes current UI.
+4661:   if(!ownsView(id,gen)){
+4662:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+4663:   }
+4664:   let allowError="";
+4665:   if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+4666:      confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+4667:    try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+4668:    catch(e){allowError=" Allow-list update failed: "+e.message;}
+4669:   }
+4670:   if(!ownsView(id,gen)){
+4671:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+4672:   }
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_web.py 5567-5690
+
+5567: def _rehydrate_jobs():
+5568:     """Re-register jobs found on disk after a restart. A job with a report
+5569:     is a reviewable job; one with an output file is a finished one — either
+5570:     way the person's work survives the server going down."""
+5571:     n = 0
+5572:     for jid in sorted(os.listdir(JOBS_DIR)):
+5573:         jdir = os.path.join(JOBS_DIR, jid)
+5574:         rep = os.path.join(jdir, "report.json")
+5575:         if not os.path.isdir(jdir):
+5576:             continue
+5577:         if os.path.exists(os.path.join(jdir, DELETE_MARKER)):
+5578:             # the user deleted this job but a file was still held open at
+5579:             # the time — finish the removal instead of resurrecting the
+5580:             # job as a zombie (restarts release whatever held the lock)
+5581:             _reap_job_dir(jdir, jid, retries=1)
+5582:             continue
+5583:         if jid in JOBS:
+5584:             continue
+5585:         if _has_render_recovery(jdir):
+5586:             # Do not follow descriptor paths or infer validity from final names.
+5587:             up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
+5588:                        if os.path.isfile(os.path.join(jdir, "input" + e))), None)
+5589:             opts = {}
+5590:             try:
+5591:                 with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
+5592:                     opts = json.load(f)
+5593:                 if not isinstance(opts, dict):
+5594:                     opts = {}
+5595:             except (OSError, ValueError):
+5596:                 pass
+5597:             job = dict(id=jid, dir=jdir, video=up, name=os.path.basename(up) if up else jid,
+5598:                        options=opts, phase="error", progress=0.0, size=0,
+5599:                        log=JobLog(["render delivery requires recovery"]),
+5600:                        error="render delivery requires recovery", output=None,
+5601:                        created=os.path.getmtime(jdir), cancel=threading.Event(), stats={})
+5602:             FILES.initialize(job).recovery_required = True
+5603:             with JOBS_LOCK:
+5604:                 JOBS[jid] = job
+5605:             n += 1
+5606:             continue
+5607:         if not os.path.exists(rep):
+5608:             # NO report: the scan never completed (crashed or the server
+5609:             # went down mid-scan). If the dir still holds an uploaded
+5610:             # input, surface it as a FAILED job instead of skipping it —
+5611:             # a skipped dir was an invisible orphan the UI could neither
+5612:             # retry nor delete, silently eating an 18 GB upload per
+5613:             # failed attempt (issue #16).
+5614:             up = next((os.path.join(jdir, "input" + e)
+5615:                        for e in sorted(MEDIA_EXTS)
+5616:                        if os.path.exists(os.path.join(jdir, "input" + e))),
+5617:                       None)
+5618:             if not up:
+5619:                 continue
+5620:             try:
+5621:                 size = os.path.getsize(up)
+5622:             except OSError:
+5623:                 size = 0
+5624:             opts = {}
+5625:             try:
+5626:                 with open(os.path.join(jdir, OPTIONS_FILE),
+5627:                           encoding="utf-8") as f:
+5628:                     opts = json.load(f)
+5629:                 if not isinstance(opts, dict):
+5630:                     opts = {}
+5631:             except (OSError, ValueError):
+5632:                 opts = {}
+5633:             job = {
+5634:                 "id": jid, "dir": jdir, "video": up,
+5635:                 "name": os.path.basename(up), "options": opts,
+5636:                 "phase": "error", "progress": 0.0, "size": size,
+5637:                 "log": JobLog(["(recovered after server restart — the scan had "
+5638:                                "not completed)"]),
+5639:                 "error": "recovered after a server restart before the "
+5640:                          "scan finished — Retry re-runs it with "
+5641:                          + ("its original settings" if opts else
+5642:                             "default settings")
+5643:                          + " (the uploaded file was kept), or "
+5644:                          "Delete frees its disk space",
+5645:                 "output": None, "created": os.path.getmtime(jdir),
+5646:                 "cancel": threading.Event(), "stats": {},
+5647:             }
+5648:             FILES.initialize(job)
+5649:             with JOBS_LOCK:
+5650:                 JOBS[jid] = job
+5651:             n += 1
+5652:             continue
+5653:         try:
+5654:             with open(rep, encoding="utf-8") as f:
+5655:                 prov = json.load(f).get("provenance", {})
+5656:             video = prov.get("input")
+5657:             if not video or not os.path.exists(video):
+5658:                 continue
+5659:             out = os.path.join(jdir, "output.mp4")
+5660:             has_out = os.path.exists(out)
+5661:             job = {
+5662:                 "id": jid, "dir": jdir, "video": video,
+5663:                 "name": os.path.basename(prov.get("original_input")
+5664:                                           or video),
+5665:                 "options": prov.get("settings", {}) or {},
+5666:                 "phase": "done" if has_out else "review",
+5667:                 "progress": 1.0 if has_out else 0.5,
+5668:                 "log": JobLog(["(recovered after server restart)"]),
+5669:                 "error": None, "output": out if has_out else None,
+5670:                 "created": os.path.getmtime(jdir),
+5671:                 "cancel": threading.Event(), "stats": {},
+5672:             }
+5673:             try:
+5674:                 # original upload size, for the editor's duplicate-upload
+5675:                 # warning (prov input may be the normalized scan copy)
+5676:                 orig = next((os.path.join(jdir, "input" + e)
+5677:                              for e in sorted(MEDIA_EXTS)
+5678:                              if os.path.exists(
+5679:                                  os.path.join(jdir, "input" + e))), video)
+5680:                 job["size"] = os.path.getsize(orig)
+5681:             except OSError:
+5682:                 pass
+5683:             FILES.initialize(job)
+5684:             with JOBS_LOCK:
+5685:                 JOBS[jid] = job
+5686:             n += 1
+5687:         except Exception:
+5688:             continue
+5689:     if n:
+5690:         print(f"  recovered {n} job(s) from {JOBS_DIR}")
+
+## c205ef5379778f63313b519411a2d5e37d07cba5:openscrub_internal/render_delivery.py 129-203
+
+129:     def commit(self, *, before_mutation=None, publish_success=None, restore_success=None):
+130:         if self.committed:
+131:             raise RuntimeError('render delivery already committed')
+132:         if not self._prepared:
+133:             raise RuntimeError('render rollback must be prepared before commit')
+134:         if any(_identity(old['path']) != old['identity'] for old in self._old):
+135:             raise RuntimeError('render destination changed before publication')
+136:         attempted = []
+137:         try:
+138:             for old in self._old:
+139:                 attempted.append(old)
+140:                 if before_mutation:
+141:                     before_mutation()
+142:                 if old['role'] == 'video':
+143:                     os.replace(self.video_stage, self.video_path)
+144:                 elif self._legacy is not None:
+145:                     self._legacy(self.report_path, self._doc)
+146:                 else:
+147:                     os.replace(self._report_stage, self.report_path)
+148:             if publish_success:
+149:                 publish_success()
+150:             # Last fallible authoritative action; backups are still present.
+151:             os.unlink(self._descriptor)
+152:             self._descriptor = None
+153:             self.committed = True
+154:         except BaseException as primary:
+155:             diagnostics = []
+156:             if restore_success:
+157:                 try:
+158:                     restore_success()
+159:                 except BaseException as error:
+160:                     diagnostics.append('terminal restoration: ' + type(error).__name__)
+161:             for old in reversed(attempted):
+162:                 try:
+163:                     if before_mutation:
+164:                         before_mutation()
+165:                     if old['backup'] is not None:
+166:                         os.replace(old['backup'], old['path'])
+167:                         old['backup'] = None
+168:                     else:
+169:                         try:
+170:                             os.unlink(old['path'])
+171:                         except FileNotFoundError:
+172:                             pass
+173:                 except BaseException as error:
+174:                     diagnostics.append(old['role'] + ' restoration: ' + type(error).__name__)
+175:             if not diagnostics:
+176:                 try:
+177:                     os.unlink(self._descriptor)
+178:                     self._descriptor = None
+179:                 except BaseException as error:
+180:                     diagnostics.append('descriptor retirement: ' + type(error).__name__)
+181:             if diagnostics:
+182:                 self.recovery_required = True
+183:                 raise _DeliveryRecoveryError(primary, diagnostics) from primary
+184:             raise
+185: 
+186:     def __exit__(self, *exc):
+187:         if self.recovery_required:
+188:             # Necessary leftovers remain discoverable; the report stage may
+189:             # still be owned by its context, so deliberately do not exit it.
+190:             self._stack.close()
+191:             return
+192:         try:
+193:             self._stack.close()
+194:         except Exception as error:
+195:             self.cleanup_diagnostics.append(type(error).__name__)
+196:         for path in [self.video_stage, self.video_stage + '.noaudio.mp4', self._descriptor] + [old['backup'] for old in self._old]:
+197:             if path is not None:
+198:                 try:
+199:                     os.unlink(path)
+200:                 except FileNotFoundError:
+201:                     pass
+202:                 except OSError as error:
+203:                     self.cleanup_diagnostics.append(type(error).__name__)

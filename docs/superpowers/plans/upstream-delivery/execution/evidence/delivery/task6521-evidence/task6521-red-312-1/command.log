@@ -1,0 +1,175 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task6521/runs/task6521-red-312-1/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d3f87fb77b8f855c730caea5c78c7e7ccb5c8c83a0c0ead40872e4c77f0d33eb"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.FFFFFFFF                                                                [100%]
+=================================== FAILURES ===================================
+_______ test_media_tools_missing_executable_skips_before_media[ffprobe] ________
+
+missing = 'ffprobe'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b51700>
+
+    @pytest.mark.parametrize("missing", ["ffmpeg", "ffprobe"])
+    def test_media_tools_missing_executable_skips_before_media(missing, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: None if name == missing else name)
+    
+        def unexpected_query(*args, **kwargs):
+            pytest.fail("missing executable must skip before querying encoders")
+    
+        monkeypatch.setattr(subprocess, "run", unexpected_query)
+>       with pytest.raises(pytest.skip.Exception, match=missing):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:200: Failed
+_ test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx265 HEVC-libx264] _
+
+encoders = ' V....D libx265 HEVC', missing = 'libx264'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b52d80>
+
+    @pytest.mark.parametrize("encoders,missing", [
+        (" V....D libx265 HEVC", "libx264"),
+        (" V....D libx264 H.264", "libx265"),
+        (" V....D libx264rgb H.264\n V....D libx265 HEVC", "libx264"),
+    ])
+    def test_media_tools_missing_exact_encoder_skips_before_media(encoders, missing, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw:
+                            subprocess.CompletedProcess(a[0], 0, encoders, ""))
+>       with pytest.raises(pytest.skip.Exception, match=missing):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:215: Failed
+_ test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264 H.264-libx265] _
+
+encoders = ' V....D libx264 H.264', missing = 'libx265'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b53dd0>
+
+    @pytest.mark.parametrize("encoders,missing", [
+        (" V....D libx265 HEVC", "libx264"),
+        (" V....D libx264 H.264", "libx265"),
+        (" V....D libx264rgb H.264\n V....D libx265 HEVC", "libx264"),
+    ])
+    def test_media_tools_missing_exact_encoder_skips_before_media(encoders, missing, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw:
+                            subprocess.CompletedProcess(a[0], 0, encoders, ""))
+>       with pytest.raises(pytest.skip.Exception, match=missing):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:215: Failed
+_ test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264rgb H.264\n V....D libx265 HEVC-libx264] _
+
+encoders = ' V....D libx264rgb H.264\n V....D libx265 HEVC', missing = 'libx264'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b52db0>
+
+    @pytest.mark.parametrize("encoders,missing", [
+        (" V....D libx265 HEVC", "libx264"),
+        (" V....D libx264 H.264", "libx265"),
+        (" V....D libx264rgb H.264\n V....D libx265 HEVC", "libx264"),
+    ])
+    def test_media_tools_missing_exact_encoder_skips_before_media(encoders, missing, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw:
+                            subprocess.CompletedProcess(a[0], 0, encoders, ""))
+>       with pytest.raises(pytest.skip.Exception, match=missing):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:215: Failed
+______ test_media_tools_unqueryable_encoders_skip_before_media[failure0] _______
+
+failure = CalledProcessError(1, ['ffmpeg', '-encoders'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b53c50>
+
+    @pytest.mark.parametrize("failure", [
+        subprocess.CalledProcessError(1, ["ffmpeg", "-encoders"]),
+        OSError("encoder query unavailable"),
+        subprocess.TimeoutExpired(["ffmpeg", "-encoders"], 10),
+    ])
+    def test_media_tools_unqueryable_encoders_skip_before_media(failure, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+    
+        def unavailable(*args, **kwargs):
+            raise failure
+    
+        monkeypatch.setattr(subprocess, "run", unavailable)
+>       with pytest.raises(pytest.skip.Exception, match="ffmpeg encoder query"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:233: Failed
+______ test_media_tools_unqueryable_encoders_skip_before_media[failure1] _______
+
+failure = OSError('encoder query unavailable')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b57ce0>
+
+    @pytest.mark.parametrize("failure", [
+        subprocess.CalledProcessError(1, ["ffmpeg", "-encoders"]),
+        OSError("encoder query unavailable"),
+        subprocess.TimeoutExpired(["ffmpeg", "-encoders"], 10),
+    ])
+    def test_media_tools_unqueryable_encoders_skip_before_media(failure, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+    
+        def unavailable(*args, **kwargs):
+            raise failure
+    
+        monkeypatch.setattr(subprocess, "run", unavailable)
+>       with pytest.raises(pytest.skip.Exception, match="ffmpeg encoder query"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:233: Failed
+______ test_media_tools_unqueryable_encoders_skip_before_media[failure2] _______
+
+failure = TimeoutExpired(['ffmpeg', '-encoders'], 10)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b53e30>
+
+    @pytest.mark.parametrize("failure", [
+        subprocess.CalledProcessError(1, ["ffmpeg", "-encoders"]),
+        OSError("encoder query unavailable"),
+        subprocess.TimeoutExpired(["ffmpeg", "-encoders"], 10),
+    ])
+    def test_media_tools_unqueryable_encoders_skip_before_media(failure, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+    
+        def unavailable(*args, **kwargs):
+            raise failure
+    
+        monkeypatch.setattr(subprocess, "run", unavailable)
+>       with pytest.raises(pytest.skip.Exception, match="ffmpeg encoder query"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Skipped
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:233: Failed
+______________________ test_media_tools_complete_support _______________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x704de3b51af0>
+
+    def test_media_tools_complete_support(monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda name: name)
+        calls = []
+    
+        def supported(args, **kwargs):
+            calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args, 0,
+                "Encoders:\n V....D libx264 H.264\n V....D libx265 HEVC\n", "")
+    
+        monkeypatch.setattr(subprocess, "run", supported)
+        require_media_tools()
+>       assert len(calls) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py:250: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_missing_executable_skips_before_media[ffprobe]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx265 HEVC-libx264]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264 H.264-libx265]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_missing_exact_encoder_skips_before_media[ V....D libx264rgb H.264\n V....D libx265 HEVC-libx264]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure0]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure1]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_unqueryable_encoders_skip_before_media[failure2]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_polygon_fallback.py::test_media_tools_complete_support
+8 failed, 1 passed, 548 deselected in 0.12s

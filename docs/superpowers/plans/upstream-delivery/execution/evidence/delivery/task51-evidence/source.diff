@@ -1,0 +1,27 @@
+diff --git a/tests/test_live_preview.py b/tests/test_live_preview.py
+index 85724b7..51661cb 100644
+--- a/tests/test_live_preview.py
++++ b/tests/test_live_preview.py
+@@ -311,6 +311,22 @@ def test_http_missing_conditional_range_and_changed_etag(preview, http):
+     assert http(headers={"Range": "bytes=10-99", "If-Range": etag})[0] == 200
+ 
+ 
++@pytest.mark.parametrize("modified_since", ["Thu, 01 Jan 1970 00:00:00 GMT",
++                                           "Fri, 01 Jan 2100 00:00:00 GMT"])
++def test_http_ignores_modified_since_without_last_modified(preview, http, modified_since):
++    job, _, frames, expected = preview
++    publish(job, frames[0])
++    response = http()
++    assert_jpeg(response, expected[0])
++    assert "last-modified" not in {name.lower() for name in response[1]}
++    etag = response[1]["ETag"]
++
++    response = http(headers={"If-Modified-Since": modified_since})
++    assert_jpeg(response, expected[0])
++    assert "last-modified" not in {name.lower() for name in response[1]}
++    assert response[1]["ETag"] == etag
++
++
+ def test_publication_helper_returns_boolean_status(preview, monkeypatch):
+     _, path, frames, expected = preview
+     assert web._publish_preview_jpeg(path, frames[0], 70) is True

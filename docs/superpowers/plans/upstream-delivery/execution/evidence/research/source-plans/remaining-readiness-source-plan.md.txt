@@ -1,0 +1,52 @@
+# Remaining focused readiness implementation plan
+
+> **For agentic workers:** Use superpowers:subagent-driven-development. Root supervises sequential implementers and independent task review. No nested agents.
+
+**Goal:** Close two existing N12/P16B test-readiness minors without changing application behavior.
+**Architecture:** Keep comment accuracy on the reviewed N12 candidate and media prerequisite checks on the reviewed P16B candidate, with separate branches and validation.
+**Tech stack:** Existing Python>=3.9, pytest, prepared FFmpeg/ffprobe; no new dependency.
+**Spec:** Recorded Task115/Task652 final-readiness findings in execution/status.md and their original approved reviews.
+
+## Task 116: make scan-report test coverage wording precise
+
+### What, why, when and constraints
+
+Comment-only follow-up to the accepted N12 minor before focused upstream submission. Base17dfe5d575306dea395b680205038e606ad598a2; root creates pr/scan-sanity-test-comment in the managed bde3 source worktree after Task16331 review. Preserve original pr/no-backtrack-scan-sanity, C01 and all previous refs. No production behavior/default, test assertions, dependencies, data or publication changes.
+
+Assigned source /home/tahv0/.codex/worktrees/bde3/OpenScrub; root proof/evidence paths runtime/task116 and task116-evidence. Preserve Python>=3.9.
+
+Modify only the comment near tests/test_first_scan_sanity.py:105. Current wording says Detection fields/report choices are pinned including order; dict equality verifies fields/values and list order but not each row's key order. Narrow that claim accurately; do not add key-order assertions or change serialization.
+
+- [ ] Read exact surrounding assertions; change only the comment wording.
+- [ ] Prove complete parsed AST including docstrings and non-comment tokens equals exactbase; retain both source hashes, one-file/comment-only diff, Python3.9 grammar and git diff --check.
+- [ ] No runtime/pytest/media/browser/package replay or new tests for this non-executable change.
+- [ ] Commit/self-review; write task-116-report.md/task-116-pr.md and tiny task116-evidence. Root assigns fresh independent review. No integration-ref advancement/publication.
+
+Use separately supplied local execution notes; source/runtime/evidence paths are root-assigned before dispatch and private execution-control material stays outside product evidence.
+
+## Task 6521: check actual-media prerequisites before allocating fixtures
+
+### What, why, when and constraints
+
+Test-only follow-up to the accepted P16B optional-prerequisite minor, before focused upstream submission. Basea3c3193e8dff41ec0588e66443398048a5c15ece; root creates pr/polygon-media-prerequisites in the same managed source worktree after Task116 review. Preserve original pr/invalid-polygon-fallback/C01/all old refs. No production paint/mask/geometry/default/resource behavior, dependency, new frontend/toolchain, user-data or publication changes.
+
+Only tests/test_polygon_fallback.py may change. Existing tiny_media fixture tests only shutil.which('ffmpeg'), but generates libx264/libx265 media and production paths also need ffprobe. Missing optional tools/encoders should skip clearly before raw media/root/output creation, while real encoding/render failures after successful prerequisite checks remain failures.
+
+### Minimal interface and checks
+
+Extract the existing ffmpeg-only guard into a small local require_media_tools() helper and invoke it first in tiny_media, before mktemp/raw writes. Keep this mechanical extraction behavior unchanged initially. Add bounded helper contract regressions for missing ffprobe and missing exact libx264/libx265 support, demonstrating real DID-NOT-SKIP failures before adding checks. Also cover missing ffmpeg and unavailable encoder-query/OSError with precise missing-prerequisite reasons; keep a complete-support control. If helper test needs different setup, retain the actual failure cause and ask root rather than fabricate RED.
+
+Implement the smallest local checks: both tool executables present; one bounded ffmpeg -encoders query succeeds; actual encoder names include libx264 and libx265. Match names as tokens, so libx264rgb alone does not qualify as libx264. Skip only missing/unqueryable prerequisites with a clear name/reason. Do not catch ordinary media generation/render/byte-oracle failures. No generic capability framework/cache registry or new root helper is justified.
+
+The helper is only test setup. Test doubles may supply tool availability/query output to pin skip-before-media behavior, but actual production render/paint/oracle calls stay real. Preserve all independent full-known-box/global-HDR/input and decoded-output assertions and exact fixture dimensions/codecs/settings.
+
+### Verification and delivery
+
+- [ ] Stabilize meaningful helper RED/GREEN without invoking missing tools or allocating media during missing-prerequisite cases; preserve complete raw failures/commands.
+- [ ] Freeze clean candidate and run the complete owning tests/test_polygon_fallback.py on actual prepared3.12.16, with real tools present and all actual-media cases passing without skips. Do not rerun unrelated full project/browser/benchmark matrices.
+- [ ] Run actual3.9 new helper contracts and existing actual-media owning nodes, with exact selected-source hashes and distinct helper-owned scratch. Node IDs derive from the actual source, not an imagined current C01 inventory.
+- [ ] Verify only designated test path differs; all production/metadata/recipe bytes unchanged; Python3.9 grammar, diff check and existing recursive sdist test inclusion retained. No new package artifact claim for unchanged runtime/recipe.
+- [ ] Self-review/commit and write task-6521-report.md/task-6521-pr.md plus compact task6521-evidence, preserving actual tool/source/fixture/command identities/failures and scope limits. No media/env/export/install/private execution-control artifacts. Root independent review before any later combined application or publication.
+
+Use unchanged verification helper, actual prepared interpreters, clean environment/login:false, original-call escalation for owned socket/native fixture phases, no downloads/shared environment changes. Root supplies exact source/scratch and local phase budgets before dispatch. One source/runtime owner; no nested agents.
+

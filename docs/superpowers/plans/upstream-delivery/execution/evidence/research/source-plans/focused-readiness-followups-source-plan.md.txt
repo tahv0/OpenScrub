@@ -1,0 +1,55 @@
+# Focused upstream readiness follow-ups implementation plan
+
+> **For agentic workers:** Use superpowers:subagent-driven-development. Root supervises one source/runtime implementer at a time and assigns independent review. No nested agents.
+
+**Goal:** Close two already-recorded upstream readiness minors without changing application behavior.
+**Architecture:** Keep HTTP cache contract regressions on the reviewed P05 candidate and wording cleanup on the reviewed P publication candidate, in separate branches/review cycles.
+**Tech stack:** Existing Python>=3.9, pytest, Flask/Cheroot and prepared read-only environments.
+**Spec:** Existing final-readiness items in docs/superpowers/plans/upstream-delivery/execution/status.md and the approved Task5/Task1633 reviews.
+
+## Task 51: pin preview cache headers over real configured HTTP
+
+### Global constraints, what, why and when
+
+Test-only follow-up after reviewed P05. Preserve Austin defaults, all production bytes, Python>=3.9, actual preview complete-generation/ETag/Range semantics and existing fixture assertions. No training/workbench, dependency, helper/environment change, benchmark, user-data change, publication or nested agents. This closes Task5's explicit missing Last-Modified/If-Modified-Since controls before focused upstream submission.
+
+Root creates pr/live-preview-cache-regressions from exact b70d42011168192cdf7a9ef93a5e9419a92a1cdb. Preserve original pr/live-preview-snapshots, integration/upstream-focused and every old candidate. Assigned managed source worktree is /home/tahv0/.codex/worktrees/bde3/OpenScrub; keep documentation worktree /home/tahv0/.codex/worktrees/c832/OpenScrub intact; mutable scratch is /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/runs, created by root.
+
+### Exact scope and interfaces
+
+Modify only tests/test_live_preview.py. Reuse its actual preview/publish/http/assert_jpeg fixtures. The http fixture runs production _serve and actual configured Cheroot sockets, returning status, response headers and body and owning stop/join. Do not replace it with a test-client shortcut. Existing test_http_missing_conditional_range_and_changed_etag remains intact.
+
+Add test_http_ignores_modified_since_without_last_modified(preview, http, modified_since), parameterized over the two dates below, proving a successful published preview has no Last-Modified header, compared case-insensitively, and that If-Modified-Since alone produces complete status200, exact JPEG bytes, correct length and same content ETag. Cover both a valid old HTTP date (Thu, 01 Jan 1970 00:00:00 GMT) and a valid future HTTP date (Fri, 01 Jan 2100 00:00:00 GMT). Retain existing ETag304/Range/If-Range behavior; do not add or change production cache policy. The existing behavior is correct: this is missing regression coverage, so no artificial failing runtime mutation/RED is required. A newly exposed actual product failure must be reported to root before expanding beyond tests.
+
+### Verification and delivery
+
+- [ ] Inspect exact base, existing owner fixtures and prepared source-isolation handoff; declare actual base/module/test/adapter hashes rather than copying C01 private-module inventory.
+- [ ] Add the two bounded header cases, using actual complete expected JPEG bytes and no timing/performance claim.
+- [ ] Freeze a clean source/test commit and run the complete owning tests/test_live_preview.py on actual prepared3.12.16, serial helper-owned scratch, original-call socket escalation, login:false.
+- [ ] Run the new exact header cases on actual prepared3.9.25 (whole owner file only if within the same declared allowance). Retain real source/interpreter/exit identities and all failures. Do not rerun unrelated full suites, browser matrices, media or models.
+- [ ] Verify only this test file changed, all production/metadata/recipe bytes equal base, Python3.9 grammar, git diff --check and existing recursive sdist inclusion for the same test path. No new package artifact/build/startup claim is needed for a test-only follow-up with unchanged runtime and recipe; original P05 package evidence remains at its original ref.
+- [ ] Self-review, commit and write task-51-report.md, task-51-pr.md and compact task51-evidence (commands/logs/source/fixture identities; no media/env/export/install or private local guard material). Explain what/why/upstream timing and test-only scope. Root assigns fresh independent review; no working integration-ref change or publication by implementer.
+
+Use the unchanged canonical verification launcher and separately supplied local execution instructions; keep those private notes outside product evidence. No downloads or shared environment/helper edits.
+
+## Task 16331: clarify recovery-stage cleanup wording
+
+### Global constraints, what, why and when
+
+Comment-only follow-up for inherited P M1 after approved P publication. Preserve all executable ASTs, signatures/defaults/runtime behavior and Python>=3.9. No tests to mirror a comment, dependency, data, environment, publication or nested-agent work. The current comment says the report context is not exited while _stack.close() immediately follows; this wording misstates correct cleanup ownership and should be corrected before focused P submission.
+
+Root will create pr/render-recovery-comment from exact a132081f1e609ed19deb4477044ee1c9b77871cc only after Task51's review, using the same isolated worktree sequentially. Do not change pr/render-output-publication or the reviewed combined ref.
+
+Assigned managed source worktree: /home/tahv0/.codex/worktrees/bde3/OpenScrub. Root-created proof/evidence paths: runtime/task16331 and task16331-evidence in the SDD workspace; no product workload is needed.
+
+### Scope and verification
+
+Modify only the misleading comment at openscrub_internal/render_delivery.py:188. Explain accurately that closing the ExitStack discards expendable report staging while recovery retains the required backup/final paths and recovery descriptor. Inspect the actual nearby implementation before choosing wording; do not claim that needed recovery material is removed or that the context stays open.
+
+- [ ] Change only comment text.
+- [ ] Programmatically compare complete parsed AST against exact base; all executable code and docstrings remain identical. Verify one-file/comment-only diff, unchanged public signatures/metadata and git diff --check.
+- [ ] Do not replay functional suites, media, browser or package builds for this non-executable change.
+- [ ] Commit/self-review and write task-16331-report.md/task-16331-pr.md plus a tiny source/diff/AST proof. Fresh root-assigned review checks wording and ownership before any integration cherry-pick/publication.
+
+Task16331 is prepared only until root fills its branch/runtime/brief; Task51 runs first. All branches and user runtime data remain preserved.
+

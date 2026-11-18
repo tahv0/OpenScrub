@@ -1,0 +1,23 @@
+{
+  "source": "tests/test_live_preview.py",
+  "seed": 20261117,
+  "frame_shape": [
+    240,
+    720,
+    3
+  ],
+  "dtype": "uint8",
+  "jpeg_quality": 70,
+  "assertion": "real cv2 encoding independently compared byte-for-byte through assert_jpeg; declared length equals full received body length",
+  "header_case_frame": 0,
+  "received_length_both_interpreters": 96380,
+  "received_sha256_both_interpreters": "3a39eb931613d2a538eaf3415816e6459aa0ba9bd3d94d4c8f0ca968467f5d43",
+  "dates": [
+    "Thu, 01 Jan 1970 00:00:00 GMT",
+    "Fri, 01 Jan 2100 00:00:00 GMT"
+  ],
+  "actual_http": "production _serve(127.0.0.1, 0, None), real configured Cheroot, original http fixture stop/join",
+  "same_content_etag": "\"3a39eb931613d2a538eaf3415816e6459aa0ba9bd3d94d4c8f0ca968467f5d43\"",
+  "last_modified": "absent on normal and If-Modified-Since responses; names lowercased for comparison",
+  "media_retained": false
+}

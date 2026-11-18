@@ -1,0 +1,95 @@
+{
+  "task": "task6521",
+  "head": "c7f9dcc29affe5da363094b8646b3064966e52ed",
+  "base": "a3c3193e8dff41ec0588e66443398048a5c15ece",
+  "files": {
+    "commands-results.json": {
+      "bytes": 5459,
+      "sha256": "42cc05fc7d1c21a2d2124fe9aba68e7d57aeb30cc68c76adfee9c073bbbd3e98"
+    },
+    "failures.json": {
+      "bytes": 1353,
+      "sha256": "99901735be022a5f682f36d24187ded41988d02707424f10959bd7216e9b264a"
+    },
+    "fixture-identities.json": {
+      "bytes": 2816,
+      "sha256": "b17ad3b9e105a6d243806b25760f55c7ca2ae0bf41d308583a1b9b037b8c758f"
+    },
+    "floor-39.json": {
+      "bytes": 3567,
+      "sha256": "b51c82ac0cc76d1a8647322da58a6bef3e6e77d5da203b92afd108fd3df545fd"
+    },
+    "green-312.json": {
+      "bytes": 3587,
+      "sha256": "05a2b35a0d70b69e085819e33aeefd3e58f7164aba734d4a90a7541afc4e06c0"
+    },
+    "native-312.json": {
+      "bytes": 3582,
+      "sha256": "656ee5db97735fe58e521686a01fd8b6b39c26c535354386de465eceb821fe1e"
+    },
+    "red-312.json": {
+      "bytes": 3391,
+      "sha256": "65a9f40b393a61107b1e977913c3558961f24f12b6ef7c006fd4b8e6a171710a"
+    },
+    "selected-nodeids.json": {
+      "bytes": 5127,
+      "sha256": "3e763275c4ca74187ea287cbd9cb406a0ea7e66511c3f92f16cba9b72831115b"
+    },
+    "static-identities.json": {
+      "bytes": 5755,
+      "sha256": "05a0202b761b599922ba262e40d60eb977e52b4a207c9bb4096b8322fad7f6bb"
+    },
+    "task6521-floor-39-1/command.log": {
+      "bytes": 1877,
+      "sha256": "987ecdd36175a943dd21ac9cd0358507c16597a8560490012147c2dc51b9a4f9"
+    },
+    "task6521-floor-39-1/preflight.json": {
+      "bytes": 2851,
+      "sha256": "32959b3434d394db1fc85c567b2b92a1cf3f23a84b498b5910a0638bb061971b"
+    },
+    "task6521-floor-39-1/runtime-4d51c37b376c40e0b49524d8b62a2a35.json": {
+      "bytes": 3613,
+      "sha256": "f4d940c951e9f9558594333e8b668fda1c56383523de02add947de637f31fe78"
+    },
+    "task6521-green-312-1/command.log": {
+      "bytes": 1337,
+      "sha256": "1163d5deb87a34c7bff03688642080453416b50a6787d550985d1a9411828e9c"
+    },
+    "task6521-green-312-1/preflight.json": {
+      "bytes": 2873,
+      "sha256": "4e6d2857d792fc0dbcc77f1a566426c92813567ca0678a47fa8fa384d1b3604b"
+    },
+    "task6521-green-312-1/runtime-ec7f1e22df3745d9ae5dd614d268952d.json": {
+      "bytes": 3633,
+      "sha256": "ef3992d82ef41d23e7f57070b7fcf779cf9fac287f968331e903977178739832"
+    },
+    "task6521-native-312-1/command.log": {
+      "bytes": 1884,
+      "sha256": "216249451dce9499dea458c5e5e37c091eed50bcb346cc2f1bcbf4d88e73a6e7"
+    },
+    "task6521-native-312-1/preflight.json": {
+      "bytes": 2868,
+      "sha256": "947a711c9b98193366781accf96c55ce3225fd2979f1977f9c2079e7984e1b52"
+    },
+    "task6521-native-312-1/runtime-539ba18cb0264ad9adb94d814316e528.json": {
+      "bytes": 3628,
+      "sha256": "a1619ab4075b49f045c76d2bb03e3f6655d4d714dd74ef2af37309c5c4ca7b65"
+    },
+    "task6521-red-312-1/command.log": {
+      "bytes": 10648,
+      "sha256": "26c8e1fcdd8eff0b24b61a2a001b9bddf718ff8941b3e51dff399457b5779923"
+    },
+    "task6521-red-312-1/preflight.json": {
+      "bytes": 2677,
+      "sha256": "55f49f7c448b1d0ebd6e99ed5796991adf2d95c9c2349bd3a6fd9057c2adad7b"
+    },
+    "task6521-red-312-1/runtime-d5cabd7eaa49484c921841739de629e9.json": {
+      "bytes": 3437,
+      "sha256": "13cd7074fa681b64564d2993613b357b41fee256eb806cf0786d737f46652612"
+    },
+    "tool-identities.json": {
+      "bytes": 1071,
+      "sha256": "ba8a37fa21acf0e00db5dadda6b465d99e917deab487a11264172ded1632223a"
+    }
+  }
+}

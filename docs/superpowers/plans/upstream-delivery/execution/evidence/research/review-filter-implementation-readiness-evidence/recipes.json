@@ -1,0 +1,24 @@
+{
+  "mode": "source-only; not execution acceptance or a storage peak guarantee",
+  "base": "2ae3257b9752e2d976ff7a0d39955a13c133273a",
+  "proposed_cycle_mib": 124,
+  "proposed_cycle_bytes": 130023424,
+  "allocation_supported_as_upper_bound": false,
+  "actual_excess_proven": false,
+  "recipes": [
+    {"phase":"source/setup/RED/focused","allocation_mib":32,"inputs":"Native selected source; new tests/test_review_filters.py plus tests/test_review_choices.py and tests/test_review_save_failures.py; AST full PAGE extraction","status":"Small payload feasible; new adapters/setup/RED outputs not frozen or fully bounded"},
+    {"phase":"full old-base candidate suite","allocation_mib":32,"inputs":"One stabilized normal discovered suite, 204 historical base cases before P15 additions","source_examples":["make_video:1280x720x45 frames at defaults","deep onset:1280x720x180","gap:1280x720x360","HDR source/temp/scan/render coexistence","tracking:640x360x150/180/240","vault:5242880 plaintext and5242940 ciphertext bytes coexist"],"known_vault_coexistence_bytes":10485820,"status":"No aggregate cap; accumulated pytest trees and encoded media lack complete upper byte recipe"},
+    {"phase":"actual3.9 focused","allocation_mib":16,"inputs":"New filter/P02/P07a cases plus applicable existing web/help/audio/video/report boundary cases","status":"Exact selection and retained/temp coexistence must be frozen"},
+    {"phase":"selected browser/server/media","allocation_mib":16,"inputs":"Full PAGE; approved seven-card fixture; modest many-group metadata; real HTTP/report writer/worker and decoded pixels","reuse":"Selected parts of review-choices-baseline-evidence/browser.cjs and task9-evidence/scripts/serve.py, qa.cjs, output.cjs, check_output.py; retarget/adapt only","status":"No full browser profile/cache/media/screenshots/server coexistence upper recipe"},
+    {"phase":"package","allocation_mib":16,"inputs":"sdist to extracted sdist to wheel to installed CLI/web/listening HTTP; exact sources/tests/default/floor checks","sdist_declared_payload_bytes":1210904,"sdist_auto_pyproject_bytes":4096,"wheel_declared_payload_bytes":920012,"status":"Payload small; backend/build/archive/extract/install/smoke coexistence not fully bounded"},
+    {"phase":"evidence/review/docs","allocation_mib":12,"inputs":"Complete commands/logs/failures/manifests/selected screenshots and incremental docs","historical_p09_compact_manifest_bytes":1742781,"status":"Retained evidence size is not a transient peak bound"}
+  ],
+  "boundaries":[
+    "No active worktree or product execution was used by this audit",
+    "No unchanged-base replay required or performed",
+    "P16D Play startup absent; disclose native video.load fixture prerequisite only for subsequent playback preservation",
+    "Standalone P06D raw-row loss remains C01 after-render preservation prerequisite",
+    "No P09 scheduler, cancellation, request, total-memory, timing or platform guarantee follows from local filters",
+    "Root must resolve allocation and phase/coexistence recipes before runtime dispatch"
+  ]
+}

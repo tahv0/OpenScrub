@@ -1,0 +1,13 @@
+{
+  "unexpected_runtime_failures": [],
+  "semantic_conflicts": [],
+  "artificial_red": "Not run; exact previously reviewed whole commits imported. Original meaningful RED belongs to original tasks.",
+  "metadata_command_failures": [
+    {
+      "command": "cat /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task6521-evidence/config-native.json /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task655-evidence/config-native.json",
+      "exit": 2,
+      "output": "cat: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task6521-evidence/config-native.json: No such file or directory\ncat: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task655-evidence/config-native.json: No such file or directory",
+      "resolution": "Read actual named native-312.json and source-identities.json after bounded file discovery; no product/helper/environment changes."
+    }
+  ]
+}

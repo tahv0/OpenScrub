@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "base": "a132081f1e609ed19deb4477044ee1c9b77871cc",
+  "head": "af862c8c9700b7b2b06426e4c4287e469fe28038",
+  "committed": true,
+  "path": "openscrub_internal/render_delivery.py",
+  "base_source_sha256": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+  "changed_source_sha256": "1faa6a16124490fca1f52f7f0fed194ee32d6fab9e8d61e05f71c87c477786ea",
+  "complete_ast_sha256": "eadf1e8fc7714cd7c0bc411b7f7b07d13b6f69efb5f521f4fe0da69a454df594",
+  "diff_sha256": "801080c3ce74aeff2b8042e4ac0eee69c4e90cd18d8eaf7e183eefa3d85a41da",
+  "proof_script_sha256": "5f84c909bd4756b73cdd1755aa911de93aab3a553368e8eeb139c356323ad545",
+  "python39_grammar": true,
+  "complete_ast_equal_including_docstrings": true,
+  "noncomment_tokens_equal": true,
+  "exact_two_comment_line_replacement": true,
+  "only_changed_file": "openscrub_internal/render_delivery.py",
+  "mode_unchanged": "100644",
+  "diff_check": "PASS",
+  "other_branch_refs_preserved": true,
+  "product_imports_or_runtime_tests": false
+}

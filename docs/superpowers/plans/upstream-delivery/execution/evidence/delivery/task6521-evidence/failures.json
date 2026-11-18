@@ -1,0 +1,31 @@
+{
+  "expected_red": "8 failed, 1 passed, 548 deselected; missing ffprobe, missing libx264, missing libx265, and libx264rgb-only cases: DID NOT RAISE Skipped. Three unavailable-query cases also DID NOT RAISE Skipped; complete-support control expected one query but got zero. Full raw log retained.",
+  "incidental_read_failures": [
+    {
+      "command": "cat /home/tahv0/.codex/skills/.system/../doesnotexist",
+      "exit": 1,
+      "reason": "accidental nonexistent path; no mutation or workload"
+    },
+    {
+      "command": "cat /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/conftest.py",
+      "exit": 1,
+      "reason": "no conftest at this older base"
+    },
+    {
+      "command": "rg --files .superpowers/sdd/README/runtime/task6521 .superpowers/sdd/README/task6521-evidence",
+      "exit": 1,
+      "reason": "initial empty/ignored-directory discovery; retried with hidden/no-ignore"
+    },
+    {
+      "command": "rg --files .superpowers/sdd/README | rg '(task116|task652|task115|task632).*(json|md)$'",
+      "exit": 1,
+      "reason": "ignored-directory discovery had no matches"
+    },
+    {
+      "command": "rg --files --hidden .superpowers/sdd/README | rg '(task51|task116|task6521|task16331)'",
+      "exit": 1,
+      "reason": "ignored-directory discovery had no matches"
+    }
+  ],
+  "unexpected_test_or_product_failures": []
+}

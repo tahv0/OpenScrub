@@ -1,0 +1,15 @@
+diff --git a/openscrub_internal/render_delivery.py b/openscrub_internal/render_delivery.py
+index 3daea4e..e5828c8 100644
+--- a/openscrub_internal/render_delivery.py
++++ b/openscrub_internal/render_delivery.py
+@@ -185,8 +185,8 @@ class _RenderDelivery:
+ 
+     def __exit__(self, *exc):
+         if self.recovery_required:
+-            # Necessary leftovers remain discoverable; the report stage may
+-            # still be owned by its context, so deliberately do not exit it.
++            # Close the ExitStack to discard expendable report staging; required
++            # recovery backups, final paths, and the descriptor remain discoverable.
+             self._stack.close()
+             return
+         try:

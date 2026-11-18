@@ -1,0 +1,105 @@
+{
+  "runs": [
+    {
+      "run": "task51-native-312-01",
+      "controller_argv": [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+        "--config",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/adapters/verify-312.json",
+        "--run-id",
+        "task51-native-312-01",
+        "run",
+        "--",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_live_preview.py",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "controller_environment": {
+        "HOME": "/home/tahv0",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "login": false,
+      "socket_permission": "original-call escalation; loopback only",
+      "workload_argv": [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_live_preview.py",
+        "-v",
+        "-s",
+        "--tb=short",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/runs/task51-native-312-01/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/runs/task51-native-312-01/cache/pytest"
+      ],
+      "exit": 0,
+      "passed": 28,
+      "duration_from_pytest": "10.73s",
+      "controller_argv_note": "Exact inner controller argv launched by the local execution wrapper; private wrapper records are deliberately excluded."
+    },
+    {
+      "run": "task51-headers-39-01",
+      "controller_argv": [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+        "--config",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/adapters/verify-39.json",
+        "--run-id",
+        "task51-headers-39-01",
+        "run",
+        "--",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_live_preview.py::test_http_ignores_modified_since_without_last_modified",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "controller_environment": {
+        "HOME": "/home/tahv0",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "login": false,
+      "socket_permission": "original-call escalation; loopback only",
+      "workload_argv": [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_live_preview.py::test_http_ignores_modified_since_without_last_modified",
+        "-v",
+        "-s",
+        "--tb=short",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/runs/task51-headers-39-01/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task51/runs/task51-headers-39-01/cache/pytest"
+      ],
+      "exit": 0,
+      "passed": 2,
+      "duration_from_pytest": "1.14s",
+      "controller_argv_note": "Exact inner controller argv launched by the local execution wrapper; private wrapper records are deliberately excluded."
+    }
+  ],
+  "static": {
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task51-evidence/check_static.py"
+    ],
+    "exit": 0
+  },
+  "failures": [],
+  "non_workload_diagnostics": [
+    {
+      "record": "archival-check.json",
+      "initial_exit": 1,
+      "corrected_exit": 0,
+      "cause": "overbroad ERROR substring rejected intentional passing HTTP500 output"
+    }
+  ]
+}

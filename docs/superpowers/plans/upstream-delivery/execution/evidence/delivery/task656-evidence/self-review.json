@@ -1,0 +1,15 @@
+{
+  "head": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7",
+  "clean": true,
+  "refs_unchanged_after_picks": true,
+  "exact_four_whole_patch_ids_and_x_provenance": true,
+  "only_four_files": true,
+  "other_165_files_and_all_modes_equal": true,
+  "complete_production_ast_docstrings_noncomment_tokens_equal": true,
+  "all_existing_test_function_asts_preserved_except_reviewed_fixture_prerequisite_replacement": true,
+  "combined_observer": "_render_into/_render_hdr_into; frame/buf locals preserved",
+  "metadata_and_recursive_inclusion_unchanged": true,
+  "owning_native_and_floor": "585 passed each, 0 skips",
+  "findings": [],
+  "next_gate": "Root fresh independent review; no working-ref advancement by implementer."
+}

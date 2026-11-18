@@ -1,0 +1,46 @@
+{
+  "prepare.py": "a67b8db19476107243c60f2b893b605204385bede20690cc037048315677f2f6",
+  "tooling": [
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py",
+      "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py",
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/README.md",
+      "sha256": "1dec8419daf134313cd85312aabf8bd94b63093fc562fa5bf831ce92214109af"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "executable": true
+    }
+  ],
+  "review_reports": {
+    "task-51-review.md": "c5de81942421526f5377d3745e46896b050e043950dc0aac28a665c2c4375a19",
+    "task-16331-review.md": "bf5b2a49fac7c68e666c6e0daa85a0bc768fd9ce9d18bb85dfa410f5130f1608",
+    "task-116-review.md": "854b2b37184a91a68abd1de4a0ee0768322e23224127eed5f806c93bdb1225f8",
+    "task-6521-review.md": "513205dca678902074ced16c437df5ca3db5923f065fa1fbd25429f1cda6e4e5"
+  },
+  "fixture": {
+    "ffmpeg": "a2439305850a5b2920c35674fbec25edaf086b17680e476077a05e629b1232b6",
+    "require_media_tools": "44026893e368350dd6f75197877e51bf41288fb8a1799a38c75937e47155b3f8",
+    "tiny_media": "efa2aa92ae5e6179fa572ac6d397ac8db583b3aede2d6795cf6f0f36a0302cb9",
+    "observe_render": "9717ee3e553a11a00304b9f2530ba045d9e3a106df176d83938f76e86c46ba97",
+    "test_report_to_actual_render_known_box": "e0539215734fd95331732963ee6ccc7cf202c6b920a36ac66c679672d94b07aa"
+  },
+  "no_adapter": true,
+  "no_model_seed": true
+}

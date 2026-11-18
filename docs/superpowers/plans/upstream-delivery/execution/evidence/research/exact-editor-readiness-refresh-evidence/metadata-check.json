@@ -1,0 +1,28 @@
+{
+  "kind": "source metadata consistency only; no product runtime",
+  "verified_immutable_source_files": 23,
+  "verified_sdd_documents": 7,
+  "planned_web_identifiers_absent_both_refs": true,
+  "artifacts": [
+    {
+      "path": "exact-editor-readiness-refresh.md",
+      "bytes": 35082,
+      "sha256": "b8d3248753c12ef147e18cbeb97dd2c5b226e26bb7b327eb7f1507401011d784"
+    },
+    {
+      "path": "exact-editor-readiness-refresh-evidence/README.md",
+      "bytes": 1329,
+      "sha256": "04a3c703b11017c84cd5a57f3891b8d9dbc4433676215b3d3a8d26911acb1bb4"
+    },
+    {
+      "path": "exact-editor-readiness-refresh-evidence/source-excerpts.txt",
+      "bytes": 155845,
+      "sha256": "78f815c80de0ae80791aac11a98f5c35569124100a837d5c12e4cc498b888f35"
+    },
+    {
+      "path": "exact-editor-readiness-refresh-evidence/source-manifest.json",
+      "bytes": 21735,
+      "sha256": "bdc399dc1aa1e127bf3039a255385d02846aa2293a1864e5e24f026c920f9e98"
+    }
+  ]
+}
