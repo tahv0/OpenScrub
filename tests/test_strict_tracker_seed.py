@@ -273,3 +273,61 @@ def test_strict_person_constructor_failure_never_falls_back(rig,monkeypatch):
     assert calls==['fixture','fixture']
     assert [c.releases for c in rig.captures]==[1]
     assert rig.initializers==[] and rig.grabs==[] and detector.want_any is False
+
+
+
+def _generic_entry_fault(rig,monkeypatch,boundary,error):
+    def fail(*args,**kwargs):raise error
+    if boundary=='constructor':monkeypatch.setattr(engine.cv2,'VideoCapture',fail)
+    else:monkeypatch.setattr(rig.Capture,'isOpened',fail)
+    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('initializer factory after generic entry failure'))
+    monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person path after generic entry failure'))
+
+
+@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+def test_strict_generic_native_entry_error_is_exact_with_cause(rig,monkeypatch,boundary):
+    error=RuntimeError('generic '+boundary+' retained oracle')
+    _generic_entry_fault(rig,monkeypatch,boundary,error)
+    with pytest.raises(exact.ExactError,match='retained oracle') as caught:
+        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+            person_det=object(),strict_seed=rig.seed)
+    assert caught.value.__cause__ is error
+    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
+    assert rig.initializers==[] and rig.grabs==[]
+
+
+@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+@pytest.mark.parametrize('kind',[exact.ExactError,engine.PipelineCancelled,KeyboardInterrupt,SystemExit],
+    ids=['exact','cancel','interrupt','exit'])
+def test_strict_generic_entry_preserves_exception_identity(rig,monkeypatch,boundary,kind):
+    error=kind('generic precedence oracle')
+    _generic_entry_fault(rig,monkeypatch,boundary,error)
+    with pytest.raises(kind) as caught:
+        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+            person_det=object(),strict_seed=rig.seed)
+    assert caught.value is error and caught.value.__cause__ is None
+    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
+    assert rig.initializers==[] and rig.grabs==[]
+
+
+@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+def test_legacy_generic_native_entry_error_is_unchanged(rig,monkeypatch,boundary):
+    error=RuntimeError('legacy '+boundary+' retained oracle')
+    _generic_entry_fault(rig,monkeypatch,boundary,error)
+    with pytest.raises(RuntimeError) as caught:
+        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,person_det=object())
+    assert caught.value is error and caught.value.__cause__ is None
+    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
+    assert rig.initializers==[] and rig.grabs==[]
+
+
+@pytest.mark.parametrize('strict',[True,False],ids=['strict','legacy'])
+def test_generic_false_open_keeps_strict_error_and_legacy_empty(rig,monkeypatch,strict):
+    monkeypatch.setattr(rig.Capture,'isOpened',lambda cap:False)
+    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('factory on unopened capture'))
+    if strict:
+        with pytest.raises(exact.ExactError):
+            engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,strict_seed=rig.seed)
+    else:assert engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17)==[]
+    assert [c.releases for c in rig.captures]==[1]
+    assert rig.initializers==[] and rig.grabs==[]

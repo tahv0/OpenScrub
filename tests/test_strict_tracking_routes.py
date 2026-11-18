@@ -398,3 +398,55 @@ def test_strict_cancel_during_context_read_never_advances(tracking,monkeypatch,h
     assert len(tracking.models)==(1 if hold_at==3 else 0),'model resolved after cancellation'
     assert len(tracking.calls)==(1 if hold_at==3 else 0)
     assert web.FILES.count==0
+
+
+
+@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+def test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication(exact,monkeypatch,boundary):
+    pc=precondition(sample(exact,.2),None)
+    before=exact.path.read_bytes();files=web.FILES.initialize(exact.job)
+    epoch=files.committed_report_epoch
+    captures=[];threads=[];models=[];observed=[]
+    native=RuntimeError('generic web '+boundary+' retained oracle')
+    real_capture=web.cv2.VideoCapture;real_track=engine.track_manual_region
+    real_start=web._start_owned_thread;attempts=[]
+    class Capture:
+        def __init__(self,video):
+            attempts.append(video)
+            if len(attempts)==2 and boundary=='constructor':raise native
+            self.cap=real_capture(video);self.releases=0
+            captures.append(self)
+        def __getattr__(self,key):return getattr(self.cap,key)
+        def isOpened(self):
+            if len(captures)==2 and self is captures[1] and boundary=='open-state':raise native
+            return self.cap.isOpened()
+        def release(self):self.releases+=1;self.cap.release()
+    def model(*a,**kw):
+        assert captures and captures[0].releases==1
+        models.append(True);return None
+    def track(*a,**kw):
+        try:return real_track(*a,**kw)
+        except BaseException as error:observed.append(error);raise
+    def start(target,lease):
+        thread=real_start(target,lease);threads.append(thread);return thread
+    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+    monkeypatch.setattr(engine,'PersonDetector',model)
+    monkeypatch.setattr(engine,'track_manual_region',track)
+    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('generic initializer fallback after source entry error'))
+    monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person fallback after generic source entry error'))
+    monkeypatch.setattr(web,'_start_owned_thread',start)
+    try:
+        response=request('post',exact.url+'/track_object',json=dict(seed=pc,
+            box=[8,8,40,40],t_ref=.2,t0=.199,t1=.201))
+        assert response.status_code==200
+    finally:
+        for thread in threads:thread.join(8);assert not thread.is_alive()
+    status=request('get',exact.url+'/track_status').json
+    assert status['state']=='done' and status['added']==0 and 'retained oracle' in status['error']
+    assert models==[True], 'web factory resolution is before generic capture entry'
+    assert len(observed)==1 and isinstance(observed[0],web.exact.ExactError)
+    assert observed[0].__cause__ is native
+    assert len(attempts)==2
+    assert [cap.releases for cap in captures]==([1] if boundary=='constructor' else [1,1])
+    assert exact.path.read_bytes()==before and files.committed_report_epoch==epoch
+    assert web.FILES.count==0

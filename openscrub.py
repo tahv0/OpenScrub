@@ -2501,14 +2501,19 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
     log = (cb.log if cb else print)
     if strict_seed is not None:
         _validate_tracker_seed(strict_seed, video, box, t_ref, t0, t1)
-    cap = cv2.VideoCapture(video)
     try:
-        if not cap.isOpened():
-            if strict_seed is not None:
-                raise exact.ExactError("strict tracker capture could not open")
-            return []
+        cap = cv2.VideoCapture(video)
+    except (exact.ExactError, PipelineCancelled):
+        raise
+    except Exception as error:
+        if strict_seed is not None:
+            raise exact.ExactError('strict generic capture failed: '+str(error)) from error
+        raise
+    try:
         if strict_seed is not None:
             _prime_tracker_seed(cap, strict_seed)
+        elif not cap.isOpened():
+            return []
         fps = strict_seed.fps if strict_seed is not None else (cap.get(cv2.CAP_PROP_FPS) or 30.0)
         step = max(1, int(step_frames)) / fps
         t_ref = min(max(t_ref, t0), t1)
