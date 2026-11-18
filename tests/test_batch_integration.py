@@ -173,7 +173,8 @@ def test_actual_scan_review_save_render_export_and_fresh_reopen(store, socket_ap
     # Seed the ordinary imported report boundary with mixed kept/selected rows and additive/audio fields.
     doc=copy.deepcopy(review.doc)
     doc['detections'] += scanned['detections']
-    web.atomic_report(str(store.path),doc)
+    with web.FILES.initialize(store.job).report_lock:
+        web._publish_job_report_locked(store.job, str(store.path), doc)
     payload={'enabled':{str(i):False for i in range(10,len(doc['detections']))},
              'manual':[{'manual_id':'batch650:replay','t_start':0,'t_end':1,'screen_box':[70,2,90,15]}]}
     # Discard the committed acknowledgement, then retry through real HTTP.
@@ -222,7 +223,8 @@ def test_thousand_row_actual_http_save_and_fresh_reopen(store,socket_api):
                             future_row={'index':i}) for i in range(1000)]
     doc['audio_transcript']=[[0,1,'synthetic']]
     doc['audio_suggestions']=[{'t0':0,'t1':1,'future':True}]
-    web.atomic_report(str(store.path),doc)
+    with web.FILES.initialize(store.job).report_lock:
+        web._publish_job_report_locked(store.job, str(store.path), doc)
     assert socket_api('POST',store.url+'/detections',{'enabled':{'999':False}})[0]==200
     saved=json.loads(store.path.read_text())
     assert len(saved['detections'])==1000 and saved['detections'][999]['enabled'] is False
