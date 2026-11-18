@@ -1,0 +1,13 @@
+# Task657 supervisor rulings for review
+
+These behavior clarifications were communicated during implementation and are recorded here for the independent review. Read with the original task-657-brief.md and source plan; this record does not relabel the original brief or any runtime input as a later version.
+
+Ruling: explicit selected IDs that still match the filter and belong to an open section remain logically available across P09 virtual unmounting/scrolling. Selected bulk retains their full group scope. Physical node/rectangle availability constrains acquiring/completing a marquee, not executing an already explicit selection. Filter-hidden/closed-zone selections are pruned as specified. This narrows the brief's ambiguous layout-available wording: scrolling must not silently change user intent or current metadata-based action scope. The implementation's initially proposed rejection expectation was invalid under this ruling, not a product RED, and production was never changed to reject unmounted IDs.
+
+Ruling: preserve explicit captured job/view checks at the visibility bridge. New synchronous filter publication passes/validates the current metadata owner; stale async callers must not inherit a newer CUR/VIEW_GEN. No-argument/empty matching refresh, zone/scroll/range and controlled pagehide/pageshow restoration retain current matching semantics without weakening owner fencing.
+
+Ruling: use the existing scheduler selectionCleanup as the sole review gesture owner, including the actual global Escape listener. Preserve clear-selection/lightbox/editor behaviors; no parallel cancellation lifecycle. The observed removed-helper ReferenceError requires its genuine actual-listener regression and minimal fix.
+
+Ruling: browser fixture adaptation may navigate actual scheduler geometry before native actions to targets that were legitimately unmounted; it must not force mounts, replace predicates or navigate between preservation actions and identity/focus assertions. A valid mocked legacy log needs the real producer's from field; the production validator is preserved. Independent fixture scenarios may reset only their task-owned setup at a new-view/fresh-context boundary, while all pending-overlay/held-save/job-switch preservation assertions remain intact.
+
+The final gates close the standalone P06D/P16D boundaries with complete post-render raw document/reopen checks and ordinary UI Play without a fixture load override. Original failed setup/oracle/product invocations remain retained and separately classified. Administrative resource/control details remain local and outside the delivery archive.

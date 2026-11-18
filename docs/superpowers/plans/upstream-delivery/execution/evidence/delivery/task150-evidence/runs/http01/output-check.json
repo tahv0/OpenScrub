@@ -1,0 +1,62 @@
+{
+  "regions": [
+    {
+      "name": "moved-selected0",
+      "blurred": true,
+      "mae": 120.00850340136054,
+      "mean": 0.12074829931972789
+    },
+    {
+      "name": "kept-member1",
+      "blurred": false,
+      "mae": 3.392857142857143,
+      "mean": 120.8452380952381
+    },
+    {
+      "name": "selected-member2",
+      "blurred": true,
+      "mae": 121.18197278911565,
+      "mean": 0.09863945578231292
+    },
+    {
+      "name": "kept-B",
+      "blurred": false,
+      "mae": 2.9506802721088436,
+      "mean": 120.73809523809524
+    },
+    {
+      "name": "kept-C",
+      "blurred": false,
+      "mae": 3.0136054421768708,
+      "mean": 120.76020408163265
+    },
+    {
+      "name": "selected-zone8",
+      "blurred": true,
+      "mae": 121.12244897959184,
+      "mean": 0.16666666666666666
+    },
+    {
+      "name": "kept-zone9",
+      "blurred": false,
+      "mae": 3.0153061224489797,
+      "mean": 120.94047619047619
+    },
+    {
+      "name": "manual",
+      "blurred": true,
+      "mae": 121.20083333333334,
+      "mean": 0.0
+    },
+    {
+      "name": "unrelated",
+      "blurred": false,
+      "mae": 3.066666666666667,
+      "mean": 120.73416666666667
+    }
+  ],
+  "pre_render_rows": 11,
+  "post_render_rows": 5,
+  "output_bytes": 73843,
+  "post_render_boundary": "Standalone lacks P06D; full raw rows after render remain C01 acceptance."
+}

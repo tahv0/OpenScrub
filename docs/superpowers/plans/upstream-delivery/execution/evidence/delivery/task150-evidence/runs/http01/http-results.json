@@ -1,0 +1,15 @@
+{
+  "page": "actual HTTP full PAGE",
+  "playbackPrerequisite": "native video.load() before existing Play, P16D startup excluded",
+  "playbackPreserved": true,
+  "savedRows": 11,
+  "rawReopen": true,
+  "phase": "done",
+  "phases": [
+    "rendering",
+    "rendering",
+    "rendering",
+    "done"
+  ],
+  "errors": []
+}

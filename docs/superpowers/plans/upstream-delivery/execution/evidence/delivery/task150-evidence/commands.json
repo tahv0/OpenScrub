@@ -1,0 +1,250 @@
+[
+  {
+    "run": "red-js01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "red-js01",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py::test_native_filters_and_exact_mixed_card_oracle",
+      "-q"
+    ],
+    "exit": 1,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/red-js01/runtime-557c136651e1470b9afd695f40b81e0c.json"
+    ]
+  },
+  {
+    "run": "red-browser01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "red-browser01",
+      "run",
+      "--",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser_run.py"
+    ],
+    "exit": 1,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/red-browser01/runtime-47254dcd77ba4335818476684477c1e4.json"
+    ]
+  },
+  {
+    "run": "green-js01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "green-js01",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests",
+      "-q"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/green-js01/runtime-24d270ad3cd84525bd07d186a95ac8a4.json"
+    ]
+  },
+  {
+    "run": "green-browser01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "green-browser01",
+      "run",
+      "--",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser_run.py"
+    ],
+    "exit": 1,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/green-browser01/runtime-fad78ae977e84e79938f79cc8cb82dd2.json"
+    ]
+  },
+  {
+    "run": "green-js02",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "green-js02",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests",
+      "-q"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/green-js02/runtime-9c0cc726dec8419382445dbdc69ef610.json"
+    ]
+  },
+  {
+    "run": "green-browser02",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/development.json",
+      "--run-id",
+      "green-browser02",
+      "run",
+      "--",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser_run.py"
+    ],
+    "exit": 1,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/green-browser02/runtime-ac45dc5ab8614dd3a06776f6a17beaad.json"
+    ]
+  },
+  {
+    "run": "full01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/frozen.json",
+      "--run-id",
+      "full01",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters",
+      "-p",
+      "task1631_fixture",
+      "-q"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/full01/runtime-61b7e530b7fd483ca3cbba1058df9d50.json"
+    ]
+  },
+  {
+    "run": "floor01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/floor.json",
+      "--run-id",
+      "floor01",
+      "run",
+      "--",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_report_roundtrip_preserves_tracks",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_from_report_respects_edits",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_every_advanced_setting_has_a_help_tip",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_audio_redaction_mute_and_report_roundtrip",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_audio_transcript_report_persistence",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_overlay_releases_video_controls",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_box_editor_has_playback",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_job_video_stream_supports_range",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_index_injects_upload_cap_for_preflight",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_bad_web_settings_fall_back_and_never_exit",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters",
+      "-p",
+      "task1631_fixture",
+      "-q"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/floor01/runtime-1a3ee5d0bc2c42888fe9ec0277167888.json"
+    ]
+  },
+  {
+    "run": "browser-accept01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/frozen.json",
+      "--run-id",
+      "browser-accept01",
+      "run",
+      "--",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+    ],
+    "exit": 1,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/browser-accept01/runtime-2da5766dbbcb49c0b678c840fbecb0fe.json"
+    ]
+  },
+  {
+    "run": "touch01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/touch.json",
+      "--run-id",
+      "touch01",
+      "run",
+      "--",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/touch01/runtime-1d2d9a03c5c24f6d84c11690c7d46e4e.json"
+    ]
+  },
+  {
+    "run": "http01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/frozen.json",
+      "--run-id",
+      "http01",
+      "run",
+      "--",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_http.py"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/http01/runtime-bf9c583853aa4b9a8517809389586fd4.json"
+    ]
+  },
+  {
+    "run": "package01",
+    "command": [
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/frozen.json",
+      "--run-id",
+      "package01",
+      "package"
+    ],
+    "exit": 0,
+    "configuration_note": "Exact executed configuration is retained in this run directory; the original named config was regenerated at explicit phase boundaries.",
+    "retained_configs": [
+      "runs/package01/runtime-7d83a1efaf764410b53d9b418712d6c5.json",
+      "runs/package01/runtime-357cacd5018c4c7ca9592186a2c9af4a.json"
+    ]
+  }
+]

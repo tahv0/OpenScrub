@@ -1,0 +1,159 @@
+{
+  "boundary": "Post-run identity audit; these native-tool byte hashes were not Task150 preflight-enforced. No shared tool/environment mutations were performed. Prior configs/logs remain unchanged.",
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "prior_native_pin": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task655-evidence/package-312.json",
+    "sha256": "6b653a5352042ea62af17d64461f9e2d9dfdba6062a34ea166d6a6f033a29419",
+    "mtime_utc": "2026-11-18T00:38:27.309458+00:00"
+  },
+  "tools": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "resolved": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "expected": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "actual": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "resolved": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "expected": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "actual": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract",
+      "resolved": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract",
+      "expected": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a",
+      "actual": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a",
+      "match": true
+    },
+    {
+      "path": "/usr/bin/node",
+      "resolved": "/usr/bin/node",
+      "expected": "d0efb6fcb9d023ba4e2b160ec2384dc28fe4f17732141ef47f676828fa960505",
+      "actual": "d0efb6fcb9d023ba4e2b160ec2384dc28fe4f17732141ef47f676828fa960505",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/browsers/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell",
+      "resolved": "/tmp/openscrub-save-as-20261116/browsers/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell",
+      "expected": "24eb0a14de64ab0c9c2e283a5512ca817db64af8fd853cdb4d818f19a8e23b9b",
+      "actual": "24eb0a14de64ab0c9c2e283a5512ca817db64af8fd853cdb4d818f19a8e23b9b",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/node_modules/playwright/package.json",
+      "resolved": "/tmp/openscrub-save-as-20261116/node_modules/playwright/package.json",
+      "expected": "66a5c412c28b7fe15902da5cb5d7dd503d1c8604d0afe46797fe31aa7dc1a6e0",
+      "actual": "66a5c412c28b7fe15902da5cb5d7dd503d1c8604d0afe46797fe31aa7dc1a6e0",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/node_modules/playwright-core/package.json",
+      "resolved": "/tmp/openscrub-save-as-20261116/node_modules/playwright-core/package.json",
+      "expected": "8243ae9fe675146825391eba8e2b06db88ea5ec94b8291a7394525965f3e7a32",
+      "actual": "8243ae9fe675146825391eba8e2b06db88ea5ec94b8291a7394525965f3e7a32",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu/libnspr4.so",
+      "resolved": "/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu/libnspr4.so",
+      "expected": "a10c172b4eecc3b7fd6a2fbca9d3c516e0d951dce21cc91d9fc4e1d68136f7d9",
+      "actual": "a10c172b4eecc3b7fd6a2fbca9d3c516e0d951dce21cc91d9fc4e1d68136f7d9",
+      "match": true
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/build.py",
+      "resolved": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/build.py",
+      "expected": "8bdc5f386de529d512e8807b1bf47843010b142f3e61fc2d5e75f13634d7e583",
+      "actual": "8bdc5f386de529d512e8807b1bf47843010b142f3e61fc2d5e75f13634d7e583",
+      "match": true
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/tomlkit/__init__.py",
+      "resolved": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/tomlkit/__init__.py",
+      "expected": "2a4876d4ff9d0050d76808f1cc06a6be09228127abf5b99c5ce6bdb307d7ed7d",
+      "actual": "2a4876d4ff9d0050d76808f1cc06a6be09228127abf5b99c5ce6bdb307d7ed7d",
+      "match": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/bootstrap/lib/python3.14/site-packages/pip/__main__.py",
+      "resolved": "/tmp/openscrub-baseline-20261116/bootstrap/lib/python3.14/site-packages/pip/__main__.py",
+      "expected": "5b36e11d74db484ea0058d7d98d37d9b8b39a3fdfae4b3af4d84a0aa06dd0611",
+      "actual": "5b36e11d74db484ea0058d7d98d37d9b8b39a3fdfae4b3af4d84a0aa06dd0611",
+      "match": true
+    }
+  ],
+  "interpreters": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "resolved": "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12",
+      "sha256": "e74c565bbccaaf3c2ec6527962890418ab6fe740c19129b02ae1b7effc322230",
+      "observed": {
+        "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+        "versions": {
+          "opencv-python": "4.14.0.94",
+          "numpy": "2.5.5",
+          "Flask": "3.1.3",
+          "Pillow": "13.0.0",
+          "cheroot": "11.1.2",
+          "pytest": "9.2.0"
+        }
+      },
+      "prior_version_pin": {
+        "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task655-evidence/environment-312.json",
+        "sha256": "637f6d1bad01629524b5d59491e3d454e5d5c215a3f3640d45a4f81f83eec023"
+      },
+      "prior_binary_pin": {
+        "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task656-evidence/interpreter-312.json",
+        "file_sha256": "20c260ae1b146c39a7a4169d172224f67dbb6abd16fc79bec136acc755a79291",
+        "expected_executable_sha256": "e74c565bbccaaf3c2ec6527962890418ab6fe740c19129b02ae1b7effc322230",
+        "match": true,
+        "mtime_utc": "2026-11-18T08:20:14.391837+00:00"
+      }
+    },
+    {
+      "path": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "resolved": "/tmp/openscrub-python39-20261117/python/cpython-3.9.25-linux-x86_64-gnu/bin/python3.9",
+      "sha256": "84c920f304e265c53096e42d83309c6f7b829988f937a7dd15c24eebcb63f59a",
+      "observed": {
+        "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+        "versions": {
+          "opencv-python": "4.14.0.94",
+          "numpy": "2.0.2",
+          "Flask": "3.1.3",
+          "Pillow": "11.3.0",
+          "cheroot": "11.1.2",
+          "pytest": "8.4.2"
+        }
+      },
+      "prior_version_pin": {
+        "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task655-evidence/environment-39.json",
+        "sha256": "2b76dda5c63332d9cde05361b9c772a24ab7a0207b1178904242b3af541ffe95"
+      },
+      "prior_binary_pin": {
+        "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task656-evidence/interpreter-39.json",
+        "file_sha256": "827aa5fb22af24d096df413daf9471b7c86f067a23ae31df9e4a8cf1c1ec0a73",
+        "expected_executable_sha256": "84c920f304e265c53096e42d83309c6f7b829988f937a7dd15c24eebcb63f59a",
+        "match": true,
+        "mtime_utc": "2026-11-18T08:20:14.426651+00:00"
+      }
+    }
+  ],
+  "versions": {
+    "/usr/bin/node": "v22.22.1\n",
+    "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers\nbuilt with gcc 15 (Ubuntu 15.2.0-13ubuntu3)\nconfiguration: --prefix=/usr --extra-version=3ubuntu2 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-pocketsphinx --disable-libcaca --disable-libmfx --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libdvdnav --enable-libdvdread --enable-libjack --enable-libjxl --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-librsvg --enable-shared\nlibavutil      60.  8.100 / 60.  8.100\nlibavcodec     62. 11.100 / 62. 11.100\nlibavformat    62.  3.100 / 62.  3.100\nlibavdevice    62.  1.100 / 62.  1.100\nlibavfilter    11.  4.100 / 11.  4.100\nlibswscale      9.  1.100 /  9.  1.100\nlibswresample   6.  1.100 /  6.  1.100\n\nExiting with exit code 0\n",
+    "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe": "ffprobe version 8.0.1-3ubuntu2 Copyright (c) 2007-2025 the FFmpeg developers\nbuilt with gcc 15 (Ubuntu 15.2.0-13ubuntu3)\nconfiguration: --prefix=/usr --extra-version=3ubuntu2 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-pocketsphinx --disable-libcaca --disable-libmfx --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libdvdnav --enable-libdvdread --enable-libjack --enable-libjxl --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-librsvg --enable-shared\nlibavutil      60.  8.100 / 60.  8.100\nlibavcodec     62. 11.100 / 62. 11.100\nlibavformat    62.  3.100 / 62.  3.100\nlibavdevice    62.  1.100 / 62.  1.100\nlibavfilter    11.  4.100 / 11.  4.100\nlibswscale      9.  1.100 /  9.  1.100\nlibswresample   6.  1.100 /  6.  1.100\n",
+    "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract": "tesseract 5.5.0\n leptonica-1.86.0\n  libgif 5.2.2 : libjpeg 8d (libjpeg-turbo 2.1.5) : libpng 1.6.57 : libtiff 4.7.0 : zlib 1.3.1 : libwebp 1.5.0 : libopenjp2 2.5.4\n Found AVX2\n Found AVX\n Found FMA\n Found SSE4.1\n Found OpenMP 201511\n Found libarchive 3.8.5 zlib/1.3.1 liblzma/5.8.3 bz2lib/1.0.8 liblz4/1.10.0 libzstd/1.5.7 nettle/3.10 libb2/bundled libacl/2.3.2 libattr/2.3.2\n Found libcurl/8.18.0 OpenSSL/3.5.5 zlib/1.3.1 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.2 libssh2/1.11.1 nghttp2/1.68.0 librtmp/2.3 mit-krb5/1.22.1 OpenLDAP/2.6.10\n",
+    "/tmp/openscrub-save-as-20261116/browsers/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell": "Google Chrome for Testing 159.0.8154.6\n"
+  },
+  "helper_matches": {
+    "verify.py": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067",
+    "verification_hook.py": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0",
+    "sitecustomize.py": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302",
+    "README.md": "1dec8419daf134313cd85312aabf8bd94b63093fc562fa5bf831ce92214109af"
+  }
+}

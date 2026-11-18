@@ -1,0 +1,698 @@
+[
+  {
+    "run": "task657-browser-01",
+    "head": "fab87cdbcca62e4c9f65e0166d2012bbe443e853",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-01/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-01/logs/command.log",
+            "sha256": "97f5f9c031f83ad3dd647c06f4f083f108c1a3d6baa8a037adf06843434b195e"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-browser-02",
+    "head": "b8c2b43fefd78357191562fb53adf0175b7d26f2",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-02/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-02-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-02/logs/command.log",
+            "sha256": "c0deec0329d8ede73ca022e93a56adb945e1b54904dc3842d6eed304208b21b5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-browser-03",
+    "head": "755f61443275da7afb161cc350d9eac504514ef5",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-03/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-03-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-03/logs/command.log",
+            "sha256": "ae6a0ecdddaac43eaea63d2481f2d5479e4e23dd22dce8dcd8cc458da5fc787b"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-browser-04",
+    "head": "5b9241b1d6dd48fb53d42c639ea4152fd1c06b6f",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-04/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-04-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-04/logs/command.log",
+            "sha256": "e23601d9821150d0d8dbe7e6cd5fca0e0e4637bf499afb424506e83b93ec585e"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-browser-05",
+    "head": "630f6cb7383bc219f6231dff008129ca51ff96c2",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-05/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-05-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-05/logs/command.log",
+            "sha256": "e3cb4b0469fee2c537e5f3039b4a7e79d122b76c2db1c3519a746eb7ecddbef0"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-browser-06",
+    "head": "4162e560937b364d8ea44f67771ac5f162bd17d1",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-browser-06/command.log",
+    "launch_records": [
+      {
+        "log": "task657-browser-06-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-browser-06/logs/command.log",
+            "sha256": "a19201c20c9e8815f41a35c5bec10f1cc6cbf1a3e33cbf1750566f5d22dbff4a"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-dev-01",
+    "head": "7950ddd884194608abb140e90489deddb9397cc8",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-dev-01/command.log",
+    "launch_records": []
+  },
+  {
+    "run": "task657-dev-02",
+    "head": "7950ddd884194608abb140e90489deddb9397cc8",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-dev-02/command.log",
+    "launch_records": [
+      {
+        "log": "dev-02-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_thumbnail_scheduling.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_polling_node.py",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-dev-02/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-dev-02/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-dev-02/logs/command.log",
+            "sha256": "ce7ecba9ad16a0dbb4f40e0a641526cfa66a3ff083c17fcc92ce2027b8d20ca9"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-escape-green-01",
+    "head": "5b9241b1d6dd48fb53d42c639ea4152fd1c06b6f",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-escape-green-01/command.log",
+    "launch_records": [
+      {
+        "log": "escape-green-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_thumbnail_scheduling.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_polling_node.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_overlay_releases_video_controls",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_box_editor_has_playback",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_job_video_stream_supports_range",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_repairs_unselected_selects_before_submit",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-green-01/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-green-01/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-green-01/logs/command.log",
+            "sha256": "fc5389d9e28f92446eac5b16960cfae702b8748c5dc78efca2e248e9357a0469"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-escape-red-01",
+    "head": "755f61443275da7afb161cc350d9eac504514ef5",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-escape-red-01/command.log",
+    "launch_records": [
+      {
+        "log": "escape-red-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py::test_escape_uses_the_scheduler_gesture_cleanup",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-red-01/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-red-01/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-escape-red-01/logs/command.log",
+            "sha256": "1ff5395664464ac5a54dbf96123c3973a9182d8b4650184beeb8fd921342f781"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-floor-01",
+    "head": "443761aed2643bf1dbfcb7c646c553a7cbbe1983",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "command_log": "runs/task657-floor-01/command.log",
+    "launch_records": [
+      {
+        "log": "task657-floor-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-python39-20261117/venv/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_thumbnail_scheduling.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_polling_node.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_overlay_releases_video_controls",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_box_editor_has_playback",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_job_video_stream_supports_range",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_repairs_unselected_selects_before_submit",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-01/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-01/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-01/logs/command.log",
+            "sha256": "054ebc49d79bf13f29e85f125d637c6f44b54d7e1960f4f728e7ab71af2fd0b5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-floor-02",
+    "head": "5b9241b1d6dd48fb53d42c639ea4152fd1c06b6f",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "command_log": "runs/task657-floor-02/command.log",
+    "launch_records": [
+      {
+        "log": "task657-floor-02-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-python39-20261117/venv/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_thumbnail_scheduling.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_polling_node.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_overlay_releases_video_controls",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_box_editor_has_playback",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_job_video_stream_supports_range",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_repairs_unselected_selects_before_submit",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-02/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-02/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-floor-02/logs/command.log",
+            "sha256": "39391ae32c9d14f0533374c2de538649bf4293665deca642566d5252d7e4baf8"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-http-01",
+    "head": "4162e560937b364d8ea44f67771ac5f162bd17d1",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-http-01/command.log",
+    "launch_records": [
+      {
+        "log": "task657-http-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_http.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-http-01/logs/command.log",
+            "sha256": "6abfedb0d139a455a586f1c9d07ff7b1a59ff2f4037387b7b30e21fe0d574617"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-native-01",
+    "head": "443761aed2643bf1dbfcb7c646c553a7cbbe1983",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-native-01/command.log",
+    "launch_records": [
+      {
+        "log": "native-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_thumbnail_scheduling.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_polling_node.py",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_overlay_releases_video_controls",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_box_editor_has_playback",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_job_video_stream_supports_range",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_editor_repairs_unselected_selects_before_submit",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-native-01/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-native-01/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-native-01/logs/command.log",
+            "sha256": "e8a74d52c7722d7ccf4e366f6f6a49467ae4a2b0f776a682e10ef0ab5ce7dcb1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-package-01",
+    "head": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": null,
+    "launch_records": [
+      {
+        "log": "package-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "build",
+            "--sdist",
+            "--no-isolation",
+            "--outdir",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/dist",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "build",
+            "--wheel",
+            "--no-isolation",
+            "--outdir",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/wheel",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/extracted/openscrub-1.0.96"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pip",
+            "install",
+            "--no-index",
+            "--no-deps",
+            "--no-compile",
+            "--target",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/site-packages",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/wheel/openscrub-1.0.96-py3-none-any.whl"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-c",
+            "print(\"INSTALLED_IDENTITY_DEFAULTS_OK\")"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/site-packages/bin/openscrub",
+            "--help"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/site-packages/bin/openscrub-web",
+            "--help"
+          ],
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task657-evidence/installed.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/sdist.log",
+            "sha256": "b64d8b2a22f9e3fb2cdcf3a4e73c175a18b023fdb2887d3fd2375d2072cdca89"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/wheel-from-sdist.log",
+            "sha256": "2ee618e223e719a5136ec42d0177f6ac6bb400136f21d272cf45b6519508feb6"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/install.log",
+            "sha256": "f4a53dfcfea2a3e8bd57b483edb5be3668433615239d6efe390497d3cb71a474"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/installed-defaults.log",
+            "sha256": "aec46fc119ffdc3d2d05c9a8093bc6bf04f27ab29e4c08c6ac469a80bf8196a6"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/installed-0.log",
+            "sha256": "d517f56c06397d9c5bdfcaabf8d4ba780e68a14e98ebc912f4a0f4a5dbfd6daf"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/installed-1.log",
+            "sha256": "75638fe7e0b9d33f8fe8d28579e4536b47033cb3741943723549df6f4835c7b7"
+          },
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-package-01/logs/installed-2.log",
+            "sha256": "ebf2364d199e02ed9e7eeb6647698403a92a5ac258ad15637efebc1010a28909"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-selected-red-01",
+    "head": "443761aed2643bf1dbfcb7c646c553a7cbbe1983",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-selected-red-01/command.log",
+    "launch_records": [
+      {
+        "log": "selected-red-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "-m",
+            "pytest",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py::test_selected_action_excludes_a_card_retired_by_virtual_layout",
+            "-q",
+            "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-selected-red-01/pytest",
+            "-o",
+            "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-selected-red-01/cache/pytest"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-selected-red-01/logs/command.log",
+            "sha256": "8b8984f3851fae48255a4e60094c3a9e2a97f2ecad3738dd687c9e2a60d5deee"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-touch-01",
+    "head": "4162e560937b364d8ea44f67771ac5f162bd17d1",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-touch-01/command.log",
+    "launch_records": [
+      {
+        "log": "touch-01-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 1,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-touch-01/logs/command.log",
+            "sha256": "279a21b7ac3ef6f24a48348f40a44f3bdee40f7e055a4bc675d93fe2aad40780"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "run": "task657-touch-02",
+    "head": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "command_log": "runs/task657-touch-02/command.log",
+    "launch_records": [
+      {
+        "log": "touch-02-launch.log",
+        "commands": [
+          [
+            "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+            "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.py"
+          ]
+        ],
+        "results": [
+          {
+            "exit": 0,
+            "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task657/runs/task657-touch-02/logs/command.log",
+            "sha256": "99219c8cc2a5bac14ff2a98a693dc6d2971e3358153d99e8157559e8e7595e09"
+          }
+        ]
+      }
+    ]
+  }
+]

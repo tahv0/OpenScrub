@@ -1,0 +1,8 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [],
+  "errors": [],
+  "console": [],
+  "failure": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#bb0') to be visible\n\n    at /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.cjs:25:143"
+}

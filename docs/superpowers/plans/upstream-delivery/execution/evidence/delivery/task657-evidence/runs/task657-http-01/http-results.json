@@ -1,0 +1,15 @@
+{
+  "page": "actual HTTP full PAGE",
+  "playbackPrerequisite": "ordinary UI Play with shipped preload-none; no fixture video.load override",
+  "playbackPreserved": true,
+  "savedRows": 11,
+  "rawReopen": true,
+  "phase": "done",
+  "phases": [
+    "rendering",
+    "rendering",
+    "rendering",
+    "done"
+  ],
+  "errors": []
+}

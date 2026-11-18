@@ -1,0 +1,579 @@
+diff --git a/openscrub_web.py b/openscrub_web.py
+index 57b3bda..31feddd 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -2603,0 +2604,5 @@ APP_CSS = r"""
++[hidden]{display:none!important}
++.reviewfilters{flex-wrap:wrap;align-items:end}
++.reviewfilters label{display:flex;flex-direction:column;gap:4px;min-width:0;max-width:100%}
++.reviewfilters select{max-width:100%}
++
+@@ -3119,0 +3125 @@ async function openJob(id){
++ resetReviewView();
+@@ -4121,0 +4128,5 @@ const THUMB_FLIGHTS=new Set(); // unsettled fetch + body operations, across view
++let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
++function resetReviewView(){
++ REVIEW_SCHED?.selectionCleanup?.();clearSel();TRKMEM={};ROWCARD={};REVIEW_META=null;
++ REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all"};
++}
+@@ -4123 +4134 @@ function reviewDescriptors(rows){
+- const groups={},zones=[];TRKMEM={};ROWCARD={};
++ const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
+@@ -4131 +4142 @@ function reviewDescriptors(rows){
+-  const cards=items.map(x=>({id:x.i,category,zone,representative:x,members:TRKMEM[x.i]||[x.i]}));
++  const cards=items.map(x=>({id:x.i,category,realCategory:x.category,zone,representative:x,members:zone?[x.i]:TRKMEM[x.i]}));
+@@ -4133 +4144 @@ function reviewDescriptors(rows){
+-  sections.push({category,zone,cards,ids:cards.map(c=>c.id)});
++  sections.push({category,zone,index:sections.length,cards,ids:cards.map(c=>c.id)});
+@@ -4137 +4148 @@ function reviewDescriptors(rows){
+-  const grouped={},items=[];
++  const grouped=new Map(),items=[];
+@@ -4140 +4151 @@ function reviewDescriptors(rows){
+-   if(key)(grouped[key]=grouped[key]||[]).push(x);
++   if(key){if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(x);}
+@@ -4143 +4154 @@ function reviewDescriptors(rows){
+-  for(const [key,members] of Object.entries(grouped)){
++  for(const [key,members] of grouped){
+@@ -4175 +4186 @@ async function loadReview(auto=null){
+- REVIEW_META={sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
++ REVIEW_META={jobId:id,viewGen:gen,sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+@@ -4178,0 +4190,9 @@ async function loadReview(auto=null){
++ <div class="row reviewfilters">
++  <label>Detection type <select id="reviewType" onchange="setReviewFilter(this.value||null,REVIEW_FILTER.output)"></select></label>
++  <label>Output <select id="reviewOutput" onchange="setReviewFilter(REVIEW_FILTER.type,this.value)"></select></label>
++  <button class="sec" id="reviewFilterReset" onclick="setReviewFilter(null,'all')">Show all</button>
++ </div>
++ <div id="reviewFilterStatus" role="status" aria-live="polite"></div>
++ <p class="detscope">Mixed groups appear in both output views. Filters only change the view.</p>
++ <p id="reviewFilterHint" class="detscope"></p>
++ <p id="reviewFilterEmpty" hidden></p>
+@@ -4186,4 +4206,5 @@ async function loadReview(auto=null){
+-  if(section.zone)html+=`<details data-review-zones style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+-   <summary style="cursor:pointer;color:#fbbf24;font-weight:600">⚠ ${section.ids.length} detection(s) outside your zones — choose output below (mostly logos/labels by design; open only if something real was zoned out)</summary>
+-   <div class="row" style="margin:8px 0 4px"><button class="sec" onclick="setAllZd(true)">Blur all</button><button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>`;
+-  else html+=`<h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge">${section.ids.length}</span>
++  if(section.zone)html+=`<details id="reviewZones" data-review-zones style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
++   <summary style="cursor:pointer;color:#fbbf24;font-weight:600">⚠ <span id="reviewZoneCount">${section.ids.length} of ${section.ids.length}</span> detection(s) outside your zones — choose output below (mostly logos/labels by design; open only if something real was zoned out)</summary>
++   <div class="row" style="margin:8px 0 4px"><button class="sec" onclick="setAllZd(true)">Blur all</button><button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>
++   <div class="detscope">These actions affect all outside-zone detections, including filtered-out detections.</div>`;
++  else html+=`<section id="reviewSection${section.index}"><h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge" id="reviewCount${section.index}">${section.ids.length}</span>
+@@ -4191 +4212,2 @@ async function loadReview(auto=null){
+-   <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,false)" data-cat="${detLabel(cat)}">Keep all visible</button></h3>`;
++   <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,false)" data-cat="${detLabel(cat)}">Keep all visible</button></h3>
++   <div class="detscope">Category actions affect all ${detLabel(CATDN[cat]||cat)} groups, including filtered-out groups.</div>`;
+@@ -4193 +4215 @@ async function loadReview(auto=null){
+-  if(section.zone)html+='</details>';
++  html+=section.zone?'</details>':'</section>';
+@@ -4200 +4222 @@ async function loadReview(auto=null){
+- REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
++ refreshReviewFilters();REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
+@@ -4210 +4232 @@ function refreshReviewVisibleSet({jobId,viewGen,matchingCardIds}={}){
+- if(matchingCardIds)s.matching=new Set(matchingCardIds.filter(i=>s.meta.byId.has(i)));
++ if(matchingCardIds!==undefined)s.matching=new Set(matchingCardIds.filter(i=>s.meta.byId.has(i)));
+@@ -4239,4 +4261 @@ class ReviewScheduler{
+-   if(!zones.open){for(const section of this.meta.sections)if(section.zone)
+-    for(const id of section.ids)selSet.delete(id);
+-    if(menuEl){menuEl.remove();menuEl=null;}if(selSet.size)showSelMenu(12,12);
+-   }this.schedule();
++   if(this.owns())reviewZoneToggle(zones);
+@@ -4491,0 +4511,71 @@ window.addEventListener?.('pageshow',()=>{
++function reviewMatches(card,type,output){
++ return (type===null||card.realCategory===type)&&(output==="all"||
++  card.members.some(i=>output==="blur"?!!EN[i]:!EN[i]));
++}
++function setReviewFilter(type,output){
++ if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
++ REVIEW_SCHED?.selectionCleanup?.();clearSel();REVIEW_FILTER.type=type;REVIEW_FILTER.output=output;
++ refreshReviewFilters();
++}
++function reviewSelectable(i){
++ const c=REVIEW_META?.byId.get(i);if(!c||!reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output))return false;
++ return !c.zone||!!document.getElementById("reviewZones")?.open;
++}
++function pruneReviewSelection(){
++ let changed=false;
++ for(const i of [...selSet])if(!reviewSelectable(i)){
++  selSet.delete(i);document.getElementById("det"+i)?.classList.remove("selected");changed=true;}
++ if(changed&&menuEl){
++  if(!selSet.size){menuEl.remove();menuEl=null;}
++  else menuEl.querySelector("span").textContent=selSet.size+" selected";
++ }
++}
++function reviewZoneToggle(node){
++ if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen)||
++  (node&&node!==document.getElementById("reviewZones")))return;
++ pruneReviewSelection();refreshReviewFilters();
++}
++function refreshReviewFilters(){
++ if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
++ const typeControl=document.getElementById("reviewType"),outputControl=document.getElementById("reviewOutput");
++ if(!typeControl||!outputControl)return;
++ const types=[...new Set([...[...REVIEW_META.byId.values()].filter(c=>!c.zone),...[...REVIEW_META.byId.values()].filter(c=>c.zone)].map(c=>c.realCategory))];
++ if(REVIEW_FILTER.type!==null&&!types.includes(REVIEW_FILTER.type))REVIEW_FILTER.type=null;
++ const {type,output}=REVIEW_FILTER,typeCounts=new Map(types.map(t=>[t,0])),outputCounts={all:0,blur:0,visible:0};
++ let count=0,ordinary=0,zones=0,otherTypeCount=0;
++ const sectionCounts=new Map(REVIEW_META.sections.map(s=>[s.index,0]));
++ const matching=[];
++ const active=document.activeElement,focusedCard=active?.closest?.(".det");
++ let lostFocus=false;
++ // Derive aggregates once per transaction, independently of mounted/closed cards.
++ for(const s of REVIEW_META.sections)for(const c of s.cards){
++  let blurred=0;for(const i of c.members)if(EN[i])blurred++;
++  const kept=c.members.length-blurred,typeMatch=type===null||c.realCategory===type;
++  const outputMatch=output==="all"||(output==="blur"?blurred>0:kept>0),match=typeMatch&&outputMatch;
++  if(outputMatch){typeCounts.set(c.realCategory,typeCounts.get(c.realCategory)+1);otherTypeCount++;}
++  if(typeMatch){outputCounts.all++;if(blurred)outputCounts.blur++;if(kept)outputCounts.visible++;}
++  if(match){matching.push(c.id);count++;if(c.zone)zones++;else ordinary++;sectionCounts.set(s.index,sectionCounts.get(s.index)+1);}
++  const node=document.getElementById("det"+c.id);
++  if(node&&!match&&focusedCard===node)lostFocus=true;
++ }
++ typeControl.innerHTML=`<option value="">All detected types (${otherTypeCount})</option>`+types.map(t=>`<option value="${detLabel(t)}">${detLabel(CATDN[t]||t)} (${typeCounts.get(t)})</option>`).join("");
++ typeControl.value=type??"";
++ outputControl.innerHTML=[["all","All outputs"],["blur","Includes blurred appearances"],["visible","Includes visible appearances"]].map(([v,label])=>`<option value="${v}">${label} (${outputCounts[v]})</option>`).join("");
++ outputControl.value=output;
++ const zoneDetails=document.getElementById("reviewZones");
++ for(const s of REVIEW_META.sections){
++  const n=sectionCounts.get(s.index),node=document.getElementById(s.zone?"reviewZones":"reviewSection"+s.index);
++  if(node){if(!n&&node.contains?.(active))lostFocus=true;node.hidden=!n;}
++  const badge=document.getElementById(s.zone?"reviewZoneCount":"reviewCount"+s.index);
++  if(badge)badge.textContent=s.zone?`${n} of ${s.cards.length}`:String(n);
++ }
++ document.getElementById("reviewFilterStatus").textContent=`${count} of ${[...REVIEW_META.byId.values()].length} cards match`;
++ const empty=document.getElementById("reviewFilterEmpty");empty.hidden=count>0;
++ empty.textContent=[...REVIEW_META.byId.values()].length?"No cards match these filters.":"No detections in this job.";
++ document.getElementById("reviewFilterHint").textContent=count>0&&!ordinary&&zones&&!zoneDetails?.open?
++  `${zones} matching card${zones===1?" is":"s are"} outside your zones; open that section to inspect them.`:"";
++ pruneReviewSelection();
++ if(lostFocus)outputControl.focus();
++ refreshReviewVisibleSet({jobId:REVIEW_META.jobId,viewGen:REVIEW_META.viewGen,matchingCardIds:matching});
++}
++
+@@ -4516,0 +4607 @@ function finishDetChoices(){
++ if(!EDITS.busy)saveStatus(EDITS,'Unsaved edits — save to include them in the render.');
+@@ -4519 +4610 @@ function finishDetChoices(){
+- refreshReviewVisibleSet({jobId:CUR,viewGen:VIEW_GEN});
++ refreshReviewFilters();
+@@ -4525 +4615,0 @@ function applyDet(i,blur){
+- if(!EDITS.busy)saveStatus(EDITS,'Unsaved edits — save to include them in the render.');
+@@ -4550 +4640 @@ function initMarquee(){
+-  clearSel();owner.gesture=true;mStart=[e.pageX,e.pageY];
++  owner.selectionCleanup?.();clearSel();owner.gesture=true;mStart=[e.pageX,e.pageY];
+@@ -4552 +4642 @@ function initMarquee(){
+-  const targets=[...owner.bindings.values()].filter(b=>b.card.dataset.focusPin!=='1'&&
++  const targets=[...owner.bindings.values()].filter(b=>reviewSelectable(b.id)&&b.card.dataset.focusPin!=='1'&&
+@@ -4571 +4661 @@ function initMarquee(){
+-   for(const b of targets){if(!owner.valid(b,false))continue;
++   for(const b of targets){if(!owner.valid(b,false)||!reviewSelectable(b.id))continue;
+@@ -4573 +4663 @@ function initMarquee(){
+-    if(rect.left<r.right&&rect.right>r.left&&rect.top<r.bottom&&rect.bottom>r.top){selSet.add(b.id);t.classList.add('selected');}}
++    if(rect.width&&rect.height&&rect.left<r.right&&rect.right>r.left&&rect.top<r.bottom&&rect.bottom>r.top){selSet.add(b.id);t.classList.add('selected');}}
+@@ -4591 +4681 @@ function showSelMenu(x,y){
+-function bulkSet(blur){applyDetBatch([...selSet].filter(i=>REVIEW_META?.byId.has(i)),blur);clearSel();}
++function bulkSet(blur){const ids=[...selSet].filter(reviewSelectable);clearSel();applyDetBatch(ids,blur);}
+@@ -4613 +4703 @@ document.addEventListener("keydown",e=>{
+- if(e.key==="Escape"){clearSel();
++ if(e.key==="Escape"){REVIEW_SCHED?.selectionCleanup?.();clearSel();
+diff --git a/tests/review_filters_browser.cjs b/tests/review_filters_browser.cjs
+new file mode 100644
+index 0000000..e425951
+--- /dev/null
++++ b/tests/review_filters_browser.cjs
+@@ -0,0 +1,124 @@
++// Full shipped PAGE, synthetic route fixtures; no replacement review logic.
++const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE||'playwright');
++const assert=require('node:assert/strict'),fs=require('node:fs');
++const root=process.env.VERIFY_RUN,origin='http://127.0.0.1:18550';
++const row=(i,category,enabled,person=-1,track=-1,confidence=.5,zone_dropped=false)=>({i,category,enabled,person,track,confidence,zone_dropped,text:'synthetic '+i,t_start:.1,t_end:2,box:[20+i*12,20,40+i*12,50]});
++const initial=[row(0,'face',true,0,-1,.9),row(1,'face',false,0),row(2,'face',true,0),row(3,'face',true),row(4,'plate',false,-1,4,.9),row(5,'plate',false,-1,4),row(6,'plate',true),row(7,'email',false),row(8,'face',false,0,-1,.95,true),row(9,'plate',true,-1,4,.95,true)];
++const results={browserPlugin:'unavailable',page:'full emitted PAGE',scenarios:[],errors:[],console:[]};
++let browser,page;
++(async()=>{browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true,isMobile:process.env.TASK150_TOUCH_ONLY==='1'});
++page.on('pageerror',e=>results.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))results.console.push(m.text())});
++let rows=structuredClone(initial),hold=false,release=null,fail=false,holdThumbs=false;const heldThumbs=[];const requests=[];
++await page.route(origin+'/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname;requests.push({path,method:req.method()});
++const json=body=>route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
++if(path==='/')return route.fulfill({contentType:'text/html',body:fs.readFileSync(root+'/page.html','utf8')});
++if(path==='/api/jobs')return json(['A','B','empty'].map(id=>({id,name:'Synthetic '+id,phase:'review'})));
++if(/^\/api\/jobs\/[^/]+$/.test(path))return json({id:path.split('/').at(-1),name:'Synthetic review',phase:'review',progress:1,has_output:false});
++if(path.endsWith('/log'))return json({from:0,lines:[],len:0});
++if(path.endsWith('/detections')){if(req.method()==='POST'){if(hold)await new Promise(r=>release=r);if(fail)return route.fulfill({status:423,contentType:'application/json',body:'{"error":"controlled busy"}'});for(const [i,v]of Object.entries(req.postDataJSON().enabled||{}))rows[+i].enabled=v;return json({ok:true});}return json({detections:path.includes('/empty/')?[]:rows,duration:4,fps:10});}
++if(path.endsWith('/render'))return json({ok:true});
++if(path.endsWith('/report'))return json({detections:rows.map(({box,...r})=>({...r,cbox:box,aoff:[0,0]})),audio_redactions:[],render_state:{fps:10,cum:Array(40).fill([0,0])}});
++if(path.endsWith('/mediainfo'))return json({duration:4,fps:10,width:320,height:180});
++if(path.endsWith('/boxes_at'))return json({ox:0,oy:0,boxes:rows.filter(x=>!x.zone_dropped)});
++if(/\/(thumb|detframe)\/\d+$|\/frame_at$/.test(path)){if(holdThumbs&&path.includes('/thumb/'))await new Promise(resolve=>heldThumbs.push(resolve));try{return await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#233447"/><path d="M40 30h90v100H40z" fill="#abc"/></svg>'})}catch(error){if(!route.request().failure())throw error;}}
++if(path==='/api/custom_cats')return json([]);if(path==='/api/allowlist')return json({words:[]});if(path==='/api/certinfo')return json({mode:'synthetic'});if(path==='/api/vault')return json({enabled:false});if(path==='/api/extras')return json({extras:[]});if(path==='/api/update_check')return json({update_available:false});if(path==='/api/quality_tier')return json({tier:'fast',needs:{}});if(path.startsWith('/api/models/'))return json({active:true,selected:'',models:[]});if(path==='/api/model_status')return json({face:true,plate:true,person:true});if(path==='/favicon.ico')return route.fulfill({status:204});return json({});});
++await page.goto(origin);assert.equal(await page.title(),'OpenScrub');await page.locator('#jobs a').first().click();await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>scrollTo(0,document.getElementById('detwrap').getBoundingClientRect().top+scrollY-55));await page.locator('#bb0').waitFor();
++assert.match(await page.locator('body').innerText(),/Review/);
++assert.equal(await page.locator('#reviewType').count(),1,'missing Detection type selector on actual full PAGE');
++assert.equal(await page.locator('#reviewOutput').count(),1,'missing Output selector on actual full PAGE');
++results.scenarios.push('native selectors present');
++if(process.env.TASK150_RED==='1')return;
++const status=async s=>assert.equal(await page.locator('#reviewFilterStatus').innerText(),s);
++const filter=async(type,output)=>{await page.locator('#reviewType').selectOption(type??'');await page.locator('#reviewOutput').selectOption(output)};
++// Locate through actual scheduler geometry; virtualization intentionally has no offscreen card nodes.
++const placeCard=async id=>{await page.evaluate(i=>{const s=REVIEW_SCHED;s.layout();const section=s.sections.find(x=>x.ids.includes(i));if(!section)throw Error('card unavailable '+i);const n=section.ids.indexOf(i),top=section.el.getBoundingClientRect().top+scrollY+section.prefix[Math.floor(n/section.columns)]*section.scale;scrollTo(0,Math.max(0,top-100));s.layout()},id);await page.locator('#det'+id).waitFor()};
++const cardAction=async id=>{await placeCard(+id.slice(2));await page.locator('#'+id).click()};
++
++if(process.env.TASK150_TOUCH_ONLY==='1'){
++ await page.evaluate(async flags=>{for(const [i,value]of Object.entries(flags))EDITS.enabled[i]=value;await loadReview()},Object.fromEntries(initial.map(r=>[r.i,!r.enabled])));
++ await filter('','blur');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'blur')).map(c=>c.id).sort((a,b)=>a-b)),[0,4,7,8]);await status('4 of 7 cards match');
++ await filter('','visible');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'visible')).map(c=>c.id).sort((a,b)=>a-b)),[0,3,6,9]);
++ await page.locator('#reviewType').click();await page.keyboard.press('Home');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await page.locator('#reviewType').inputValue(),'face');
++ await page.locator('#reviewOutput').selectOption('blur');await cardAction('kb0');await status('1 of 7 cards match');assert.match(await page.locator('#reviewFilterHint').innerText(),/outside your zones/);assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
++ await page.evaluate(()=>openJob('empty'));await page.locator('#reviewOutput').waitFor();await status('0 of 0 cards match');assert.equal(await page.locator('#reviewFilterEmpty').innerText(),'No detections in this job.');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();
++ results.scenarios.push('opposite pending overlay, native Detection type pointer/keyboard, collapsed-zone-only matches and no detections');
++}
++if(process.env.TASK150_TOUCH_ONLY!=='1'){
++await status('7 of 7 cards match');await filter('','blur');await status('4 of 7 cards match');await filter('','visible');await status('4 of 7 cards match');
++await filter('face','visible');await status('2 of 7 cards match');assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
++await filter('email','blur');await status('0 of 7 cards match');assert.equal(await page.locator('#reviewFilterEmpty').isVisible(),true);
++await page.locator('#reviewFilterReset').click();await status('7 of 7 cards match');assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewFilterReset');
++results.scenarios.push('seven-card mixed/type/empty/reset counts');
++await page.locator('#reviewOutput').focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await status('4 of 7 cards match');
++await placeCard(3);await page.locator('#kb3').focus();await page.keyboard.press('Enter');await status('3 of 7 cards match');assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewOutput');
++await placeCard(0);await page.locator('#bb0').focus();await page.keyboard.press('Enter');assert.equal(await page.evaluate(()=>document.activeElement.id),'bb0');
++results.scenarios.push('native keyboard, disappearing-control focus fallback and retained-card focus');
++await page.locator('#reviewFilterReset').click();await page.locator('#reviewZones summary').click();await page.locator('#det8').waitFor({state:'visible'});
++await page.evaluate(()=>{selSet.add(8);document.getElementById('det8').classList.add('selected')});await page.locator('#reviewZones summary').click();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);await page.locator('#reviewZones summary').click();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
++await filter('email','all');assert.equal(await page.locator('#reviewZones').isVisible(),false);await filter('','all');assert.equal(await page.locator('#reviewZones').getAttribute('open'),'');
++results.scenarios.push('zone collapse selection pruning and open preference retained across hiding');
++await page.locator('#reviewZones summary').click();
++await filter('face','all');await placeCard(0);const target=page.locator('#det0');await target.scrollIntoViewIfNeeded();let b=await target.boundingBox();
++await page.mouse.move(b.x+3,b.y+3);await page.mouse.down();await page.mouse.move(b.x+b.width-3,b.y+b.height-3,{steps:4});await page.mouse.up();
++assert.deepEqual(await page.evaluate(()=>[...selSet]),[0]);await page.locator('.selmenu .mkeep').click();assert.deepEqual(await page.evaluate(()=>[EN[0],EN[1],EN[2]]),[false,false,false]);
++await cardAction('bb0');b=await target.boundingBox();await page.mouse.move(b.x+3,b.y+3);await page.mouse.down();await page.mouse.move(b.x+30,b.y+30);await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
++await page.locator('#det0 img').click();await page.locator('#lb img').waitFor();assert.match(await page.locator('#lb img').getAttribute('src'),/detframe\/0$/);await page.keyboard.press('Escape');assert.equal(await page.locator('#lb').count(),0);
++await page.locator('#reviewFilterReset').click();
++results.scenarios.push('native marquee full-group selected action, Escape cancels active marquee, enlarged original preview');
++
++await page.locator('button[onclick="loadBoxEdit(1)"]').click();await page.locator('#beCv').waitFor();
++await page.waitForFunction(()=>BE.boxes.length>0&&BE.scale>0);await page.locator('#beCv').scrollIntoViewIfNeeded();
++let cv=await page.locator('#beCv').boundingBox(),scale=await page.evaluate(()=>BE.scale);
++await page.mouse.click(cv.x+42*scale,cv.y+35*scale);assert.equal(await page.evaluate(()=>BE.sel),1);
++await page.locator('#beT0').fill('0.2');await page.locator('#beT1').fill('1.8');await page.locator('button[onclick="beApplyTimes()"]').click();
++await page.locator('#beCv').scrollIntoViewIfNeeded();cv=await page.locator('#beCv').boundingBox();await page.mouse.move(cv.x+42*scale,cv.y+35*scale);await page.mouse.down();await page.mouse.move(cv.x+47*scale,cv.y+40*scale);
++assert.equal(await page.evaluate(()=>BE.drag?.kind),'move');
++await page.evaluate(()=>{window.retainedBE=BE;window.retainedEditor=document.getElementById('beCv');BE.ov[1]=[1,2,30,40];BE.times[1]=[0,1];BE.adds.push({t0:0,t1:1,box:[2,3,30,40]});BE.audio=[{t0:0,t1:1,mode:'mute'}];BE.sel=1;MAN.push({draft:true});window.draft=JSON.stringify({EN,BE,MAN,enabled:EDITS.enabled})});
++const boundary=requests.length;await page.evaluate(()=>setReviewFilter('email','blur'));await page.evaluate(()=>setReviewFilter(null,'all'));
++assert.equal(await page.evaluate(()=>BE===window.retainedBE&&document.getElementById('beCv')===window.retainedEditor&&JSON.stringify({EN,BE,MAN,enabled:EDITS.enabled})===window.draft),true);
++assert.deepEqual(requests.slice(boundary).filter(r=>/\/(detections|report|mediainfo|boxes_at|render)$/.test(r.path)),[]);
++assert.equal(await page.evaluate(()=>BE.drag?.kind),'move');await page.mouse.up();assert.equal(await page.evaluate(()=>BE.drag),null);
++results.scenarios.push('editor object/node, selection, pending geometry/time/manual/audio and actual unfinished pointer gesture retained; zero metadata/save/render requests');
++await page.evaluate(()=>{BE.drag=null;MAN.length=0;BE.adds.length=0;BE.ov={};BE.times={};BE.audio=[];BE.audioLoaded=false});
++hold=true;await cardAction('kb0');await page.evaluate(()=>{window.saving=saveAndRender()});await page.waitForFunction(()=>EDITS.busy);await cardAction('bb0');await filter('plate','visible');hold=false;release();await page.evaluate(()=>window.saving);assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);assert.equal(requests.filter(r=>r.path.endsWith('/render')).length,0);await status('1 of 7 cards match');
++fail=true;await page.evaluate(()=>saveAndRender());assert.match(await page.locator('#reviewSaveStatus').innerText(),/controlled busy/);await page.locator('#reviewFilterReset').click();assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);
++await page.evaluate(()=>openJob('B'));await page.locator('#reviewType').waitFor();assert.equal(await page.locator('#reviewType').inputValue(),'');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewOutput').inputValue(),'all');
++results.scenarios.push('held-save newer intent, failed save, A→B→A reset and owning draft');
++}
++
++// Modest complete metadata proves actual scheduler/filter ownership beyond mounted nodes.
++await page.setViewportSize({width:700,height:600});await page.waitForFunction(()=>THUMB_FLIGHTS.size===0);holdThumbs=true;
++rows=Array.from({length:96},(_,i)=>row(100+i,i%2?'plate':'face',i%3!==0));
++rows.push(row(220,'face',false,-1,-1,.5,true),row(221,'plate',true,-1,-1,.5,true));
++await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();
++await page.locator('#reviewFilterReset').click();await placeCard(100);
++await page.waitForFunction(()=>REVIEW_SCHED.bindings.size>0);assert.equal(await page.evaluate(()=>REVIEW_META.byId.size),98);assert.ok(await page.evaluate(()=>REVIEW_SCHED.bindings.size<REVIEW_META.byId.size));
++await page.waitForFunction(()=>THUMB_FLIGHTS.size===4);await page.evaluate(()=>window.filteredFlights=[...THUMB_FLIGHTS]);await filter('face','blur');await status('32 of 98 cards match');await page.waitForFunction(()=>filteredFlights.some(op=>op.cancelled));assert.ok(await page.evaluate(()=>THUMB_FLIGHTS.size<=4));holdThumbs=false;heldThumbs.splice(0).forEach(release=>release());await page.waitForFunction(()=>THUMB_FLIGHTS.size===0);await placeCard(102);
++const focusId=await page.evaluate(()=>{const b=[...REVIEW_SCHED.bindings.values()].find(b=>REVIEW_SCHED.matching.has(b.id));b.card.querySelector('button').focus();window.retainedFilterNode=b.card;return b.id});
++await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(id=>document.getElementById('det'+id)===window.retainedFilterNode,focusId),true);
++await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen});refreshReviewVisibleSet();});
++assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),32);
++await page.locator('[data-review-next]').click();await page.waitForFunction(()=>[...REVIEW_SCHED.bindings.keys()].every(i=>REVIEW_SCHED.matching.has(i)));
++await page.evaluate(()=>{window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
++await page.waitForFunction(()=>REVIEW_SCHED.owns());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),32);
++// Category actions affect every unmounted/hidden ordinary member, independently of zones.
++await page.evaluate(()=>setAll('face',false));assert.equal(await page.evaluate(()=>Array.from({length:48},(_,i)=>EN[100+i*2]).every(v=>v===false)),true);assert.equal(await page.evaluate(()=>EN[221]),true);await status('0 of 98 cards match');
++await page.evaluate(()=>setAllZd(false));assert.equal(await page.evaluate(()=>EN[221]),false);
++await filter('plate','all');await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen,matchingCardIds:[]})});await page.waitForFunction(()=>REVIEW_SCHED.bindings.size===0);await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),49);
++const explicit=await page.evaluate(()=>{const c=[...REVIEW_META.byId.values()].find(c=>c.category==='plate'&&!c.zone&&!REVIEW_SCHED.bindings.has(c.id)&&EN[c.id]===false);if(!c)throw Error('missing unmounted selected fixture');selSet.add(c.id);selSet.add(100);bulkSet(true);return c.id});assert.equal(await page.evaluate(i=>EN[i],explicit),true);assert.equal(await page.evaluate(()=>EN[100]),false);assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
++results.scenarios.push('actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership');
++// Restore the exact seven-card/mobile oracle and pending choices established above.
++rows=structuredClone(initial);await page.evaluate(()=>{REVIEW_DRAFTS.get('A').enabled={};openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>{applyDet(0,true);applyDet(3,false)});
++await page.setViewportSize({width:390,height:844});await page.locator('#reviewFilterReset').click();await page.screenshot({path:root+'/mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.locator('#reviewOutput').selectOption('visible');// A is all true from pending bb0; B3 was kept, C4/5 and E7 remain false, Z8 is false, D6/Z9 true. Thus B/C/E/Z8 match.
++await status('4 of 7 cards match');
++results.scenarios.push('390px layout and native controls');
++await page.locator('#reviewFilterReset').click();await placeCard(0);await page.locator('#det0').scrollIntoViewIfNeeded();const touch=await page.context().newCDPSession(page);
++const touchGeometry=await page.evaluate(()=>{const e=document.getElementById('detwrap');scrollTo(0,e.getBoundingClientRect().top+scrollY);return {container:'window/vertical',scrollY,max:document.documentElement.scrollHeight-innerHeight,wrap:e.getBoundingClientRect().toJSON()}});assert.ok(touchGeometry.max>touchGeometry.scrollY+150);const scrollBefore=touchGeometry.scrollY;
++results.touchGeometry=touchGeometry;fs.writeFileSync(root+'/touch-precondition.json',JSON.stringify(touchGeometry,null,2));
++await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:190,y:700}]});
++for(let y=650;y>=300;y-=50){await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:190,y}]});await page.waitForTimeout(20)}
++await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);await page.waitForFunction(before=>scrollY>before,scrollBefore);results.touchAfter=await page.evaluate(()=>scrollY);
++await page.getByText('Advanced settings ▸',{exact:true}).click();const tip=page.locator('label:has(#faceheads) .qm');await tip.scrollIntoViewIfNeeded();const checked=await page.locator('#faceheads').isChecked();await tip.tap();assert.equal(await tip.evaluate(e=>e.classList.contains('open')),true);assert.equal(await page.locator('#faceheads').isChecked(),checked);assert.equal(await tip.evaluate(e=>e.style.getPropertyValue('--qw')),'250px');
++results.scenarios.push('native touch scrolling leaves selection empty; mobile help tap preserves checkbox and tooltip bounds');
++assert.deepEqual(results.errors,[]);await page.screenshot({path:root+'/filtered.png'});
++})().catch(e=>{results.failure=e.stack;process.exitCode=1}).finally(async()=>{if(results.failure&&page){results.failureState=await page.evaluate(()=>({poll:document.getElementById('pollStatus')?.textContent,review:!!REVIEW_META,matching:REVIEW_SCHED?[...REVIEW_SCHED.matching]:[],mounted:REVIEW_SCHED?[...REVIEW_SCHED.bindings.keys()]:[]})).catch(()=>null)}if(browser)await browser.close();fs.writeFileSync(root+'/browser-results.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results))});
+diff --git a/tests/review_filters_browser.py b/tests/review_filters_browser.py
+new file mode 100644
+index 0000000..62dbacb
+--- /dev/null
++++ b/tests/review_filters_browser.py
+@@ -0,0 +1,7 @@
++from pathlib import Path
++import os,subprocess
++import openscrub_web as w
++root=Path(os.environ['VERIFY_RUN'])
++(root/'page.html').write_text(w.index())
++result=subprocess.run(['node',str(Path(__file__).with_name('review_filters_browser.cjs'))],check=False)
++raise SystemExit(result.returncode)
+diff --git a/tests/review_filters_http.cjs b/tests/review_filters_http.cjs
+new file mode 100644
+index 0000000..be18c0a
+--- /dev/null
++++ b/tests/review_filters_http.cjs
+@@ -0,0 +1,32 @@
++const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE||'playwright');
++const assert=require('node:assert/strict'),fs=require('node:fs'),root=process.env.VERIFY_RUN,origin='http://127.0.0.1:18551';let browser;
++(async()=>{browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1365,height:1000}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('dialog',d=>d.dismiss());
++await page.goto(origin);assert.equal(await page.title(),'OpenScrub');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewFilterStatus').innerText(),'7 of 7 cards match');
++const placeCard=async id=>{await page.evaluate(i=>{const s=REVIEW_SCHED;s.layout();const section=s.sections.find(x=>x.ids.includes(i));if(!section)throw Error('card unavailable '+i);const n=section.ids.indexOf(i),top=section.el.getBoundingClientRect().top+scrollY+section.prefix[Math.floor(n/section.columns)]*section.scale;scrollTo(0,Math.max(0,top-100));s.layout()},id);await page.locator('#det'+id).waitFor()};
++const cardAction=async id=>{await placeCard(+id.slice(2));await page.locator('#'+id).click()};
++await page.evaluate(()=>scrollTo(0,document.getElementById('detwrap').getBoundingClientRect().top+scrollY-55));await cardAction('kb3');await cardAction('bb0');await page.locator('#reviewZones summary').click();await cardAction('bb8');await cardAction('kb9');await page.locator('#reviewZones summary').click();
++await page.locator('button[onclick="loadBoxEdit(1)"]').click();await page.locator('#beCv').waitFor();
++await page.locator('#bePlay').click();await page.waitForFunction(()=>document.getElementById('beVid').currentTime>.15);
++const playback=await page.evaluate(()=>{window.videoNode=document.getElementById('beVid');window.editorObject=BE;return videoNode.currentTime});
++await page.locator('#reviewType').selectOption('email');await page.waitForFunction(before=>videoNode.currentTime>before,playback);
++assert.equal(await page.evaluate(()=>!videoNode.paused&&videoNode===document.getElementById('beVid')&&editorObject===BE),true);await page.locator('#bePlay').click();await page.locator('#reviewFilterReset').click();
++await page.locator('#beT').fill('1');await page.locator('#beT').dispatchEvent('input');await page.waitForFunction(()=>BE.boxes.some(x=>x.i===1)&&BE.scale>0);
++const canvas=page.locator('#beCv');await canvas.scrollIntoViewIfNeeded();let b=await canvas.boundingBox(),scale=await page.evaluate(()=>BE.scale);
++await canvas.click({position:{x:82*scale,y:32*scale}});assert.equal(await page.evaluate(()=>BE.sel),1);await page.locator('#beRm').click();assert.deepEqual(await page.evaluate(()=>[EN[0],EN[1],EN[2]]),[true,false,true]);
++// Pending additive fields use the existing editor/save owner; filter sees no manual cards.
++await page.evaluate(()=>{BE.ov[0]=[25,25,49,49];BE.times[0]=[.2,2.5];BE.adds.push({manual_id:'task657-manual',t0:.5,t1:2.5,tref:1,box:[500,100,530,130]});BE.audio=[{t0:.5,t1:.7,mode:'mute'}];BE.audioLoaded=true;BE.audioSaved=[]});
++await page.locator('#reviewType').selectOption('email');await page.locator('#reviewOutput').selectOption('blur');assert.equal(await page.locator('#reviewFilterStatus').innerText(),'0 of 7 cards match');
++await context.request.post(origin+'/__qa__/control',{data:{render:false}});await page.getByRole('button',{name:'Save edits & render',exact:true}).click();await page.waitForFunction(()=>document.getElementById('reviewSaveStatus').textContent.includes('requesting render'));
++const report=await(await context.request.get(origin+'/api/jobs/A/report')).json(),initial=JSON.parse(fs.readFileSync(root+'/initial-report.json'));
++assert.equal(report.detections.length,11);assert.deepEqual(report.detections.slice(0,10).map(r=>r.enabled),[true,false,true,false,false,false,true,false,true,false]);
++assert.deepEqual(report.detections[0].cbox,[25,25,49,49]);assert.deepEqual([report.detections[0].t_start,report.detections[0].t_end],[.2,2.5]);assert.deepEqual(report.detections[10].cbox,[500,100,530,130]);assert.deepEqual(report.audio_redactions,[{t0:.5,t1:.7,mode:'mute'}]);
++for(let i=0;i<10;i++)for(const [key,value]of Object.entries(initial.detections[i]))if(key!=='enabled'&&!(i===0&&['cbox','t_start','t_end','last_seen'].includes(key)))assert.deepEqual(report.detections[i][key],value,`row${i}/${key}`);
++const expected=structuredClone(initial);expected.detections.forEach((r,i)=>r.enabled=[true,false,true,false,false,false,true,false,true,false][i]);Object.assign(expected.detections[0],{cbox:[25,25,49,49],t_start:.2,t_end:2.5,last_seen:.2});
++const creation={t_start:.5,t_end:2.5,cbox:[500,100,530,130],aoff:[0,0]};expected.detections.push({...creation,category:'manual',text:'user-drawn',confidence:1,last_seen:.5,enabled:true,manual_id:'task657-manual',manual_creation:structuredClone(creation)});expected.audio_redactions=[{t0:.5,t1:.7,mode:'mute'}];assert.deepEqual(report,expected,'complete expected raw document after HTTP save');
++fs.writeFileSync(root+'/pre-render-report.json',JSON.stringify(report,null,2));
++const fresh=await context.newPage();await fresh.goto(origin);await fresh.evaluate(()=>openJob('A'));await fresh.locator('#reviewOutput').waitFor();assert.equal(await fresh.locator('#reviewOutput').inputValue(),'all');assert.equal(await fresh.evaluate(()=>Object.keys(EDITS.enabled).length),0);assert.deepEqual(await fresh.evaluate(()=>Array.from({length:10},(_,i)=>EN[i])),report.detections.slice(0,10).map(r=>r.enabled));
++await context.request.post(origin+'/__qa__/control',{data:{render:true}});const phases=[];let job;
++for(let n=0;n<200;n++){job=await(await context.request.get(origin+'/api/jobs/A')).json();phases.push(job.phase);if(['done','error'].includes(job.phase))break;await fresh.waitForTimeout(100)}assert.equal(job.phase,'done',JSON.stringify(job));const post=await(await context.request.get(origin+'/api/jobs/A/report')).json();assert.deepEqual(post.detections,report.detections);assert.deepEqual(post.audio_redactions,report.audio_redactions);assert.deepEqual(post.unknown_fixture,report.unknown_fixture);
++const reopened=await context.newPage();await reopened.goto(origin);await reopened.evaluate(()=>openJob('A'));await reopened.getByRole('button',{name:'Re-open review',exact:true}).click();await reopened.locator('#reviewOutput').waitFor();assert.equal(await reopened.evaluate(()=>REVIEW_META.byId.size),8);assert.equal(await reopened.locator('#reviewOutput').inputValue(),'all');assert.deepEqual(await reopened.evaluate(()=>Array.from({length:11},(_,i)=>EN[i])),post.detections.map(r=>r.enabled));assert.equal(await reopened.evaluate(()=>Object.keys(EDITS.enabled).length),0);assert.deepEqual(errors,[]);
++const results={page:'actual HTTP full PAGE',playbackPrerequisite:'ordinary UI Play with shipped preload-none; no fixture video.load override',playbackPreserved:true,savedRows:report.detections.length,rawReopen:true,phase:job.phase,phases,errors};fs.writeFileSync(root+'/http-results.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results));await browser.close();browser=null;
++})().catch(async e=>{console.error(e);if(browser)await browser.close();process.exitCode=1});
+diff --git a/tests/review_filters_http.py b/tests/review_filters_http.py
+new file mode 100644
+index 0000000..41fc077
+--- /dev/null
++++ b/tests/review_filters_http.py
+@@ -0,0 +1,71 @@
++"""Finite real HTTP/report/render fixture, launched with task-owned output paths."""
++from pathlib import Path
++import hashlib,json,os,subprocess,threading
++import cv2
++import numpy as np
++import openscrub as o
++import openscrub_web as w
++from flask import request
++from cheroot.wsgi import Server
++
++root=Path(os.environ['VERIFY_RUN'])
++y,x=np.indices((180,640));checker=(((x//2+y//2)%2)*180+30).astype('uint8')
++frame=np.stack([checker,np.roll(checker,1,0),checker],axis=2)
++video=root/'synthetic.mp4';raw=root/'raw.mp4'
++writer=cv2.VideoWriter(str(raw),cv2.VideoWriter_fourcc(*'mp4v'),10,(640,180))
++for _ in range(30):writer.write(frame)
++writer.release()
++subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(raw),'-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
++flags=[True,False,True,True,False,False,True,False,False,True]
++categories=['face']*4+['plate']*3+['email','face','plate']
++boxes=[(20+i*50,20,44+i*50,44) for i in range(8)]+[(20,100,44,124),(70,100,94,124)]
++for jid,n in [('A',10),('B',1),('empty',0)]:
++ job=w.new_job(str(video),dict(mode='box',pad=0,face_expand=0,face_shape='rect',engine='tesseract',device='cpu',encoder='x264',categories=['face','plate','email']),'Synthetic '+jid)
++ w.JOBS.pop(job['id']);job.update(id=jid,phase='review',progress=1);w.JOBS[jid]=job
++ detections=[o.Detection(.1,2.8,boxes[i],categories[i],'synthetic '+str(i),.9 if i in (0,4) else .5,(0,0),dense=i in (0,1,2,4,5),track=4 if i in (4,5,9) else -1,person=0 if i in (0,1,2,8) else -1) for i in range(n)]
++ report=Path(job['dir'])/'report.json'
++ seed=root/('seed-'+jid+'.json')
++ o.write_report(str(seed),o.build_parser().parse_args([str(video)]),dict(fps=10.,cum=[(0,0)]*30,bands=[(0,0)]*30,detections=detections,input_sha256=hashlib.sha256(video.read_bytes()).hexdigest()))
++ doc=json.loads(seed.read_text())
++ for i,r in enumerate(doc['detections']):r.update(enabled=flags[i],zone_dropped=i>=8)
++ doc['audio_redactions']=[]
++ for i,r in enumerate(doc['detections']):r['unknown_fixture']={'raw_index':i,'retained':[False,'unknown',None]}
++ doc['unknown_fixture']={'retained':'full document'}
++ doc['render_state']['unknown_fixture']={'retained':'render state'}
++ doc['provenance']['unknown_fixture']={'retained':'provenance'}
++ with w.VAULT_LOCK:lease=w.FILES.reserve(job)
++ with lease:
++  with w.FILES.initialize(job).report_lock:w._publish_job_report_locked(job,str(report),doc)
++ if jid=='A':(root/'initial-report.json').write_text(json.dumps(doc,indent=2))
++render_gate=threading.Event();render_gate.set();original=w.app.view_functions['job_render']
++def gated_render(jid):
++ if not render_gate.wait(60):return w.jsonify(error='fixture render gate expired'),409
++ return original(jid)
++w.app.view_functions['job_render']=gated_render
++@w.app.route('/__qa__/control',methods=['POST'])
++def control():
++ render_gate.set() if request.json['render'] else render_gate.clear()
++ return w.jsonify(ok=True)
++w.app.view_functions['update_check']=lambda:w.jsonify(current=o.VERSION,update_available=False)
++w.start_worker();server=Server(('127.0.0.1',18551),w.app,numthreads=8)
++thread=threading.Thread(target=server.start,daemon=True);thread.start()
++try:
++ result=subprocess.run(['node',str(Path(__file__).with_name('review_filters_http.cjs'))],check=False)
++ assert result.returncode==0,'real HTTP browser fixture failed'
++ job=w.JOBS['A'];assert job['phase']=='done',job
++ def at(path):
++  cap=cv2.VideoCapture(str(path));cap.set(cv2.CAP_PROP_POS_MSEC,1500);ok,image=cap.read();cap.release();assert ok,str(path);return image
++ source,output=at(video),at(job['output']);regions=[]
++ for name,box,blurred in [('moved-selected0',(30,30,44,44),True),('kept-member1',(75,25,89,39),False),('selected-member2',(125,25,139,39),True),('kept-B',(175,25,189,39),False),('kept-C',(225,25,239,39),False),('selected-zone8',(25,105,39,119),True),('kept-zone9',(75,105,89,119),False),('manual',(505,105,525,125),True),('unrelated',(600,140,620,160),False)]:
++  x1,y1,x2,y2=box;a=source[y1:y2,x1:x2];b=output[y1:y2,x1:x2];mae=float(np.abs(a.astype(float)-b.astype(float)).mean());mean=float(b.mean())
++  assert mean<8 if blurred else mae<10,(name,mae,mean)
++  regions.append(dict(name=name,blurred=blurred,mae=mae,mean=mean))
++ saved=json.loads((root/'pre-render-report.json').read_text());post=json.loads((Path(job['dir'])/'report.json').read_text())
++ assert {k:v for k,v in post.items() if k!='provenance'}=={k:v for k,v in saved.items() if k!='provenance'}
++ assert post['provenance']['unknown_fixture']==saved['provenance']['unknown_fixture']
++ assert post['provenance']['input_sha256']==hashlib.sha256(video.read_bytes()).hexdigest()
++ assert post['provenance']['output_sha256']==hashlib.sha256(Path(job['output']).read_bytes()).hexdigest()
++ summary=dict(regions=regions,pre_render_rows=len(saved['detections']),post_render_rows=len(post['detections']),output_bytes=Path(job['output']).stat().st_size,post_render_boundary='All raw rows, disabled/zone/manual/audio/unknown fields preserved after real render and fresh HTTP reopen.')
++ (root/'output-check.json').write_text(json.dumps(summary,indent=2));cv2.imwrite(str(root/'decoded-output.png'),output);print(json.dumps(summary),flush=True)
++finally:
++ render_gate.set();server.stop();thread.join(10);assert not thread.is_alive()
+diff --git a/tests/test_review_filters.py b/tests/test_review_filters.py
+new file mode 100644
+index 0000000..fa46823
+--- /dev/null
++++ b/tests/test_review_filters.py
+@@ -0,0 +1,140 @@
++"""View filters evaluate the shipped JavaScript, not a second predicate model."""
++from test_review_choices import DOM, run as run_choices
++
++FILTER_DOM = r"""
++const oldCreate=document.createElement;
++document.createElement=(tag)=>{const e=oldCreate(tag);e.isConnected=true;e.focus=()=>document.activeElement=e;
++ e.closest=()=>null;e.contains=x=>x===e;return e;};
++const fixture=[row(0,true,'face',0,-1,.9),row(1,false,'face',0),row(2,true,'face',0),
++ row(3,true,'face'),row(4,false,'plate',-1,4,.9),row(5,false,'plate',-1,4),
++ row(6,true,'plate'),row(7,false,'email'),row(8,false,'face',0,-1,.95,true),
++ row(9,true,'plate',-1,4,.95,true)];
++const ids=()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output)).map(c=>c.id).sort((a,b)=>a-b);
++const status=()=>elements.get('reviewFilterStatus').textContent;
++"""
++
++
++def run(scenario):
++    run_choices(FILTER_DOM + scenario)
++
++
++def test_native_filters_and_exact_mixed_card_oracle():
++    run("""await review(fixture);
++    if(!mounted.includes('id="reviewType"')||!mounted.includes('id="reviewOutput"'))throw Error('missing native review selectors');
++    eq(ids(),[0,3,4,6,7,8,9]);eq(status(),'7 of 7 cards match');
++    setReviewFilter(null,'blur');eq(ids(),[0,3,6,9]);eq(status(),'4 of 7 cards match');
++    setReviewFilter(null,'visible');eq(ids(),[0,4,7,8]);
++    setReviewFilter('face','all');eq(ids(),[0,3,8]);
++    setReviewFilter('face','blur');eq(ids(),[0,3]);
++    setReviewFilter('face','visible');eq(ids(),[0,8]);
++    setReviewFilter('plate','all');eq(ids(),[4,6,9]);
++    setReviewFilter('plate','blur');eq(ids(),[6,9]);
++    setReviewFilter('plate','visible');eq(ids(),[4]);
++    setReviewFilter('email','blur');eq(ids(),[]);eq(elements.get('reviewFilterEmpty').hidden,false);
++    eq(TRKMEM[0],[0,1,2]);eq(ROWCARD[8],8);eq(REVIEW_META.byId.get(8).members,[8]);
++    """)
++
++
++def test_conditional_counts_pending_overlay_false_representative_and_unknown_categories():
++    run("""const altered=fixture.map(x=>({...x}));altered[0].enabled=false;
++    openJob('A');EDITS.enabled[0]=true;EDITS.enabled[1]=false;
++    const pending=loadReview();await reply({duration:5,detections:altered});await pending;
++    setReviewFilter('face','visible');
++    const types=elements.get('reviewType').innerHTML,outputs=elements.get('reviewOutput').innerHTML;
++    if(!types.includes('face (2)')||!types.includes('plate (1)')||!outputs.includes('All outputs (3)')||!outputs.includes('Includes blurred appearances (2)'))throw Error('wrong conditional option counts');
++    applyDet(0,false);eq(ids(),[0,8]);setReviewFilter('face','blur');eq(ids(),[3]);
++    const extra=row(10,true,`custom \"<&'`,0,-1,.5,true);await review([...fixture,extra]);
++    setReviewFilter(extra.category,'all');eq(ids(),[10]);
++    if(!elements.get('reviewType').innerHTML.includes('&lt;&amp;'))throw Error('category name not escaped');
++    """)
++
++
++def test_hidden_bulk_scopes_and_single_transaction_refresh():
++    run("""await review(fixture);setReviewFilter('face','visible');
++    let refreshes=0;const original=refreshReviewFilters;refreshReviewFilters=(...args)=>{refreshes++;return original(...args)};
++    setAll('face',false);eq([0,1,2,3].map(i=>EN[i]),[false,false,false,false]);eq(EN[8],false);eq(EN[9],true);eq(refreshes,1);
++    setAllZd(false);eq(EN[9],false);eq(EN[6],true);eq(refreshes,2);
++    setReviewFilter('face','all');selSet.add(0);selSet.add(3);bulkSet(true);eq([0,1,2,3].map(i=>EN[i]),[true,true,true,true]);eq([...selSet],[]);
++    """)
++
++
++def test_filtering_is_local_retains_editor_and_resets_each_new_job():
++    run("""await review(fixture);BE.ov[1]=[1,2,3,4];BE.times[1]=[0,1];BE.adds.push({box:[1,2,3,4]});
++    BE.drag={i:1};BE.audio=[{t0:0,t1:1,mode:'mute'}];BE.sel=1;MAN.push({draft:true});
++    const before=JSON.stringify({EN,EDITS,BE,MAN}),editor=BE,node=elements.get('beslot'),requests=calls.length;
++    selSet.add(0);setReviewFilter('email','blur');eq([...selSet],[]);setReviewFilter(null,'all');
++    eq(calls.length,requests);eq(JSON.stringify({EN,EDITS,BE,MAN}),before);eq(BE===editor,true);eq(elements.get('beslot')===node,true);
++    setReviewFilter('plate','visible');openJob('B');eq([REVIEW_FILTER.type,REVIEW_FILTER.output],[null,'all']);openJob('A');eq([REVIEW_FILTER.type,REVIEW_FILTER.output],[null,'all']);
++    """)
++
++
++def test_selection_prunes_on_live_output_and_zone_close_without_resurrection():
++    run("""await review(fixture);setReviewFilter(null,'blur');selSet.add(0);selSet.add(3);
++    applyDet(0,false);eq([...selSet],[3]);
++    setReviewFilter(null,'all');elements.get('reviewZones').open=true;selSet.add(8);selSet.add(3);
++    elements.get('reviewZones').open=false;reviewZoneToggle();eq([...selSet],[3]);
++    elements.get('reviewZones').open=true;reviewZoneToggle();eq([...selSet],[3]);
++    """)
++
++
++def test_no_detections_and_collapsed_zone_only_are_distinct():
++    run("""await review([]);eq(status(),'0 of 0 cards match');eq(elements.get('reviewFilterEmpty').textContent,'No detections in this job.');
++    await review([row(8,false,'face',0,-1,.5,true)]);eq(status(),'1 of 1 cards match');
++    if(!elements.get('reviewFilterHint').textContent.includes('outside your zones'))throw Error('collapsed matches unexplained');
++    """)
++
++
++def test_many_group_counts_scan_once_per_bulk_transaction():
++    run("""await review(Array.from({length:600},(_,i)=>row(i,true,'face',Math.floor(i/3))));
++    let reads=0;const live=EN;EN=new Proxy(live,{get(o,k){reads++;return o[k]}});
++    let scans=0;const old=refreshReviewFilters;refreshReviewFilters=(...a)=>{scans++;return old(...a)};
++    setAll('face',false);eq(scans,1);if(reads>2400)throw Error('per-member full-list filter scan: '+reads);
++    eq(status(),'200 of 200 cards match');
++    """)
++
++
++def test_false_mixed_representative_and_stale_zone_callback():
++    run("""const r=fixture.map(x=>({...x}));r[1].confidence=.99;await review(r);
++    eq(TRKMEM[1],[0,1,2]);setReviewFilter(null,'blur');eq(ids(),[1,3,6,9]);
++    setReviewFilter(null,'visible');eq(ids(),[1,4,7,8]);
++    let scans=0;const old=refreshReviewFilters;refreshReviewFilters=()=>{scans++;old()};
++    reviewZoneToggle(document.createElement('details'));eq(scans,0);
++    """)
++
++
++def test_scheduler_matching_bridge_keeps_empty_and_rejects_stale_owner():
++    run("""await review(fixture);const owner=REVIEW_SCHED;
++    setReviewFilter('email','blur');eq([...owner.matching],[]);
++    refreshReviewVisibleSet({jobId:owner.jobId,viewGen:owner.viewGen});
++    refreshReviewVisibleSet();eq([...owner.matching],[]);
++    setReviewFilter('face','visible');eq([...owner.matching],[8,0]);
++    refreshReviewVisibleSet({jobId:'old',viewGen:owner.viewGen,matchingCardIds:[3]});
++    eq([...owner.matching],[8,0]);
++    let cancelled=0;owner.selectionCleanup=()=>{cancelled++;owner.selectionCleanup=null};
++    selSet.add(0);setReviewFilter(null,'all');eq(cancelled,1);eq([...selSet],[]);
++    eq(owner.meta.byId,REVIEW_META.byId);eq(owner.meta.byId.get(0).members,[0,1,2]);
++    """)
++
++
++def test_selected_action_retains_explicit_matching_ids_across_virtual_unmount():
++    run("""await review(fixture);setReviewFilter('face','all');
++    selSet.add(0);selSet.add(3);elements.delete('det3');
++    bulkSet(false);eq([EN[0],EN[1],EN[2]],[false,false,false]);
++    eq(EN[3],false);eq([...selSet],[]);
++    """)
++
++
++def test_escape_uses_the_scheduler_gesture_cleanup(monkeypatch):
++    import test_review_choices as choices
++    harness = choices.HARNESS.replace(
++        'const elements=new Map();', 'const elements=new Map(),documentEvents=new Map();'
++    ).replace('({elements,console,', '({elements,documentEvents,console,').replace(
++        'querySelectorAll:()=>[],addEventListener(){},createElement:el}',
++        'querySelectorAll:()=>[],addEventListener:(name,fn)=>documentEvents.set(name,fn),createElement:el}'
++    )
++    monkeypatch.setattr(choices, 'HARNESS', harness)
++    run("""await review(fixture);let cancelled=0;
++    REVIEW_SCHED.selectionCleanup=()=>{cancelled++;REVIEW_SCHED.selectionCleanup=null};
++    selSet.add(0);documentEvents.get('keydown')({key:'Escape'});
++    eq(cancelled,1);eq([...selSet],[]);
++    """)

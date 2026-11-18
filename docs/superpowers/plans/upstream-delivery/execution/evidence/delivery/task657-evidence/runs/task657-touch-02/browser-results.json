@@ -1,0 +1,29 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [
+    "native selectors present",
+    "opposite pending overlay, native Detection type pointer/keyboard, collapsed-zone-only matches and no detections",
+    "actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership",
+    "390px layout and native controls",
+    "native touch scrolling leaves selection empty; mobile help tap preserves checkbox and tooltip bounds"
+  ],
+  "errors": [],
+  "console": [],
+  "touchGeometry": {
+    "container": "window/vertical",
+    "scrollY": 1759,
+    "max": 2616,
+    "wrap": {
+      "x": 32,
+      "y": 0,
+      "width": 326,
+      "height": 1503,
+      "top": 0,
+      "right": 358,
+      "bottom": 1503,
+      "left": 32
+    }
+  },
+  "touchAfter": 2144
+}

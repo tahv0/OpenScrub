@@ -1,0 +1,7 @@
+# Add detection type and output view filters to review
+
+Review now has native Detection type and Output selectors, Show all and conditional card counts. Mixed groups appear in both applicable output views; filtering keeps edits/editor/playback/save ownership intact and every new job view starts Show all. Category and outside-zone actions retain complete, separate scopes, including hidden cards; marquee/focus/counts follow the current view.
+
+Validation:8 new emitted-JS cases plus70 existing review owners pass; one full discovered suite212 passed; actual Python3.9 selection88 passed. Full shipped PAGE core checks and targeted native touch/help follow-up cover selectors/counts/focus/selection/editor gestures/held and failed saves/A→B→A/390px. Real HTTP save/fresh raw reopen/render and9 selected/kept output pixel checks pass. Offline sdist→wheel-from-sdist→installed CLI/web/listening HTTP and exact package-byte checks pass.
+
+Known standalone boundaries: native video.load fixture establishes already-started playback (P16D owns Play startup), and full raw rows after render remain P06D/C01 acceptance. This branch preserves raw pre-render save/reopen and real output evidence. Original harness failures and the post-run matching tool-identity audit are disclosed in task-150-report.md; no claim that missing native-tool byte pins were Task150 preflight-enforced. Final browser fixture-only commit retains identical full/floor-tested product bytes. Awaiting independent review; not published.

@@ -1,0 +1,36 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [
+    "native selectors present",
+    "seven-card mixed/type/empty/reset counts",
+    "native keyboard, disappearing-control focus fallback and retained-card focus",
+    "zone collapse selection pruning and open preference retained across hiding",
+    "native marquee full-group selected action, Escape cancels active marquee, enlarged original preview",
+    "editor object/node, selection, pending geometry/time/manual/audio and actual unfinished pointer gesture retained; zero metadata/save/render requests",
+    "held-save newer intent, failed save, A→B→A reset and owning draft",
+    "actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership",
+    "390px layout and native controls",
+    "native touch scrolling leaves selection empty; mobile help tap preserves checkbox and tooltip bounds"
+  ],
+  "errors": [],
+  "console": [
+    "Failed to load resource: the server responded with a status of 423 (Locked)"
+  ],
+  "touchGeometry": {
+    "container": "window/vertical",
+    "scrollY": 1759,
+    "max": 2582,
+    "wrap": {
+      "x": 32,
+      "y": 0,
+      "width": 326,
+      "height": 1469,
+      "top": 0,
+      "right": 358,
+      "bottom": 1469,
+      "left": 32
+    }
+  },
+  "touchAfter": 2144
+}

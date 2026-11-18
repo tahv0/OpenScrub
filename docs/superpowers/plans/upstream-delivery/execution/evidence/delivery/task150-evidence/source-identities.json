@@ -1,0 +1,43 @@
+{
+  "base": "2ae3257b9752e2d976ff7a0d39955a13c133273a",
+  "full_floor_head": "ac28a2ac981f2612cbaeadedddbfac8db1efeefb",
+  "head": "c0ebcc7a8c3121330730bea3619bbfea8add7992",
+  "files": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "0f94a94edd2e08e739cdf756b4bf1383b029a54f1e4cd147a0a9d56843015f06",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "test_openscrub.py": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+    "pyproject.toml": "b0da1993170924d246d18ced2bc2cb53242111d4e824e8fe8bc70da1e342d684",
+    "README.md": "f1cbeffbe1e6d2ea85d98564aa14bed7b92816a42af0b92a57a6886359386a25",
+    "LICENSE": "9d6cfd05c0c876047c6b3b390380b1dd6349b00e8b41ec7ce1ca93854abb99ca",
+    "NOTICE": "e8a30bbd58209d1a167081f4157c27a8da7b78e3fa316a878703ac9ff3cb2f02",
+    "THIRD_PARTY_NOTICES.md": "9de8481cfa91d49e0447b07927a5a781aaf99a422efa191a186f5a67782519a8",
+    "requirements.txt": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+    "install.py": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb",
+    "face_models.json": "406434d10478ba15845c509c3b9cc292874935e87cf2e6f07a5396598d9d700b",
+    "plate_models.json": "4637fabd1e5f7bc6f9c69f495070e071d14e381e0f0a33c63974cdb5241d6a87",
+    "person_models.json": "8abc33e5c1d03e43fa4dcedb4d2052ff363f2f1c1fa3630b67b0339f6cdd0685",
+    "assets/openscrub.ico": "00c3ac6122340f637b03eec50b385d8e38fbde9e825f077ff4bfd65eeee76f36",
+    "tests/review_filters_browser.cjs": "dd53f8e281fc23c685226299f9b01d07a09b098c8e6b3db6de9aa7ac242d27ae",
+    "tests/review_filters_browser.py": "c1f52ea468bf0378357790845d039bdd63fe94d26c116e8eae42b38fadc2ca3a",
+    "tests/review_filters_http.cjs": "b4d0934f48b8c5aae3f6793a9e769a2c81f87eef64ab1b192fe4a3982a13ec25",
+    "tests/review_filters_http.py": "4cc64e6f1e758b9f3274356b98999a1f47a77a012b355d5b08b573ffbbe4e2af",
+    "tests/test_review_choices.py": "e0c18159987ad6f91ca5faa72864193af6fceffdd9515191f4de51b84b8b088d",
+    "tests/test_review_filters.py": "590c37d8ffa58ddd4a46ffd5b6c13ccabbb1b11daec81d3bf586e8cf3bf837da",
+    "tests/test_review_save_failures.py": "35e2d0d4a0cb19eec169b3fc5571ff6a148fdc344d57fd3124ed8272804dd6d4"
+  },
+  "full_floor_changes": " tests/review_filters_browser.cjs | 18 ++++++++++++++++--\n 1 file changed, 16 insertions(+), 2 deletions(-)\n",
+  "product_unchanged_since_full": {
+    "openscrub.py": true,
+    "openscrub_web.py": true,
+    "zones_ui.py": true,
+    "openscrub_vault.py": true,
+    "openscrub_update.py": true
+  },
+  "engine_defaults_unchanged_from_base": true,
+  "APP_JS_sha256": "269ba1834155cfc58dace2855a79ee486b8f9dd9c6121fcc5b299930a0b833b5",
+  "APP_CSS_sha256": "bd429691e1103ff8aded849e9faa464b693eb9b68607afb2ab89e9cf5455f79b"
+}

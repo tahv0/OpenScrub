@@ -1,0 +1,8 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [],
+  "errors": [],
+  "console": [],
+  "failure": "AssertionError [ERR_ASSERTION]: missing Detection type selector on actual full PAGE\n\n0 !== 1\n\n    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser.cjs:27:8"
+}

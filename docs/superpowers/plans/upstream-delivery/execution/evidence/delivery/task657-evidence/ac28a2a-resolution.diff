@@ -1,0 +1,694 @@
+diff --cc openscrub_web.py
+index 57b3bda,e614417..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -3115,8 -2167,8 +3120,9 @@@ async function openJob(id)
+    delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+    trimReviewDraft(EDITS);
+   }
+ + stopPolling();disposeRecentLog();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+   VIEW_GEN++;CUR=id;
++  resetReviewView();
+   EDITS=REVIEW_DRAFTS.get(id);
+   if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+    REVIEW_DRAFTS.set(id,EDITS);}
+@@@ -4116,379 -2785,196 +4122,463 @@@ function cmpShow()
+   document.getElementById("cmpR").src=`api/jobs/${CUR}/frame_at?t=${t}&src=output`;
+  }
+  
+ -async function loadReview(){
+ - const id=CUR,gen=VIEW_GEN;
+ - showPanel("review");
+ - const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+ - if(!ownsView(id,gen))return;
+ +// Complete metadata stays authoritative even when its cards are unmounted.
+ +let TRKMEM={},ROWCARD={},REVIEW_META=null,REVIEW_SCHED=null,REVIEW_LOAD=0;
+ +const THUMB_FLIGHTS=new Set(); // unsettled fetch + body operations, across views
+++let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
+++function resetReviewView(){
+++ REVIEW_SCHED?.selectionCleanup?.();clearSel();TRKMEM={};ROWCARD={};REVIEW_META=null;
+++ REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all"};
+++}
+ +function reviewDescriptors(rows){
+-  const groups={},zones=[];TRKMEM={};ROWCARD={};
+++ const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
+ + for(const x of rows){
+ +  EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+ +  if(x.zone_dropped)zones.push(x);
+ +  else (groups[x.category]=groups[x.category]||[]).push(x);
+ + }
+ + const sections=[];
+ + function section(category,items,zone=false){
+-   const cards=items.map(x=>({id:x.i,category,zone,representative:x,members:TRKMEM[x.i]||[x.i]}));
+++  const cards=items.map(x=>({id:x.i,category,realCategory:x.category,zone,representative:x,members:zone?[x.i]:TRKMEM[x.i]}));
+ +  for(const c of cards)for(const m of c.members)ROWCARD[m]=c.id;
+-   sections.push({category,zone,cards,ids:cards.map(c=>c.id)});
+++  sections.push({category,zone,index:sections.length,cards,ids:cards.map(c=>c.id)});
+ + }
+ + if(zones.length)section('zdrop',zones,true);
+ + for(const [cat,raw] of Object.entries(groups)){
+-   const grouped={},items=[];
+++  const grouped=new Map(),items=[];
+ +  for(const x of raw){
+ +   const key=x.person>=0?'p'+x.person:x.track>=0?'t'+x.track:null;
+-    if(key)(grouped[key]=grouped[key]||[]).push(x);
+++   if(key){if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(x);}
+ +   else{TRKMEM[x.i]=[x.i];items.push(x);}
+ +  }
+-   for(const [key,members] of Object.entries(grouped)){
+++  for(const [key,members] of grouped){
+ +   members.sort((a,b)=>a.t_start-b.t_start);
+ +   let best=members[0];
+ +   for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+ +   const rep={...best,t_start:members[0].t_start,t_end:members[members.length-1].t_end,
+ +    frames:members.length,personcard:key[0]==='p'};
+ +   TRKMEM[rep.i]=members.map(m=>m.i);items.push(rep);
+ +  }
+ +  items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+ +  section(cat,items);
+ + }
+ + return sections;
+ +}
+ +function reviewCard(c){
+ + const x=c.representative,cat=c.category;
+ + return `<div class="det" id="det${c.id}" data-cat="${detLabel(cat)}">
+ +  <div class="thumbwell"><img alt="Detection preview" style="cursor:zoom-in" onclick="zoomDet(${c.id})"></div>
+ +  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+ +  ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(CATDN[cat]||cat)} group</div>`:''}
+ +  ${detChoices(c.id,c.zone?'Outside-zone detection':CATDN[cat]||cat)}</div>`;
+ +}
+ +async function loadReview(auto=null){
+ + const id=CUR,gen=VIEW_GEN,request=++REVIEW_LOAD,reviewRequest={};REVIEW_REQUEST=reviewRequest;
+ + disposeReview();showPanel('review');
+ + const r=await fetch(`api/jobs/${id}/detections`);
+ + if(!r.ok)throw new Error("Review HTTP "+r.status);
+ + const d=await r.json();
+ + if(!ownsView(id,gen)||request!==REVIEW_LOAD||
+ +    (auto&&(REVIEW_REQUEST!==reviewRequest||AUTO_REVIEW!==auto||PHPH!=="review")))return;
+ + if(auto)auto.state="ready";
+   DUR=d.duration;
+ - d.detections.forEach(x=>{EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;});
+ - REVIEW_META=reviewDescriptors(d.detections);
+ - const zdrop=REVIEW_META.cards.filter(c=>c.zone).map(c=>c.representative);
+ + const sections=reviewDescriptors(d.detections);
+-  REVIEW_META={sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+++ REVIEW_META={jobId:id,viewGen:gen,sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+   let html=`<div class="card" id="review"><h2>Review — choose Blur or Keep visible.
+   Drag a box around several to bulk-set.</h2>
+ - <div class="row" style="margin:0 0 8px">
+ -  <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
+ -  (before rendering)</button></div>
+ + <div class="row" style="margin:0 0 8px"><button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes (before rendering)</button></div>
++  <div class="row reviewfilters">
++   <label>Detection type <select id="reviewType" onchange="setReviewFilter(this.value||null,REVIEW_FILTER.output)"></select></label>
++   <label>Output <select id="reviewOutput" onchange="setReviewFilter(REVIEW_FILTER.type,this.value)"></select></label>
++   <button class="sec" id="reviewFilterReset" onclick="setReviewFilter(null,'all')">Show all</button>
++  </div>
++  <div id="reviewFilterStatus" role="status" aria-live="polite"></div>
++  <p class="detscope">Mixed groups appear in both output views. Filters only change the view.</p>
++  <p id="reviewFilterHint" class="detscope"></p>
++  <p id="reviewFilterEmpty" hidden></p>
+ - <div id="beslot"></div>
+ + <div id="beslot"></div><div class="row reviewranges">
+ + <button class="sec" data-review-prev onclick="REVIEW_SCHED?.range(-1)">Previous review cards</button>
+ + <span data-review-range role="status" aria-live="polite"></span>
+ + <button class="sec" data-review-next onclick="REVIEW_SCHED?.range(1)">Next review cards</button></div>
+   <div id="detwrap" style="position:relative;user-select:none">`;
+ - if(zdrop.length){
+ -  html+=`<details id="reviewZones" ontoggle="reviewZoneToggle(this)" style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+ -   <summary style="cursor:pointer;color:#fbbf24;font-weight:600">
+ -    ⚠ <span id="reviewZoneCount">${zdrop.length} of ${zdrop.length}</span> detection(s) outside your zones — choose output below
+ -    (mostly logos/labels by design; open only if something real was zoned out)
+ -   </summary>
+ -   <div class="row" style="margin:8px 0 4px">
+ -    <button class="sec" onclick="setAllZd(true)">Blur all</button>
+ -    <button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>
+ -   <div class="detscope">These actions affect all outside-zone detections, including filtered-out detections.</div>
+ -   <div class="grid3">`;
+ -  for(const x of zdrop){
+ -   html+=`<div class="det" id="det${x.i}" data-cat="zdrop">
+ -    <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+ -     style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+ -    <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+ -    ${detChoices(x.i,"Outside-zone detection")}
+ -   </div>`;
+ -  }
+ -  html+=`</div></details>`;
+ - }
+ - for(const section of REVIEW_META.sections.filter(s=>!s.zone)){
+ -  const cat=section.category,items=section.cards.map(c=>c.representative);
+ -  html+=`<section id="reviewSection${section.index}"><h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge" id="reviewCount${section.index}">${items.length}</span>
+ -  <button class="sec" style="padding:3px 8px;font-size:12px"
+ -   onclick="setAll(REVIEW_META.sections[${section.index}].category,true)">Blur all</button>
+ -  <button class="sec" style="padding:3px 8px;font-size:12px"
+ -   onclick="setAll(REVIEW_META.sections[${section.index}].category,false)">Keep all visible</button></h3>
+ -   <div class="detscope">Category actions affect all ${detLabel(CATDN[cat]||cat)} groups, including filtered-out groups.</div><div class="grid3">`;
+ -  for(const x of items){
+ -   html+=`<div class="det" id="det${x.i}" data-cat="${detLabel(cat)}">
+ -    <img src="api/jobs/${CUR}/thumb/${x.i}"
+ -     style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+ -     onerror="thumbRetry(this)">
+ -    <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+ -    ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(CATDN[cat]||cat)} group</div>`:""}
+ -    ${detChoices(x.i,CATDN[cat]||cat)}
+ -   </div>`}
+ -  html+=`</div></section>`}
+ - html+=`</div>
+ - <div class="row" style="margin-top:12px">
+ - <button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
+ - <span style="font-size:12px;color:#94a3b8">missed something? use
+ -  ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+ -  add-region tool</span></div></div>`;
+ - const old=document.getElementById("review"); if(old)old.remove();
+ - detail.insertAdjacentHTML("beforeend",html);
+ - // Derived membership belongs to this mounted view, never to the saved draft.
+ - for(const [rep,members] of Object.entries(TRKMEM))for(const m of members)ROWCARD[m]=+rep;
+ - for(const x of zdrop)ROWCARD[x.i]=x.i;
+ - for(const i of new Set(Object.values(ROWCARD)))refreshDet(i);
+ - refreshReviewFilters();initMarquee();saveStatus(EDITS,EDITS.status);
+ + sections.forEach((section,n)=>{
+ +  const cat=section.category;
+-   if(section.zone)html+=`<details data-review-zones style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+-    <summary style="cursor:pointer;color:#fbbf24;font-weight:600">⚠ ${section.ids.length} detection(s) outside your zones — choose output below (mostly logos/labels by design; open only if something real was zoned out)</summary>
+-    <div class="row" style="margin:8px 0 4px"><button class="sec" onclick="setAllZd(true)">Blur all</button><button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>`;
+-   else html+=`<h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge">${section.ids.length}</span>
+++  if(section.zone)html+=`<details id="reviewZones" data-review-zones style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+++   <summary style="cursor:pointer;color:#fbbf24;font-weight:600">⚠ <span id="reviewZoneCount">${section.ids.length} of ${section.ids.length}</span> detection(s) outside your zones — choose output below (mostly logos/labels by design; open only if something real was zoned out)</summary>
+++   <div class="row" style="margin:8px 0 4px"><button class="sec" onclick="setAllZd(true)">Blur all</button><button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>
+++   <div class="detscope">These actions affect all outside-zone detections, including filtered-out detections.</div>`;
+++  else html+=`<section id="reviewSection${section.index}"><h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge" id="reviewCount${section.index}">${section.ids.length}</span>
+ +   <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,true)" data-cat="${detLabel(cat)}">Blur all</button>
+-    <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,false)" data-cat="${detLabel(cat)}">Keep all visible</button></h3>`;
+++   <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,false)" data-cat="${detLabel(cat)}">Keep all visible</button></h3>
+++   <div class="detscope">Category actions affect all ${detLabel(CATDN[cat]||cat)} groups, including filtered-out groups.</div>`;
+ +  html+=`<div class="grid3 reviewgrid" data-review-section="${n}"></div>`;
+-   if(section.zone)html+='</details>';
+++  html+=section.zone?'</details>':'</section>';
+ + });
+ + html+=`</div><div class="row" style="margin-top:12px"><button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
+ + <span style="font-size:12px;color:#94a3b8">missed something? use ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old add-region tool</span></div></div>`;
+ + const old=document.getElementById('review');if(old){beUnmountIn(old);old.remove();}
+ + detail.insertAdjacentHTML('beforeend',html);
+ + REVIEW_SCHED=new ReviewScheduler(id,gen,document.getElementById('review'),REVIEW_META);
+-  REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
+++ refreshReviewFilters();REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
+  }
+ -
+ -let TRKMEM={},ROWCARD={};
+ -
+ -// Display metadata retains complete P02 groups; EN remains the only live output map.
+ -let REVIEW_META={cards:[],sections:[],byId:{}},REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
+ -function resetReviewView(){
+ - cancelReviewMarquee();clearSel();TRKMEM={};ROWCARD={};
+ - REVIEW_META={cards:[],sections:[],byId:{}};
+ - REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all"};
+ +function disposeReview(){
+ + if(REVIEW_SCHED){const old=REVIEW_SCHED;REVIEW_SCHED=null;old.dispose();}
+  }
+ -function reviewDescriptors(rows){
+ - const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
+ - for(const x of rows){if(x.zone_dropped)zones.push(x);
+ -  else{(groups[x.category]=groups[x.category]||[]).push(x);}}
+ - const meta={cards:[],sections:[],byId:{}};
+ - function section(category,zone,items){
+ -  const s={category,zone,index:meta.sections.length,cards:[],ids:[]};
+ -  for(const x of items){const c={id:x.i,category,realCategory:x.category,zone,representative:x,members:zone?[x.i]:TRKMEM[x.i]};
+ -   s.cards.push(c);s.ids.push(c.id);meta.cards.push(c);meta.byId[c.id]=c;
+ -   for(const m of c.members)ROWCARD[m]=c.id;}
+ -  meta.sections.push(s);
+ +// P15 seam: matchingCardIds is the COMPLETE matching descriptor set. P15 owns
+ +// predicates/counts/focus fallback. This local hook never writes choices or I/O.
+ +function refreshReviewVisibleSet({jobId,viewGen,matchingCardIds}={}){
+ + const s=REVIEW_SCHED;
+ + if(!s||s.jobId!==jobId||s.viewGen!==viewGen||!s.owns())return;
+-  if(matchingCardIds)s.matching=new Set(matchingCardIds.filter(i=>s.meta.byId.has(i)));
+++ if(matchingCardIds!==undefined)s.matching=new Set(matchingCardIds.filter(i=>s.meta.byId.has(i)));
+ + s.schedule();
+ +}
+ +// One review-instance owner. It never owns output, editor or unrelated requests.
+ +class ReviewScheduler{
+ + constructor(jobId,viewGen,root,meta){
+ +  Object.assign(this,{jobId,viewGen,root,meta});
+ +  this.token={};this.disposed=false;this.frame=0;this.bindings=new Map();
+ +  this.retries=new Map();this.eligible=new Map();this.queue=[];this.listeners=[];
+ +  this.matching=new Set(meta.byId.keys());this.sections=[];this.normalIds=[];
+ +  this.gesture=false;this.selectionCleanup=null;
+   }
+ - if(zones.length)section("zdrop",true,zones);
+ - for(const [cat,rawItems]of Object.entries(groups)){
+ -  const byGroup=new Map(),items=[];
+ -  for(const x of rawItems){
+ -   const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+ -   if(key){if(!byGroup.has(key))byGroup.set(key,[]);byGroup.get(key).push(x);}
+ -   else{TRKMEM[x.i]=[x.i];items.push(x);}
+ + owns(){return !this.disposed&&REVIEW_SCHED===this&&ownsView(this.jobId,this.viewGen)&&
+ +  this.root.isConnected&&document.getElementById('review')===this.root;}
+ + valid(b,eligible=true){return this.owns()&&this.bindings.get(b.id)===b&&b.img.isConnected&&
+ +  b.card.isConnected&&(!eligible||this.eligible.has(b.id));}
+ + listen(target,event,fn,options){target.addEventListener(event,fn,options);
+ +  this.listeners.push(()=>target.removeEventListener(event,fn,options));}
+ + start(){
+ +  this.sections=this.meta.sections.map((data,n)=>({data,el:this.root.querySelector(`[data-review-section="${n}"]`),
+ +   ids:[],columns:0,width:0,heights:[],prefix:[0],rows:new Map(),spacers:[]}));
+ +  this.observer=new ResizeObserver(()=>this.schedule());
+ +  this.observer.observe(this.root);
+ +  this.listen(window,'scroll',()=>this.schedule(),{passive:true});
+ +  this.listen(window,'resize',()=>this.schedule(),{passive:true});
+ +  this.listen(this.root,'focusin',()=>this.schedule());
+ +  this.listen(this.root,'focusout',()=>this.schedule());
+ +  const zones=this.root.querySelector('[data-review-zones]');
+ +  if(zones)this.listen(zones,'toggle',()=>{
+-    if(!zones.open){for(const section of this.meta.sections)if(section.zone)
+-     for(const id of section.ids)selSet.delete(id);
+-     if(menuEl){menuEl.remove();menuEl=null;}if(selSet.size)showSelMenu(12,12);
+-    }this.schedule();
+++   if(this.owns())reviewZoneToggle(zones);
+ +  });
+ +  this.listen(window,'pagehide',()=>this.dispose({suspend:true}));
+ +  this.layout();
+ + }
+ + schedule(){if(!this.owns()||this.frame)return;
+ +  this.frame=requestAnimationFrame(()=>{this.frame=0;if(this.owns())this.layout();});}
+ + prefix(section){
+ +  section.prefix=[0];for(const h of section.heights)section.prefix.push(section.prefix.at(-1)+h+9);
+ +  section.el.style.height=Math.max(0,section.prefix.at(-1)-9)+'px';
+ + }
+ + rowAt(section,y){
+ +  let lo=0,hi=section.heights.length;
+ +  while(lo<hi){const mid=(lo+hi)>>1;if(section.prefix[mid+1]<=y)lo=mid+1;else hi=mid;}
+ +  return Math.min(lo,Math.max(0,section.heights.length-1));
+ + }
+ + anchor(){
+ +  let best=null;
+ +  for(const b of this.bindings.values()){
+ +   if(b.card.dataset.focusPin==='1')continue;
+ +   const r=b.card.getBoundingClientRect();
+ +   if(r.bottom>0&&r.top<window.innerHeight&&(!best||r.top<best.top))best={id:b.id,top:r.top};
+ +  }return best;
+ + }
+ + // Reconcile siblings around the actual focused subtree. Moving its other
+ + // siblings preserves native Tab order without detaching the focused ancestor.
+ + orderNodes(parent,nodes,active){
+ +  let next=null;
+ +  for(let n=nodes.length-1;n>=0;n--){const node=nodes[n];
+ +   if(!node.contains(active)&&node.nextElementSibling!==next)parent.insertBefore(node,next);
+ +   next=node;
+    }
+ -  for(const [key,members]of byGroup){
+ -   members.sort((a,b)=>a.t_start-b.t_start);
+ -   let best=members[0];
+ -   for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+ -   const rep={...best,t_start:members[0].t_start,t_end:members[members.length-1].t_end,
+ -    frames:members.length,personcard:key[0]==="p"};
+ -   TRKMEM[rep.i]=members.map(m=>m.i);items.push(rep);
+ + }
+ + layout(){
+ +  if(!this.owns()||this.gesture)return;
+ +  let anchor=this.anchor();const active=document.activeElement;
+ +  const focus=active?.closest?.('.det'),focusId=focus?+focus.id.slice(3):null;
+ +  let changed=false;
+ +  for(const section of this.sections){
+ +   const open=!section.data.zone||section.el.closest('details').open;
+ +   const ids=open?section.data.ids.filter(id=>this.matching.has(id)):[];
+ +   const rect=section.el.getBoundingClientRect(),width=section.el.clientWidth;
+ +   section.scale=width?rect.width/width:1;
+ +   const tracks=getComputedStyle(section.el).gridTemplateColumns;
+ +   const columns=tracks&&tracks!=='none'?tracks.split(' ').length:1;
+ +   if(section.width!==width||section.columns!==columns||ids.length!==section.ids.length||ids.some((id,n)=>id!==section.ids[n])){
+ +    if(section.width&&section.width!==width&&this.lastAnchor)anchor=this.lastAnchor;
+ +    section.width=width;section.columns=columns;section.ids=ids;
+ +    section.heights=Array(Math.ceil(ids.length/columns)).fill(260);changed=true;
+ +   }else for(const [n,row] of section.rows){
+ +    if(row.dataset.pin==='1')continue;
+ +    const h=row.getBoundingClientRect().height/section.scale;
+ +    if(h&&Math.abs(section.heights[n]-h)>.5){section.heights[n]=h;changed=true;}
+ +   }
+ +   this.prefix(section);
+    }
+ -  items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+ -  section(cat,false,items);
+ +  // Correct estimates/widths without shifting the user's first visible card.
+ +  if(changed&&anchor){
+ +   for(const section of this.sections){const n=section.ids.indexOf(anchor.id);if(n<0)continue;
+ +    const top=section.el.getBoundingClientRect().top+section.prefix[Math.floor(n/section.columns)]*section.scale;
+ +    window.scrollBy(0,top-anchor.top);break;}
+ +  }
+ +  const candidates=[],nearby=[];
+ +  for(const section of this.sections){
+ +   if(!section.ids.length)continue;
+ +   const top=section.el.getBoundingClientRect().top;
+ +   const end=section.prefix.at(-1)-9,scale=section.scale;
+ +   if(top>window.innerHeight||top+end*scale<0)continue;
+ +   const first=this.rowAt(section,Math.max(0,-top/scale));
+ +   const last=this.rowAt(section,Math.min(end,(window.innerHeight-top)/scale));
+ +   for(let n=first;n<=last;n++)candidates.push({section,n,rank:0});
+ +   for(let n=last+1;n<section.heights.length&&(section.prefix[n]-section.prefix[last+1])*scale<window.innerHeight;n++)
+ +    nearby.push({section,n,rank:1});
+ +   for(let n=first-1;n>=0&&(section.prefix[first]-section.prefix[n+1])*scale<window.innerHeight;n--)
+ +    nearby.push({section,n,rank:1});
+ +  }
+ +  const selected=new Map(),desired=new Map();let used=0,prefetch=0;
+ +  function admit(item){const {section,n,rank}=item;
+ +   const ids=section.ids.slice(n*section.columns,(n+1)*section.columns);
+ +   if(used+ids.length>64)return false;
+ +   if(rank&&prefetch+(section.heights[n]+9)*section.scale>window.innerHeight)return false;
+ +   if(!selected.has(section))selected.set(section,new Set());selected.get(section).add(n);
+ +   for(const id of ids)desired.set(id,{rank,order:desired.size});
+ +   used+=ids.length;if(rank)prefetch+=(section.heights[n]+9)*section.scale;return true;
+ +  }
+ +  candidates.forEach(admit);nearby.forEach(admit);
+ +  this.normalIds=[...desired.keys()];
+ +  // Keep one actual focused subtree. Its row contains only that card, at its
+ +  // original column; a selected card alone never receives a retention pin.
+ +  const pin=focusId!==null&&!desired.has(focusId)&&this.bindings.has(focusId)&&
+ +   this.sections.some(s=>s.ids.includes(focusId))?focusId:null;
+ +  for(const [id,b]of this.bindings)if(!desired.has(id)&&id!==pin)this.retire(b);
+ +  for(const section of this.sections){
+ +   const rows=selected.get(section)||new Set();
+ +   const pinIndex=pin===null?-1:section.ids.indexOf(pin),pinRow=pinIndex<0?-1:Math.floor(pinIndex/section.columns);
+ +   for(const [n,row]of section.rows)if(!rows.has(n)&&n!==pinRow){this.observer.unobserve(row);row.remove();section.rows.delete(n);}
+ +   const needed=new Set(rows);if(pinRow>=0)needed.add(pinRow);
+ +   const orderedRows=[];
+ +   for(const n of [...needed].sort((a,b)=>a-b)){
+ +    let row=section.rows.get(n);
+ +    if(!row){row=document.createElement('div');row.className='grid3 reviewrow';section.el.appendChild(row);
+ +     section.rows.set(n,row);this.observer.observe(row);}
+ +    orderedRows.push(row);
+ +    row.style.top=section.prefix[n]+'px';row.dataset.pin=String(!rows.has(n)?1:0);
+ +    const ids=section.ids.slice(n*section.columns,(n+1)*section.columns),orderedCards=[];
+ +    for(const [col,id]of ids.entries()){
+ +     if(!desired.has(id)&&id!==pin)continue;
+ +     let b=this.bindings.get(id);
+ +     if(!b){
+ +      const holder=document.createElement('div');holder.innerHTML=reviewCard(this.meta.byId.get(id));
+ +      const card=holder.firstElementChild,img=card.querySelector('img');
+ +      b={id,card,img,token:{},url:null,op:null};this.bindings.set(id,b);
+ +     }
+ +     if(b.card.parentElement!==row)row.appendChild(b.card);orderedCards.push(b.card);
+ +     b.card.style.gridColumn=String(col+1);b.card.dataset.focusPin=String(id===pin?1:0);
+ +     b.card.classList.toggle('selected',selSet.has(id));refreshDet(id);
+ +    }
+ +    this.orderNodes(row,orderedCards,active);
+ +   }
+ +   for(const spacer of section.spacers)spacer.remove();section.spacers=[];
+ +   this.orderNodes(section.el,orderedRows,active);
+ +   // Constant before/after spacers (plus a focused row, if any). Offscreen
+ +   // rows are numeric heights only; no per-group placeholder/HTML is kept.
+ +   const ns=[...rows].sort((a,b)=>a-b),first=ns[0]??0,last=ns.at(-1)??-1;
+ +   for(const [top,height]of [[0,section.prefix[first]||0],[section.prefix[last+1]||0,
+ +    section.prefix.at(-1)-(section.prefix[last+1]||0)]]){
+ +    const spacer=document.createElement('div');spacer.className='reviewspacer';
+ +    spacer.setAttribute('aria-hidden','true');spacer.style.top=top+'px';spacer.style.height=height+'px';
+ +    section.el.appendChild(spacer);section.spacers.push(spacer);
+ +   }
+ +  }
+ +  if(active?.isConnected&&document.activeElement!==active)active.focus({preventScroll:true});
+ +  this.eligible=desired;this.updateQueue();this.rangeFeedback();this.lastAnchor=this.anchor();
+ + }
+ + rangeFeedback(){
+ +  const ids=this.sections.flatMap(s=>s.ids),mounted=new Set(this.normalIds),positions=[];
+ +  ids.forEach((id,n)=>{if(mounted.has(id))positions.push(n)});
+ +  const first=positions[0]??-1,last=positions.at(-1)??-1;
+ +  this.rangeIds=ids;this.rangeFirst=first;this.rangeLast=last;
+ +  const status=this.root.querySelector('[data-review-range]');
+ +  status.textContent=first<0?`${ids.length} review cards; scroll to view`:`Cards ${first+1}–${last+1} of ${ids.length}`;
+ +  this.root.querySelector('[data-review-prev]').disabled=!ids.length||first===0;
+ +  this.root.querySelector('[data-review-next]').disabled=!ids.length||last===ids.length-1;
+ + }
+ + range(direction){
+ +  if(!this.owns())return;
+ +  const ids=this.rangeIds||[],index=direction>0?Math.max(0,this.rangeLast+1):
+ +   (this.rangeFirst<0?ids.length-1:Math.max(0,this.rangeFirst-1));
+ +  const id=ids[index];if(id===undefined)return;
+ +  for(const section of this.sections){const n=section.ids.indexOf(id);if(n<0)continue;
+ +   const top=section.el.getBoundingClientRect().top+window.scrollY+section.prefix[Math.floor(n/section.columns)]*section.scale;
+ +   window.scrollTo(0,Math.max(0,top-55));this.layout();
+ +   this.bindings.get(id)?.card.querySelector('button')?.focus({preventScroll:true});break;}
+ + }
+ + retryState(id){if(!this.retries.has(id))this.retries.set(id,{failures:0,readyAt:0,timer:0});return this.retries.get(id);}
+ + clearURL(b){
+ +  b.img.onload=null;b.img.onerror=null;b.img.removeAttribute('src');
+ +  if(b.url){URL.revokeObjectURL(b.url);b.url=null;}
+ + }
+ + cancel(b){if(b.op&&!b.op.cancelled){b.op.cancelled=true;b.op.controller.abort();}}
+ + retire(b){
+ +  this.cancel(b);this.clearURL(b);this.bindings.delete(b.id);
+ +  const r=this.retries.get(b.id);if(r?.timer){clearTimeout(r.timer);r.timer=0;}
+ +  b.card.remove?.();
+ + }
+ + unavailable(b){if(this.valid(b,false))b.img.parentElement.classList.add('unavailable');}
+ + fail(b){
+ +  if(!this.valid(b))return;
+ +  this.clearURL(b);const r=this.retryState(b.id);r.failures++;
+ +  if(r.failures>=4){this.unavailable(b);return;}
+ +  r.readyAt=Date.now()+600*r.failures;this.updateQueue();
+ + }
+ + updateQueue(){
+ +  if(!this.owns())return;
+ +  this.queue=[];
+ +  for(const [id,b]of this.bindings){
+ +   const r=this.retryState(id),priority=this.eligible.get(id);
+ +   if(!priority){this.cancel(b);if(r.timer){clearTimeout(r.timer);r.timer=0;}continue;}
+ +   if(b.url||b.op)continue;
+ +   if(r.failures>=4){this.unavailable(b);continue;}
+ +   if(r.readyAt>Date.now()){
+ +    if(!r.timer){const token=b.token;
+ +     r.timer=setTimeout(()=>{r.timer=0;if(this.valid(b)&&b.token===token)this.updateQueue();},r.readyAt-Date.now());}
+ +    continue;
+ +   }
+ +   this.queue.push({b,rank:priority.rank?2:r.failures?1:0,order:priority.order});
+ +  }
+ +  this.queue.sort((a,b)=>a.rank-b.rank||a.order-b.order);this.pump();
+ + }
+ + pump(){
+ +  if(!this.owns())return;
+ +  while(THUMB_FLIGHTS.size<4&&this.queue.length){
+ +   const {b}=this.queue.shift();if(!this.valid(b)||b.op||b.url)continue;
+ +   this.request(b);
+ +  }
+ + }
+ + async request(b){
+ +  const controller=new AbortController(),op={controller,cancelled:false,token:b.token};
+ +  b.op=op;THUMB_FLIGHTS.add(op);
+ +  try{
+ +   const url=new URL(`api/jobs/${this.jobId}/thumb/${b.id}`,document.baseURI);
+ +   const r=this.retryState(b.id);if(r.failures)url.searchParams.set('r',String(Date.now()));
+ +   const response=await fetch(url.href,{signal:controller.signal});
+ +   const blob=await response.blob();
+ +   if(!response.ok)throw Error('Thumbnail HTTP '+response.status);
+ +   if(op.cancelled||!this.valid(b)||b.token!==op.token)return;
+ +   const urlValue=URL.createObjectURL(blob);
+ +   if(op.cancelled||!this.valid(b)||b.token!==op.token){URL.revokeObjectURL(urlValue);return;}
+ +   b.url=urlValue;b.img.parentElement.classList.remove('unavailable');
+ +   b.img.onload=()=>{if(!this.valid(b)||b.token!==op.token||b.url!==urlValue)return;};
+ +   b.img.onerror=()=>{if(this.valid(b)&&b.token===op.token&&b.url===urlValue)this.fail(b);};
+ +   b.img.src=urlValue;
+ +  }catch(error){if(!op.cancelled&&this.valid(b)&&b.token===op.token)this.fail(b);}
+ +  finally{
+ +   if(b.op===op)b.op=null;THUMB_FLIGHTS.delete(op);
+ +   // Replacements can mount immediately, but never borrow an unsettled slot.
+ +   if(REVIEW_SCHED?.owns())REVIEW_SCHED.updateQueue();
+ +  }
+ + }
+ + dispose({suspend=false}={}){
+ +  if(this.disposed){if(!suspend){this.retries.clear();this.suspended=false;}return;}
+ +  this.disposed=true;this.suspended=suspend;
+ +  if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
+ +  this.observer?.disconnect();this.listeners.splice(0).forEach(remove=>remove());
+ +  this.selectionCleanup?.();this.selectionCleanup=null;
+ +  const wrap=this.root.querySelector?.('#detwrap');if(wrap)delete wrap.dataset.mq;
+ +  for(const b of [...this.bindings.values()])this.retire(b);
+ +  for(const section of this.sections){
+ +   for(const row of section.rows.values())row.remove();section.rows.clear();
+ +   for(const spacer of section.spacers)spacer.remove();section.spacers=[];
+ +  }
+ +  for(const r of this.retries.values())if(r.timer)clearTimeout(r.timer);
+ +  // A hidden page keeps only numeric retry history for this exact view.
+ +  // Timers/bindings/controllers belong to the retired scheduler, never resume.
+ +  this.retries=suspend?new Map([...this.retries].map(([id,r])=>
+ +   [id,{failures:r.failures,readyAt:r.readyAt,timer:0}])):new Map();
+ +  this.eligible.clear();this.queue=[];
+ +  clearSel();if(marqEl){marqEl.remove();marqEl=null;}mStart=null;
+   }
+ - return meta;
+  }
+ +// Back/forward-cache restoration reuses this view's complete metadata/drafts.
+ +window.addEventListener?.('pageshow',()=>{
+ + const s=REVIEW_SCHED;
+ + if(s?.disposed&&s.suspended&&ownsView(s.jobId,s.viewGen)&&s.root.isConnected&&document.getElementById('review')===s.root){
+ +  REVIEW_SCHED=new ReviewScheduler(s.jobId,s.viewGen,s.root,s.meta);
+ +  REVIEW_SCHED.matching=s.matching;REVIEW_SCHED.retries=s.retries;
+ +  s.retries=new Map();s.suspended=false;
+ +  REVIEW_SCHED.start();initMarquee();
+ + }
+ +});
++ function reviewMatches(card,type,output){
++  return (type===null||card.realCategory===type)&&(output==="all"||
++   card.members.some(i=>output==="blur"?!!EN[i]:!EN[i]));
++ }
++ function setReviewFilter(type,output){
++  if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
+ - cancelReviewMarquee();clearSel();REVIEW_FILTER.type=type;REVIEW_FILTER.output=output;
+++ REVIEW_SCHED?.selectionCleanup?.();clearSel();REVIEW_FILTER.type=type;REVIEW_FILTER.output=output;
++  refreshReviewFilters();
++ }
++ function reviewSelectable(i){
+ - const c=REVIEW_META.byId[i];if(!c||!reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output))return false;
+++ const c=REVIEW_META?.byId.get(i);if(!c||!reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output))return false;
++  return !c.zone||!!document.getElementById("reviewZones")?.open;
++ }
++ function pruneReviewSelection(){
++  let changed=false;
++  for(const i of [...selSet])if(!reviewSelectable(i)){
++   selSet.delete(i);document.getElementById("det"+i)?.classList.remove("selected");changed=true;}
++  if(changed&&menuEl){
++   if(!selSet.size){menuEl.remove();menuEl=null;}
++   else menuEl.querySelector("span").textContent=selSet.size+" selected";
++  }
++ }
++ function reviewZoneToggle(node){
++  if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen)||
++   (node&&node!==document.getElementById("reviewZones")))return;
++  pruneReviewSelection();refreshReviewFilters();
++ }
++ function refreshReviewFilters(){
++  if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
++  const typeControl=document.getElementById("reviewType"),outputControl=document.getElementById("reviewOutput");
++  if(!typeControl||!outputControl)return;
+ - const types=[...new Set([...REVIEW_META.cards.filter(c=>!c.zone),...REVIEW_META.cards.filter(c=>c.zone)].map(c=>c.realCategory))];
+++ const types=[...new Set([...[...REVIEW_META.byId.values()].filter(c=>!c.zone),...[...REVIEW_META.byId.values()].filter(c=>c.zone)].map(c=>c.realCategory))];
++  if(REVIEW_FILTER.type!==null&&!types.includes(REVIEW_FILTER.type))REVIEW_FILTER.type=null;
++  const {type,output}=REVIEW_FILTER,typeCounts=new Map(types.map(t=>[t,0])),outputCounts={all:0,blur:0,visible:0};
++  let count=0,ordinary=0,zones=0,otherTypeCount=0;
++  const sectionCounts=new Map(REVIEW_META.sections.map(s=>[s.index,0]));
+++ const matching=[];
++  const active=document.activeElement,focusedCard=active?.closest?.(".det");
++  let lostFocus=false;
++  // Derive aggregates once per transaction, independently of mounted/closed cards.
++  for(const s of REVIEW_META.sections)for(const c of s.cards){
++   let blurred=0;for(const i of c.members)if(EN[i])blurred++;
++   const kept=c.members.length-blurred,typeMatch=type===null||c.realCategory===type;
++   const outputMatch=output==="all"||(output==="blur"?blurred>0:kept>0),match=typeMatch&&outputMatch;
++   if(outputMatch){typeCounts.set(c.realCategory,typeCounts.get(c.realCategory)+1);otherTypeCount++;}
++   if(typeMatch){outputCounts.all++;if(blurred)outputCounts.blur++;if(kept)outputCounts.visible++;}
+ -  if(match){count++;if(c.zone)zones++;else ordinary++;sectionCounts.set(s.index,sectionCounts.get(s.index)+1);}
+++  if(match){matching.push(c.id);count++;if(c.zone)zones++;else ordinary++;sectionCounts.set(s.index,sectionCounts.get(s.index)+1);}
++   const node=document.getElementById("det"+c.id);
+ -  if(node){if(!match&&focusedCard===node)lostFocus=true;node.hidden=!match;}
+++  if(node&&!match&&focusedCard===node)lostFocus=true;
++  }
++  typeControl.innerHTML=`<option value="">All detected types (${otherTypeCount})</option>`+types.map(t=>`<option value="${detLabel(t)}">${detLabel(CATDN[t]||t)} (${typeCounts.get(t)})</option>`).join("");
++  typeControl.value=type??"";
++  outputControl.innerHTML=[["all","All outputs"],["blur","Includes blurred appearances"],["visible","Includes visible appearances"]].map(([v,label])=>`<option value="${v}">${label} (${outputCounts[v]})</option>`).join("");
++  outputControl.value=output;
++  const zoneDetails=document.getElementById("reviewZones");
++  for(const s of REVIEW_META.sections){
++   const n=sectionCounts.get(s.index),node=document.getElementById(s.zone?"reviewZones":"reviewSection"+s.index);
++   if(node){if(!n&&node.contains?.(active))lostFocus=true;node.hidden=!n;}
++   const badge=document.getElementById(s.zone?"reviewZoneCount":"reviewCount"+s.index);
++   if(badge)badge.textContent=s.zone?`${n} of ${s.cards.length}`:String(n);
++  }
+ - document.getElementById("reviewFilterStatus").textContent=`${count} of ${REVIEW_META.cards.length} cards match`;
+++ document.getElementById("reviewFilterStatus").textContent=`${count} of ${[...REVIEW_META.byId.values()].length} cards match`;
++  const empty=document.getElementById("reviewFilterEmpty");empty.hidden=count>0;
+ - empty.textContent=REVIEW_META.cards.length?"No cards match these filters.":"No detections in this job.";
+++ empty.textContent=[...REVIEW_META.byId.values()].length?"No cards match these filters.":"No detections in this job.";
++  document.getElementById("reviewFilterHint").textContent=count>0&&!ordinary&&zones&&!zoneDetails?.open?
++   `${zones} matching card${zones===1?" is":"s are"} outside your zones; open that section to inspect them.`:"";
++  pruneReviewSelection();
++  if(lostFocus)outputControl.focus();
+++ refreshReviewVisibleSet({jobId:REVIEW_META.jobId,viewGen:REVIEW_META.viewGen,matchingCardIds:matching});
++ }
++ 
+  function detLabel(s){return String(s).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","\'":"&#39;"}[c]));}
+  function detChoices(i,category){
+   const count=(TRKMEM[i]||[i]).length;
+@@@ -4514,9 -3000,10 +4604,10 @@@ function refreshDet(i)
+  }
+  let DET_BATCH=0,DET_DIRTY=new Set();
+  function finishDetChoices(){
+ - if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+++ if(!EDITS.busy)saveStatus(EDITS,'Unsaved edits — save to include them in the render.');
+   DET_DIRTY.forEach(refreshDet);DET_DIRTY.clear();
+ - if(document.getElementById("beCv")){beFilter();beDraw();}
+ + if(document.getElementById('beCv')){beFilter();beDraw();}
+-  refreshReviewVisibleSet({jobId:CUR,viewGen:VIEW_GEN});
++  refreshReviewFilters();
+  }
+  function applyDet(i,blur){
+   for(const m of (TRKMEM[i]||[i])){
+@@@ -4543,40 -3035,42 +4633,40 @@@ function clearSel()
+   if(menuEl){menuEl.remove();menuEl=null;}
+  }
+  function initMarquee(){
+ - const wrap=document.getElementById("detwrap");
+ - if(!wrap||wrap.dataset.mq)return;
+ - wrap.dataset.mq=1;
+ - wrap.addEventListener("pointerdown",e=>{
+ -  if(e.pointerType==="touch")return;         // touch keeps normal scrolling
+ -  if(e.target.closest("button"))return;      // button clicks stay clicks
+ -  cancelReviewMarquee();clearSel();
+ -  const id=CUR,gen=VIEW_GEN;
+ -  mStart=[e.pageX,e.pageY];
+ -  marqEl=document.createElement("div");marqEl.className="marq";
+ -  document.body.appendChild(marqEl);
+ + const wrap=document.getElementById('detwrap'),owner=REVIEW_SCHED;
+ + if(!wrap||!owner||wrap.dataset.mq)return;wrap.dataset.mq=1;
+ + owner.listen(wrap,'pointerdown',e=>{
+ +  if(e.pointerType==='touch'||e.target.closest('button')||!owner.owns())return;
+-   clearSel();owner.gesture=true;mStart=[e.pageX,e.pageY];
+++  owner.selectionCleanup?.();clearSel();owner.gesture=true;mStart=[e.pageX,e.pageY];
+ +  // A bounded frozen set; scrolling during the gesture does not mount more.
+-   const targets=[...owner.bindings.values()].filter(b=>b.card.dataset.focusPin!=='1'&&
+++  const targets=[...owner.bindings.values()].filter(b=>reviewSelectable(b.id)&&b.card.dataset.focusPin!=='1'&&
+ +   b.card.getBoundingClientRect().bottom>0&&b.card.getBoundingClientRect().top<window.innerHeight);
+ +  marqEl=document.createElement('div');marqEl.className='marq';document.body.appendChild(marqEl);
+ +  const cleanup=()=>{
+ +   document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);
+ +   document.removeEventListener('pointercancel',cancel);document.removeEventListener('keydown',key);
+ +   if(marqEl){marqEl.remove();marqEl=null;}mStart=null;owner.gesture=false;owner.selectionCleanup=null;
+ +   owner.schedule();
+ +  };
+    const move=ev=>{
+ +   if(!owner.owns()||!mStart)return;
+     const x1=Math.min(mStart[0],ev.pageX),y1=Math.min(mStart[1],ev.pageY),
+ -         x2=Math.max(mStart[0],ev.pageX),y2=Math.max(mStart[1],ev.pageY);
+ -   Object.assign(marqEl.style,{left:x1+"px",top:y1+"px",
+ -    width:(x2-x1)+"px",height:(y2-y1)+"px"});
+ -  };
+ -  const cancel=()=>{
+ -   document.removeEventListener("pointermove",move);
+ -   document.removeEventListener("pointerup",up);
+ -   if(marqEl)marqEl.remove();marqEl=null;mStart=null;marqCancel=null;
+ +    x2=Math.max(mStart[0],ev.pageX),y2=Math.max(mStart[1],ev.pageY);
+ +   Object.assign(marqEl.style,{left:x1+'px',top:y1+'px',width:(x2-x1)+'px',height:(y2-y1)+'px'});
+    };
+    const up=ev=>{
+ -   const r=marqEl.getBoundingClientRect();cancel();
+ -   if(!ownsView(id,gen))return;
+ -   if(r.width<8&&r.height<8)return;          // just a click — not a drag
+ -   document.querySelectorAll("#detwrap .det").forEach(t=>{
+ -    if(!reviewSelectable(+t.id.slice(3))||t.hidden)return;
+ -    const b=t.getBoundingClientRect();
+ -    if(b.width&&b.height&&b.left<r.right&&b.right>r.left&&b.top<r.bottom&&b.bottom>r.top){
+ -     selSet.add(+t.id.slice(3));t.classList.add("selected");}});
+ +   if(!owner.owns()||!marqEl){cleanup();return;}
+ +   const r=marqEl.getBoundingClientRect();cleanup();
+ +   if(r.width<8&&r.height<8)return;
+-    for(const b of targets){if(!owner.valid(b,false))continue;
+++   for(const b of targets){if(!owner.valid(b,false)||!reviewSelectable(b.id))continue;
+ +    const t=b.card,rect=t.getBoundingClientRect();
+-     if(rect.left<r.right&&rect.right>r.left&&rect.top<r.bottom&&rect.bottom>r.top){selSet.add(b.id);t.classList.add('selected');}}
+++    if(rect.width&&rect.height&&rect.left<r.right&&rect.right>r.left&&rect.top<r.bottom&&rect.bottom>r.top){selSet.add(b.id);t.classList.add('selected');}}
+     if(selSet.size)showSelMenu(ev.pageX,ev.pageY);
+    };
+ -  marqCancel=cancel;
+ -  document.addEventListener("pointermove",move);
+ -  document.addEventListener("pointerup",up);
+ +  const cancel=()=>cleanup(),key=ev=>{if(ev.key==='Escape')cleanup();};
+ +  owner.selectionCleanup=cleanup;
+ +  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
+ +  document.addEventListener('pointercancel',cancel);document.addEventListener('keydown',key);
+    e.preventDefault();
+   });
+  }

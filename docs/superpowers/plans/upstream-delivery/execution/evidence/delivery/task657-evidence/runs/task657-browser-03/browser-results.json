@@ -1,0 +1,29 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [
+    "native selectors present",
+    "seven-card mixed/type/empty/reset counts",
+    "native keyboard, disappearing-control focus fallback and retained-card focus",
+    "zone collapse selection pruning and open preference retained across hiding"
+  ],
+  "errors": [
+    "cancelReviewMarquee is not defined",
+    "cancelReviewMarquee is not defined"
+  ],
+  "console": [],
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n1 !== 0\n\n    at /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.cjs:61:203",
+  "failureState": {
+    "poll": "",
+    "review": true,
+    "matching": [
+      8,
+      0,
+      3
+    ],
+    "mounted": [
+      0,
+      3
+    ]
+  }
+}

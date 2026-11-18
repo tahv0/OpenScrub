@@ -1,0 +1,9 @@
+# Add detection type and output view filters to review
+
+Large reviews can mix detection types and blurred/visible appearances across grouped cards. Add native Detection type and Output selectors, Show all and conditional counts. A mixed group appears in both applicable output views while keeping its complete action scope. Filtering preserves edits, the editor and pending saves; every new job view starts Show all. Category and outside-zone actions keep their complete separate scope, including hidden cards.
+
+Candidate: pr/review-view-filters at c0ebcc7a8c3121330730bea3619bbfea8add7992, on reviewed P02/P07a prerequisite 2ae3257b9752e2d976ff7a0d39955a13c133273a. Independent spec and quality review approved.
+
+Validation: 78 owning tests, one full 212-test run and 88 active-source Python3.9 checks; full shipped PAGE/core plus targeted native-touch/help follow-up; actual HTTP save/raw fresh reopen/render and 9 selected/kept pixel checks; offline sdist-to-wheel-from-sdist and installed CLI/web/listening HTTP. Exact source/head boundaries and failed fixtures are retained in the [report](../evidence/delivery/task-150-report.md) and [review](../evidence/delivery/task-150-review.md).
+
+Standalone evidence preserves already-started playback using a disclosed native video.load fixture prerequisite and raw rows before render; complete post-render row preservation remains P06D/C01. The separately reviewed [combined gate](../batches/review-filters-integration.md) closes those two boundaries on the clean application. Tool byte pins were matched to prior reviewed binaries in a transparent post-run audit; original configs were not relabeled as preflight enforcement. No default output policy, report/API/schema, dependency, training state or autosave changed. Nothing has been published; refresh the actual accepted Austin prerequisite before submission.

@@ -1,0 +1,23 @@
+{
+  "author_review": true,
+  "fresh_independent_review": "root assigns next; not claimed",
+  "checks": [
+    "complete P15 donor and current C01 source mapping",
+    "one metadata Map and pending EN overlay; zone singleton/category grouping/order",
+    "current scheduler/queue/layout/focus teardown and owner fences retained",
+    "single batch, complete hidden category/zone scopes, explicit matching selected ID scope",
+    "no filter-induced I/O/editor/save/render mutation",
+    "actual Escape listener RED/current selectionCleanup GREEN",
+    "native/floor final product and owning tests identical to final head",
+    "complete real saved/post-render raw document and decoded pixels",
+    "offline extracted-sdist wheel/installed source origins",
+    "Python3.9 grammar, unchanged backend AST/other production/defaults/dependencies"
+  ],
+  "blocking_findings": [],
+  "limits": [
+    "author self-review; root independent review pending",
+    "controlled pagehide/pageshow lifecycle dispatch, not native BFCache navigation certification",
+    "virtual native touch in headless Chromium, not physical touch-device certification",
+    "Linux CPU/headless Chromium only; no cross-platform/browser/GPU/performance/memory claim"
+  ]
+}

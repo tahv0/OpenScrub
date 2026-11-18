@@ -1,0 +1,13 @@
+{
+  "reason": "Independent review Minor M1: package-count precision only",
+  "original_report_sha256": "875a51adfd028b07812212c8d952ffe46ec3a976c1c2776ffc2f48158eed1141",
+  "original_report_preserved": true,
+  "validated_required_sdist_files": 84,
+  "sdist_total_regular_files": 90,
+  "validated_required_wheel_files": 15,
+  "wheel_total_entries": 23,
+  "sdist_sha256": "13405de491bc16f7af6c1e225c723a5ccf39d446246d7c33121c275fad7bc258",
+  "wheel_sha256": "7fce236edbe9e0bb17ef9b8d5d5a8ca66978b3b584cbb547c9085714a09a1641",
+  "product_or_runtime_change": false,
+  "authored_delivery_record_policy": "State validated required subsets separately from total archive entries. No package failure or workload replay."
+}

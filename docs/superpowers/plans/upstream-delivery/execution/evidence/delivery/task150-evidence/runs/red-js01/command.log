@@ -1,0 +1,48 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task150/runs/red-js01/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "af3b9e97b55deefa5bdeb372f66ed545d34c0517ce3df2f5e7a4870bedad4a8f"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_native_filters_and_exact_mixed_card_oracle ________________
+
+    def test_native_filters_and_exact_mixed_card_oracle():
+>       run("""await review(fixture);
+        if(!mounted.includes('id="reviewType"')||!mounted.includes('id="reviewOutput"'))throw Error('missing native review selectors');
+        eq(ids(),[0,3,4,6,7,8,9]);eq(status(),'7 of 7 cards match');
+        setReviewFilter(null,'blur');eq(ids(),[0,3,6,9]);eq(status(),'4 of 7 cards match');
+        setReviewFilter(null,'visible');eq(ids(),[0,4,7,8]);
+        setReviewFilter('face','all');eq(ids(),[0,3,8]);
+        setReviewFilter('face','blur');eq(ids(),[0,3]);
+        setReviewFilter('face','visible');eq(ids(),[0,8]);
+        setReviewFilter('plate','all');eq(ids(),[4,6,9]);
+        setReviewFilter('plate','blur');eq(ids(),[6,9]);
+        setReviewFilter('plate','visible');eq(ids(),[4]);
+        setReviewFilter('email','blur');eq(ids(),[]);eq(elements.get('reviewFilterEmpty').hidden,false);
+        eq(TRKMEM[0],[0,1,2]);eq(ROWCARD[8],8);eq(REVIEW_META.byId[8].members,[8]);
+        """)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py:18: in run
+    run_choices(FILTER_DOM + scenario)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nconst oldCreate=document.createElement;\ndocument.createElement=(tag)=>{const e=oldCreate(tag);e.focus=()=>document...iewFilterEmpty').hidden,false);\n    eq(TRKMEM[0],[0,1,2]);eq(ROWCARD[8],8);eq(REVIEW_META.byId[8].members,[8]);\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: missing native review selectors
+E             at evalmachine.<anonymous>:42:91
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...'', stderr='Error: missing native review selectors\n    at evalmachine.<anonymous>:42:91\n    at async [eval]:31:12\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_choices.py:53: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_filters.py::test_native_filters_and_exact_mixed_card_oracle
+1 failed in 0.17s

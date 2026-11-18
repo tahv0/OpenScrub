@@ -1,0 +1,19 @@
+{
+  "native_floor_head": "5b9241b1d6dd48fb53d42c639ea4152fd1c06b6f",
+  "browser_http_head": "4162e560937b364d8ea44f67771ac5f162bd17d1",
+  "final_touch_package_head": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+  "native_floor_files_identical_at_final_head": {
+    "openscrub_web.py": "92c25601ab5c0bfdd890c0a54ab4ffdcc74c55d99403c0b02ee4c220dbef52ac",
+    "tests/test_review_filters.py": "403e6fdfadcd7b729829d4f9a9f9a41a90753871a444f2e467e962cd2ea92233",
+    "tests/test_review_choices.py": "29080142232fae1134ecba4eb3bda4d952930a78e63178c9bf744181e1ef98bc",
+    "tests/test_review_save_failures.py": "2e540df8ff6599092f4a1299ab8771fd383339631731f797176ce1bfc1b9b97d",
+    "tests/test_thumbnail_scheduling.py": "685fe7b8a2e4f68ce1fe635e79238f3457e177022180a9ea866f336f9b571aef",
+    "tests/test_job_polling_node.py": "b4ea1e11ee5880e28cd2091143ee06ef38e403218dbc4b41f1037186affc6e80",
+    "test_openscrub.py": "414d5a40ab71914071856c0d593de4799b1c5d2c3e5c3cb51161dc2b6f8e1b14"
+  },
+  "product_sha256": "92c25601ab5c0bfdd890c0a54ab4ffdcc74c55d99403c0b02ee4c220dbef52ac",
+  "screenshots": {
+    "mobile-controls.png": "2efd19a3aff4523dfdba1c41e2657ab2695d90b14463d486fd34097040817386",
+    "mobile-help.png": "dbc5de3ab7540b60251f4dd25d491bb6ab90916eeddb10cd24b275b69ead8d71"
+  }
+}

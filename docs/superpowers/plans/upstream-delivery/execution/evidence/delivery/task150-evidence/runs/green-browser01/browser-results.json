@@ -1,0 +1,17 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [
+    "native selectors present",
+    "seven-card mixed/type/empty/reset counts",
+    "native keyboard, disappearing-control focus fallback and retained-card focus",
+    "zone collapse selection pruning and open preference retained across hiding",
+    "editor object/node, selection, pending geometry/time/manual/audio/gesture retained; zero metadata/save/render requests",
+    "held-save newer intent, failed save, A→B→A reset and owning draft"
+  ],
+  "errors": [],
+  "console": [
+    "Failed to load resource: the server responded with a status of 423 (Locked)"
+  ],
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ '4 of 7 cards match'\n- '3 of 7 cards match'\n\n    at status (/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser.cjs:31:30)\n    at async /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task150-evidence/browser.cjs:57:303"
+}

@@ -1,0 +1,15 @@
+{
+  "container": "window/vertical",
+  "scrollY": 1759,
+  "max": 2616,
+  "wrap": {
+    "x": 32,
+    "y": 0,
+    "width": 326,
+    "height": 1503,
+    "top": 0,
+    "right": 358,
+    "bottom": 1503,
+    "left": 32
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task150/runs/package01/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "5d79b2b7dc325c84e5f495658b69d66410914b4829637adae9301558e6400a90",
+    "bytes": 544258
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task150/runs/package01/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "eb505227c01b98f40ed260e7152e390d2932d1847642f68a3d8a64378bdd5bcd",
+    "bytes": 439053
+  },
+  "sdist_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_vault.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "test_openscrub.py",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md",
+    "requirements.txt",
+    "install.py",
+    "face_models.json",
+    "plate_models.json",
+    "person_models.json",
+    "assets/openscrub.ico",
+    "tests/review_filters_browser.cjs",
+    "tests/review_filters_browser.py",
+    "tests/review_filters_http.cjs",
+    "tests/review_filters_http.py",
+    "tests/test_review_choices.py",
+    "tests/test_review_filters.py",
+    "tests/test_review_save_failures.py"
+  ],
+  "wheel_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_vault.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "face_models.json",
+    "plate_models.json",
+    "person_models.json"
+  ],
+  "requires_python": ">=3.9"
+}

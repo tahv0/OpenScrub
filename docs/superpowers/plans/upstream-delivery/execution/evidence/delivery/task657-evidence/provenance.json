@@ -1,0 +1,51 @@
+{
+  "base": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7",
+  "head": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+  "branch": "integration/upstream-focused-filters",
+  "mapping": {
+    "ac28a2ac981f2612cbaeadedddbfac8db1efeefb": "e8b961111d7888f5176b6bbbad84c3aaa9c5c93f",
+    "c0ebcc7a8c3121330730bea3619bbfea8add7992": "7950ddd884194608abb140e90489deddb9397cc8"
+  },
+  "followups": [
+    {
+      "commit": "443761aed2643bf1dbfcb7c646c553a7cbbe1983",
+      "subject": "Exercise filters with current scheduler and complete rendered reports"
+    },
+    {
+      "commit": "fab87cdbcca62e4c9f65e0166d2012bbe443e853",
+      "subject": "Keep explicit selection scope across virtual unmounting"
+    },
+    {
+      "commit": "b8c2b43fefd78357191562fb53adf0175b7d26f2",
+      "subject": "Enter virtual review viewport before native card actions"
+    },
+    {
+      "commit": "755f61443275da7afb161cc350d9eac504514ef5",
+      "subject": "Use accepted current polling log cursor in browser fixture"
+    },
+    {
+      "commit": "5b9241b1d6dd48fb53d42c639ea4152fd1c06b6f",
+      "subject": "Route Escape through the current review scheduler cleanup"
+    },
+    {
+      "commit": "630f6cb7383bc219f6231dff008129ca51ff96c2",
+      "subject": "Scroll actual virtual scheduler before native card actions"
+    },
+    {
+      "commit": "4162e560937b364d8ea44f67771ac5f162bd17d1",
+      "subject": "Exercise real filtered thumbnail cancellation and finite review ranges"
+    },
+    {
+      "commit": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+      "subject": "Restore the explicit seven-card fixture after pending overlay checks"
+    }
+  ],
+  "conflicts": [
+    "openscrub_web.py: metadata/render/lifecycle block; batch/setters; marquee setup/completion; selected bulk"
+  ],
+  "resolution": "Retain current C01 metadata Map, scheduler shells/queue/lifetime, captured-owner visibility seam, openJob/loadReview teardown/request guards, one batch and scheduler selectionCleanup; graft P15 category/section/filter/count UI and live eligibility.",
+  "escape_fix": "5b9241b: global Escape auto-pick referenced removed donor cancelReviewMarquee; actual listener RED then sole current scheduler cleanup invocation.",
+  "source_export": false,
+  "publication": false,
+  "ref_advance": false
+}

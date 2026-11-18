@@ -1,0 +1,57 @@
+[
+  {
+    "run": "task657-dev-01",
+    "classification": "fixture interface",
+    "result": "5 passed,3 failed: standalone cards/object access vs adopted Map",
+    "outer_exit": null,
+    "limit": "Complete workload log retained; outer yielded launcher exit not separately captured."
+  },
+  {
+    "run": "task657-selected-red-01",
+    "classification": "invalid expectation after root clarification",
+    "exit": 1,
+    "result": "Proposed rejection of unmounted explicit selection contradicted clarified metadata selection ownership; no product fix."
+  },
+  {
+    "run": "task657-escape-red-01",
+    "classification": "genuine product RED",
+    "exit": 1,
+    "result": "Actual global keydown listener ReferenceError: cancelReviewMarquee undefined."
+  },
+  {
+    "run": "task657-browser-01",
+    "classification": "fixture contract",
+    "exit": 1,
+    "result": "Missing from on intercepted empty legacy log prevented accepted polling/review; initial card wait timed out."
+  },
+  {
+    "run": "task657-browser-02",
+    "classification": "fixture contract",
+    "exit": 1,
+    "result": "Same missing from prevented review selector wait; no product JS errors."
+  },
+  {
+    "run": "task657-browser-03",
+    "classification": "genuine product RED",
+    "exit": 1,
+    "result": "First4 core groups passed; actual Escape ReferenceError and leftover gesture."
+  },
+  {
+    "run": "task657-browser-04",
+    "classification": "fixture access",
+    "exit": 1,
+    "result": "First6 core groups passed/no page errors; editor viewport correctly unmounted review cards before kb0 click."
+  },
+  {
+    "run": "task657-browser-05",
+    "classification": "fixture geometry",
+    "exit": 1,
+    "result": "First7 core groups passed/no page errors;32 filtered cards all admitted at desktop viewport, so Next correctly disabled."
+  },
+  {
+    "run": "task657-touch-01",
+    "classification": "fixture setup isolation",
+    "exit": 1,
+    "result": "Pending/native/empty/closed-zone and scheduler groups passed. Carried inverted A enabled map correctly yielded Z9/B3/D6 (3) vs independent original-row oracle4."
+  }
+]

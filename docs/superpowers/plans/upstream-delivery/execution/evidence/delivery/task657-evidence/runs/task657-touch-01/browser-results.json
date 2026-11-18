@@ -1,0 +1,25 @@
+{
+  "browserPlugin": "unavailable",
+  "page": "full emitted PAGE",
+  "scenarios": [
+    "native selectors present",
+    "opposite pending overlay, native Detection type pointer/keyboard, collapsed-zone-only matches and no detections",
+    "actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership"
+  ],
+  "errors": [],
+  "console": [],
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ '3 of 7 cards match'\n- '4 of 7 cards match'\n\n    at status (/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.cjs:31:30)\n    at async /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/review_filters_browser.cjs:113:1",
+  "failureState": {
+    "poll": "",
+    "review": true,
+    "matching": [
+      9,
+      3,
+      6
+    ],
+    "mounted": [
+      0,
+      3
+    ]
+  }
+}
