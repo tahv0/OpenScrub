@@ -1,6 +1,7 @@
 """Live exact-source continuity across real vault transitions."""
 import os
 
+import pytest
 import openscrub_web as web
 from test_exact_samples import exact, sample, precondition, post, raw
 from test_job_lifecycle import store, request
@@ -733,16 +734,86 @@ def test_substituted_stage_is_never_cleaned_as_owned(tmp_path, monkeypatch):
     import openscrub_vault as vault
     source = tmp_path / 'source'
     source.write_bytes(b'plaintext')
-    original = vault._encrypt_stream
-    substituted = []
-    def swap(aes, src, dst, nonce):
-        count = original(aes, src, dst, nonce)
-        path = next(tmp_path.glob('.vault-*.tmp'))
-        path.replace(tmp_path / 'owned-stage')
-        path.write_bytes(b'foreign replacement')
-        substituted.append(path)
-        return count
-    monkeypatch.setattr(vault, '_encrypt_stream', swap)
+    original_stream, original_entry = vault._encrypt_stream, vault._entry_stamp
+    writers, stage_checks, substituted = [], [], []
+    def track(aes, src, dst, nonce):
+        writers.append(dst)
+        return original_stream(aes, src, dst, nonce)
+    def swap_after_close(path):
+        from pathlib import Path
+        stage = Path(path)
+        if stage.name.startswith('.vault-'):
+            stage_checks.append(stage)
+            if len(stage_checks) == 2:
+                assert writers and writers[0].closed
+                stage.replace(tmp_path / 'owned-stage')
+                stage.write_bytes(b'foreign replacement')
+                substituted.append(stage)
+        return original_entry(path)
+    monkeypatch.setattr(vault, '_encrypt_stream', track)
+    monkeypatch.setattr(vault, '_entry_stamp', swap_after_close)
     with pytest.raises(OSError, match='stage changed'):
         vault.encrypt_file(os.urandom(32), str(source), lambda *_: lambda receipt: None)
     assert substituted[0].read_bytes() == b'foreign replacement' and source.exists()
+
+
+@pytest.mark.parametrize('failing_mode', ['rb', 'wb'])
+def test_wrapper_construction_failure_keeps_original_error_and_one_raw_close(tmp_path, monkeypatch, failing_mode):
+    import openscrub_vault as vault
+    real_fdopen, real_close, real_fstat = vault.os.fdopen, vault.os.close, vault.os.fstat
+    class ConstructionFailure(RuntimeError):
+        pass
+    source = tmp_path / 'source'
+    source.write_bytes(b'bounded plaintext')
+    target, closes, receipts = [], [], []
+    def fail_after_wrapping(fd, mode, *args, **kwargs):
+        if mode == failing_mode:
+            target.append(fd)
+            wrapper = real_fdopen(fd, mode, *args, **kwargs)
+            wrapper.close()  # Simulate cleanup after ownership was acquired.
+            raise ConstructionFailure('synthetic wrapper construction failure')
+        return real_fdopen(fd, mode, *args, **kwargs)
+    def count_close(fd):
+        if target and fd == target[0]:
+            closes.append(fd)
+        return real_close(fd)
+    with monkeypatch.context() as patch:
+        patch.setattr(vault.os, 'fdopen', fail_after_wrapping)
+        patch.setattr(vault.os, 'close', count_close)
+        with pytest.raises(ConstructionFailure, match='synthetic wrapper construction failure'):
+            vault.encrypt_file(os.urandom(32), str(source), lambda *_: receipts.append)
+    assert len(target) == 1 and closes == target
+    with pytest.raises(OSError):
+        real_fstat(target[0])
+    assert source.exists() and not receipts
+
+
+def test_wrapper_failure_does_not_close_an_unrelated_open_file(tmp_path, monkeypatch):
+    import openscrub_vault as vault
+    source = tmp_path / 'source'
+    source.write_bytes(b'plaintext')
+    foreign = tmp_path / 'foreign'
+    foreign.write_bytes(b'unrelated')
+    real_fdopen, real_open, real_close = vault.os.fdopen, vault.os.open, vault.os.close
+    reopened = []
+    class ConstructionFailure(RuntimeError):
+        pass
+    def fail_after_wrapping(fd, mode, *args, **kwargs):
+        if mode == 'rb':
+            wrapper = real_fdopen(fd, mode, *args, **kwargs)
+            wrapper.close()
+            reopened.append(real_open(str(foreign), os.O_RDONLY))
+            raise ConstructionFailure('after wrapping')
+        return real_fdopen(fd, mode, *args, **kwargs)
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(vault.os, 'fdopen', fail_after_wrapping)
+            with pytest.raises(ConstructionFailure, match='after wrapping'):
+                vault.encrypt_file(os.urandom(32), str(source), lambda *_: lambda receipt: None)
+        assert len(reopened) == 1 and os.read(reopened[0], 9) == b'unrelated'
+    finally:
+        if reopened:
+            try:
+                real_close(reopened[0])
+            except OSError:
+                pass

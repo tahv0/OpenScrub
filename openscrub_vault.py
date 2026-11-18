@@ -26,6 +26,7 @@ permanently unrecoverable — that is the entire point of the feature.
 """
 
 import base64
+from contextlib import contextmanager
 import json
 import os
 import struct
@@ -161,12 +162,20 @@ def _entry_stamp(path):
     return _regular_stamp(os.stat(path, follow_symlinks=False))
 
 
+@contextmanager
 def _fdopen_owned(fd, mode):
+    """Own the raw descriptor independently of the buffered file wrapper."""
     try:
-        return os.fdopen(fd, mode)
+        with os.fdopen(fd, mode, closefd=False) as stream:
+            yield stream
     except BaseException:
-        os.close(fd)
+        try:
+            os.close(fd)
+        except OSError:
+            pass  # Preserve the original construction, I/O, or close failure.
         raise
+    else:
+        os.close(fd)
 
 
 def _witnessed_file(key, path, direction, finish):
