@@ -2,7 +2,7 @@ const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),root=process.env.VERIFY_RUN,origin='http://127.0.0.1:18551';let browser;
 (async()=>{browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1365,height:1000}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('dialog',d=>d.dismiss());
 await page.goto(origin);assert.equal(await page.title(),'OpenScrub');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewFilterStatus').innerText(),'7 of 7 cards match');
-await page.locator('#kb3').click();await page.locator('#bb0').click();await page.locator('#reviewZones summary').click();await page.locator('#bb8').click();await page.locator('#kb9').click();await page.locator('#reviewZones summary').click();
+await page.evaluate(()=>scrollTo(0,document.getElementById('detwrap').getBoundingClientRect().top+scrollY-55));await page.locator('#kb3').click();await page.locator('#bb0').click();await page.locator('#reviewZones summary').click();await page.locator('#bb8').click();await page.locator('#kb9').click();await page.locator('#reviewZones summary').click();
 await page.locator('button[onclick="loadBoxEdit(1)"]').click();await page.locator('#beCv').waitFor();
 await page.locator('#bePlay').click();await page.waitForFunction(()=>document.getElementById('beVid').currentTime>.15);
 const playback=await page.evaluate(()=>{window.videoNode=document.getElementById('beVid');window.editorObject=BE;return videoNode.currentTime});
