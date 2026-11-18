@@ -34,6 +34,7 @@ import re
 import secrets
 import sys
 import socket
+import stat
 import threading
 import time
 import uuid
@@ -45,6 +46,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
 import openscrub
 from openscrub_internal.reports import atomic_report
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import thumbnails as thumbs
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 import zones_ui
 
@@ -831,6 +833,7 @@ def _operation_valid(job, owner):
 
 def _begin_operation(job, owner):
     files = FILES.initialize(job)
+    thumbs.invalidate_locked(files.thumbnail, 'operation changed')
     if files.source_pair is not None:
         files.source_pair = None
         files.source_retired = True
@@ -1000,77 +1003,33 @@ def _run_job(job, action, owner=None):
                 thumbnail_owner = _own_files(job, work=True)
                 pregen_source = files.current_source
                 def _pregen(jb=job, video=thumbnail_owner.source):
-                    """One pass through the video with a single decoder:
-                    thumbnails come out in seconds instead of minutes.
-                    Sorting by reference time keeps seeks short and forward-
-                    only, which is what codecs are fast at."""
-                    cap = None
+                    cap = lease = None
                     try:
-                        doc = _load_job_report(jb)
-                        rs = doc["render_state"]
-                        todo = []
-                        for k, d in enumerate(doc["detections"]):
-                            cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
-                            if os.path.exists(cch):
-                                continue
-                            tref = min(max(d.get("last_seen", d["t_start"]),
-                                           d["t_start"]), d["t_end"])
-                            todo.append((tref, k, d, cch))
-                        todo.sort()
+                        doc, selected, fence, lease = _thumbnail_snapshot(jb, operation_owner=owner)
+                        if selected is not pregen_source or selected['path'] != video:
+                            return
+                        rows, rs = _thumbnail_validate_report(doc)
+                        _thumbnail_select(jb, doc, selected, fence, operation_owner=owner)
                         cap = cv2.VideoCapture(video)
-                        cur = -1
-                        frame = None
-                        for tref, k, d, cch in todo:
-                            fidx = min(int(tref * rs["fps"]),
-                                       len(rs["cum"]) - 1)
-                            if fidx != cur:
-                                if 0 <= fidx - cur <= 12:
-                                    while cur < fidx:   # cheap forward decode
-                                        ok, frame = cap.read()
-                                        if not ok:
-                                            frame = None
-                                            break
-                                        cur += 1
-                                else:
-                                    cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
-                                    ok, frame = cap.read()
-                                    cur = fidx if ok else cur
-                                    if not ok:
-                                        frame = None
-                            if frame is None:
-                                continue
-                            ox, oy = rs["cum"][fidx]
-                            h, wd = frame.shape[:2]
-                            pad = 24
-                            x1 = max(0, int(d["cbox"][0] + ox) - pad)
-                            y1 = max(0, int(d["cbox"][1] + oy) - pad)
-                            x2 = min(wd, int(d["cbox"][2] + ox) + pad)
-                            y2 = min(h, int(d["cbox"][3] + oy) + pad)
-                            crop = frame[y1:y2, x1:x2].copy()
-                            if crop.size == 0:
-                                continue
-                            inner = crop[pad:-pad or None, pad:-pad or None]
-                            if not inner.size or float(inner.std()) <= 8:
-                                continue   # blank: leave for the on-demand
-                                           # path, which tries other moments
-                            cv2.rectangle(crop, (pad, pad),
-                                          (crop.shape[1] - pad,
-                                           crop.shape[0] - pad),
-                                          (0, 0, 255), 2)
-                            with files.report_lock:
-                                if (not _operation_valid(job, owner) or owner.operation.is_set()
-                                        or files.current_source is not pregen_source
-                                        or files.source_status != 'coherent'
-                                        or _file_stamp(os.stat(video)) != pregen_source['stamp']):
+                        for index in range(len(rows)):
+                            try:
+                                _thumbnail_image(jb, index, 'crop', operation_owner=owner,
+                                                 capture=cap, snapshot=(doc, selected, fence, rows, rs))
+                            except _ThumbnailError as error:
+                                if error.code in ('thumbnail_obsolete', 'thumbnail_source_conflict',
+                                                  'source_report_pending'):
                                     return
-                                cv2.imwrite(cch, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        jb["log"].append("thumbnails pre-generated "
-                                         f"({len(todo)})")
+                                continue
+                        jb['log'].append('thumbnails pre-generated (%d)' % len(rows))
                     except Exception:
                         pass
                     finally:
-                        if cap is not None:
-                            cap.release()
+                        try:
+                            if cap is not None:
+                                cap.release()
+                        finally:
+                            if lease is not None:
+                                lease.release()
                 _start_owned_thread(_pregen, thumbnail_owner)
             next_owner = (_prepare_work(job, "render")
                           if job["options"].get("skip_review") else None)
@@ -1204,13 +1163,14 @@ def enforce_vault_lock():
             _validate_files_locked(job)
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
-                "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
+                "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
             g.file_owner = _reserve_files_locked(job, read_source=read_source)
 
 
 @app.after_request
 def _finish_file_response(response):
-    if request.endpoint == "job_edit_sample":
+    if (request.endpoint in {"job_edit_sample", "job_detections", "job_thumb", "job_detframe"}
+            and not g.get('thumbnail_versioned_response')):
         response.headers["Cache-Control"] = "private, no-store"
     for child in g.pop("file_children", []):
         child.release()
@@ -1496,6 +1456,7 @@ def job_cancel(jid):
         if operation is None:
             job["cancel"].set()  # idle/intake: no running compute to interrupt
         files.operation = None  # Event.clear cannot revive the captured attempt
+        thumbs.invalidate_locked(files.thumbnail, 'operation cancelled')
         if files.source_pair is not None:
             files.source_pair = None
             files.source_retired = True
@@ -1530,6 +1491,7 @@ def _report_committed_locked(job, doc, scan_owner=None):
     """Success-only notification; caller owns report/lifetime transaction."""
     files = FILES.initialize(job)
     files.committed_report_epoch += 1
+    thumbs.invalidate_locked(files.thumbnail, 'report committed')
     if scan_owner is not None:
         expected = doc.get('provenance', {}).get('input')
         files.source_pair = (scan_owner.operation, files.committed_report_epoch, expected,
@@ -1561,8 +1523,18 @@ def _prepare_observed_source(job, path):
         lease = _reserve_files_locked(job, source=path)
     try:
         canonical = lease.source
-        with open(canonical, 'rb') as opened:
-            stamp = _file_stamp(os.fstat(opened.fileno()))
+        flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NONBLOCK', 0)
+        fd = os.open(canonical, flags)
+        try:
+            opened = os.fdopen(fd, 'rb')
+        except BaseException:
+            os.close(fd)
+            raise
+        with opened:
+            observed = os.fstat(opened.fileno())
+            if not stat.S_ISREG(observed.st_mode):
+                raise exact.ExactError('source is not a regular file', 409, 'sample_conflict')
+            stamp = _file_stamp(observed)
             if stamp != _file_stamp(os.stat(canonical)):
                 raise exact.ExactError('source changed while opening', 409, 'sample_conflict')
             files = FILES.initialize(job)
@@ -1584,13 +1556,20 @@ def _prepare_observed_source(job, path):
         raise
 
 
-def _select_observed_locked(job, prepared, authoritative=False):
+def _select_observed_locked(job, prepared, authoritative=False, *, report_bound=True):
     files = FILES.initialize(job)
+    try:
+        if (_file_stamp(os.stat(prepared['path'])) != prepared['stamp']
+                or not authoritative and os.path.realpath(job['video']) != prepared['path']):
+            raise exact.ExactError('source changed before association', 409, 'sample_conflict')
+    except OSError:
+        raise exact.ExactError('source unavailable before association', 409, 'sample_conflict') from None
     current = files.current_source
     same = current and (current['path'],current['stamp']) == (prepared['path'],prepared['stamp'])
     if not authoritative and files.source_status == 'pending':
         raise exact.ExactError('scan report awaits source adoption', 409, 'source_report_pending')
     if not authoritative and (files.source_retired or current is not None and not same):
+        thumbs.invalidate_locked(files.thumbnail, 'source changed')
         files.source_retired = True
         files.current_source = None
         files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
@@ -1603,6 +1582,8 @@ def _select_observed_locked(job, prepared, authoritative=False):
     if authoritative:
         files.source_pair = None
     files.source_status, files.source_reason = 'coherent', None
+    if report_bound:
+        files.source_report_bound = True
     return files.current_source
 
 
@@ -1671,6 +1652,7 @@ def _exact_snapshot(job):
     if recovery is None and canonical != os.path.realpath(job['video']):
         with files.report_lock:
             if files.current_source is not None:
+                thumbs.invalidate_locked(files.thumbnail, 'source changed')
                 files.source_retired = True
                 files.current_source = None
                 files.source_status, files.source_reason = 'unavailable', 'selected scan path changed; rescan required'
@@ -1709,6 +1691,536 @@ def _exact_snapshot(job):
         raise
 
 
+class _ThumbnailError(Exception):
+    def __init__(self, code, status, detail):
+        super().__init__(detail)
+        self.code, self.status, self.detail = code, status, detail
+
+
+def _thumbnail_error_response(error):
+    value = {'error': error.code, 'detail': error.detail}
+    if error.code == 'thumbnail_obsolete':
+        value['refresh'] = 'detections'
+    return jsonify(value), error.status
+
+
+def _thumbnail_missing_source(job, path):
+    files = FILES.initialize(job)
+    with files.report_lock:
+        current = files.current_source
+        if current is not None and current['path'] == path:
+            files.current_source = None
+            files.source_retired = True
+            files.source_status, files.source_reason = 'unavailable', 'observed source disappeared; rescan required'
+            thumbs.invalidate_locked(files.thumbnail, 'source disappeared')
+            return _ThumbnailError('thumbnail_source_conflict', 409, 'Source requires rescan')
+        if files.source_retired or files.source_pair is not None:
+            return _ThumbnailError('thumbnail_source_conflict', 409, 'Source requires rescan')
+    return _ThumbnailError('missing_source', 404, 'Source unavailable')
+
+
+def _read_thumbnail_ordinal(selected, index, *, count, capture=None):
+    cap = capture
+    owned = capture is None
+    try:
+        if owned:
+            cap = cv2.VideoCapture(selected['path'])
+        try:
+            result = thumbs.read_ordinal_capture(cap, index, count=count)
+        except BaseException:
+            if owned and cap is not None:
+                try:
+                    cap.release()
+                except BaseException:
+                    pass
+                cap = None
+            raise
+        if owned:
+            cap.release()
+            cap = None
+        return result
+    except (openscrub.PipelineCancelled, thumbs.ThumbnailDecodeError):
+        raise
+    except Exception as error:
+        raise thumbs.ThumbnailDecodeError('thumbnail unavailable') from error
+
+
+def _thumbnail_current_locked(job, selected, fence, *, operation_owner=None):
+    """Check the shared source, committed report and operation before acceptance."""
+    files = FILES.initialize(job)
+    _report_current(job)
+    operation = fence[0][1]
+    if operation is not None and operation.is_set():
+        current = files.thumbnail.current
+        if current is not None and current.operation is operation:
+            thumbs.invalidate_locked(files.thumbnail, 'operation signalled')
+        raise _ThumbnailError('thumbnail_obsolete', 409, 'Operation changed')
+    if (files.current_source is not selected or files.source_status != 'coherent'
+            or files.source_retired or os.path.realpath(job['video']) != selected['path']
+            or (files.committed_report_epoch, files.operation) != fence[0]
+            or operation_owner is not None and operation_owner.operation is not operation):
+        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+    try:
+        source_stat = os.stat(selected['path'])
+    except FileNotFoundError:
+        source_stat = None
+    if source_stat is None or not stat.S_ISREG(source_stat.st_mode) or _file_stamp(source_stat) != selected['stamp']:
+        files.source_retired = True
+        files.current_source = None
+        files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
+        thumbs.invalidate_locked(files.thumbnail, 'source changed')
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source changed; rescan required')
+    try:
+        if _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != fence[1]:
+            current = files.thumbnail.current
+            if (current is not None and current.selected_source is selected
+                    and (current.report_epoch, current.operation) == fence[0]
+                    and current.report_stamp == fence[1]):
+                thumbs.invalidate_locked(files.thumbnail, 'report changed')
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Report changed')
+    except FileNotFoundError:
+        current = files.thumbnail.current
+        if current is not None and current.selected_source is selected and current.report_stamp == fence[1]:
+            thumbs.invalidate_locked(files.thumbnail, 'source or report disappeared')
+        raise _ThumbnailError('thumbnail_obsolete', 409, 'Source or report changed') from None
+
+
+def _thumbnail_snapshot(job, *, operation_owner=None):
+    """Read one private report and associate its source under existing authority."""
+    files = FILES.initialize(job)
+    report_path = os.path.join(job['dir'], 'report.json')
+    with files.report_lock:
+        _report_current(job)
+        fence = (files.committed_report_epoch, files.operation)
+        if fence[1] is not None and fence[1].is_set():
+            current = files.thumbnail.current
+            if current is not None and current.operation is fence[1]:
+                thumbs.invalidate_locked(files.thumbnail, 'operation signalled')
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Operation changed')
+        if operation_owner is not None and operation_owner.operation is not fence[1]:
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Operation changed')
+        if files.source_status == 'pending':
+            raise _ThumbnailError('source_report_pending', 409, 'Source adoption pending')
+        recovery = files.source_pair if files.source_status == 'unavailable' else None
+        if files.source_retired and recovery is None:
+            raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source requires rescan')
+    try:
+        with open(report_path, encoding='utf-8') as opened:
+            report_stamp = _file_stamp(os.fstat(opened.fileno()))
+            doc = json.load(opened)
+            if (report_stamp != _file_stamp(os.fstat(opened.fileno()))
+                    or report_stamp != _file_stamp(os.stat(report_path))):
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Report changed')
+    except FileNotFoundError:
+        raise _ThumbnailError('missing_report', 404, 'Report unavailable') from None
+    except (ValueError, UnicodeError, OSError):
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid') from None
+    if not isinstance(doc, dict):
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid')
+    provenance = doc.get('provenance', {})
+    if not isinstance(provenance, dict):
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report provenance invalid')
+    missing = 'input' not in provenance
+    candidate = job.get('video') if missing else provenance['input']
+    if not isinstance(candidate, str) or not candidate.strip():
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report provenance invalid')
+    with files.report_lock:
+        if missing and (files.source_report_bound or files.source_pair is not None
+                        or files.source_retired or files.source_status == 'unavailable'):
+            raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
+    canonical = os.path.realpath(candidate)
+    if recovery is None and canonical != os.path.realpath(job['video']):
+        with files.report_lock:
+            if files.current_source is not None:
+                files.source_retired = True
+                files.current_source = None
+                files.source_status, files.source_reason = 'unavailable', 'selected scan path changed; rescan required'
+                thumbs.invalidate_locked(files.thumbnail, 'source changed')
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
+    if recovery and (report_stamp != recovery[3] or recovery[0] is not fence[1]
+                     or recovery[0].is_set() or canonical != os.path.realpath(recovery[2])):
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source recovery unavailable')
+    lease = None
+    try:
+        prepared, lease = _prepare_observed_source(job, canonical)
+        source_stat = os.stat(canonical)
+        if not stat.S_ISREG(source_stat.st_mode) or _file_stamp(source_stat) != prepared['stamp']:
+            raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source changed')
+        with files.report_lock:
+            _report_current(job)
+            try:
+                final_report_stamp = _file_stamp(os.stat(report_path))
+            except FileNotFoundError:
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Report changed') from None
+            if ((files.committed_report_epoch, files.operation) != fence
+                    or fence[1] is not None and fence[1].is_set()
+                    or final_report_stamp != report_stamp
+                    or files.source_status == 'pending'):
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Source or report changed')
+            if recovery is not None and (files.source_pair != recovery
+                    or recovery[0] is not files.operation or recovery[0].is_set()
+                    or recovery[1] != files.committed_report_epoch
+                    or recovery[3] != report_stamp
+                    or prepared['path'] != os.path.realpath(recovery[2])):
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Source recovery changed')
+            if missing and (files.source_report_bound or files.source_pair is not None
+                            or files.source_retired or files.source_status == 'unavailable'):
+                raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
+            try:
+                selected = _select_observed_locked(job, prepared, authoritative=recovery is not None,
+                                                   report_bound=not missing)
+            except exact.ExactError:
+                raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable') from None
+            if recovery is not None:
+                job['video'] = selected['path']
+            final_fence = (fence, report_stamp)
+            _thumbnail_current_locked(job, selected, final_fence, operation_owner=operation_owner)
+        return doc, selected, final_fence, lease
+    except FileNotFoundError:
+        if lease is not None:
+            lease.release()
+        raise _thumbnail_missing_source(job, canonical) from None
+    except exact.ExactError:
+        if lease is not None:
+            lease.release()
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable') from None
+    except OSError:
+        if lease is not None:
+            lease.release()
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable') from None
+    except BaseException:
+        if lease is not None:
+            lease.release()
+        raise
+
+
+def _thumbnail_validate_report(doc):
+    try:
+        rows = doc['detections']
+        rs = doc['render_state']
+        if not isinstance(rows, list) or not isinstance(rs, dict):
+            raise ValueError()
+        fps, cum = rs['fps'], rs['cum']
+        if isinstance(fps, bool) or not isinstance(fps, (float, int)) or not math.isfinite(fps) or fps <= 0:
+            raise ValueError()
+        if not isinstance(cum, list) or not cum:
+            raise ValueError()
+        for pair in cum:
+            if (not isinstance(pair, (list, tuple)) or len(pair) != 2 or any(
+                    isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x)
+                    for x in pair)):
+                raise ValueError()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError()
+            thumbs.recipe_for_row(row, rs, 'crop')
+        return rows, rs
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid') from None
+
+
+def _sweep_thumbnail_derivatives(job_dir):
+    """Remove only validated, regular thumbnail artifacts from a drained job."""
+    pattern = re.compile(r'(?:thumb2_[0-9]+\.jpg|thumb3_[0-9a-f]{32}_(?:crop|detframe)_[0-9]+\.jpg|\.thumb3-stage-[A-Za-z0-9_-]+)')
+    try:
+        with os.scandir(job_dir) as entries:
+            paths = [entry.path for entry in entries
+                     if pattern.fullmatch(entry.name) and entry.is_file(follow_symlinks=False)]
+    except OSError:
+        return False
+    success = True
+    for path in paths:
+        for _ in range(3):
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                break
+            except OSError:
+                continue
+            else:
+                break
+        else:
+            success = False
+    return success
+
+
+def _thumbnail_sweep(job):
+    files = FILES.initialize(job)
+    with files.report_lock:
+        if not files.thumbnail_sweep_pending:
+            return
+        if files.thumbnail_sweep_active:
+            raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending')
+        files.thumbnail_sweep_active = True
+    complete = False
+    try:
+        complete = _sweep_thumbnail_derivatives(job['dir'])
+    finally:
+        with files.report_lock:
+            files.thumbnail_sweep_active = False
+            if complete:
+                _report_current(job)
+                files.thumbnail_sweep_pending = False
+    if not complete:
+        raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending')
+
+
+def _thumbnail_cleanup(job):
+    files = FILES.initialize(job)
+    _thumbnail_sweep(job)
+    with files.report_lock:
+        batch = thumbs.claim_cleanup_locked(files.thumbnail)
+    if batch is not None:
+        succeeded = set()
+        try:
+            succeeded = thumbs.cleanup(batch)
+        finally:
+            with files.report_lock:
+                thumbs.complete_cleanup_locked(files.thumbnail, batch, succeeded)
+
+
+def _thumbnail_reserve_discovery(job):
+    files = FILES.initialize(job)
+    deadline = time.monotonic() + 1.0
+    while True:
+        with files.report_lock:
+            _report_current(job)
+            state = files.thumbnail
+            if state.current is not None:
+                return state.current, None
+            try:
+                return None, thumbs.begin_discovery_locked(state)
+            except thumbs.ThumbnailPending:
+                pass
+        if time.monotonic() >= deadline:
+            raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail pending')
+        time.sleep(.01)
+
+
+def _thumbnail_select(job, doc, selected, fence, *, operation_owner=None, discovery=None):
+    """Converge a private coherent report on the current bounded generation."""
+    rows, _ = _thumbnail_validate_report(doc)
+    files = FILES.initialize(job)
+    state = files.thumbnail
+    if discovery is None:
+        _, discovery = _thumbnail_reserve_discovery(job)
+    try:
+        with files.report_lock:
+            _thumbnail_current_locked(job, selected, fence, operation_owner=operation_owner)
+            generation = state.current
+            if generation is not None and (generation.selected_source is not selected
+                    or (generation.report_epoch, generation.operation) != fence[0]
+                    or generation.report_stamp != fence[1]):
+                thumbs.invalidate_locked(state, 'selection changed')
+                generation = None
+            if generation is None:
+                if discovery is None:
+                    discovery = thumbs.begin_discovery_locked(state)
+                candidate = thumbs.Candidate(incarnation=files.incarnation,
+                    report_epoch=fence[0][0], source_epoch=files.source_epoch,
+                    operation=fence[0][1], selected_source=selected,
+                    source_path=selected['path'], source_stamp=selected['stamp'],
+                    report_path=os.path.join(job['dir'], 'report.json'), report_stamp=fence[1])
+                try:
+                    generation = thumbs.accept_discovery_locked(state, discovery, candidate, len(rows))
+                except thumbs.ThumbnailObsolete:
+                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+            return generation
+    finally:
+        if discovery is not None:
+            with files.report_lock:
+                thumbs.finish_discovery_locked(state, discovery)
+
+
+def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owner=None, capture=None, snapshot=None):
+    files = FILES.initialize(job)
+    state = files.thumbnail
+    lease = None
+    fill = None
+    discovery = None
+    try:
+        _thumbnail_cleanup(job)
+        with files.report_lock:
+            generation = state.current
+            if requested_version is not None and (generation is None or generation.version != requested_version):
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+        if generation is None:
+            generation, discovery = _thumbnail_reserve_discovery(job)
+        doc = None
+        if generation is not None:
+            try:
+                prepared, lease = _prepare_observed_source(job, generation.source_path)
+                with files.report_lock:
+                    if state.current is not generation:
+                        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+                    _thumbnail_current_locked(job, generation.selected_source,
+                        ((generation.report_epoch, generation.operation), generation.report_stamp),
+                        operation_owner=operation_owner)
+                    if (prepared['path'], prepared['stamp']) != (generation.source_path, generation.source_stamp):
+                        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+            except FileNotFoundError:
+                if lease is not None:
+                    lease.release()
+                    lease = None
+                raise _thumbnail_missing_source(job, generation.source_path) from None
+            except BaseException:
+                if lease is not None:
+                    lease.release()
+                    lease = None
+                raise
+        else:
+            doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+            generation = _thumbnail_select(job, doc, selected, fence, operation_owner=operation_owner,
+                                           discovery=discovery)
+        if index < 0 or index >= generation.row_count:
+            raise _ThumbnailError('thumbnail_unavailable', 404, 'Thumbnail unavailable')
+        with files.report_lock:
+            if state.current is not generation:
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+            entry = state.entries.get((kind, index))
+        if entry is None:
+            if snapshot is not None:
+                saved_doc, saved_source, saved_fence, saved_rows, saved_rs = snapshot
+                if saved_source is not generation.selected_source or saved_fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
+                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+                doc = saved_doc
+            if doc is None:
+                lease.release()
+                lease = None
+                doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+                with files.report_lock:
+                    if state.current is not generation or selected is not generation.selected_source or fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
+                        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+            rows, rs = (saved_rows, saved_rs) if snapshot is not None else _thumbnail_validate_report(doc)
+            recipe = thumbs.recipe_for_row(rows[index], rs, kind)
+            with files.report_lock:
+                _thumbnail_current_locked(job, generation.selected_source,
+                    ((generation.report_epoch, generation.operation), generation.report_stamp),
+                    operation_owner=operation_owner)
+                try:
+                    fill = thumbs.begin_fill_locked(state, generation, kind, index)
+                except thumbs.ThumbnailPending:
+                    raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail pending') from None
+                except thumbs.ThumbnailObsolete:
+                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+            image = None
+            for ordinal, offset in zip(recipe.indices, recipe.offsets):
+                try:
+                    frame = _read_thumbnail_ordinal(generation.selected_source, ordinal,
+                                                    count=len(rs['cum']), capture=capture)
+                except thumbs.ThumbnailDecodeError:
+                    if capture is not None:
+                        break
+                    continue
+                if kind == 'detframe':
+                    x1, y1 = int(recipe.cbox[0] + offset[0]), int(recipe.cbox[1] + offset[1])
+                    x2, y2 = int(recipe.cbox[2] + offset[0]), int(recipe.cbox[3] + offset[1])
+                    cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+                    image = frame
+                    break
+                crop, nonblank = thumbs.crop_frame(frame, recipe.cbox, offset)
+                if crop is not None:
+                    image = crop
+                if nonblank:
+                    break
+                if capture is not None:
+                    image = None
+                    break
+            if image is None:
+                raise _ThumbnailError('thumbnail_unavailable', 404, 'Thumbnail unavailable')
+            try:
+                jpeg = thumbs.encode_jpeg(image, recipe.jpeg_quality)
+                import numpy as np
+                verified = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                if verified is None or not verified.size:
+                    raise ValueError('invalid encoded thumbnail')
+            except openscrub.PipelineCancelled:
+                raise
+            except Exception:
+                raise _ThumbnailError('thumbnail_encode_failed', 500, 'Thumbnail encoding failed') from None
+            try:
+                staged = thumbs.stage_jpeg(job['dir'], fill, jpeg)
+                with files.report_lock:
+                    _thumbnail_current_locked(job, generation.selected_source,
+                        ((generation.report_epoch, generation.operation), generation.report_stamp),
+                        operation_owner=operation_owner)
+                    try:
+                        entry = thumbs.accept_jpeg_locked(state, fill, staged)
+                    except thumbs.ThumbnailObsolete:
+                        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+            except OSError:
+                raise _ThumbnailError('thumbnail_io_failed', 500, 'Thumbnail storage failed') from None
+        opened = None
+        stamp = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns)
+        try:
+            opened = open(entry.path, 'rb')
+            observed = os.fstat(opened.fileno())
+            with files.report_lock:
+                _thumbnail_current_locked(job, generation.selected_source,
+                    ((generation.report_epoch, generation.operation), generation.report_stamp),
+                    operation_owner=operation_owner)
+                path_stat = os.stat(entry.path)
+                if (not stat.S_ISREG(observed.st_mode) or stamp(observed) != entry.stamp
+                        or stamp(path_stat) != entry.stamp):
+                    raise OSError('thumbnail changed')
+                reader = thumbs.begin_reader_locked(state, generation, entry, opened)
+        except (OSError, thumbs.ThumbnailObsolete):
+            if opened is not None:
+                opened.close()
+            with files.report_lock:
+                if state.current is generation:
+                    thumbs.invalidate_locked(state, 'cached thumbnail changed')
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+        except BaseException:
+            if opened is not None:
+                opened.close()
+            raise
+        try:
+            try:
+                with opened:
+                    body = opened.read()
+                    observed = os.fstat(opened.fileno())
+            except OSError:
+                with files.report_lock:
+                    if state.current is generation:
+                        thumbs.invalidate_locked(state, 'cached thumbnail read failed')
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+        finally:
+            with files.report_lock:
+                thumbs.end_reader_locked(state, reader)
+        if (stamp(observed) != entry.stamp or len(body) != entry.size
+                or thumbs.jpeg_etag(kind, generation.version, index, body) != entry.etag):
+            with files.report_lock:
+                if state.current is generation:
+                    thumbs.invalidate_locked(state, 'cached thumbnail changed')
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+        with files.report_lock:
+            _thumbnail_current_locked(job, generation.selected_source,
+                ((generation.report_epoch, generation.operation), generation.report_stamp),
+                operation_owner=operation_owner)
+            if state.current is not generation:
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+            try:
+                if stamp(os.stat(entry.path)) != entry.stamp:
+                    raise OSError('thumbnail changed')
+            except OSError:
+                thumbs.invalidate_locked(state, 'cached thumbnail changed')
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
+        return body, entry.etag
+    finally:
+        if discovery is not None:
+            with files.report_lock:
+                thumbs.finish_discovery_locked(state, discovery)
+        if fill is not None:
+            with files.report_lock:
+                thumbs.finish_fill_locked(state, fill)
+        if lease is not None:
+            try:
+                _thumbnail_cleanup(job)
+            finally:
+                lease.release()
+
+
 def _exact_policy(doc, selected):
     if selected['policy_error']:
         raise exact.ExactError(selected['policy_error'])
@@ -1732,6 +2244,7 @@ def _exact_current_locked(job, selected, fence=None):
         raise exact.ExactError('source selection changed', 409, 'sample_conflict')
     try:
         if _file_stamp(os.stat(selected['path'])) != selected['stamp']:
+            thumbs.invalidate_locked(files.thumbnail, 'source changed')
             files.source_retired = True
             files.current_source = None
             files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
@@ -1860,42 +2373,67 @@ def job_mediainfo(jid):
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
-    doc = _load_job_report(job)
-    items = []
-    for i, d in enumerate(doc["detections"]):
-        items.append({"i": i, "category": d["category"], "text": d["text"],
-                      "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
-                      "enabled": d.get("enabled", True),
-                      "track": d.get("track", -1),
-                      "person": d.get("person", -1),
-                      "confidence": d.get("confidence", 0),
-                      "zone_dropped": bool(d.get("zone_dropped"))})
-    return jsonify({"detections": items,
-                    "fps": doc["render_state"]["fps"],
-                    "duration": len(doc["render_state"]["cum"]) /
-                                doc["render_state"]["fps"]})
+    lease = None
+    try:
+        _thumbnail_cleanup(job)
+        doc, selected, fence, lease = _thumbnail_snapshot(job)
+        rows, rs = _thumbnail_validate_report(doc)
+        generation = _thumbnail_select(job, doc, selected, fence)
+        items = []
+        for i, d in enumerate(rows):
+            items.append({"i": i, "category": d["category"], "text": d["text"],
+                          "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+                          "enabled": d.get("enabled", True), "track": d.get("track", -1),
+                          "person": d.get("person", -1), "confidence": d.get("confidence", 0),
+                          "zone_dropped": bool(d.get("zone_dropped")),
+                          "thumbnail_row": thumbs.raw_row_fingerprint(d)})
+        files = FILES.initialize(job)
+        with files.report_lock:
+            _thumbnail_current_locked(job, selected, fence)
+            if files.thumbnail.current is not generation:
+                raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+        return jsonify({"detections": items, "fps": rs['fps'],
+                        "duration": len(rs['cum']) / rs['fps'],
+                        "thumbnail_version": generation.version})
+    except _ThumbnailError as error:
+        return _thumbnail_error_response(error)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return _thumbnail_error_response(_ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid'))
+    finally:
+        if lease is not None:
+            lease.release()
+
+
+def _thumbnail_route(job, index, kind):
+    version = request.args.get('v')
+    if version is not None and not re.fullmatch(r'[0-9a-f]{32}', version):
+        return _thumbnail_error_response(_ThumbnailError('thumbnail_invalid_version', 400, 'Invalid thumbnail version'))
+    for attempt in range(2 if version is None else 1):
+        try:
+            body, etag = _thumbnail_image(job, index, kind, version)
+            if version is not None and request.if_none_match.contains(etag[1:-1]):
+                response = Response(status=304)
+            else:
+                response = Response(body, mimetype='image/jpeg')
+            if version is not None:
+                response.set_etag(etag[1:-1], weak=False)
+                response.headers['Cache-Control'] = 'private, no-cache, max-age=0, must-revalidate'
+                g.thumbnail_versioned_response = True
+            return response
+        except _ThumbnailError as error:
+            if version is None and error.code == 'thumbnail_obsolete' and attempt == 0:
+                continue
+            return _thumbnail_error_response(error)
+        except FileNotFoundError:
+            return _thumbnail_error_response(_ThumbnailError('missing_source', 404, 'Source unavailable'))
+        except (OSError, exact.ExactError):
+            return _thumbnail_error_response(_ThumbnailError('thumbnail_source_conflict', 409, 'Source unavailable'))
+    return _thumbnail_error_response(_ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed'))
 
 
 @app.route("/api/jobs/<jid>/detframe/<int:i>")
 def job_detframe(jid, i):
-    """Full video frame at a real sighting of detection i, with its box
-    outlined — the review lightbox."""
-    job = JOBS.get(jid) or abort(404)
-    doc = _load_job_report(job)
-    d = doc["detections"][i]
-    rs = doc["render_state"]
-    tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
-    fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
-    ox, oy = rs["cum"][fidx]
-    frame = _frame_at(job, tref, rs)
-    if frame is None:
-        abort(404)
-    x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
-    x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
-    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
-    from flask import Response
-    return Response(buf.tobytes(), mimetype="image/jpeg")
+    return _thumbnail_route(JOBS.get(jid) or abort(404), i, 'detframe')
 
 
 @app.route("/api/jobs/<jid>/boxes_at")
@@ -1927,53 +2465,7 @@ def job_boxes_at(jid):
 
 @app.route("/api/jobs/<jid>/thumb/<int:i>")
 def job_thumb(jid, i):
-    job = JOBS.get(jid) or abort(404)
-    # i is already a Flask <int:> route var, but CodeQL doesn't trust the
-    # converter — format it as an explicit non-negative integer so the
-    # cache filename can never carry anything but digits.
-    i = int(i)
-    if i < 0:
-        abort(404)
-    cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
-    if not os.path.exists(cache):
-        doc = _load_job_report(job)
-        if i >= len(doc["detections"]):
-            abort(404)
-        d = doc["detections"][i]
-        rs = doc["render_state"]
-        # cut the thumbnail at a moment the detector actually SAW the object.
-        # t_start can be earlier than the object's appearance (backtracking
-        # deliberately moves it to just before onset) — a frame there shows
-        # nothing and made review pictures mismatch their text.
-        ls = min(max(d.get("last_seen", d["t_start"]), d["t_start"]),
-                 d["t_end"])
-        mid = (d["t_start"] + d["t_end"]) / 2
-        crop = None
-        pad = 24
-        for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
-            fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
-            ox, oy = rs["cum"][fidx]
-            frame = _frame_at(job, tref, rs)
-            if frame is None:
-                continue
-            h, w = frame.shape[:2]
-            x1 = max(0, int(d["cbox"][0] + ox) - pad)
-            y1 = max(0, int(d["cbox"][1] + oy) - pad)
-            x2 = min(w, int(d["cbox"][2] + ox) + pad)
-            y2 = min(h, int(d["cbox"][3] + oy) + pad)
-            c = frame[y1:y2, x1:x2]
-            if c.size == 0:
-                continue
-            crop = c
-            inner = c[pad:-pad or None, pad:-pad or None]
-            if inner.size and float(inner.std()) > 8:
-                break   # crop shows real content — use this moment
-        if crop is None:
-            abort(404)
-        cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
-                                         crop.shape[0] - pad), (0, 0, 255), 2)
-        cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    return send_file(cache, mimetype="image/jpeg", max_age=3600)
+    return _thumbnail_route(JOBS.get(jid) or abort(404), i, 'crop')
 
 
 @app.route("/api/jobs/<jid>/frame_at")
@@ -4452,6 +4944,16 @@ def vault_locked():
     return VAULT.get("closed", False) or (vault_enabled() and VAULT["key"] is None)
 
 
+def _evict_thumbnails_for_store_transition():
+    """Invalidate after admission closes and all job lifetimes have drained."""
+    with JOBS_LOCK:
+        jobs = list(JOBS.values())
+    for job in jobs:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            thumbs.invalidate_locked(files.thumbnail, 'store transition')
+
+
 def _vault_lock_locked(blocking_jobs=True):
     if _files_busy_locked(blocking=blocking_jobs):
         raise FilesBusy("job files are still in use")
@@ -4460,6 +4962,7 @@ def _vault_lock_locked(blocking_jobs=True):
         return 0
     VAULT["closed"] = True
     try:
+        _evict_thumbnails_for_store_transition()
         n = vault.encrypt_tree(key, JOBS_DIR)
     except BaseException:
         VAULT["error"] = "Encryption failed; unlock to recover before accessing jobs."
@@ -4554,6 +5057,7 @@ def vault_unlock():
         VAULT["closed"] = True
         try:
             n = vault.decrypt_tree(key, JOBS_DIR)
+            _evict_thumbnails_for_store_transition()
             _rehydrate_jobs()  # registration is part of the closed transition
         except BaseException:
             VAULT["error"] = "Decryption or recovery failed; unlock again to recover."
@@ -5039,7 +5543,8 @@ def _rehydrate_jobs():
                 "output": None, "created": os.path.getmtime(jdir),
                 "cancel": threading.Event(), "stats": {},
             }
-            FILES.initialize(job)
+            files = FILES.initialize(job)
+            files.thumbnail_sweep_pending = True
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1
@@ -5074,7 +5579,8 @@ def _rehydrate_jobs():
                 job["size"] = os.path.getsize(orig)
             except OSError:
                 pass
-            FILES.initialize(job)
+            files = FILES.initialize(job)
+            files.thumbnail_sweep_pending = True
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1

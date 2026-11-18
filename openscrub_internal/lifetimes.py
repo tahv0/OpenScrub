@@ -6,6 +6,7 @@ This does not coordinate other processes. A lifetime token may move to a queued 
 
 import threading
 import uuid
+from .thumbnails import ThumbnailState
 
 
 class _JobFiles:
@@ -24,6 +25,10 @@ class _JobFiles:
         self.incarnation = uuid.uuid4().hex
         self.source_epoch = 0
         self.current_source = None
+        self.source_report_bound = False
+        self.thumbnail = ThumbnailState()
+        self.thumbnail_sweep_pending = False
+        self.thumbnail_sweep_active = False
         self.committed_report_epoch = 0
         self.source_pair = None
         self.source_status = "undiscovered"
