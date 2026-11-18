@@ -101,6 +101,15 @@ consoles) — but the engine is general-purpose.
   all its appearances — with an interactive box editor to resize, move,
   add, time-bound, or **template-track a manually drawn box** through a
   chosen time range, and audio mute/bleep spans for spoken PII.
+  Paused editing and Track use the same decoded, inspected source frame;
+  requested and canonical frame times are shown separately. Geometry waits
+  for exact pixels and a usable image transform while output/audio choices
+  remain independent. Pending position/time edits retain their first inspected
+  baseline across scrubs and reopenings. If a save response is lost, Save
+  confirms the identical submission before sending newer edits. Conflict
+  recovery offers explicit abandonment of an unconfirmed retry and selected
+  geometry/addition discard followed by fresh inspection; neither action
+  undoes saved changes or renders automatically.
 - **HDR in, HDR out** — iPhone (Dolby Vision/HLG) and HDR10 footage keeps
   its 10-bit HDR signal through redaction: output is 10-bit HEVC with the
   original color primaries and transfer preserved, and the blur is applied

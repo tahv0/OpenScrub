@@ -3147,7 +3147,7 @@ let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLP
 // but may never publish into, or start rendering from, a different view.
 let VIEW_GEN=0, EDITS=null;
 const REVIEW_DRAFTS=new Map();
-function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},geometry:{},adds:[],
  add:false,addAnchor:null,drag:null,scale:1,dur:10,
  audio:[],audioSaved:[],audioLoaded:false};}
 function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
@@ -3158,6 +3158,7 @@ function saveStatus(d,message){
  if(d!==EDITS)return;
  const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
  document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+ reviewResolveActions(d);
 }
 function trimReviewDraft(d){
  const b=d.editor;
@@ -3172,7 +3173,7 @@ function trimReviewDraft(d){
 }
 function hasReviewEdits(d){
  const b=d.editor;
- return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+ return !!d.submitted||Object.keys(d.enabled).length||d.manual.length||b.adds.length||
   Object.keys(b.ov).length||Object.keys(b.times).length||
   !sameEdit(b.audio,b.audioSaved);
 }
@@ -3207,11 +3208,11 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){beUnmountIn(detail);VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+ if(CUR===id){BE_OPEN_INTENT++;beUnmountIn(detail);VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
- beUnmountIn(detail);
+ BE_OPEN_INTENT++; beUnmountIn(detail);
  const video=document.getElementById("beVid");
  if(video){try{video.pause();}catch(e){}}
  if(EDITS){
@@ -3227,7 +3228,7 @@ async function openJob(id){
   REVIEW_DRAFTS.set(id,EDITS);}
  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
  PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
- detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+ detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewResolveActions"></div>';
  saveStatus(EDITS,EDITS.status);
 
  if(POLL)clearInterval(POLL);
@@ -3338,6 +3339,120 @@ async function refresh(){
 let BE=emptyEditor();
 // Display geometry belongs to this DOM mount, never to a retained draft.
 let BE_VIEW=null;
+// One page-wide cycle owns fetch, body, candidate decode and cleanup. Retirement
+// never releases native decode early; only the latest desired request survives.
+let BE_OPEN_INTENT=0;
+const EDIT_SAMPLE_IO={active:null,wanted:null};
+function beSampleCurrent(view,serial){return !!view&&view.current()&&view.serial===serial&&!view.editor.playing;}
+function beInvalidateSample(view,message){
+ if(!view)return;
+ view.serial++;view.readySample=null;view.loading=true;view.transform=null;
+ beEndGesture(view.editor,view.cv);view.editor.sel=-1;
+ for(const id of ['beRm','beTimes']){const e=document.getElementById(id);if(e)e.style.display='none';}
+ if(view.current()){
+  const label=document.getElementById('beL');if(label&&message)label.textContent=message;
+  beDraw();
+ }
+}
+function beVector(value,n){return Array.isArray(value)&&value.length===n&&value.every(x=>typeof x==='number'&&Number.isFinite(x));}
+function beBase(base){return !!base&&beVector(base.cbox,4)&&beVector(base.span,3);}
+function bePrecondition(sample){const {source_ref,timeline_eq,policy,index,width,height,offset}=sample;
+ return copyEdit({version:1,source_ref,timeline_eq,policy,index,width,height,offset});}
+function beValidateSample(body,t){
+ const s=body?.sample,hex=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ if(body?.version!==1||!s||typeof s.source_ref!=='string'||s.source_ref.length<1||s.source_ref.length>128||
+ !hex(s.timeline_eq)||s.policy!=='opencv-ffmpeg-zero-cfr-v1'||!Number.isSafeInteger(s.index)||s.index<0||
+ ![s.width,s.height].every(n=>Number.isSafeInteger(n)&&n>0)||!Number.isInteger(s.stream)||s.stream<0||
+ ![s.requested_s,s.canonical_s,s.observed_s].every(n=>typeof n==='number'&&Number.isFinite(n))||s.requested_s!==t||
+ s.canonical_s<0||!beVector(s.offset,2)||!sameEdit(s.origin,[0,0])||!Array.isArray(body.boxes)||
+ body.image?.mime!=='image/jpeg'||typeof body.image.base64!=='string'||
+ !/^[/]9j[/][A-Za-z0-9+/]*={0,2}$/.test(body.image.base64))throw Error('Invalid exact sample response');
+ const seen=new Set();
+ for(const row of body.boxes){
+  if(!Number.isSafeInteger(row.i)||row.i<0||seen.has(row.i)||!hex(row.row_context_eq)||!beBase(row.base)||
+   !beVector(row.box,4)||row.t_start!==row.base.span[0]||row.t_end!==row.base.span[1]||
+   !row.box.every((v,i)=>Math.abs(v-row.base.cbox[i]-s.offset[i%2])<1e-8)||
+   typeof row.enabled!=='boolean'||typeof row.category!=='string')throw Error('Invalid exact sample row');
+  seen.add(row.i);
+ }
+ return {sample:copyEdit(s),precondition:bePrecondition(s),rows:copyEdit(body.boxes),image:body.image};
+}
+async function beApplySample(view,serial,data){
+ let url=null,installed=false;
+ try{
+  const bytes=Uint8Array.from(atob(data.image.base64),c=>c.charCodeAt(0));
+  url=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'}));
+  const candidate=new Image();candidate.src=url;await candidate.decode();
+  if(!beSampleCurrent(view,serial))return;
+  if(candidate.naturalWidth!==data.sample.width||candidate.naturalHeight!==data.sample.height)throw Error('Exact image dimensions changed');
+  const img=view.img;img.src=url;await img.decode();
+  if(!beSampleCurrent(view,serial))return;
+  if(!img.complete||img.naturalWidth!==data.sample.width||img.naturalHeight!==data.sample.height||img.src!==url)
+   throw Error('Exact image is not displayed');
+  view.loading=false;
+  if(!view.sync())throw Error('Exact image has no visible transform; inspect again when visible');
+  const previous=view.imageURL;view.imageURL=url;installed=true;
+  if(previous&&previous!==url)URL.revokeObjectURL(previous);
+  const b=view.editor;b.raw=data.rows;b.ox=data.sample.offset[0];b.oy=data.sample.offset[1];b.t=data.sample.canonical_s;
+  view.readySample={serial,...data,imageURL:url};
+  const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
+  beFilter();beDraw();beTLDraw();
+ }finally{if(url&&!installed)URL.revokeObjectURL(url);}
+}
+function beRequestSample(view,t){
+ if(!view||!view.current()||!Number.isFinite(t))return;
+ beInvalidateSample(view,`Inspecting ${t.toFixed(3)}s…`);
+ EDIT_SAMPLE_IO.wanted={view,serial:view.serial,t};
+ return bePumpSamples();
+}
+function bePumpSamples(){
+ if(EDIT_SAMPLE_IO.active)return EDIT_SAMPLE_IO.active.promise;
+ const request=EDIT_SAMPLE_IO.wanted;if(!request)return;
+ EDIT_SAMPLE_IO.wanted=null;
+ const {view,serial,t}=request;
+ EDIT_SAMPLE_IO.active=request;
+ request.promise=(async()=>{
+  try{
+   if(!beSampleCurrent(view,serial))return;
+   const response=await fetch(`api/jobs/${view.id}/edit_sample?t=${t}`);
+   if(!response.ok)throw Error(`Exact sample unavailable (HTTP ${response.status}). Inspect again to retry.`);
+   const body=await response.json();
+   if(!beSampleCurrent(view,serial))return;
+   await beApplySample(view,serial,beValidateSample(body,t));
+  }catch(error){
+   if(beSampleCurrent(view,serial)){
+    view.readySample=null;view.loading=true;view.transform=null;
+    const label=document.getElementById('beL');if(label)label.textContent=String(error.message||error);
+    beDraw();
+   }
+  }finally{if(EDIT_SAMPLE_IO.active===request){EDIT_SAMPLE_IO.active=null;bePumpSamples();}}
+ })();
+ return request.promise;
+}
+function beReady(view=BE_VIEW){
+ if(!view||!view.current()||view.editor.playing||!view.img.isConnected||!view.cv.isConnected)return false;
+ const ready=view.readySample;
+ if(!ready||ready.serial!==view.serial||ready.imageURL!==view.imageURL||view.img.src!==view.imageURL||
+ !view.img.complete||view.img.naturalWidth!==ready.sample.width||view.img.naturalHeight!==ready.sample.height)return false;
+ const tr=view.sync(),r=view.cv.getBoundingClientRect();
+ const valid=!!tr&&tr.media===view.img&&tr.sw===ready.sample.width&&tr.sh===ready.sample.height&&
+ [r.width,r.height].every(n=>Number.isFinite(n)&&n>0);
+ if(!valid)beEndGesture(view.editor,view.cv);return valid;
+}
+function beCaptureGeometry(view,row){
+ if(!beReady(view)||!row||!view.readySample.rows.includes(row))return false;
+ const b=view.editor,old=b.geometry[row.i];
+ if(old)return old.precondition.source_ref===view.readySample.sample.source_ref&&
+ old.precondition.timeline_eq===view.readySample.sample.timeline_eq&&old.precondition.row_context_eq===row.row_context_eq;
+ b.geometry[row.i]={precondition:{...copyEdit(view.readySample.precondition),row_context_eq:row.row_context_eq,base:copyEdit(row.base)}};
+ return true;
+}
+function beNewBox(view,box,t0,t1){
+ if(!beReady(view))return false;const s=view.readySample.sample;
+ return beVector(box,4)&&box[0]>=0&&box[1]>=0&&box[2]<=s.width&&box[3]<=s.height&&box[2]>box[0]&&box[3]>box[1]&&
+ [t0,t1].every(Number.isFinite)&&t0>=0&&t1>t0&&t1<=view.editor.dur&&t0<=s.canonical_s&&s.canonical_s<=t1;
+}
+
 function beEndGesture(editor,cv){
  editor.drag=null;editor.addAnchor=null;editor.addFloat=null;
  if(editor.pointerId!=null){
@@ -3347,7 +3462,16 @@ function beEndGesture(editor,cv){
 }
 function beUnmount(){
  const view=BE_VIEW;if(!view)return;
- BE_VIEW=null;view.observer.disconnect();
+ BE_VIEW=null;view.serial++;view.playbackSerial++;view.trackLaunch=null;
+ const gesture=view.tlGesture;
+ if(gesture){
+  if(view.editor.tlDrag===gesture.drag)view.editor.tlDrag=null;
+  try{view.tl.releasePointerCapture(gesture.pointerId);}catch(_){}
+  view.tlGesture=null;
+ }
+ if(view.trackTimer)clearTimeout(view.trackTimer);
+ if(view.imageURL)URL.revokeObjectURL(view.imageURL);view.imageURL=null;view.readySample=null;
+ view.observer.disconnect();
  beEndGesture(view.editor,view.cv);
 }
 // Retained panels keep their mount. Retire only the subtree being removed,
@@ -3359,7 +3483,7 @@ function beUnmountIn(root){
 }
 function beMount(img,vid,cv,id,gen,editor){
  beUnmount();
- const view={img,vid,cv,id,gen,editor,transform:null};
+ const view={img,vid,cv,id,gen,editor,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false};
  view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
   document.getElementById("beCv")===cv;
  view.sync=()=>{
@@ -3367,7 +3491,7 @@ function beMount(img,vid,cv,id,gen,editor){
   const media=editor.playing?vid:img,r=media.getBoundingClientRect();
   const sw=media===vid?vid.videoWidth:img.naturalWidth,
         sh=media===vid?vid.videoHeight:img.naturalHeight;
-  const loaded=media===vid?vid.readyState>=1:img.complete;
+  const loaded=media===vid?vid.readyState>=1:img.complete&&!view.loading;
   const valid=loaded&&[sw,sh,r.width,r.height].every(n=>Number.isFinite(n)&&n>0);
   const old=view.transform;
   if(!valid){
@@ -3399,8 +3523,14 @@ function beMount(img,vid,cv,id,gen,editor){
 async function loadBoxEdit(fromReview){
  const id=CUR,gen=VIEW_GEN,editor=BE;
  showPanel(fromReview?"boxedit_rev":"boxedit");
- const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
- if(!ownsView(id,gen)||BE!==editor)return;
+ const intent=++BE_OPEN_INTENT;
+ let mi;
+ try{
+  const response=await fetch(`api/jobs/${id}/mediainfo`);
+  if(!response.ok)throw Error(`Media information unavailable (HTTP ${response.status})`);
+  mi=await response.json();if(!Number.isFinite(mi.duration)||mi.duration<=0)throw Error('Invalid media duration');
+ }catch(error){if(ownsView(id,gen)&&BE===editor&&intent===BE_OPEN_INTENT)saveStatus(EDITS,error.message);return;}
+ if(!ownsView(id,gen)||BE!==editor||intent!==BE_OPEN_INTENT)return;
  // in review: the slot right under the Preview button; on done: the actions slot
  let c=document.getElementById("beslot")||document.getElementById("beslot_done");
  if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
@@ -3458,16 +3588,19 @@ async function loadBoxEdit(fromReview){
  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
  saveStatus(EDITS,EDITS.status);
  beHook();tlHook();await tlInit();
- if(ownsView(id,gen)&&BE===editor)beScrub();
+ if(ownsView(id,gen)&&BE===editor&&intent===BE_OPEN_INTENT&&view.current())beScrub();
 }
 
 // ---- playback with live boxes (issue #17: review was scrub-only) ----
 async function beTogglePlay(){
  const id=CUR,gen=VIEW_GEN,editor=BE;
- const v=document.getElementById("beVid"),img=document.getElementById("beImg");
+ const v=document.getElementById("beVid"),img=document.getElementById("beImg"),view=BE_VIEW;
  if(!v)return;
- const current=()=>ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===v;
- if(BE.playing){v.pause();return;}          // the pause handler cleans up
+ if(BE.playing){bePlayStop();return;}
+ const serial=view?++view.playbackSerial:(editor.playbackSerial=(editor.playbackSerial||0)+1);
+ if(view)beInvalidateSample(view,"Playback is view only; pause to inspect.");
+ const current=()=>ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===v&&
+ BE.playing&&(view?BE_VIEW===view&&view.playbackSerial===serial:editor.playbackSerial===serial);
  if(!v.src)v.src=`api/jobs/${CUR}/video`;
  BE.playing=true;
  v.style.display="block";img.style.display="none";
@@ -3486,7 +3619,7 @@ async function beTogglePlay(){
   if(!current())return;
   v.currentTime=BE.t||0;
   await v.play();
-  if(!current()){v.pause();return;}
+  if(!current()){if(!view||BE_VIEW!==view||view.playbackSerial===serial)v.pause();return;}
  }catch(e){
   if(!current())return;
   bePlayStop();
@@ -3517,6 +3650,9 @@ async function beTogglePlay(){
  requestAnimationFrame(step);
 }
 function bePlayStop(){
+ const view=BE_VIEW;if(view)view.playbackSerial++;else BE.playbackSerial=(BE.playbackSerial||0)+1;
+ const video=document.getElementById("beVid");
+ if(BE.playing&&video&&Number.isFinite(video.currentTime)){BE.t=video.currentTime;const sl=document.getElementById("beT");if(sl)sl.value=BE.t;}
  BE.playing=false;
  const v=document.getElementById("beVid");
  if(v){try{v.pause();}catch(e){}v.style.display="none";}
@@ -3532,14 +3668,15 @@ const TLC={name:"#3b82f6",dob:"#22c55e",phone:"#f59e0b",ssn:"#ef4444",
  apikey:"#0891b2",ipaddr:"#65a30d",plate:"#7c3aed",face:"#ec4899",
  person:"#0ea5e9",manual:"#eab308"};
 async function tlInit(){
- const id=CUR,gen=VIEW_GEN,editor=BE;
+ const id=CUR,gen=VIEW_GEN,editor=BE,view=BE_VIEW;
+ const current=()=>ownsView(id,gen)&&BE===editor&&BE_VIEW===view;
  // one fetch of the full report: detection spans for the lanes (dense
  // tracks collapse to one span per track) + stored audio redactions
  try{
   const response=await fetch(`api/jobs/${id}/report`);
   if(!response.ok)throw Error("could not load audio");
   const doc=await response.json();
-  if(!ownsView(id,gen)||BE!==editor)return;
+  if(!current())return;
   const per={};
   for(const d of (doc.detections||[])){
    if(d.enabled===false)continue;
@@ -3556,7 +3693,7 @@ async function tlInit(){
   BE.audioSugg=doc.audio_suggestions||[];
   BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
   renderAudioSugg();renderTranscript();
- }catch(e){if(!ownsView(id,gen)||BE!==editor)return;BE.tlspans=[];}
+ }catch(e){if(!current())return;BE.tlspans=[];}
  beTLDraw();
 }
 function tlX(t,w){return Math.max(0,Math.min(w,t/Math.max(0.1,BE.dur)*w));}
@@ -3597,17 +3734,26 @@ function beTLDraw(){
   :`window: ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s`;
 }
 function tlHook(){
- const cv=document.getElementById("beTL");if(!cv)return;
+ const cv=document.getElementById("beTL"),view=BE_VIEW,editor=BE;if(!cv||!view)return;
+ view.tl=cv;
+ const current=()=>view.current()&&BE===editor&&document.getElementById("beTL")===cv;
+ const owned=e=>current()&&view.tlGesture?.pointerId===e.pointerId&&editor.tlDrag===view.tlGesture.drag;
+ const start=drag=>{editor.tlDrag=drag;view.tlGesture.drag=drag;};
+ const release=()=>{const g=view.tlGesture;if(!g)return;
+  if(editor.tlDrag===g.drag)editor.tlDrag=null;
+  try{cv.releasePointerCapture(g.pointerId);}catch(_){}view.tlGesture=null;};
  const tAt=e=>{const r=cv.getBoundingClientRect();
-  return Math.max(0,Math.min(BE.dur,(e.clientX-r.left)/r.width*BE.dur));};
+  return r.width>0&&Number.isFinite(e.clientX)?Math.max(0,Math.min(editor.dur,(e.clientX-r.left)/r.width*editor.dur)):null;};
  const yAt=e=>{const r=cv.getBoundingClientRect();return e.clientY-r.top;};
  cv.addEventListener("pointerdown",e=>{
-  cv.setPointerCapture(e.pointerId);
-  const t=tAt(e),w=cv.clientWidth,px=e.clientX-cv.getBoundingClientRect().left;
-  if(Math.abs(px-tlX(BE.win[0],w))<7){BE.tlDrag={k:"w0"};return;}
-  if(Math.abs(px-tlX(BE.win[1],w))<7){BE.tlDrag={k:"w1"};return;}
+  if(!current()||view.tlGesture)return;
+  const t=tAt(e);if(t===null)return;
+  view.tlGesture={pointerId:e.pointerId,drag:null};editor.tlDrag=null;cv.setPointerCapture(e.pointerId);
+  const w=cv.clientWidth,px=e.clientX-cv.getBoundingClientRect().left;
+  if(Math.abs(px-tlX(BE.win[0],w))<7){start({k:"w0"});return;}
+  if(Math.abs(px-tlX(BE.win[1],w))<7){start({k:"w1"});return;}
   if(yAt(e)>=54){                                  // audio lane
-   if(BE.muteArm){BE.tlDrag={k:"anew",t0:t};
+   if(BE.muteArm){start({k:"anew",t0:t});
     BE.audio.push({t0:t,t1:t,mode:document.getElementById("beAMode").value});
     BE.audioSel=BE.audio.length-1;beTLDraw();return;}
    const hit=BE.audio.findIndex(s=>t>=s.t0&&t<=s.t1);
@@ -3615,12 +3761,12 @@ function tlHook(){
    document.getElementById("beARm").style.display=hit>=0?"inline-block":"none";
    beTLDraw();return;
   }
-  BE.tlDrag={k:"seek"};
+  start({k:"seek"});
   document.getElementById("beT").value=t.toFixed(1);beScrub();
  });
  cv.addEventListener("pointermove",e=>{
-  if(!BE.tlDrag)return;
-  const t=tAt(e);
+  if(!owned(e)||!editor.tlDrag)return;
+  const t=tAt(e);if(t===null)return;
   if(BE.tlDrag.k==="w0")BE.win[0]=Math.min(t,BE.win[1]-0.2);
   else if(BE.tlDrag.k==="w1")BE.win[1]=Math.max(t,BE.win[0]+0.2);
   else if(BE.tlDrag.k==="anew"){
@@ -3630,7 +3776,8 @@ function tlHook(){
    document.getElementById("beT").value=t.toFixed(1);beScrub();}
   beTLDraw();
  });
- cv.addEventListener("pointerup",()=>{
+ cv.addEventListener("pointerup",e=>{
+  if(!owned(e))return;
   if(BE.tlDrag&&BE.tlDrag.k==="anew"){
    const s=BE.audio[BE.audioSel];
    if(s.t1-s.t0<0.15){BE.audio.pop();BE.audioSel=-1;}   // stray click
@@ -3638,8 +3785,9 @@ function tlHook(){
    document.getElementById("beARm").style.display=BE.audioSel>=0?"inline-block":"none";
    renderTranscript();
   }
-  BE.tlDrag=null;beTLDraw();
+  release();beTLDraw();
  });
+ cv.addEventListener("pointercancel",e=>{if(owned(e)){release();beTLDraw();}});
 }
 function beWinReset(){BE.win=[0,BE.dur];beTLDraw();}
 function beMuteMode(){
@@ -3654,52 +3802,60 @@ function beAudioRm(){
   renderTranscript();renderAudioSugg();beTLDraw();}
 }
 function beTrackMode(){
+ if(!beReady()||BE_VIEW.trackLaunch)return;
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
  document.getElementById("beTrk").classList.toggle("on",BE.trk);
  document.getElementById("beAdd").classList.remove("on");
  document.getElementById("beMute").classList.remove("on");
 }
+function beTrackCurrent(launch){return launch.view.current()&&BE_VIEW===launch.view&&
+ ownsView(launch.id,launch.gen)&&BE===launch.editor&&launch.view.trackLaunch===launch;}
 async function beTrackGo(box){
- const st=document.getElementById("beTrkSt");st.style.display="inline";
- st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
- const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
- if(!r.ok){st.textContent="tracking failed to start";return;}
- const poll=setInterval(async()=>{
-  const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
-  if(d.state!=="running"){
-   clearInterval(poll);
-   st.textContent=d.error?("⚠ "+d.error)
-    :`tracked ✓ ${d.added} position(s) — review card added`;
-   if(!d.error){await tlInit();beScrub();
-    if(document.getElementById("review"))loadReview();}
-  }
- },1500);
+ const view=BE_VIEW;if(!beReady(view)||view.trackLaunch)return;
+ const editor=view.editor,[t0,t1]=editor.win||[];
+ if(!beNewBox(view,box,t0,t1)){saveStatus(EDITS,"Track requires an in-frame box and a window containing the canonical frame time.");return;}
+ const st=document.getElementById("beTrkSt"),launch={view,editor,id:view.id,gen:view.gen,st};
+ const payload={box:copyEdit(box),t_ref:view.readySample.sample.canonical_s,t0,t1,seed:copyEdit(view.readySample.precondition)};
+ view.trackLaunch=launch;st.style.display="inline";st.textContent=`tracking ${t0.toFixed(1)}–${t1.toFixed(1)}s…`;
+ try{
+  await reviewPost(`api/jobs/${launch.id}/track_object`,payload);
+  if(!beTrackCurrent(launch))return;
+  const poll=async()=>{
+   if(!beTrackCurrent(launch))return;
+   try{
+    const response=await fetch(`api/jobs/${launch.id}/track_status`);
+    if(!response.ok)throw Error(`Track status unavailable (HTTP ${response.status})`);
+    const d=await response.json();if(!beTrackCurrent(launch))return;
+    if(d.state==='running'){view.trackTimer=setTimeout(poll,1500);return;}
+    if(d.error){st.textContent='⚠ '+d.error;view.trackLaunch=null;return;}
+    st.textContent=`tracked ✓ ${d.added} position(s) — inspect and review`;
+    saveStatus(EDITS,'Tracked positions added. Inspect and review them; pending edits are retained.');
+    beInvalidateSample(view,'Inspecting tracked result…');
+    await tlInit();if(!beTrackCurrent(launch))return;
+    view.trackLaunch=null;
+    if(document.getElementById("review")){
+     // This owned refresh intentionally removes the old mount. A newer panel
+     // or open intention while the review response waits owns the next UI.
+     const pending=loadReview(),intent=BE_OPEN_INTENT;await pending;
+     if(!ownsView(launch.id,launch.gen)||BE!==editor||intent!==BE_OPEN_INTENT)return;
+     await loadBoxEdit(1);
+    }else beScrub();
+   }catch(error){if(beTrackCurrent(launch)){st.textContent=String(error.message||error);view.trackLaunch=null;}}
+  };
+  view.trackTimer=setTimeout(poll,1500);
+ }catch(error){if(beTrackCurrent(launch)){st.textContent='Tracking failed: '+error.message;view.trackLaunch=null;}}
 }
-async function beScrub(){
- const id=CUR,gen=VIEW_GEN,editor=BE;
- const sl=document.getElementById("beT");if(!sl)return; // editor was closed
- if(BE.playing){               // dragging the slider while playing = seek
-  const v=document.getElementById("beVid");
-  if(v)v.currentTime=+sl.value;
-  return;                      // the rAF loop keeps label/boxes in sync
- }
- BE.sel=-1;document.getElementById("beRm").style.display="none";
- document.getElementById("beTimes").style.display="none";
- BE.t=+document.getElementById("beT").value;
- document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
- document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
- if(BE_VIEW)BE_VIEW.sync();
- const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
- if(!ownsView(id,gen)||BE!==editor)return;
- BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
- beFilter();beDraw();beTLDraw();
+function beScrub(){
+ const view=BE_VIEW,sl=document.getElementById("beT");if(!sl||!view||!view.current())return;
+ const t=+sl.value;if(!Number.isFinite(t))return;
+ if(BE.playing){if(view.vid)view.vid.currentTime=t;return;}
+ return beRequestSample(view,t);
 }
 function beFilter(){
  BE.boxes=(BE.raw||[]).filter(b=>{
   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
-  return on;
+  const span=BE.times[b.i]||[b.t_start,b.t_end];
+  return on&&(BE.playing||(BE.t>=span[0]-.01&&BE.t<=span[1]+.01));
  }).map(b=>{
   let bb=b;
   if(BE.ov[b.i]){const o=BE.ov[b.i];
@@ -3739,6 +3895,7 @@ function beDraw(){
  }
 }
 function beAddMode(){
+ if(!beReady())return;
  BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;
  BE.trk=false;BE.muteArm=false;
  document.getElementById("beAdd").classList.toggle("on",BE.add);
@@ -3749,14 +3906,15 @@ function beAddMode(){
  beDraw();
 }
 function beApplyTimes(){
- if(BE.sel<0)return;
+ if(BE.sel<0||!beReady())return;
  const t0=+document.getElementById("beT0").value,
        t1=+document.getElementById("beT1").value;
- if(!(t1>t0&&t0>=0)){alert("'to' must be after 'from'.");return;}
- BE.times[BE.sel]=[t0,Math.min(t1,BE.dur)];
+ if(![t0,t1].every(Number.isFinite)||!(t1>t0&&t0>=0&&t1<=BE.dur)){alert("'to' must be after 'from'.");return;}
+ const row=BE.raw.find(x=>x.i===BE.sel);if(!beCaptureGeometry(BE_VIEW,row))return;
+ BE.times[BE.sel]=[t0,t1];reviewResolveActions(EDITS);
  const b=BE.boxes.find(x=>x.i===BE.sel);
  if(b){b.t_start=t0;b.t_end=t1;}
- beDraw();
+ beFilter();beDraw();
 }
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
@@ -3777,11 +3935,11 @@ function manualId(){
 function beHook(){
  const cv=document.getElementById("beCv"),view=BE_VIEW;
  const pt=e=>{
-  const tr=view&&view.sync();if(!tr||BE.playing)return null;
+  if(!beReady(view))return null;const tr=view.transform;
   const r=cv.getBoundingClientRect();
   return[(e.clientX-r.left)/tr.sx,(e.clientY-r.top)/tr.sy];};
  cv.addEventListener("pointerdown",e=>{
-  const p=pt(e);if(!p)return;
+  const p=pt(e);if(!p||BE.pointerId!=null&&BE.pointerId!==e.pointerId)return;
   cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion
@@ -3806,13 +3964,15 @@ function beHook(){
     if(box[2]-box[0]>6&&box[3]-box[1]>6){
      const t0=Math.max(0,+(BE.t-0.5).toFixed(1)),
            t1=Math.min(BE.dur,+(BE.t+3).toFixed(1));
+     const serial=view.serial;
      const fr=prompt("Blur this region FROM (seconds):",t0);
      if(fr===null){beDraw();return;}
      const to=prompt("...TO (seconds):",t1);
      if(to===null){beDraw();return;}
      try{
-      BE.adds.push({manual_id:manualId(),box,t0:Math.max(0,+fr||0),
-                    t1:Math.min(BE.dur,+to||t1),tref:BE.t});
+      if(view.serial!==serial||!beNewBox(view,box,+fr,+to)){saveStatus(EDITS,"Inspect the frame and choose a window containing its canonical time before adding a box.");return;}
+      BE.adds.push({manual_id:manualId(),box,t0:+fr,t1:+to,tref:view.readySample.sample.canonical_s,
+       sample_precondition:copyEdit(view.readySample.precondition)});reviewResolveActions(EDITS);
      }catch(e){saveStatus(EDITS,"Could not add box: "+e.message);}
     }
     beDraw();
@@ -3824,9 +3984,9 @@ function beHook(){
    const corners=[[a1,b1,0],[a2,b1,1],[a1,b2,2],[a2,b2,3]];
    for(const[hx,hy,ci] of corners)
     if(Math.abs(p[0]-hx)<9/tr.sx&&Math.abs(p[1]-hy)<9/tr.sy){
-     BE.drag={kind:"corner",ci};return;}
+     BE.drag={kind:"corner",ci,serial:view.serial,i:BE.sel,row:BE.raw.find(b=>b.i===BE.sel)};return;}
    if(p[0]>=a1&&p[0]<=a2&&p[1]>=b1&&p[1]<=b2){
-    BE.drag={kind:"move",off:[p[0]-a1,p[1]-b1]};return;}
+    BE.drag={kind:"move",off:[p[0]-a1,p[1]-b1],serial:view.serial,i:BE.sel,row:BE.raw.find(b=>b.i===BE.sel)};return;}
   }
   const hit=[...BE.boxes].reverse().find(b=>{
    const[a1,b1,a2,b2]=b.box;
@@ -3838,9 +3998,9 @@ function beHook(){
   beDraw();
  });
  cv.addEventListener("pointermove",e=>{
-  const p=pt(e);if(!p)return;
+  const p=pt(e);if(!p||BE.pointerId!=null&&BE.pointerId!==e.pointerId)return;
   if(BE.add&&BE.addAnchor){BE.addFloat=p;beDraw();return;}
-  if(!BE.drag||BE.sel<0)return;
+  if(!BE.drag||BE.sel<0||BE.drag.serial!==view.serial||BE.drag.i!==BE.sel||BE.drag.row!==BE.raw.find(b=>b.i===BE.sel))return;
   const b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
   let[a1,b1,a2,b2]=b.box;
   if(BE.drag.kind==="move"){
@@ -3852,13 +4012,15 @@ function beHook(){
    if(BE.drag.ci===2){a1=p[0];b2=p[1];}
    if(BE.drag.ci===3){a2=p[0];b2=p[1];}
   }
-  b.box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+  const box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+  if(!beVector(box,4)||box[2]<=box[0]||box[3]<=box[1]||!beCaptureGeometry(view,BE.raw.find(x=>x.i===BE.sel)))return;
+  b.box=box;
   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
   beDraw();
  });
- const end=()=>{if(view&&view.current()){BE.drag=null;delete BE.pointerId;}};
- cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",()=>{
-  if(view&&view.current()){beEndGesture(BE,cv);beDraw();}
+ const end=e=>{if(view&&view.current()&&BE.pointerId===e.pointerId){BE.drag=null;delete BE.pointerId;reviewResolveActions(EDITS);}};
+ cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",e=>{
+  if(view&&view.current()&&BE.pointerId===e.pointerId){beEndGesture(BE,cv);reviewResolveActions(EDITS);beDraw();}
  });
 }
 function zoomDet(i){
@@ -3888,6 +4050,7 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
+ BE_OPEN_INTENT++;
  const clear=element=>{if(element){beUnmountIn(element);element.innerHTML="";}};
  // The in-review editor slot remains mounted on this retained panel path.
  if(which!=="compare")clear(document.getElementById("compare"));
@@ -3924,8 +4087,9 @@ function cmpShow(){
 async function loadReview(){
  const id=CUR,gen=VIEW_GEN;
  showPanel("review");
+ const intent=BE_OPEN_INTENT;
  const d=await (await fetch(`api/jobs/${id}/detections`)).json();
- if(!ownsView(id,gen))return;
+ if(!ownsView(id,gen)||intent!==BE_OPEN_INTENT)return;
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
@@ -4111,10 +4275,13 @@ document.addEventListener("keydown",e=>{
 async function reviewPost(url,payload){
  const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
   ...(payload===undefined?{}:{body:JSON.stringify(payload)})});
- let body;
- try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
- if(!response.ok||!body||body.error||body.ok!==true)
-  throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+ if(!response.ok){
+  let body;try{body=await response.json();}catch(_){}
+  const error=Error(body?.error||("Request failed (HTTP "+response.status+")"));
+  error.status=response.status;error.code=body?.error;throw error;
+ }
+ let body;try{body=await response.json();}catch(_){throw Error("Invalid server response (HTTP "+response.status+")");}
+ if(!body||body.error||body.ok!==true)throw Error(body?.error||"Invalid success acknowledgement");
  return body;
 }
 function acknowledgeMap(current,submitted){
@@ -4127,30 +4294,116 @@ function acknowledgeAdds(current,refs,submitted){
   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
  }
 }
+function reviewResolveActions(d){
+ if(d!==EDITS)return;const el=document.getElementById('reviewResolveActions');if(!el)return;
+ const b=d.editor,rows=[...new Set([...Object.keys(b.ov),...Object.keys(b.times)])];
+ el.innerHTML='';
+ if(d.submitted?.everUncertain){const button=document.createElement('button');button.textContent='Abandon unconfirmed save…';button.disabled=!!d.busy;button.onclick=reviewAbandon;el.appendChild(button);}
+ if(!rows.length&&!b.adds.length)return;
+ const select=document.createElement('select');select.id='reviewResolveSelection';select.disabled=!!d.busy||!!d.submitted;
+ for(const key of rows){const option=document.createElement('option');option.value='row:'+key;option.textContent='Position/time row '+key;select.appendChild(option);}
+ b.adds.forEach((a,i)=>{const option=document.createElement('option');option.value='add:'+a.manual_id;option.textContent='New box '+(i+1);select.appendChild(option)});
+ el.appendChild(select);const button=document.createElement('button');button.textContent='Discard geometry and inspect';
+ button.disabled=!!d.busy||!!d.submitted;button.onclick=()=>reviewDiscard(select.value);el.appendChild(button);
+}
+function reviewAbandon(){
+ const d=EDITS,submitted=d?.submitted;if(!submitted?.everUncertain||d.busy)return;
+ if(!confirm('Abandon this unconfirmed save retry? This does not undo changes that may already be saved. All current drafts and baselines will remain.'))return;
+ if(EDITS!==d||d.busy||d.submitted!==submitted)return;
+ d.submitted=null;saveStatus(d,'Unconfirmed retry abandoned. Inspect saved state; current drafts and baselines are retained.');
+}
+async function reviewDiscard(key){
+ const d=EDITS;if(!d||d.busy||d.submitted)return;
+ const b=d.editor,view=BE_VIEW,id=CUR,gen=VIEW_GEN;
+ const row=key?.startsWith('row:')?key.slice(4):null;
+ const addition=key?.startsWith('add:')?b.adds.find(a=>a.manual_id===key.slice(4)):null;
+ if(row!==null&&!/^[0-9]+$/.test(row)||row===null&&!addition)return;
+ const family=row!==null?b.geometry[row]:null,familySnapshot=family?copyEdit(family):null;
+ const values=row!==null?copyEdit({ov:b.ov[row]??null,times:b.times[row]??null}):copyEdit(addition);
+ if(row!==null&&values.ov===null&&values.times===null)return;
+ if(!confirm('Discard only this pending geometry and inspect the saved frame? Other edits stay pending. This does not undo saved changes.'))return;
+ if(EDITS!==d||d.editor!==b||!ownsView(id,gen)||BE_VIEW!==view||d.busy||d.submitted)return;
+ if(row!==null){
+  if(b.geometry[row]!==family||!sameEdit(b.geometry[row]||null,familySnapshot)||!sameEdit(values,{ov:b.ov[row]??null,times:b.times[row]??null}))return;
+  delete b.ov[row];delete b.times[row];delete b.geometry[row];
+ }else{
+  if(!b.adds.includes(addition)||!sameEdit(addition,values))return;
+  b.adds.splice(b.adds.indexOf(addition),1);
+ }
+ if(view&&view.current()){beEndGesture(b,view.cv);beRequestSample(view,view.readySample?.sample.requested_s??b.t);}
+ else await loadBoxEdit(!!document.getElementById('review'));
+ saveStatus(d,'Selected geometry discarded. Inspect the exact frame, then deliberately edit again; missing rows are never remapped.');
+}
+function reviewSubmission(d){
+ const b=d.editor;
+ for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,'manual_id'))a.manual_id=manualId();
+ const manualRefs=[...d.manual],addRefs=[...b.adds],manualSnapshot=copyEdit(d.manual),addSnapshot=copyEdit(b.adds);
+ const payload=copyEdit({enabled:d.enabled,manual:[...manualSnapshot,...addSnapshot.map(a=>({
+  manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box,
+  ...(a.sample_precondition?{sample_precondition:a.sample_precondition}:{})}))],box_overrides:b.ov,time_overrides:b.times});
+ const geometryOwners={},geometrySnapshot={};
+ for(const key of new Set([...Object.keys(payload.box_overrides),...Object.keys(payload.time_overrides)])){
+  if(!b.geometry[key])continue; // genuinely preexisting legacy drafts keep their optional wire path
+  geometryOwners[key]=b.geometry[key];geometrySnapshot[key]=copyEdit(b.geometry[key].precondition);
+ }
+ if(Object.keys(geometrySnapshot).length)payload.geometry_preconditions=copyEdit(geometrySnapshot);
+ if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved))payload.audio=copyEdit(b.audio);
+ return {payload,manualRefs,addRefs,manualSnapshot,addSnapshot,geometryOwners,geometrySnapshot,view:BE_VIEW,everUncertain:false};
+}
+function acknowledgeGeometry(editor,submission,result){
+ const pcs=submission.geometrySnapshot,payload=submission.payload,validated={};
+ // Validate the whole strict acknowledgement before acknowledging any edit kind.
+ for(const [key,pc] of Object.entries(pcs)){
+  const row=result.geometry_rows?.[key];
+  if(!row||!beBase(row.base)||!sameEdit(bePrecondition(row),bePrecondition(pc))||row.version!==1||
+   row.row_context_eq!==pc.row_context_eq||!sameEdit(row.base.cbox,payload.box_overrides[key]||pc.base.cbox)||
+   !sameEdit(row.base.span.slice(0,2),payload.time_overrides[key]||pc.base.span.slice(0,2)))throw Error('Missing or invalid geometry acknowledgement; retry the same save.');
+  validated[key]=copyEdit(row);
+ }
+ for(const [key,row] of Object.entries(validated)){
+  const owner=editor.geometry[key];if(owner!==submission.geometryOwners[key])continue;
+  if(sameEdit(editor.ov[key],payload.box_overrides[key]))delete editor.ov[key];
+  if(sameEdit(editor.times[key],payload.time_overrides[key]))delete editor.times[key];
+  owner.precondition=copyEdit(row);
+  if(!(key in editor.ov)&&!(key in editor.times))delete editor.geometry[key];
+ }
+ // Legacy compatibility is intentionally separate from strict ownership.
+ for(const [key,value] of Object.entries(payload.box_overrides))if(!(key in pcs)&&sameEdit(editor.ov[key],value))delete editor.ov[key];
+ for(const [key,value] of Object.entries(payload.time_overrides))if(!(key in pcs)&&sameEdit(editor.times[key],value))delete editor.times[key];
+ const view=BE_VIEW;
+ if(!Object.keys(validated).length||!view||view.editor!==editor||!view.current())return;
+ let refresh=view!==submission.view||!beReady(view);
+ if(!refresh)for(const [key,ack] of Object.entries(validated)){
+  const pc=pcs[key],ready=view.readySample,old=ready.rows.find(r=>String(r.i)===key);
+  if(!old||ready.sample.source_ref!==pc.source_ref||ready.sample.timeline_eq!==pc.timeline_eq||
+   old.row_context_eq!==pc.row_context_eq||(!sameEdit(old.base,pc.base)&&!sameEdit(old.base,ack.base))){refresh=true;break;}
+ }
+ if(refresh){beRequestSample(view,view.readySample?.sample.requested_s??editor.t);return;}
+ for(const [key,ack] of Object.entries(validated)){
+  const row=view.readySample.rows.find(r=>String(r.i)===key);row.base=copyEdit(ack.base);row.row_context_eq=ack.row_context_eq;
+  row.t_start=ack.base.span[0];row.t_end=ack.base.span[1];
+  row.box=ack.base.cbox.map((v,i)=>v+view.readySample.sample.offset[i%2]);
+ }
+ beFilter();beDraw();
+}
+
 async function saveAndRender(){
  const id=CUR,gen=VIEW_GEN,d=EDITS;
  if(!id||!d||d.busy)return false;
  const b=d.editor;
- try{
-  // Compatibility drafts acquire an identity once, on the original object.
-  for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
- }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
- const manRefs=[...d.manual],addRefs=[...b.adds];
- const man=copyEdit(d.manual),adds=copyEdit(b.adds);
- const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
-  manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
-  box_overrides:b.ov,time_overrides:b.times});
- // Plain review must never wipe audio that the editor has not loaded.
- if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+ let submission;
+ try{submission=d.submitted||(d.submitted=reviewSubmission(d));}
+ catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+ const payload=submission.payload;
  d.audioInFlight=payload.audio!==undefined;
  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
  let saved=false;
  try{
   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
-  saved=true;d.audioInFlight=false;
+  acknowledgeGeometry(b,submission,result);
+  saved=true;d.submitted=null;d.audioInFlight=false;
   acknowledgeMap(d.enabled,payload.enabled);
-  acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
-  acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+  acknowledgeAdds(d.manual,submission.manualRefs,submission.manualSnapshot);acknowledgeAdds(b.adds,submission.addRefs,submission.addSnapshot);
   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
   // A switched-away view never opens a confirmation or changes current UI.
   if(!ownsView(id,gen)){
@@ -4183,7 +4436,10 @@ async function saveAndRender(){
  }catch(e){
   // A failed response leaves the audio baseline uncertain. Retain even a
   // newer toggle-back to the old baseline and deliberately send it on retry.
-  if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+  if(!saved){
+   if(e.status===409&&e.code==="geometry_conflict"&&!submission.everUncertain)d.submitted=null;
+   else {submission.everUncertain=true;if(payload.audio!==undefined)b.audioSaved=null;}
+  }
   saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
   return false;

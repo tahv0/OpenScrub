@@ -23,15 +23,15 @@ def app_js():
 HARNESS = r"""
 const vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map();
-function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:false,
+function el(){return {isConnected:true,textContent:'',innerHTML:'',style:{},dataset:{},disabled:false,
  classList:{toggle(){},remove(){}},remove(){this.removed=true},
- addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
+ appendChild(e){(this.children??=[]).push(e);return e},addEventListener(k,f){(this.events??={})[k]=f},querySelector(){return null},insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
 const ctx=vm.createContext({elements,el,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
  ResizeObserver:class {observe(){} disconnect(){}},
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:el},
- detail:elements.get('detail'),window:{},setInterval:()=>1,clearInterval(){},setTimeout(){},
+ detail:elements.get('detail'),window:{},setInterval:()=>1,clearInterval(){},clearTimeout(){},setTimeout(){},
  confirm:()=>false,alert(){},fetch:async()=>({ok:true,json:async()=>({})})});
 // Skip startup I/O only; every function under test is evaluated from the Python string.
 vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
@@ -324,8 +324,10 @@ def test_audio_toggle_back_survives_unacknowledged_save_and_revisit(failure):
     await tick();await save;openJob('A');
     const load=tlInit();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
     if(!sameEdit(BE.audio,baseline))throw Error('unacknowledged audio toggle-back lost');
-    const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('unacknowledged audio toggle-back omitted');
-    await reply();await reply();await retry;
+    const retry=saveAndRender();if(calls.at(-1).body.audio.length!==2)throw Error('uncertain payload changed before acknowledgement');
+    await reply();await retry;if(!hasReviewEdits(EDITS))throw Error('newer audio toggle-back lost after retry ACK');
+    const final=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('audio toggle-back omitted after retry ACK');
+    await reply();await reply();await final;
     """.replace("FAILURE", json.dumps(failure)))
 
 
@@ -497,3 +499,318 @@ def test_pending_playback_metadata_retirement_and_same_draft_remount(retained):
     assert.equal(played,false,'late old metadata started outgoing video');
     assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,pixels);
     """.replace('RETAINED', str(retained).lower()))
+
+
+# Exact-sample fixtures model DOM/media I/O only: shipped handlers remain intact.
+EXACT = MOUNT + r"""
+assert.deepEqual=(a,b)=>assert.equal(JSON.stringify(a),JSON.stringify(b));
+var candidates=[],liveURLs=new Set(),revoked=[],urlNumber=0;
+Blob=class {};atob=s=>s;
+URL={createObjectURL(){const u='blob:sample-'+(++urlNumber);liveURLs.add(u);return u},
+ revokeObjectURL(u){liveURLs.delete(u);revoked.push(u)}};
+Image=class {constructor(){this.complete=true;this.naturalWidth=640;this.naturalHeight=360;}
+ decode(){return new Promise((resolve,reject)=>candidates.push({image:this,resolve,reject}));}};
+function sample(t=0,extra={}){return {version:1,sample:{source_ref:'incarnation:7',timeline_eq:'a'.repeat(64),
+ policy:'opencv-ffmpeg-zero-cfr-v1',index:4,requested_s:t,canonical_s:4/24,observed_s:4/24,
+ width:640,height:360,stream:0,origin:[0,0],offset:[8,-4],...extra},
+ image:{mime:'image/jpeg',base64:'/9j/AA=='},boxes:[{i:0,category:'name',text:'synthetic',enabled:true,
+ t_start:0,t_end:2,box:[128,76,328,216],row_context_eq:'b'.repeat(64),
+ base:{cbox:[120,80,320,220],span:[0,2,0]}}]};}
+function exactMount(){const m=mountIn('beslot');BE.dur=3;BE.win=[0,3];
+ for(const id of ['beT','beL','beRm','beTimes','beT0','beT1','beAdd','beTrk','beMute','beTrkSt','bePlay','reviewResolveActions'])elements.set(id,el());
+ elements.get('beT').value=0;BE.tlspans=[];
+ m.cv.getContext=()=>new Proxy({},{get:()=>()=>{}});
+ m.cv.setPointerCapture=()=>{};m.cv.getBoundingClientRect=()=>({left:0,top:0,width:319.5,height:179.71875});
+ elements.get('detail').contains=m.root.contains;
+ m.img.decode=async()=>{};m.img.currentSrc='';beHook();return m;}
+async function inspected(m,t=0){const p=beScrub();await reply(sample(t));
+ assert.equal(candidates.length,1,'exact sample must await detached decode');
+ candidates.shift().resolve();await tick();await p;
+ assert(beReady(m.view),'decoded displayed sample should be ready');}
+function strictDraft(){openJob('A');const m=exactMount();return m;}
+function ack(payload,base={cbox:[130,85,330,225],span:[0,2,.4]}){
+ const rows={};for(const [key,pc] of Object.entries(payload.geometry_preconditions||{}))rows[key]={...pc,base};
+ return {ok:true,geometry_rows:rows};}
+"""
+
+
+def test_exact_scrubs_coalesce_fetch_and_body_across_mounts():
+    run_js(EXACT + r"""openJob('A');const a=exactMount();beScrub();
+    let bodyResolve;const req=queue.shift();req.resolve({ok:true,status:200,json:()=>new Promise(r=>bodyResolve=r)});await tick();
+    elements.get('beT').value=.2;beScrub();openJob('B');exactMount();beScrub();
+    openJob('A');const a3=exactMount();elements.get('beT').value=.7;beScrub();
+    assert.equal(calls.length,1,'fetch/body cycle released early');bodyResolve(sample());await tick();
+    assert.equal(candidates.length,0,'stale body decoded');assert.equal(calls.length,2);
+    assert(calls[1].url.endsWith('A/edit_sample?t=0.7'));
+    await reply(sample(.7));assert.equal(candidates.length,1);
+    elements.get('beT').value=.8;beScrub();assert.equal(calls.length,2,'decode released slot early');
+    candidates.shift().resolve();await tick();assert.equal(calls.length,3);assert.equal(liveURLs.size,0);
+    await reply(sample(.8));candidates.shift().resolve();await tick();assert(beReady(a3.view));
+    assert.equal(liveURLs.size,1);beUnmount();assert.equal(liveURLs.size,0);""")
+
+
+@pytest.mark.parametrize('bad', ['dimensions','zero','hidden'])
+def test_exact_sample_waits_for_display_decode_and_transform(bad):
+    run_js(EXACT + r"""const m=strictDraft();beScrub();await reply(sample());assert.equal(beReady(m.view),false);
+    if(BAD==='dimensions')m.img.naturalWidth=1;
+    else if(BAD==='zero')m.img.getBoundingClientRect=()=>({width:0,height:0});
+    else m.cv.getBoundingClientRect=()=>({left:0,top:0,width:0,height:0});
+    candidates.shift().resolve();await tick();assert.equal(beReady(m.view),false);
+    assert.equal(Object.keys(BE.ov).length,0);""".replace('BAD',json.dumps(bad)))
+
+
+def test_exact_old_load_error_and_same_be_remount_are_inert():
+    run_js(EXACT+r"""const old=strictDraft();beScrub();await reply(sample());
+    const next=exactMount();beScrub();candidates.shift().reject(Error('old decode'));await tick();
+    assert.equal(BE_VIEW,next.view);assert.equal(next.view.readySample,null);
+    await reply(sample());candidates.shift().resolve();await tick();assert(beReady(next.view));
+    assert.equal(liveURLs.size,1);assert.equal(revoked.length,1);""")
+
+
+def test_same_be_open_intent_before_metadata_cannot_replace_newer_mount():
+    run_js(EXACT+r"""const old=strictDraft();const p=loadBoxEdit(1);
+    const q=loadBoxEdit(1);const first=queue.shift(),second=queue.shift();
+    // Same draft, newer mounted content appears before older metadata.
+    second.resolve(response({duration:3}));await tick();const newer=BE_VIEW;
+    first.resolve(response({duration:99}));await tick();assert.equal(BE_VIEW,newer);
+    assert.equal(BE.dur,3);await reply({detections:[]});await q;await p;
+    assert.equal(BE_VIEW,newer);""")
+
+
+def test_exact_geometry_handlers_share_ready_sample():
+    run_js(EXACT+r"""const m=strictDraft();const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});
+    down(100,60);assert.equal(BE.sel,-1);beAddMode();assert.equal(BE.add,false);
+    beTrackMode();assert.equal(!!BE.trk,false);BE.sel=0;elements.get('beT0').value=0;elements.get('beT1').value=1;
+    beApplyTimes();assert.equal(Object.keys(BE.times).length,0);
+    await inspected(m);down(100,60);assert.equal(BE.sel,0);down(100,60);
+    m.cv.events.pointermove({clientX:110,clientY:65,pointerId:1});
+    assert(BE.ov[0]);assert.equal(BE.geometry[0].precondition.source_ref,'incarnation:7');
+    assert.deepEqual(BE.geometry[0].precondition.base.span,[0,2,0]);
+    assert.deepEqual(BE.geometry[0].precondition.offset,[8,-4]);""")
+
+
+def test_exact_scrub_cancels_gesture_keeps_pending_baseline():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);
+    BE.sel=0;elements.get('beT0').value=.1;elements.get('beT1').value=1;beApplyTimes();
+    const owner=BE.geometry[0],before=JSON.stringify(BE.times);BE.drag={kind:'move'};BE.addAnchor=[1,2];
+    BE.audio.push({t0:0,t1:1});applyDet(2,false);beScrub();
+    assert.equal(BE.drag,null);assert.equal(BE.addAnchor,null);assert.equal(BE.sel,-1);
+    assert.equal(BE.geometry[0],owner);assert.equal(JSON.stringify(BE.times),before);
+    assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[2],false);""")
+
+
+@pytest.mark.parametrize('change',['window','scrub','good'])
+def test_exact_add_captures_canonical_creation_after_prompts(change):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beAddMode();let prompts=0;
+    prompt=()=>{prompts++;if(CHANGE==='scrub'&&prompts===2)beScrub();return prompts===1?(CHANGE==='window'?'1':'0'):'2'};
+    const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});down(10,10);down(50,50);
+    if(CHANGE!=='good'){assert.equal(BE.adds.length,0);return;}
+    assert.equal(BE.adds.length,1);assert.equal(BE.adds[0].tref,4/24);
+    assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);""".replace('CHANGE',json.dumps(change)))
+
+
+@pytest.mark.parametrize('kind',['box-span','span-box','both','away-back'])
+def test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base(kind):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+    if(KIND==='span-box')BE.times[0]=[.1,1];else BE.ov[0]=[130,85,330,225];
+    if(KIND==='both')BE.times[0]=[.1,1];const p=saveAndRender(),sent=calls.at(-1).body;
+    if(KIND==='box-span')BE.times[0]=[.2,1.5];else BE.ov[0]=[140,90,340,230];
+    if(KIND==='away-back')BE.ov[0]=[130,85,330,225];
+    const base={cbox:sent.box_overrides[0]||[120,80,320,220],span:sent.time_overrides[0]?[...sent.time_overrides[0],.4]:[0,2,.4]};
+    await reply(ack(sent,base));if(KIND==='away-back')await reply();await p;
+    if(KIND!=='away-back'){assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+    assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}
+    """.replace('KIND',json.dumps(kind)))
+
+
+def test_geometry_ack_does_not_transplant_reinspected_family():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    const p=saveAndRender(),sent=calls.at(-1).body;BE.geometry[0]={precondition:{...BE.geometry[0].precondition,source_ref:'other:1'}};
+    await reply(ack(sent));await p;assert(BE.ov[0]);assert.equal(BE.geometry[0].precondition.source_ref,'other:1');""")
+
+
+@pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+    if(FAILURE==='network')req.reject(Error('lost ACK'));
+    else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+    else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+    BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+    const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+    assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+    assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+
+@pytest.mark.parametrize('uncertain',[False,True])
+def test_geometry_conflict_authority_and_abandon_preserve_drafts(uncertain):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    let p=saveAndRender();if(UNCERTAIN){queue.shift().reject(Error('lost'));await tick();await p;p=saveAndRender();}
+    await reply({ok:false,error:'geometry_conflict'},409);await p;
+    assert.equal(!!EDITS.submitted,UNCERTAIN);const before=JSON.stringify(BE.ov),n=calls.length;
+    if(UNCERTAIN){confirm=()=>false;reviewAbandon();assert(EDITS.submitted);confirm=()=>true;reviewAbandon();assert.equal(EDITS.submitted,null);}
+    assert.equal(JSON.stringify(BE.ov),before);assert.equal(calls.length,n);""".replace('UNCERTAIN',str(uncertain).lower()))
+
+
+@pytest.mark.parametrize('changed',[False,True])
+def test_discard_geometry_and_inspect_is_selected_and_confirmed(changed):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];BE.times[99]=[0,1];
+    BE.adds.push({manual_id:'keep',box:[1,2,3,4]});MAN.push({manual_id:'separate'});BE.audio.push({t0:0,t1:1});applyDet(1,false);
+    confirm=()=>{if(CHANGED)BE.ov[0]=[140,85,340,225];return true};await reviewDiscard('row:0');
+    assert.equal(!!BE.ov[0],CHANGED);assert(BE.times[99]);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+    assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[1],false);
+    assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);
+    """.replace('CHANGED',str(changed).lower()))
+
+
+def test_ack_clear_next_edit_uses_confirmed_display_baseline():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    const p=saveAndRender(),sent=calls.at(-1).body;applyDet(1,false);await reply(ack(sent));await p;
+    assert.deepEqual(BE.raw[0].base.cbox,[130,85,330,225]);assert.deepEqual(BE.boxes[0].box,[138,81,338,221]);
+    beCaptureGeometry(m.view,BE.raw[0]);assert.deepEqual(BE.geometry[0].precondition.base.span,[0,2,.4]);""")
+
+
+def test_track_captures_seed_window_and_job_before_await():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);const st=elements.get('beTrkSt');
+    const p=beTrackGo([10,20,40,60]);const sent=calls.at(-1);assert(sent.url.endsWith('A/track_object'));
+    assert.equal(sent.body.t_ref,4/24);assert.deepEqual(sent.body.box,[10,20,40,60]);
+    assert.equal(Object.keys(sent.body.seed).length,8);assert.deepEqual([sent.body.t0,sent.body.t1],[0,3]);
+    BE.win=[1,2];openJob('B');await reply({ok:true});await p;assert.equal(BE_VIEW,null);""")
+
+
+def test_track_late_status_cannot_refresh_reopened_mount():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);var timers=[];setTimeout=f=>{timers.push(f);return 1};
+    const p=beTrackGo([10,20,40,60]);await reply();await p;const poll=timers.pop();poll();
+    const next=exactMount();await reply({state:'done',added:2});assert.equal(BE_VIEW,next.view);
+    assert.equal(calls.filter(c=>c.url.endsWith('/report')).length,0);""")
+
+
+def test_playback_response_after_pause_cannot_replace_exact_sample():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);var frames=[];requestAnimationFrame=f=>frames.push(f);performance={now:()=>200};
+    Object.assign(m.vid,{readyState:1,currentTime:.2,videoWidth:640,videoHeight:360,play:async()=>{}});
+    await beTogglePlay();m.vid.currentTime=.2;frames.shift()();const old=queue.shift();bePlayStop();
+    await reply(sample(.2));candidates.shift().resolve();await tick();const before=JSON.stringify(BE.raw);
+    old.resolve(response({ox:99,oy:99,boxes:[]}));await tick();assert.equal(JSON.stringify(BE.raw),before);assert(beReady(m.view));""")
+
+
+
+def test_exact_existing_outside_frame_rows_remain_inspectable():
+    run_js(EXACT+r"""const m=strictDraft();beScrub();const data=sample();data.boxes[0].base={cbox:[-20,-10,700,400],span:[0,2,3]};
+    data.boxes[0].box=[-12,-14,708,396];await reply(data);assert.equal(candidates.length,1);
+    candidates.shift().resolve();await tick();assert(beReady(m.view));assert.equal(BE.boxes[0].box[0],-12);""")
+
+
+def test_ack_span_inactive_and_other_mount_cannot_patch_current_row():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.times[0]=[1,2];
+    const p=saveAndRender(),sent=calls.at(-1).body;applyDet(2,false);await reply(ack(sent,{cbox:[120,80,320,220],span:[1,2,1]}));await p;
+    assert.equal(BE.boxes.length,0,'ACK span left an inactive row editable');
+    beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];const q=saveAndRender(),sent2=calls.at(-1).body;
+    const next=exactMount();applyDet(2,true);await reply(ack(sent2,{cbox:[130,85,330,225],span:[1,2,1]}));await q;
+    assert.equal(next.view.readySample,null);assert(calls.at(-1).url.includes('/edit_sample'));
+    assert.equal(BE_VIEW,next.view);""")
+
+
+@pytest.mark.parametrize('kind',['missing','wrongbase','wrongsource'])
+def test_malformed_geometry_ack_keeps_all_submitted_state_uncertain(kind):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];applyDet(1,false);
+    BE.adds.push({manual_id:'new',box:[1,2,3,4],t0:0,t1:1,tref:0});
+    const p=saveAndRender(),sent=calls.at(-1).body,result=ack(sent);
+    if(KIND==='missing')delete result.geometry_rows;
+    else if(KIND==='wrongbase')result.geometry_rows[0].base.cbox=[0,0,1,1];else result.geometry_rows[0].source_ref='other';
+    await reply(result);await p;assert(BE.ov[0]);assert.equal(BE.adds.length,1);assert.equal(EDITS.enabled[1],false);
+    assert(EDITS.submitted.everUncertain);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);""".replace('KIND',json.dumps(kind)))
+
+
+@pytest.mark.parametrize('case',['busy','unresolved','changed','good'])
+def test_discard_addition_preserves_other_additions_and_manual(case):
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);const first={manual_id:'first',box:[1,2,30,40],t0:0,t1:1,tref:0};
+    BE.adds.push(first,{manual_id:'second',box:[1,2,3,4]});MAN.push({manual_id:'manual'});
+    if(CASE==='busy')EDITS.busy=true;if(CASE==='unresolved')EDITS.submitted={everUncertain:true};
+    confirm=()=>{if(CASE==='changed')first.t1=2;return true};await reviewDiscard('add:first');
+    assert.equal(BE.adds.length,CASE==='good'?1:2);assert.equal(BE.adds.at(-1).manual_id,'second');assert.equal(MAN.length,1);
+    assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);""".replace('CASE',json.dumps(case)))
+
+
+def test_playback_restart_serial_fences_metadata_and_raf():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);var frames=[];requestAnimationFrame=f=>frames.push(f);
+    Object.assign(m.vid,{readyState:0,paused:true,load(){},play:async()=>{m.vid.playCount=(m.vid.playCount||0)+1}});
+    const first=beTogglePlay(),metadata=m.vid.onloadedmetadata;bePlayStop();const second=beTogglePlay();
+    metadata();await first;assert.equal(m.vid.playCount,undefined,'old metadata played a restarted session');
+    Object.assign(m.vid,{readyState:1,videoWidth:640,videoHeight:360});m.vid.onloadedmetadata();await second;
+    assert.equal(m.vid.playCount,1);assert.equal(BE.playing,true);""")
+
+
+def test_old_review_continuation_cannot_retire_same_be_reinspection():
+    run_js(EXACT+r"""const m=strictDraft();const p=loadReview();showPanel('boxedit_rev');const next=exactMount();
+    elements.get('review').contains=next.root.contains;await reply({duration:3,detections:[]});await p;
+    assert.equal(BE_VIEW,next.view,'old review retired a newer editor intention');""")
+
+
+def test_authoritative_geometry_rejection_preserves_audio_baseline():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    BE.audioLoaded=true;BE.audio.push({t0:0,t1:1,mode:'mute'});const before=copyEdit(BE.audioSaved);
+    const p=saveAndRender();await reply({error:'geometry_conflict'},409);await p;
+    assert.equal(EDITS.submitted,null);assert.deepEqual(BE.audioSaved,before);assert.equal(BE.audio.length,1);""")
+
+
+def test_discard_geometry_refuses_changed_baseline_family_during_confirmation():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+    confirm=()=>{BE.geometry[0].precondition.base.span[2]=.5;return true};await reviewDiscard('row:0');
+    assert(BE.ov[0],'changed baseline family was discarded');assert.equal(BE.geometry[0].precondition.base.span[2],.5);""")
+
+
+
+def test_exact_wrong_policy_is_blocked_before_decode():
+    run_js(EXACT+r"""const m=strictDraft();beScrub();await reply(sample(0,{policy:'cfr-index-v1'}));
+    assert.equal(candidates.length,0);assert.equal(beReady(m.view),false);assert.equal(liveURLs.size,0);""")
+
+
+def test_hidden_canvas_cancels_incomplete_pointer_gesture():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);BE.drag={kind:'move',serial:m.view.serial};BE.addAnchor=[1,2];
+    m.cv.getBoundingClientRect=()=>({width:0,height:0,left:0,top:0});m.cv.events.pointermove({clientX:10,clientY:10,pointerId:1});
+    assert.equal(BE.drag,null);assert.equal(BE.addAnchor,null);""")
+
+
+def test_owned_track_success_replaces_prior_refusal_status():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);elements.delete('review');
+    BE.win=[1,2];await beTrackGo([10,20,40,60]);assert(EDITS.status.includes('requires'));
+    var timers=[];setTimeout=f=>{timers.push(f);return 1};BE.win=[0,3];
+    const p=beTrackGo([10,20,40,60]);await reply();await p;const poll=timers.shift()();
+    await reply({state:'done',added:1});await reply({detections:[],audio_redactions:[]});await poll;
+    assert(!EDITS.status.includes('requires'),'successful owned Track still reports prior refusal');""")
+
+
+@pytest.mark.parametrize('replace',['mount','job'])
+def test_detached_timeline_callbacks_cannot_edit_new_mount(replace):
+    run_js(EXACT+r"""const m=strictDraft(),timeline=el();Object.assign(timeline,{clientWidth:300,
+    getBoundingClientRect:()=>({left:0,top:0,width:300,height:72}),setPointerCapture(){},releasePointerCapture(){this.released=true}});
+    elements.set('beTL',timeline);elements.set('beWinL',el());timeline.getContext=m.cv.getContext;tlHook();
+    timeline.events.pointerdown({clientX:0,clientY:10,pointerId:7});assert(BE.tlDrag);
+    if(REPLACE==='job')openJob('B');const next=exactMount();BE.win=[.5,2.5];BE.tlDrag={k:'w0'};
+    timeline.events.pointermove({clientX:150,clientY:10,pointerId:7});timeline.events.pointerup({pointerId:7});
+    assert.deepEqual(BE.win,[.5,2.5]);assert.equal(BE.tlDrag.k,'w0');assert.equal(timeline.released,true);""".replace('REPLACE',json.dumps(replace)))
+
+
+def test_timeline_audio_remains_usable_while_exact_sample_loads():
+    run_js(EXACT+r"""const m=strictDraft(),timeline=el();Object.assign(timeline,{clientWidth:300,
+    getBoundingClientRect:()=>({left:0,top:0,width:300,height:72}),setPointerCapture(){},releasePointerCapture(){}});
+    elements.set('beTL',timeline);timeline.getContext=m.cv.getContext;elements.set('beWinL',el());
+    elements.set('beAMode',{value:'mute'});elements.set('beARm',el());tlHook();BE.muteArm=true;beScrub();
+    timeline.events.pointerdown({clientX:100,clientY:60,pointerId:7});timeline.events.pointermove({clientX:200,clientY:60,pointerId:7});timeline.events.pointerup({pointerId:7});
+    assert.equal(beReady(m.view),false);assert.deepEqual(BE.audio,[{t0:1,t1:2,mode:'mute'}]);""")
+
+
+def test_timeline_release_cannot_clear_replaced_gesture_family():
+    run_js(EXACT+r"""const m=strictDraft(),timeline=el();Object.assign(timeline,{clientWidth:300,
+    getBoundingClientRect:()=>({left:0,top:0,width:300,height:72}),setPointerCapture(){},releasePointerCapture(){}});
+    elements.set('beTL',timeline);timeline.getContext=m.cv.getContext;elements.set('beWinL',el());tlHook();
+    timeline.events.pointerdown({clientX:0,clientY:10,pointerId:7});const replacement={k:'w1'};BE.tlDrag=replacement;
+    timeline.events.pointerup({pointerId:7});assert.equal(BE.tlDrag,replacement);""")
+
+
+def test_geometry_pointer_continuation_owns_selected_raw_row_and_pointer():
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);const down=(id,x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:id});
+    down(1,100,60);m.cv.events.pointerup({pointerId:1});down(1,100,60);
+    m.cv.events.pointermove({clientX:120,clientY:60,pointerId:2});assert.equal(Object.keys(BE.ov).length,0,'another pointer moved the selected row');
+    m.cv.events.pointerup({pointerId:2});assert(BE.drag,'another pointer ended current drag');
+    m.cv.events.pointermove({clientX:110,clientY:65,pointerId:1});assert(BE.ov[0]);""")

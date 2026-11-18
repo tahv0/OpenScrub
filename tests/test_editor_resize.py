@@ -16,10 +16,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_editor_live_resize_pixels_and_pointer(tmp_path):
+def launch_editor_page(tmp_path,script,render=False,reopen=None):
     if not os.environ.get("OPENSCRUB_PLAYWRIGHT_MODULE") or not os.environ.get("OPENSCRUB_CHROMIUM") or not shutil.which("node"):
         pytest.skip("Set OPENSCRUB_PLAYWRIGHT_MODULE and OPENSCRUB_CHROMIUM for real-page QA")
-    artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path)))
+    artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path))) / script.removesuffix(".cjs")
+    if reopen:
+        artifacts = Path(reopen["previous"]) / "fresh-process"
     artifacts.mkdir(parents=True, exist_ok=True)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -29,7 +31,8 @@ def test_editor_live_resize_pixels_and_pointer(tmp_path):
     env["OPENSCRUB_NO_AUTOFETCH"] = "1"
     with log.open("w") as output:
         server = subprocess.Popen([sys.executable, str(ROOT / "tests/editor_resize_server.py"),
-                                   str(ROOT), str(artifacts / "runtime"), str(port)],
+                                   str(ROOT), str(artifacts / "runtime"), str(port)] +
+                                  ([str(reopen["report"]), reopen["job"]] if reopen else []),
                                   cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT)
         try:
             for _ in range(150):
@@ -42,12 +45,14 @@ def test_editor_live_resize_pixels_and_pointer(tmp_path):
                     time.sleep(.1)
             else:
                 pytest.fail("resize server did not start: " + log.read_text())
-            result = subprocess.run(["node", str(ROOT / "tests/editor_resize_browser.cjs"),
-                                     f"http://127.0.0.1:{port}", str(artifacts)],
+            result = subprocess.run(["node", str(ROOT / "tests" / script),
+                                     f"http://127.0.0.1:{port}", str(artifacts)] +
+                                    (["reopen", str(reopen["previous"]), reopen["job"]] if reopen else []),
                                     env=env, capture_output=True, text=True, timeout=180)
             (artifacts / "browser.log").write_text(result.stdout + result.stderr)
             assert result.returncode == 0, result.stdout + result.stderr
-            verify_render(artifacts)
+            if render:
+                verify_render(artifacts)
         finally:
             server.terminate()
             try:
@@ -55,6 +60,23 @@ def test_editor_live_resize_pixels_and_pointer(tmp_path):
             except subprocess.TimeoutExpired:
                 server.kill()
                 server.wait()
+
+    if not reopen:
+        # The original server is terminated and reaped before a separate actual
+        # Python process restores the UI-saved raw report and opens a fresh PAGE.
+        job = "resize" if render else "cfr24"
+        launch_editor_page(tmp_path, "exact_editor_browser.cjs", reopen={
+            "report": artifacts / "saved-report.json", "previous": artifacts, "job": job})
+
+
+def test_editor_live_resize_pixels_and_pointer(tmp_path):
+    launch_editor_page(tmp_path, "editor_resize_browser.cjs", render=True)
+
+
+def test_exact_editor_samples_and_track(tmp_path):
+    if not os.environ.get("OPENSCRUB_EXACT_MEDIA"):
+        pytest.skip("Set OPENSCRUB_EXACT_MEDIA for the retained-media PAGE gate")
+    launch_editor_page(tmp_path, "exact_editor_browser.cjs")
 
 
 def verify_render(artifacts):

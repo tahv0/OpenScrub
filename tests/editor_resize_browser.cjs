@@ -3,7 +3,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const [url,root]=process.argv.slice(2);
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.OPENSCRUB_CHROMIUM});
 try{for(const dpr of [1,2]){const context=await browser.newContext({viewport:{width:1365,height:1000},deviceScaleFactor:dpr});
-try{const page=await context.newPage(),errors=[],requests=[],warnings=[];
+try{let page;try{page=await context.newPage();}catch(e){throw e;}const errors=[],requests=[],warnings=[];
 await page.addInitScript(()=>{
  const Native=ResizeObserver;window.resizeObservers=[];
  window.ResizeObserver=class extends Native{
@@ -12,10 +12,11 @@ await page.addInitScript(()=>{
  };
 });
 page.on('console',m=>{if(['error','warning'].includes(m.type()))warnings.push(m.text())});page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({method:r.method(),url:r.url()}));
+page.on('response',async r=>{if(r.url().includes('/edit_sample?')){try{const b=await r.json();if(b.image)b.image={mime:b.image.mime,prefix:b.image.base64.slice(0,24),length:b.image.base64.length};fs.writeFileSync(root+`/wire-${dpr}.json`,JSON.stringify(b,null,2))}catch(_){}}});
 page.on('dialog',d=>{console.log('dialog: '+d.message());d.accept(d.defaultValue())});
 await page.goto(url);assert.equal(await page.title(),'OpenScrub');assert((await page.locator('body').innerText()).includes('OpenScrub'));assert.equal(await page.locator('vite-error-overlay,nextjs-portal').count(),0);
 await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
-await page.waitForFunction(()=>document.getElementById('beImg')?.naturalWidth===640&&BE.boxes.length===1);
+await page.waitForFunction(()=>document.getElementById('beImg')?.naturalWidth===640&&BE.boxes.length===1).catch(async e=>{console.log('PAGE_FAILURE_STATE',JSON.stringify(await page.evaluate(()=>({label:document.getElementById('beL')?.textContent,ready:BE_VIEW?.readySample,transform:BE_VIEW?.transform&&{sw:BE_VIEW.transform.sw,width:BE_VIEW.transform.width},loading:BE_VIEW?.loading,image:{src:BE_VIEW?.img.src,width:BE_VIEW?.img.naturalWidth,height:BE_VIEW?.img.naturalHeight,complete:BE_VIEW?.img.complete},raw:BE.raw,active:!!EDIT_SAMPLE_IO.active,wanted:!!EDIT_SAMPLE_IO.wanted}))));throw e});
 const result={dpr,states:[]};
 // Watch the actual DOM owner immediately before its shipped removal method.
 await page.evaluate(()=>{
@@ -46,7 +47,9 @@ function retired(records){assert(records.length>0);for(const record of records){
      const geom=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,clientWidth:el.clientWidth,clientHeight:el.clientHeight}};
      const image=geom(img),canvas=geom(cv),sourceBox=BE.boxes[0].box;
      const boxes=BE.boxes.map(b=>b.box),extent=[Math.min(...boxes.map(b=>b[0])),Math.min(...boxes.map(b=>b[1])),Math.max(...boxes.map(b=>b[2])),Math.max(...boxes.map(b=>b[3]))];
-     const px=cv.getContext('2d').getImageData(0,0,cv.width,cv.height),a=px.data;
+     const readback=document.createElement('canvas');readback.width=cv.width;readback.height=cv.height;
+     const reader=readback.getContext('2d',{willReadFrequently:true});reader.drawImage(cv,0,0);
+     const px=reader.getImageData(0,0,cv.width,cv.height),a=px.data;
      // Measure the production painting itself: bounds of the opaque red stroke,
      // and all nontransparent pixels, with an empty/nonselected editor state.
      function bounds(pred){let x0=Infinity,y0=Infinity,x1=-1,y1=-1,n=0;for(let y=0;y<cv.height;y++)for(let x=0;x<cv.width;x++){const i=(y*cv.width+x)*4;if(pred(a[i],a[i+1],a[i+2],a[i+3])){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);n++}}return n?{x0,y0,x1,y1,count:n}:null}
@@ -76,7 +79,7 @@ fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
 assert(result.edgeError<=2,`painted edge drift ${result.edgeError} CSS px; visible target hit ${result.liveHit}`);assert.equal(result.liveHit,0);
 
 assert(await page.evaluate(()=>originalImg===document.getElementById('beImg')&&originalCv===document.getElementById('beCv')&&imageLoads===0));
-assert.deepEqual(requests.slice(before).filter(r=>/frame_at|boxes_at/.test(r.url)),[]);
+assert.deepEqual(requests.slice(before).filter(r=>/edit_sample|frame_at|boxes_at/.test(r.url)),[]);
 assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds,t:BE.t,boxes:BE.boxes})),originalGeometry);
 assert.deepEqual(await page.evaluate(()=>[BE.ox,BE.oy]),[20,12]);
 async function point(x,y){return page.evaluate(([x,y])=>{const r=(BE.playing?document.getElementById('beVid'):document.getElementById('beImg')).getBoundingClientRect();return {x:r.x+x*r.width/640,y:r.y+y*r.height/360}},[x,y]);}
@@ -88,7 +91,7 @@ async function selectedBox(){return page.evaluate(()=>BE.boxes[0].box.slice());}
 await page.setViewportSize({width:1365,height:1000});await page.waitForTimeout(120);
 const grown=await measure('desktop-grown');assert(Math.max(...grown.paint.edgeDelta.map(Math.abs))<=2);
 assert.equal(await page.evaluate(()=>imageLoads),0);
-assert.deepEqual(requests.slice(before).filter(r=>/frame_at|boxes_at/.test(r.url)),[]);
+assert.deepEqual(requests.slice(before).filter(r=>/edit_sample|frame_at|boxes_at/.test(r.url)),[]);
 // Fractional layout plus separate X/Y backing ratios, in both DPR contexts.
 await page.locator('#beImg').evaluate(e=>e.style.width='487.375px');
 await page.waitForTimeout(120);const fractional=await measure('fractional');
@@ -115,7 +118,7 @@ assert.equal(await page.evaluate(()=>BE.adds.length),1);near(await page.evaluate
 const drafts=await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds}));
 // Hidden/zero element geometry invalidates edits, and recovers when visible.
 await page.locator('#beImg').evaluate(e=>e.style.display='none');await page.waitForTimeout(120);
-assert.equal(await page.evaluate(()=>BE_VIEW.transform),null);
+assert.equal(await page.evaluate(()=>beReady()),false);
 await page.locator('#beCv').dispatchEvent('pointerdown',{clientX:100,clientY:100,pointerId:1});
 assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
 await page.locator('#beImg').evaluate(e=>{e.style.display='';e.style.width='0px'});await page.waitForTimeout(120);
@@ -124,11 +127,11 @@ await page.locator('#beImg').evaluate(e=>e.style.width='');await page.waitForTim
 assert(await page.evaluate(()=>!!BE_VIEW.transform));
 // Unloaded current image must reject input while its real frame request waits.
 let release;const gate=new Promise(r=>release=r);let started;const pending=new Promise(r=>started=r);
-await page.route('**/frame_at?t=0.7',async route=>{started();await gate;await route.continue()});
+await page.route('**/edit_sample?t=0.7',async route=>{started();await gate;await route.continue()});
 await page.locator('#beT').fill('0.7');await page.locator('#beT').dispatchEvent('input');await pending;
-assert.equal(await page.evaluate(()=>BE_VIEW.transform),null);
+assert.equal(await page.evaluate(()=>beReady()),false);
 await page.locator('#beCv').dispatchEvent('pointerdown',{clientX:100,clientY:100,pointerId:1});
-assert.equal(await page.evaluate(()=>BE.drag),null);release();await page.waitForFunction(()=>document.getElementById('beImg').complete&&BE_VIEW.transform!==null);await page.unroute('**/frame_at?t=0.7');
+assert.equal(await page.evaluate(()=>BE.drag),null);release();await page.waitForFunction(()=>beReady());await page.unroute('**/edit_sample?t=0.7');
 // Actual video playback and live resize, then ordinary pause/scrub switches back.
 await page.locator('#bePlay').click();await page.waitForTimeout(300);
 fs.writeFileSync(root+`/video-start-${dpr}.json`,JSON.stringify(await page.evaluate(()=>{const v=document.getElementById('beVid');return {playing:BE.playing,ready:v.readyState,network:v.networkState,src:v.src,preload:v.preload,error:v.error?.message,transform:!!BE_VIEW.transform,canPlay:v.canPlayType('video/mp4')}}),null,2));
@@ -243,8 +246,9 @@ if(dpr===2){
 }
 result.errors=errors;result.warnings=warnings;result.requests=requests;
 fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
-assert(!requests.some(r=>/edit_sample/.test(r.url)),'ordinary editor unexpectedly migrated to exact samples');
-assert.deepEqual(errors,[]);assert(warnings.every(w=>w.includes('willReadFrequently')),warnings.join('\n'));
+assert(requests.some(r=>/edit_sample/.test(r.url)),'ordinary editor must use exact samples');
+assert(!requests.some(r=>/frame_at/.test(r.url)),'paused editor used tolerant frame path');
+assert.deepEqual(errors,[]);assert.deepEqual(warnings,[]);
 console.log(JSON.stringify({dpr,edgeError:result.edgeError,hit:result.liveHit,states:result.states.map(s=>s.name),persistence:result.persistence,errors,warnings}));
 
 }finally{await context.close()}}}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

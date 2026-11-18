@@ -53,12 +53,61 @@ job['phase']='review'
 other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
 web.JOBS.pop(other['id']);other['id']='other';web.JOBS['other']=other
 Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
+# Retained media: expected ordinals/PTS/pixels come from sequential native decode
+# and FFprobe, independent of edit_sample and the embedded editor state.
+manifest=os.environ.get('OPENSCRUB_EXACT_MEDIA')
+if manifest:
+ from fractions import Fraction
+ values=json.loads(Path(manifest).read_text());oracles={}
+ for key,fps,want in [('cfr24',24,4),('cfr5',5,9),('normalized',13,6)]:
+  value=values[key];path=Path(value['path']);assert hashlib.sha256(path.read_bytes()).hexdigest()==value['sha256']
+  probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_frames',
+   '-show_entries','frame=pts:stream=time_base','-of','json',str(path)],timeout=15))
+  pts=[Fraction(v['pts'])*Fraction(probe['streams'][0]['time_base']) for v in probe['frames']]
+  capture=cv2.VideoCapture(str(path));frames=[]
+  try:
+   while True:
+    ok,pixels=capture.read()
+    if not ok:break
+    frames.append(pixels)
+  finally:capture.release()
+  assert len(frames)==len(pts)
+  selected=frames[want];marker=sum((int(selected[14,14+12*k,0])>128)<<k for k in range(6))
+  oracles[key]=dict(input=value,index=want,pts=str(pts[want]),canonical=want/fps,marker=marker,
+   shape=list(selected.shape),source_box=[20+2*want,30-want,80+2*want,70-want])
+  fixture=web.new_job(str(path),{'categories':'email','mode':'box','pad':0},'exact-'+key+'.mp4')
+  web.JOBS.pop(fixture['id']);fixture['id']=key;web.JOBS[key]=fixture
+  row=dict(t_start=0,t_end=len(frames)/fps,last_seen=0,cbox=[20,30,80,70],aoff=[0,0],category='name',text='exact target',confidence=1,enabled=True)
+  doc=dict(provenance=dict(input=str(path),vfr_normalized=key=='normalized',settings=dict(pad=0,mode='box')),
+   render_state=dict(fps=fps,cum=[[2*i,-i] for i in range(len(frames))],bands=[[0,0]]*len(frames)),
+   detections=[row,dict(row,text='disabled raw row',enabled=False,opaque={'kept':[1,2,3]})],audio_redactions=[])
+  Path(fixture['dir'],'report.json').write_text(json.dumps(doc));fixture['phase']='review'
+ (runtime/'media-oracles.json').write_text(json.dumps(oracles,indent=2))
+# Deterministic engine fake only: real strict route, source decode, background
+# ownership and atomic report append remain in use; no tracking-quality claim.
+def deterministic_track(video,box,t_ref,t0,t1,**kwargs):
+ seed=kwargs['strict_seed'];assert seed.index==round(t_ref*seed.fps)
+ (runtime/'track-seed.json').write_text(json.dumps(dict(index=seed.index,canonical=seed.canonical_s,
+  box=box,t_ref=t_ref,t0=t0,t1=t1,source_shape=list(seed.pixels.shape))))
+ return [(t_ref,list(box),1.0)]
+openscrub.track_manual_region=deterministic_track
+class NoPersonModel:
+ net=None;ort=None
+openscrub.PersonDetector=lambda *a,**kw:NoPersonModel()
+# Optional second process restores the exact report written by the first UI.
+# Keep its real selected media path; generated startup fixtures never replace it.
+reopened=None
+if len(sys.argv)>4:
+ saved_path=Path(sys.argv[4]);selected_id=sys.argv[5];saved=json.loads(saved_path.read_text())
+ selected_job=web.JOBS[selected_id];selected_job['video']=saved['provenance']['input']
+ Path(selected_job['dir'],'report.json').write_text(json.dumps(saved));selected_job['phase']='review'
+ reopened=dict(report=str(saved_path),job=selected_id,video=selected_job['video'])
 # Read-only network-independent replacement only for unrelated update metadata.
 web.app.view_functions['update_check']=lambda:web.jsonify({'current':web.openscrub.VERSION,'update_available':False})
 identity={'label':label,'sha':sha,'port':port,'cwd':os.getcwd(),'web_import':web.__file__,
  'engine_import':openscrub.__file__,'web_sha256':hashlib.sha256(Path(web.__file__).read_bytes()).hexdigest(),
  'runtime':str(runtime),'job_dir':job['dir'],'video':str(video),'pid':os.getpid(),
- 'python':sys.version,'opencv':cv2.__version__,'model_downloads':'forbidden','scan_started':False,'real_render_worker':True}
+ 'reopened':reopened,'python':sys.version,'opencv':cv2.__version__,'model_downloads':'forbidden','scan_started':False,'real_render_worker':True}
 (runtime/'server-identity.json').write_text(json.dumps(identity,indent=2))
 web.start_worker()
 from cheroot.wsgi import Server
