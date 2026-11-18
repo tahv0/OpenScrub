@@ -473,3 +473,27 @@ def test_old_mount_callbacks_cannot_touch_replacement():
     assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,before);
     assert.equal(old.view.observer.disconnected,true);
     """)
+
+
+@pytest.mark.parametrize('retained', [False, True], ids=['removed', 'retained'])
+def test_pending_playback_metadata_retirement_and_same_draft_remount(retained):
+    run_js(MOUNT + r"""openJob('A');requestAnimationFrame=()=>{};
+    const old=mountIn('beslot');elements.set('bePlay',el());let played=false;
+    Object.assign(old.vid,{readyState:0,paused:true,load(){},
+      play:async()=>{played=true;old.vid.paused=false}});
+    const pending=beTogglePlay();assert.equal(BE.playing,true);assert.equal(old.vid.paused,true);
+    if(RETAINED){
+      showPanel('boxedit_rev');assert.equal(BE_VIEW,old.view);
+      assert.equal(BE.playing,true);assert.equal(old.view.observer.disconnected,false);
+      Object.assign(old.vid,{readyState:1,videoWidth:640,videoHeight:360});
+      old.vid.onloadedmetadata();await pending;assert.equal(played,true);
+      assert.equal(BE_VIEW,old.view);showPanel('compare');return;
+    }
+    showPanel('compare');const replacement=mountIn('beslot_done');
+    assert.equal(BE.playing,false,'removed pending Play leaked into the same draft remount');
+    assert(replacement.view.sync(),'replacement still image has no transform');
+    const pixels=replacement.paint.value;
+    old.vid.onloadedmetadata();await pending;
+    assert.equal(played,false,'late old metadata started outgoing video');
+    assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,pixels);
+    """.replace('RETAINED', str(retained).lower()))

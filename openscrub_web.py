@@ -3354,8 +3354,8 @@ function beUnmount(){
 // before detach, so an outgoing video cannot keep playing without its owner.
 function beUnmountIn(root){
  const view=BE_VIEW;if(!view||!root?.contains?.(view.cv))return;
- beUnmount();
- try{if(view.vid&&!view.vid.paused){view.editor.playing=false;view.vid.pause();}}catch(e){}
+ beUnmount();view.editor.playing=false;
+ try{if(view.vid&&!view.vid.paused)view.vid.pause();}catch(e){}
 }
 function beMount(img,vid,cv,id,gen,editor){
  beUnmount();

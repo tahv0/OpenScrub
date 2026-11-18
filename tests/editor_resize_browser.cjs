@@ -157,6 +157,23 @@ await page.evaluate(()=>{retainedView.observer.callback([]);retainedImageLoad()}
 assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),replacementPixels);
 assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),await page.evaluate(()=>retainedApplied));
 result.retainedPendingMetadata=true;result.remountRetiredBeforeDetach=true;
+// A Play request still waiting for video metadata owns playing=true even
+// though the media element remains paused. Retiring that mount must clear it.
+let releaseVideo,startVideo,continuedVideo;
+const videoGate=new Promise(r=>releaseVideo=r),videoStarted=new Promise(r=>startVideo=r),videoContinued=new Promise(r=>continuedVideo=r);
+await page.route('**/api/jobs/resize/video',async route=>{startVideo();await videoGate;await route.continue();continuedVideo()});
+await page.evaluate(()=>{window.pendingVideoView=BE_VIEW;watchRetirement(document.getElementById('beslot'),'innerHTML')});
+await page.locator('#bePlay').click();await videoStarted;
+assert(await page.evaluate(()=>BE.playing&&pendingVideoView.vid.paused&&pendingVideoView.vid.readyState===0));
+await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
+await page.waitForFunction(()=>BE_VIEW!==pendingVideoView&&document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&!BE.playing);
+retired(await page.evaluate(()=>retirements.splice(0)));
+const afterPendingPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
+releaseVideo();await videoContinued;await page.unroute('**/api/jobs/resize/video');
+await page.evaluate(()=>{pendingVideoView.vid.onloadedmetadata();pendingVideoView.observer.callback([])});
+assert(await page.evaluate(()=>!BE.playing&&pendingVideoView.vid.paused));
+assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),afterPendingPixels);
+result.pendingPlayRetiredBeforeRemount=true;
 // Ordinary explicit Play/pause still switches back to the current still image.
 await page.locator('#bePlay').click();await page.waitForFunction(()=>BE.playing);
 await page.locator('#bePlay').click();await page.waitForFunction(()=>!BE.playing&&document.getElementById('beImg').complete&&BE_VIEW.transform?.media===document.getElementById('beImg'));
