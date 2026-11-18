@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "date": "2026-11-18",
+  "old_source": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "new_source": "d3d02770b8a42575236b11309b5a334170f7ec89",
+  "python": "3.9.25",
+  "sequence": [
+    "A",
+    "B",
+    "B",
+    "A",
+    "A",
+    "B"
+  ],
+  "selection": {
+    "modules": [
+      "tests/test_exact_media.py",
+      "tests/test_strict_tracking_routes.py"
+    ],
+    "expression": "production_pixels or retained_strict",
+    "passed_per_sample": 7,
+    "deselected_per_sample": 35,
+    "new_helper_cases_included": false
+  },
+  "matching": "Same original three pinned media, tools/native dependency files, ten unchanged product modules, serial new processes, same observation plugin and pytest flags; intended differences are source test patch and explicit/fallback output mode. Checkouts and prospective hashing outside timers.",
+  "samples": [
+    {
+      "sample": 1,
+      "pair": 1,
+      "mode": "A",
+      "pytest_elapsed_s": 1.85,
+      "controlled_invocation_wall_s": 3.848626,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    },
+    {
+      "sample": 2,
+      "pair": 1,
+      "mode": "B",
+      "pytest_elapsed_s": 1.55,
+      "controlled_invocation_wall_s": 2.676789,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    },
+    {
+      "sample": 3,
+      "pair": 2,
+      "mode": "B",
+      "pytest_elapsed_s": 1.42,
+      "controlled_invocation_wall_s": 2.461559,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    },
+    {
+      "sample": 4,
+      "pair": 2,
+      "mode": "A",
+      "pytest_elapsed_s": 1.46,
+      "controlled_invocation_wall_s": 2.482325,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    },
+    {
+      "sample": 5,
+      "pair": 3,
+      "mode": "A",
+      "pytest_elapsed_s": 1.45,
+      "controlled_invocation_wall_s": 2.477975,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    },
+    {
+      "sample": 6,
+      "pair": 3,
+      "mode": "B",
+      "pytest_elapsed_s": 1.45,
+      "controlled_invocation_wall_s": 2.473099,
+      "exit": 0,
+      "passed": 7,
+      "deselected": 35,
+      "artifacts": 7,
+      "artifact_bytes": 4542
+    }
+  ],
+  "statistics": {
+    "A": {
+      "pytest_elapsed_s": {
+        "median": 1.46,
+        "min": 1.45,
+        "max": 1.85
+      },
+      "controlled_invocation_wall_s": {
+        "median": 2.482325,
+        "min": 2.477975,
+        "max": 3.848626
+      }
+    },
+    "B": {
+      "pytest_elapsed_s": {
+        "median": 1.45,
+        "min": 1.42,
+        "max": 1.55
+      },
+      "controlled_invocation_wall_s": {
+        "median": 2.473099,
+        "min": 2.461559,
+        "max": 2.676789
+      }
+    }
+  },
+  "unexpected_failures": 0,
+  "invalid_samples": 0,
+  "retries": 0,
+  "output_setup_actions": {
+    "old": {
+      "environment_assignments": 1,
+      "directory_preparation": 1,
+      "total": 2
+    },
+    "new": {
+      "environment_assignments": 0,
+      "directory_preparation": 0,
+      "total": 0
+    },
+    "definition": "Explicit portable output recipe actions; common media-manifest environment assignment, prepared dependencies and pytest invocation excluded equally. No manual elapsed-time estimate."
+  },
+  "artifact_names": [
+    "media-cfr24.json",
+    "media-cfr5.json",
+    "media-coarse.json",
+    "media-normalized.json",
+    "strict-media-cfr24.json",
+    "strict-media-cfr5.json",
+    "strict-media-normalized.json"
+  ],
+  "artifact_bytes_per_sample": 4542,
+  "artifact_semantics": "All seven JSON schemas and deterministic values match across all six samples. Coarse remux container sha256 and source_ref varied. The protocol also excluded timeline_eq, which matched across all six raw records. Raw records preserve every field; original media paths and hashes match.",
+  "timing_conclusion": "No repeatable speed benefit established by these three pairs. First A was slower; later samples overlap. No project-wide or human-time savings inferred.",
+  "timing_limits": [
+    "Small single-machine, single-session sample; no cache reset or warmup exclusion.",
+    "Pytest elapsed is reported to 0.01 seconds and includes plugin/test setup.",
+    "Controlled invocation wall includes source/prerequisite verification, interpreter startup and logging; it is not portable pytest workload time.",
+    "Same local observer adds temporary-fixture/location-recording overhead to both modes.",
+    "Only seven opt-in retained-media cases; no full-suite, packaging or product-performance inference."
+  ],
+  "prior_evidence": {
+    "final_source_only_modes": {
+      "explicit": {
+        "passed": 48,
+        "pytest_elapsed_s": 3.4
+      },
+      "fallback": {
+        "passed": 48,
+        "pytest_elapsed_s": 3.43
+      },
+      "interpretation": "Mode compatibility observation only; not source-before/after benchmark and not pooled with new samples."
+    },
+    "negative_control": {
+      "missing_environment_failures": 7,
+      "interpretation": "Reliability evidence only; never a successful timing baseline."
+    }
+  }
+}

@@ -16,6 +16,8 @@ The user-prioritized [D01 development and verification efficiency](execution/dev
 
 The [ordinary exact editor and Track](execution/evidence/delivery/task-1004-final-acceptance.md) are accepted locally at d1f056e on the accepted backend 335435e, strict seeds 6fde5ad and mounted prerequisite 07cf lineage. The review-found error-body slot issue is repaired and independently approved. [Portable media-test artifact output](execution/evidence/delivery/task-10110-final-acceptance.md) is separately accepted at d3d0277 on 6fde5ad, with no runtime changes or blanket dependency. The dormant matcher 3547f82 and P08A source preparation remain independent. The reviewed application stays b4fc209; C01 composition, upstream publication and working-version adoption remain open.
 
+The [portable test-output measurement](execution/measurements/portable-media-tests.md) records six matched seven-case runs and a reproducible recipe. It establishes fewer output setup commands and preserved evidence, with no repeatable speed gain; failed missing-environment runs are reliability evidence only.
+
 ## Global constraints
 
 - Upstream means `austinmabry/OpenScrub`; remote means the user's `tahv0/OpenScrub`, currently `origin`.

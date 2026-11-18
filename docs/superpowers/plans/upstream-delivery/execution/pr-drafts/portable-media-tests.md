@@ -9,3 +9,5 @@ Validation at `d3d02770b8a42575236b11309b5a334170f7ec89`: frozen native full 566
 Depends only on the owning exact/strict tests at BASE `6fde5ad60c6d78d69dbbd8e049a9196f15e4095f`. It can accompany that contribution if a separate tooling stack adds unnecessary work. Unrelated PRs need no dependency, rebase or repeated validation.
 
 [Final acceptance](../evidence/delivery/task-10110-final-acceptance.md).
+
+A [matched seven-case measurement](../measurements/portable-media-tests.md) ran three old/new pairs on the same Python3.9 inputs: every sample passed, with no retries, and all seven evidence files preserved their deterministic semantics. Pytest medians were1.46s old and1.45s new; this does not establish a repeatable speed gain. The explicit output recipe drops two setup commands (environment assignment and directory creation); this is an action count, not measured human-time savings.
