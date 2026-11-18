@@ -254,3 +254,22 @@ def test_strict_person_prime_preserves_cancellation(rig,monkeypatch,failure):
             person_det=detector,strict_seed=rig.seed)
     assert [c.releases for c in rig.captures]==[1,1]
     assert rig.initializers==[] and rig.grabs==[]
+
+
+
+def test_strict_person_constructor_failure_never_falls_back(rig,monkeypatch):
+    calls=[];errors=[]
+    def capture(video):
+        calls.append(video)
+        if len(calls)==2:
+            error=RuntimeError('person constructor retained oracle');errors.append(error);raise error
+        return rig.Capture(video)
+    monkeypatch.setattr(engine.cv2,'VideoCapture',capture)
+    detector=SimpleNamespace(want_any=False,find=lambda frame:pytest.fail('detector after source failure'))
+    with pytest.raises(exact.ExactError,match='person constructor retained oracle') as caught:
+        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+            person_det=detector,strict_seed=rig.seed)
+    assert caught.value.__cause__ is errors[0]
+    assert calls==['fixture','fixture']
+    assert [c.releases for c in rig.captures]==[1]
+    assert rig.initializers==[] and rig.grabs==[] and detector.want_any is False

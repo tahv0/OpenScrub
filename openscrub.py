@@ -1958,14 +1958,19 @@ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
     if strict_seed is not None:
         _validate_tracker_seed(strict_seed, video, box, t_ref, t0, t1)
     prev_any = getattr(det, "want_any", False)
-    cap = cv2.VideoCapture(video)
     try:
-        if not cap.isOpened():
-            if strict_seed is not None:
-                raise exact.ExactError("strict tracker capture could not open")
-            return []
+        cap = cv2.VideoCapture(video)
+    except (exact.ExactError, PipelineCancelled):
+        raise
+    except Exception as error:
+        if strict_seed is not None:
+            raise exact.ExactError('strict person capture failed: '+str(error)) from error
+        raise
+    try:
         if strict_seed is not None:
             _prime_tracker_seed(cap, strict_seed)
+        elif not cap.isOpened():
+            return []
         fps = strict_seed.fps if strict_seed is not None else (cap.get(cv2.CAP_PROP_FPS) or 30.0)
         step = max(1, int(step_frames)) / fps
         t_ref = min(max(t_ref, t0), t1)

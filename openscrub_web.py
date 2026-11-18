@@ -2323,6 +2323,17 @@ def job_track_object(jid):
         if snapshot_lease is not None:
             snapshot_lease.release()
 
+    def strict_current():
+        if lease.operation is None:
+            if (job.get('qgen', 0) != admission_qgen
+                    or job['cancel'] is not admission_cancel
+                    or (not admission_signalled and admission_cancel.is_set())
+                    or (operation is not None and operation.is_set())):
+                raise exact.ExactError('tracking admission was cancelled',409,'sample_conflict')
+        elif (not _operation_valid(job, lease) or job.get('trackbg') is not st
+                or lease.operation.is_set()):
+            raise exact.ExactError('tracking operation changed or was cancelled',409,'sample_conflict')
+
     def strict_document():
         _exact_current_locked(job, selected)
         if os.path.realpath(lease.source) != selected['path']:
@@ -2330,6 +2341,9 @@ def job_track_object(jid):
         latest = _load_job_report(job)
         current_fps, current_cum, current_eq, _ = _exact_policy(latest, selected)
         _check_sample_precondition(seed_pc, selected, current_fps,current_cum,current_eq)
+        # Report I/O/projection may block while cancellation signals its Event.
+        _exact_current_locked(job, selected)
+        strict_current()
         return latest
 
     try:
@@ -2338,11 +2352,7 @@ def job_track_object(jid):
             if job.get("video") != current or files.operation is not operation:
                 abort(409, "job operation or source changed — retry tracking")
             if selected is not None:
-                if (job.get('qgen', 0) != admission_qgen
-                        or job['cancel'] is not admission_cancel
-                        or (not admission_signalled and admission_cancel.is_set())
-                        or (operation is not None and operation.is_set())):
-                    raise exact.ExactError('tracking admission was cancelled',409,'sample_conflict')
+                strict_current()
                 strict_document()
             if ((files.tracker is not None and not files.tracker.released)
                     or job.get("trackbg", {}).get("state") == "running"):
@@ -2439,6 +2449,9 @@ def job_track_object(jid):
                 new[-1]["t_end"] += 0.25
                 doc["detections"].extend(new)
                 path = os.path.join(job["dir"], "report.json")
+                if selected is not None:
+                    _exact_current_locked(job, selected)
+                    strict_current()
                 atomic_report(path, doc)
                 _report_committed_locked(job, doc)
                 job["log"].append(

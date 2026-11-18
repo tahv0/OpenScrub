@@ -351,3 +351,50 @@ def test_fresh_strict_track_after_acknowledged_idle_cancel(tracking):
     status=joined(tracking)
     assert status['added']==1 and status['error'] is None,status
     assert tracking.calls[0][3]['strict_seed'].index==1
+
+
+
+@pytest.mark.parametrize('hold_at',[1,2,3],ids=['installation','pre-model','preappend'])
+def test_strict_cancel_during_context_read_never_advances(tracking,monkeypatch,hold_at):
+    files=web.FILES.initialize(tracking.exact.job)
+    if hold_at==1:
+        # A real completed attempt supplies the Event cancelled before lock entry.
+        legacy=copy.deepcopy(tracking.payload);del legacy['seed']
+        launch(tracking,legacy);assert joined(tracking)['added']==1
+        assert files.operation is not None and not files.operation.is_set()
+        tracking.models.clear();tracking.calls.clear()
+    entered,release,signalled=(threading.Event() for _ in range(3))
+    tracking.releases.append(release)
+    original=web._load_job_report;reads=[]
+    def load(job):
+        reads.append(True)
+        if len(reads)==hold_at:
+            entered.set();assert release.wait(8)
+        return original(job)
+    monkeypatch.setattr(web,'_load_job_report',load)
+    before=tracking.exact.path.read_bytes()
+    launch_call=cancel_call=None
+    try:
+        if hold_at==1:
+            launch_call=start_call('post',tracking.exact.url+'/track_object',json=tracking.payload)
+        else:launch(tracking)
+        assert entered.wait(5),'actual context read was not held'
+        operation=files.operation
+        assert operation is not None
+        original_set=operation.set
+        def signal():
+            original_set();signalled.set()
+        monkeypatch.setattr(operation,'set',signal)
+        cancel_call=start_call('post',tracking.exact.url+'/cancel')
+        assert signalled.wait(5),'real cancel did not signal before report-lock entry'
+    finally:
+        release.set()
+        if launch_call is not None:launch_response=finish(launch_call)
+        if cancel_call is not None:cancel_response=finish(cancel_call)
+        status=joined(tracking)
+    assert cancel_response.status_code==200
+    if hold_at==1:assert launch_response.status_code==409
+    assert tracking.exact.path.read_bytes()==before,'cancelled strict work published rows'
+    assert len(tracking.models)==(1 if hold_at==3 else 0),'model resolved after cancellation'
+    assert len(tracking.calls)==(1 if hold_at==3 else 0)
+    assert web.FILES.count==0
