@@ -5,8 +5,8 @@ const root=process.env.VERIFY_RUN,origin='http://127.0.0.1:18550';
 const row=(i,category,enabled,person=-1,track=-1,confidence=.5,zone_dropped=false)=>({i,category,enabled,person,track,confidence,zone_dropped,text:'synthetic '+i,t_start:.1,t_end:2,box:[20+i*12,20,40+i*12,50]});
 const initial=[row(0,'face',true,0,-1,.9),row(1,'face',false,0),row(2,'face',true,0),row(3,'face',true),row(4,'plate',false,-1,4,.9),row(5,'plate',false,-1,4),row(6,'plate',true),row(7,'email',false),row(8,'face',false,0,-1,.95,true),row(9,'plate',true,-1,4,.95,true)];
 const results={browserPlugin:'unavailable',page:'full emitted PAGE',scenarios:[],errors:[],console:[]};
-let browser;
-(async()=>{browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true,isMobile:process.env.TASK150_TOUCH_ONLY==='1'});
+let browser,page;
+(async()=>{browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true,isMobile:process.env.TASK150_TOUCH_ONLY==='1'});
 page.on('pageerror',e=>results.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))results.console.push(m.text())});
 let rows=structuredClone(initial),hold=false,release=null,fail=false;const requests=[];
 await page.route(origin+'/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname;requests.push({path,method:req.method()});
@@ -14,7 +14,7 @@ const json=body=>route.fulfill({contentType:'application/json',body:JSON.stringi
 if(path==='/')return route.fulfill({contentType:'text/html',body:fs.readFileSync(root+'/page.html','utf8')});
 if(path==='/api/jobs')return json(['A','B','empty'].map(id=>({id,name:'Synthetic '+id,phase:'review'})));
 if(/^\/api\/jobs\/[^/]+$/.test(path))return json({id:path.split('/').at(-1),name:'Synthetic review',phase:'review',progress:1,has_output:false});
-if(path.endsWith('/log'))return json({lines:[],len:0});
+if(path.endsWith('/log'))return json({from:0,lines:[],len:0});
 if(path.endsWith('/detections')){if(req.method()==='POST'){if(hold)await new Promise(r=>release=r);if(fail)return route.fulfill({status:423,contentType:'application/json',body:'{"error":"controlled busy"}'});for(const [i,v]of Object.entries(req.postDataJSON().enabled||{}))rows[+i].enabled=v;return json({ok:true});}return json({detections:path.includes('/empty/')?[]:rows,duration:4,fps:10});}
 if(path.endsWith('/render'))return json({ok:true});
 if(path.endsWith('/report'))return json({detections:rows.map(({box,...r})=>({...r,cbox:box,aoff:[0,0]})),audio_redactions:[],render_state:{fps:10,cum:Array(40).fill([0,0])}});
@@ -116,4 +116,4 @@ await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});as
 await page.getByText('Advanced settings ▸',{exact:true}).click();const tip=page.locator('label:has(#faceheads) .qm');await tip.scrollIntoViewIfNeeded();const checked=await page.locator('#faceheads').isChecked();await tip.tap();assert.equal(await tip.evaluate(e=>e.classList.contains('open')),true);assert.equal(await page.locator('#faceheads').isChecked(),checked);assert.equal(await tip.evaluate(e=>e.style.getPropertyValue('--qw')),'250px');
 results.scenarios.push('native touch scrolling leaves selection empty; mobile help tap preserves checkbox and tooltip bounds');
 assert.deepEqual(results.errors,[]);await page.screenshot({path:root+'/filtered.png'});
-})().catch(e=>{results.failure=e.stack;process.exitCode=1}).finally(async()=>{if(browser)await browser.close();fs.writeFileSync(root+'/browser-results.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results))});
+})().catch(e=>{results.failure=e.stack;process.exitCode=1}).finally(async()=>{if(results.failure&&page){results.failureState=await page.evaluate(()=>({poll:document.getElementById('pollStatus')?.textContent,review:!!REVIEW_META,matching:REVIEW_SCHED?[...REVIEW_SCHED.matching]:[],mounted:REVIEW_SCHED?[...REVIEW_SCHED.bindings.keys()]:[]})).catch(()=>null)}if(browser)await browser.close();fs.writeFileSync(root+'/browser-results.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results))});
