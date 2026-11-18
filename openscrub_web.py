@@ -24,6 +24,8 @@ over the GPU.
 """
 
 import argparse
+import base64
+import subprocess
 import json
 import math
 import os
@@ -42,6 +44,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
 
 import openscrub
 from openscrub_internal.reports import atomic_report
+from openscrub_internal import exact_samples as exact
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 import zones_ui
 
@@ -974,6 +977,7 @@ def _run_job(job, action, owner=None):
             if not _operation_valid(job, owner) or owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
             atomic_report(path, doc)
+            _report_committed_locked(job, doc, owner if action == "scan" else None)
     cb.publish_report = publish_report
     source = owner.source if owner is not None else job["video"]
     try:
@@ -987,84 +991,83 @@ def _run_job(job, action, owner=None):
                 if not _operation_valid(job, owner):
                     return
                 job["stats"] = state["stats"]
-            try:
-                prov = _load_job_report(job).get("provenance", {})
-                if (prov.get("vfr_normalized")
-                        and os.path.exists(prov.get("input", ""))):
-                    _update_job_source(job, prov["input"], owner)
-                    job["log"].append(
-                        "using CFR-normalized file for previews/thumbnails")
-            except Exception:
-                pass
-            thumbnail_owner = _own_files(job, work=True)
-            def _pregen(jb=job, video=thumbnail_owner.source):
-                """One pass through the video with a single decoder:
-                thumbnails come out in seconds instead of minutes.
-                Sorting by reference time keeps seeks short and forward-
-                only, which is what codecs are fast at."""
-                cap = None
-                try:
-                    doc = _load_job_report(jb)
-                    rs = doc["render_state"]
-                    todo = []
-                    for k, d in enumerate(doc["detections"]):
-                        cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
-                        if os.path.exists(cch):
-                            continue
-                        tref = min(max(d.get("last_seen", d["t_start"]),
-                                       d["t_start"]), d["t_end"])
-                        todo.append((tref, k, d, cch))
-                    todo.sort()
-                    cap = cv2.VideoCapture(video)
-                    cur = -1
-                    frame = None
-                    for tref, k, d, cch in todo:
-                        fidx = min(int(tref * rs["fps"]),
-                                   len(rs["cum"]) - 1)
-                        if fidx != cur:
-                            if 0 <= fidx - cur <= 12:
-                                while cur < fidx:   # cheap forward decode
+            coherent = _adopt_scan_source(job, owner)
+            if coherent:
+                thumbnail_owner = _own_files(job, work=True)
+                pregen_source = files.current_source
+                def _pregen(jb=job, video=thumbnail_owner.source):
+                    """One pass through the video with a single decoder:
+                    thumbnails come out in seconds instead of minutes.
+                    Sorting by reference time keeps seeks short and forward-
+                    only, which is what codecs are fast at."""
+                    cap = None
+                    try:
+                        doc = _load_job_report(jb)
+                        rs = doc["render_state"]
+                        todo = []
+                        for k, d in enumerate(doc["detections"]):
+                            cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+                            if os.path.exists(cch):
+                                continue
+                            tref = min(max(d.get("last_seen", d["t_start"]),
+                                           d["t_start"]), d["t_end"])
+                            todo.append((tref, k, d, cch))
+                        todo.sort()
+                        cap = cv2.VideoCapture(video)
+                        cur = -1
+                        frame = None
+                        for tref, k, d, cch in todo:
+                            fidx = min(int(tref * rs["fps"]),
+                                       len(rs["cum"]) - 1)
+                            if fidx != cur:
+                                if 0 <= fidx - cur <= 12:
+                                    while cur < fidx:   # cheap forward decode
+                                        ok, frame = cap.read()
+                                        if not ok:
+                                            frame = None
+                                            break
+                                        cur += 1
+                                else:
+                                    cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
                                     ok, frame = cap.read()
+                                    cur = fidx if ok else cur
                                     if not ok:
                                         frame = None
-                                        break
-                                    cur += 1
-                            else:
-                                cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
-                                ok, frame = cap.read()
-                                cur = fidx if ok else cur
-                                if not ok:
-                                    frame = None
-                        if frame is None:
-                            continue
-                        ox, oy = rs["cum"][fidx]
-                        h, wd = frame.shape[:2]
-                        pad = 24
-                        x1 = max(0, int(d["cbox"][0] + ox) - pad)
-                        y1 = max(0, int(d["cbox"][1] + oy) - pad)
-                        x2 = min(wd, int(d["cbox"][2] + ox) + pad)
-                        y2 = min(h, int(d["cbox"][3] + oy) + pad)
-                        crop = frame[y1:y2, x1:x2].copy()
-                        if crop.size == 0:
-                            continue
-                        inner = crop[pad:-pad or None, pad:-pad or None]
-                        if not inner.size or float(inner.std()) <= 8:
-                            continue   # blank: leave for the on-demand
-                                       # path, which tries other moments
-                        cv2.rectangle(crop, (pad, pad),
-                                      (crop.shape[1] - pad,
-                                       crop.shape[0] - pad),
-                                      (0, 0, 255), 2)
-                        cv2.imwrite(cch, crop,
-                                    [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    jb["log"].append("thumbnails pre-generated "
-                                     f"({len(todo)})")
-                except Exception:
-                    pass
-                finally:
-                    if cap is not None:
-                        cap.release()
-            _start_owned_thread(_pregen, thumbnail_owner)
+                            if frame is None:
+                                continue
+                            ox, oy = rs["cum"][fidx]
+                            h, wd = frame.shape[:2]
+                            pad = 24
+                            x1 = max(0, int(d["cbox"][0] + ox) - pad)
+                            y1 = max(0, int(d["cbox"][1] + oy) - pad)
+                            x2 = min(wd, int(d["cbox"][2] + ox) + pad)
+                            y2 = min(h, int(d["cbox"][3] + oy) + pad)
+                            crop = frame[y1:y2, x1:x2].copy()
+                            if crop.size == 0:
+                                continue
+                            inner = crop[pad:-pad or None, pad:-pad or None]
+                            if not inner.size or float(inner.std()) <= 8:
+                                continue   # blank: leave for the on-demand
+                                           # path, which tries other moments
+                            cv2.rectangle(crop, (pad, pad),
+                                          (crop.shape[1] - pad,
+                                           crop.shape[0] - pad),
+                                          (0, 0, 255), 2)
+                            with files.report_lock:
+                                if (not _operation_valid(job, owner) or owner.operation.is_set()
+                                        or files.current_source is not pregen_source
+                                        or files.source_status != 'coherent'
+                                        or _file_stamp(os.stat(video)) != pregen_source['stamp']):
+                                    return
+                                cv2.imwrite(cch, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        jb["log"].append("thumbnails pre-generated "
+                                         f"({len(todo)})")
+                    except Exception:
+                        pass
+                    finally:
+                        if cap is not None:
+                            cap.release()
+                _start_owned_thread(_pregen, thumbnail_owner)
             next_owner = (_prepare_work(job, "render")
                           if job["options"].get("skip_review") else None)
             ticket = None
@@ -1197,12 +1200,14 @@ def enforce_vault_lock():
             _validate_files_locked(job)
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
-                "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+                "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
             g.file_owner = _reserve_files_locked(job, read_source=read_source)
 
 
 @app.after_request
 def _finish_file_response(response):
+    if request.endpoint == "job_edit_sample":
+        response.headers["Cache-Control"] = "private, no-store"
     for child in g.pop("file_children", []):
         child.release()
     lease = g.pop("file_owner", None)
@@ -1487,6 +1492,8 @@ def job_cancel(jid):
         if operation is None:
             job["cancel"].set()  # idle/intake: no running compute to interrupt
         files.operation = None  # Event.clear cannot revive the captured attempt
+        if files.source_status == 'pending':
+            files.source_status, files.source_reason = 'unavailable', 'scan source adoption cancelled'
         with JOBS_LOCK:
             released = list(files.queued.values())
             files.queued.clear()
@@ -1507,6 +1514,285 @@ def job_cancel(jid):
 def _load_job_report(job):
     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
         return json.load(f)
+
+
+def _file_stamp(stat):
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _report_committed_locked(job, doc, scan_owner=None):
+    """Success-only notification; caller owns report/lifetime transaction."""
+    files = FILES.initialize(job)
+    files.committed_report_epoch += 1
+    if scan_owner is not None:
+        expected = doc.get('provenance', {}).get('input')
+        files.source_pair = (scan_owner.operation, files.committed_report_epoch, expected,
+                             _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))))
+        files.source_status, files.source_reason = 'pending', None
+    elif files.source_pair is not None and files.source_status == 'unavailable':
+        operation, _, expected, _ = files.source_pair
+        files.source_pair = (operation, files.committed_report_epoch, expected,
+                             _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))))
+
+
+def _probe_exact_source(path):
+    try:
+        result = subprocess.run([
+            'ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries',
+            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames:stream_tags=rotate:stream_side_data',
+            '-of', 'json', path], capture_output=True, timeout=15, check=True)
+        if len(result.stdout) > 65536:
+            raise exact.ExactError('stream metadata exceeds bounded response')
+        return exact.metadata_facts(json.loads(result.stdout))
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        raise exact.ExactError('successful exact stream metadata unavailable: '+str(error)) from None
+
+
+def _prepare_observed_source(job, path):
+    """Reserve containing lifetime before first stat/probe; never under report_lock."""
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        lease = _reserve_files_locked(job, source=path)
+    try:
+        canonical = lease.source
+        with open(canonical, 'rb') as opened:
+            stamp = _file_stamp(os.fstat(opened.fileno()))
+            if stamp != _file_stamp(os.stat(canonical)):
+                raise exact.ExactError('source changed while opening', 409, 'sample_conflict')
+            files = FILES.initialize(job)
+            with files.report_lock:
+                cached = files.current_source
+                cached = cached if cached and (cached['path'], cached['stamp']) == (canonical, stamp) else None
+            if cached is not None:
+                facts, policy_error = cached['facts'], cached['policy_error']
+            else:
+                try:
+                    facts, policy_error = _probe_exact_source(canonical), None
+                except exact.ExactError as error:
+                    facts, policy_error = None, str(error)
+            if stamp != _file_stamp(os.fstat(opened.fileno())) or stamp != _file_stamp(os.stat(canonical)):
+                raise exact.ExactError('source changed during preparation', 409, 'sample_conflict')
+        return dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error), lease
+    except BaseException:
+        lease.release()
+        raise
+
+
+def _select_observed_locked(job, prepared, authoritative=False):
+    files = FILES.initialize(job)
+    current = files.current_source
+    same = current and (current['path'],current['stamp']) == (prepared['path'],prepared['stamp'])
+    if not authoritative and files.source_status == 'pending':
+        raise exact.ExactError('scan report awaits source adoption', 409, 'source_report_pending')
+    if not authoritative and (files.source_retired or current is not None and not same):
+        files.source_retired = True
+        files.current_source = None
+        files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
+        raise exact.ExactError(files.source_reason)
+    if not same:
+        files.source_epoch += 1
+        prepared = dict(prepared, source_ref='%s:%d' % (files.incarnation, files.source_epoch))
+        files.current_source = prepared
+    files.source_retired = False
+    files.source_status, files.source_reason = 'coherent', None
+    return files.current_source
+
+
+def _adopt_scan_source(job, owner):
+    files = FILES.initialize(job)
+    with files.report_lock:
+        pair = files.source_pair
+        if (pair is None or pair[0] is not owner.operation or
+                not _operation_valid(job, owner) or owner.operation.is_set()):
+            return False
+    prepared = lease = None
+    try:
+        if not isinstance(pair[2], str) or not pair[2]:
+            raise exact.ExactError('scan report has no selected input')
+        prepared, lease = _prepare_observed_source(job, pair[2])
+        with files.report_lock:
+            if (files.source_pair != pair or not _operation_valid(job, owner)
+                    or owner.operation.is_set()):
+                return False
+            if _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != pair[3]:
+                raise exact.ExactError('committed scan report changed during adoption', 409, 'sample_conflict')
+            selected = _select_observed_locked(job, prepared, authoritative=True)
+            job['video'] = selected['path']
+            return True
+    except Exception as error:
+        with files.report_lock:
+            if files.source_pair == pair and _operation_valid(job, owner) and not owner.operation.is_set():
+                files.source_status, files.source_reason = 'unavailable', str(error)
+                job['log'].append('exact source unavailable: '+str(error))
+        return False
+    finally:
+        if lease is not None:
+            lease.release()
+
+
+def _exact_snapshot(job):
+    """One parsed raw document and one convergent current source descriptor."""
+    files = FILES.initialize(job)
+    path = os.path.join(job['dir'], 'report.json')
+    with files.report_lock:
+        _report_current(job)
+        fence = files.committed_report_epoch, files.operation
+        if files.source_status == 'pending':
+            raise exact.ExactError('scan report awaits source adoption', 409, 'source_report_pending')
+        if files.active is not None:
+            raise exact.ExactError('job work is active', 409, 'sample_conflict')
+        if files.source_retired:
+            raise exact.ExactError(files.source_reason)
+        recovery = files.source_pair if files.source_status == 'unavailable' else None
+    try:
+        with open(path, encoding='utf-8') as opened:
+            report_stamp = _file_stamp(os.fstat(opened.fileno()))
+            doc = json.load(opened)
+            if report_stamp != _file_stamp(os.fstat(opened.fileno())) or report_stamp != _file_stamp(os.stat(path)):
+                raise exact.ExactError('report changed while reading', 409, 'sample_conflict')
+    except FileNotFoundError:
+        raise exact.ExactError('job report not found', 404, 'missing_report') from None
+    except (ValueError, UnicodeError):
+        raise exact.ExactError('invalid raw report') from None
+    if not isinstance(doc, dict):
+        raise exact.ExactError('legacy list report has no exact timeline')
+    candidate = doc.get('provenance', {}).get('input')
+    if not isinstance(candidate, str) or not candidate:
+        raise exact.ExactError('report has no selected scan input')
+    canonical = os.path.realpath(candidate)
+    if recovery is None and canonical != os.path.realpath(job['video']):
+        with files.report_lock:
+            if files.current_source is not None:
+                files.source_retired = True
+                files.current_source = None
+                files.source_status, files.source_reason = 'unavailable', 'selected scan path changed; rescan required'
+        raise exact.ExactError('report and selected scan input disagree')
+    if recovery and report_stamp != recovery[3]:
+        raise exact.ExactError('committed scan report changed before recovery', 409, 'sample_conflict')
+    if recovery and (recovery[0] is not fence[1] or recovery[0].is_set()
+                     or canonical != os.path.realpath(recovery[2])):
+        raise exact.ExactError('scan adoption was cancelled or replaced')
+    lease = None
+    try:
+        prepared, lease = _prepare_observed_source(job, canonical)
+        with files.report_lock:
+            _report_current(job)
+            if ((files.committed_report_epoch, files.operation) != fence
+                    or files.active is not None or _file_stamp(os.stat(path)) != report_stamp
+                    or files.source_status == 'pending'):
+                raise exact.ExactError('source/report selection changed', 409, 'sample_conflict')
+            selected = _select_observed_locked(job, prepared)
+            if recovery:
+                job['video'] = selected['path']
+        return doc, selected, (fence, report_stamp), lease
+    except FileNotFoundError:
+        if lease is not None:
+            lease.release()
+        raise exact.ExactError('selected source not found', 404, 'missing_source') from None
+    except BaseException:
+        if lease is not None:
+            lease.release()
+        raise
+
+
+def _exact_policy(doc, selected):
+    if selected['policy_error']:
+        raise exact.ExactError(selected['policy_error'])
+    provenance = doc.get('provenance', {})
+    settings = provenance.get('settings', {})
+    normalized = (provenance.get('vfr_normalized') and provenance.get('original_input')
+                  and os.path.realpath(provenance['original_input']) != selected['path'])
+    if not normalized and (settings.get('no_vfr_fix') or settings.get('vfr') == 'ignore'):
+        raise exact.ExactError('known raw timing bypass is unsupported')
+    fps, cum, timeline_eq = exact.timeline(doc, selected['facts'])
+    tolerance = exact.precision_bound(selected['facts'], fps, len(cum))
+    return fps, cum, timeline_eq, tolerance
+
+
+def _exact_current_locked(job, selected, fence=None):
+    files = FILES.initialize(job)
+    _report_current(job)
+    if (files.current_source is not selected or files.source_status != 'coherent'
+            or files.source_retired or files.active is not None
+            or os.path.realpath(job['video']) != selected['path']):
+        raise exact.ExactError('source selection changed', 409, 'sample_conflict')
+    try:
+        if _file_stamp(os.stat(selected['path'])) != selected['stamp']:
+            files.source_retired = True
+            files.current_source = None
+            files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
+            raise exact.ExactError(files.source_reason, 409, 'sample_conflict')
+        if fence is not None and ((files.committed_report_epoch, files.operation) != fence[0]
+                or _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != fence[1]):
+            raise exact.ExactError('report publication overlapped sample', 409, 'sample_conflict')
+    except FileNotFoundError:
+        raise exact.ExactError('source/report disappeared', 409, 'sample_conflict') from None
+
+
+def _exact_error(error):
+    return jsonify(error=error.code, detail=str(error)), error.status
+
+
+@app.route('/api/jobs/<jid>/edit_sample')
+def job_edit_sample(jid):
+    job = JOBS.get(jid) or abort(404)
+    lease = None
+    try:
+        try:
+            requested = json.loads(request.args['t'])
+            if not exact.finite(requested):
+                raise ValueError()
+        except (KeyError, ValueError, TypeError):
+            raise exact.ExactError('finite numeric t required', 400, 'invalid_sample_request') from None
+        if 'src' in request.args:
+            raise exact.ExactError('exact samples use scan input only', 400, 'invalid_sample_request')
+        doc, selected, fence, lease = _exact_snapshot(job)
+        fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+        index = exact.resolve_time(requested, fps, len(cum))
+        facts = selected['facts']
+        with open(selected['path'], 'rb') as opened:
+            if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
+                raise exact.ExactError('opened source changed', 409, 'sample_conflict')
+            cap = cv2.VideoCapture(selected['path'])
+            try:
+                decoded = exact.read_indexed_capture(cap, index, fps=fps, count=len(cum),
+                    width=facts['width'], height=facts['height'], tolerance_s=tolerance)
+                try:
+                    ok, encoded = cv2.imencode('.jpg', decoded.pixels, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    if not ok or encoded is None:
+                        raise ValueError('JPEG encoder returned no image')
+                    image = base64.b64encode(encoded.tobytes()).decode('ascii')
+                except Exception as error:
+                    raise exact.ExactError('JPEG encoding failed: '+str(error), 500, 'sample_encode_failed') from None
+            finally:
+                cap.release()
+            if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
+                raise exact.ExactError('opened source mutated', 409, 'sample_conflict')
+        offset = cum[index]
+        boxes = []
+        for i, row in enumerate(doc['detections']):
+            baseline = exact.row_base(row)
+            start, end, _ = baseline['span']
+            if start-.01 <= decoded.canonical_s <= end+.01:
+                box = baseline['cbox']
+                boxes.append(dict(i=i, category=row['category'], text=row.get('text',''),
+                    enabled=row.get('enabled',True), t_start=start, t_end=end,
+                    box=[box[0]+offset[0], box[1]+offset[1], box[2]+offset[0], box[3]+offset[1]],
+                    row_context_eq=exact.row_context_eq(row), base=baseline))
+        with FILES.initialize(job).report_lock:
+            _exact_current_locked(job, selected, fence)
+        return jsonify(version=1, sample=dict(source_ref=selected['source_ref'],
+            timeline_eq=timeline_eq, policy=exact.POLICY, index=index, requested_s=requested,
+            canonical_s=decoded.canonical_s, observed_s=decoded.observed_s, width=facts['width'],
+            height=facts['height'], stream=facts['stream'], origin=[0,0], offset=offset),
+            image=dict(mime='image/jpeg', base64=image), boxes=boxes)
+    except exact.ExactError as error:
+        return _exact_error(error)
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        return _exact_error(exact.ExactError('invalid consumed report geometry: '+str(error)))
+    finally:
+        if lease is not None:
+            lease.release()
 
 
 def _frame_at(job, t, rstate):
@@ -1716,100 +2002,230 @@ def _valid_manual_creation(value):
             and numbers(value["aoff"], 2))
 
 
-@app.route("/api/jobs/<jid>/detections", methods=["POST"])
+def _parse_sample_precondition(value, row=False):
+    def invalid():
+        raise exact.ExactError('invalid geometry precondition shape', 400, 'invalid_sample_request')
+    if not isinstance(value, dict):
+        invalid()
+    if (type(value.get('version')) is not int or value['version'] != 1
+            or value.get('policy') != exact.POLICY
+            or not isinstance(value.get('source_ref'), str) or not 1 <= len(value['source_ref']) <= 128
+            or type(value.get('index')) is not int or value['index'] < 0
+            or any(type(value.get(k)) is not int or value[k] <= 0 for k in ('width','height'))):
+        invalid()
+    for key in ('timeline_eq','row_context_eq') if row else ('timeline_eq',):
+        if not isinstance(value.get(key), str) or re.fullmatch('[0-9a-f]{64}', value[key]) is None:
+            invalid()
+    try:
+        exact.vector(value.get('offset'), 2)
+        if row:
+            baseline = value['base']
+            if not isinstance(baseline, dict) or set(baseline) != {'cbox','span'}:
+                invalid()
+            exact.vector(baseline['cbox'], 4)
+            exact.vector(baseline['span'], 3)
+    except (KeyError, exact.ExactError):
+        invalid()
+    return value
+
+
+def _strict_geometry(edits):
+    preconditions = edits.get('geometry_preconditions', {})
+    if not isinstance(preconditions, dict):
+        raise exact.ExactError('geometry_preconditions must be an index map', 400, 'invalid_sample_request')
+    for key, value in preconditions.items():
+        if (not isinstance(key, str) or re.fullmatch('0|[1-9][0-9]*', key) is None
+                or len(key) > 18 or not any(key in (edits.get(k) or {}) for k in ('box_overrides','time_overrides'))):
+            raise exact.ExactError('strict row must name a submitted raw index', 400, 'invalid_sample_request')
+        _parse_sample_precondition(value, row=True)
+        try:
+            if key in (edits.get('box_overrides') or {}):
+                exact.vector(edits['box_overrides'][key], 4)
+            if key in (edits.get('time_overrides') or {}):
+                span = exact.vector(edits['time_overrides'][key], 2)
+                if not span[1] > span[0] >= 0:
+                    raise ValueError()
+        except (exact.ExactError, ValueError):
+            raise exact.ExactError('invalid strict geometry target', 400, 'invalid_sample_request') from None
+    for manual in edits.get('manual', []):
+        if 'sample_precondition' in manual:
+            _parse_sample_precondition(manual['sample_precondition'])
+    return preconditions
+
+
+def _manual_candidates(doc, edits):
+    """Classify immutable replay before current-source freshness or any mutation."""
+    identified = {}
+    for row in doc['detections']:
+        identity = row.get('manual_id')
+        if isinstance(identity, str):
+            identified.setdefault(identity, []).append(row)
+    additions, strict = [], []
+    rs = doc['render_state']
+    for manual in edits.get('manual', []):
+        has_id, identity = 'manual_id' in manual, manual.get('manual_id')
+        if has_id and (not isinstance(identity,str) or re.fullmatch(r'[A-Za-z0-9._:-]{1,128}',identity) is None):
+            raise exact.ExactError('Invalid manual_id', 400, 'invalid_sample_request')
+        pc = manual.get('sample_precondition')
+        try:
+            if pc is not None:
+                times = exact.vector([manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])], 3)
+                box = exact.vector(manual['screen_box'], 4)
+                t0,t1,tref = times
+                ox,oy = pc['offset']
+            else:
+                t0,t1 = float(manual['t_start']),float(manual['t_end'])
+                tref = float(manual.get('t_ref',t0)); box = manual['screen_box']
+                if has_id and (len(box) != 4 or not all(math.isfinite(v) for v in [t0,t1,tref,*box])):
+                    raise ValueError()
+                index = min(int(tref*rs['fps']),len(rs['cum'])-1)
+                ox,oy = rs['cum'][index]
+            creation = dict(t_start=t0,t_end=t1,cbox=[int(box[0]-ox),int(box[1]-oy),int(box[2]-ox),int(box[3]-oy)],aoff=[ox,oy])
+            if (has_id or pc is not None) and not _valid_manual_creation(creation):
+                raise ValueError()
+        except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+            if has_id or pc is not None:
+                raise exact.ExactError('Invalid finite manual creation', 400, 'invalid_sample_request') from None
+            raise
+        if has_id and identity in identified:
+            rows = identified[identity]
+            if (len(rows) != 1 or not _valid_manual_creation(rows[0].get('manual_creation'))
+                    or rows[0]['manual_creation'] != creation):
+                raise exact.ExactError('manual_id conflict: immutable creation differs', 409, 'geometry_conflict')
+            continue
+        row = dict(creation,category='manual',text='user-drawn',confidence=1.,last_seen=t0,enabled=True)
+        if has_id:
+            row.update(manual_id=identity,manual_creation={**creation,'cbox':list(creation['cbox']),'aoff':list(creation['aoff'])})
+            identified[identity] = [row]
+        additions.append(row)
+        if pc is not None:
+            strict.append((manual, pc))
+    return additions, strict
+
+
+def _check_sample_precondition(pc, selected, fps, cum, timeline_eq):
+    if (pc['source_ref'] != selected['source_ref'] or pc['timeline_eq'] != timeline_eq
+            or pc['width'] != selected['facts']['width'] or pc['height'] != selected['facts']['height']
+            or pc['index'] >= len(cum) or pc['offset'] != cum[pc['index']]):
+        raise exact.ExactError('sample source/timeline differs', 409, 'geometry_conflict')
+
+
+def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq):
+    targets = {}
+    for key, pc in preconditions.items():
+        _check_sample_precondition(pc, selected, fps, cum, timeline_eq)
+        index = int(key)
+        if index >= len(doc['detections']):
+            raise exact.ExactError('raw row no longer exists', 409, 'geometry_conflict')
+        row = doc['detections'][index]
+        if exact.row_context_eq(row) != pc['row_context_eq']:
+            raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+        baseline = pc['base']
+        desired_box = list((edits.get('box_overrides') or {}).get(key, baseline['cbox']))
+        span = (edits.get('time_overrides') or {}).get(key)
+        desired_span = ([span[0], span[1], min(max(baseline['span'][2],span[0]),span[1])]
+                        if span is not None else list(baseline['span']))
+        intended = dict(cbox=desired_box, span=desired_span)
+        current = exact.row_base(row)
+        if current != baseline and current != intended:
+            raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
+        targets[key] = intended, current == intended
+    return targets
+
+
+@app.route('/api/jobs/<jid>/detections', methods=['POST'])
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
     edits = request.get_json(force=True)
-    path = os.path.join(job["dir"], "report.json")
-    with FILES.initialize(job).report_lock:
-        _edit_gate(job)
-        try:
-            doc = _load_job_report(job)
-        except FileNotFoundError:
-            abort(404, "job report not found")
-        enabled = edits.get("enabled", {})
-        for i, d in enumerate(doc["detections"]):
-            if str(i) in enabled:
-                d["enabled"] = bool(enabled[str(i)])
-        for i, box in (edits.get("box_overrides") or {}).items():
-            i = int(i)
-            if 0 <= i < len(doc["detections"]) and len(box) == 4:
-                doc["detections"][i]["cbox"] = [float(v) for v in box]
-        for i, span in (edits.get("time_overrides") or {}).items():
-            i = int(i)
-            if 0 <= i < len(doc["detections"]) and len(span) == 2:
-                t0, t1 = float(span[0]), float(span[1])
-                if t1 > t0 >= 0:
-                    doc["detections"][i]["t_start"] = t0
-                    doc["detections"][i]["t_end"] = t1
-                    doc["detections"][i]["last_seen"] = min(
-                        max(doc["detections"][i].get("last_seen", t0), t0), t1)
-        rs = doc["render_state"]
-        # Read identities from this transaction's latest raw document. Never
-        # reconstruct creation from a row's mutable current geometry/choices.
-        identified = {}
-        for d in doc["detections"]:
-            identity = d.get("manual_id")
-            if isinstance(identity, str):
-                identified.setdefault(identity, []).append(d)
-        for m in edits.get("manual", []):
-            has_id = "manual_id" in m
-            identity = m.get("manual_id")
-            if has_id and (not isinstance(identity, str) or
-                           re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
-                return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
-            try:
-                t0 = float(m["t_start"]); t1 = float(m["t_end"])
-                tref = float(m.get("t_ref", t0))
-                b = m["screen_box"]
-                if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
-                    raise ValueError("non-finite creation or invalid box")
-                fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
-                ox, oy = rs["cum"][fidx]
-                creation = {"t_start": t0, "t_end": t1,
-                            "cbox": [int(b[0] - ox), int(b[1] - oy),
-                                     int(b[2] - ox), int(b[3] - oy)],
-                            "aoff": [ox, oy]}
-                if has_id and not _valid_manual_creation(creation):
-                    raise ValueError("invalid effective creation")
-            except (KeyError, TypeError, ValueError, OverflowError, IndexError):
-                if has_id:
-                    return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
-                raise
-            if has_id and identity in identified:
-                rows = identified[identity]
-                if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
-                        or rows[0]["manual_creation"] != creation):
-                    return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
-                continue
-            row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
-                       last_seen=t0, enabled=True)
-            if has_id:
-                # Separate lists keep later indexed edits independent of creation.
-                row.update(manual_id=identity, manual_creation={
-                    **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
-                identified[identity] = [row]
-            doc["detections"].append(row)
-        if "audio" in edits:
-            # audio redaction spans (mute/bleep): stored in the report so the
-            # --from-report render applies them and re-renders keep them
-            doc["audio_redactions"] = [
-                {"t0": float(s["t0"]), "t1": float(s["t1"]),
-                 "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
-                          else "mute")}
-                for s in (edits.get("audio") or [])
-                if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-        atomic_report(path, doc)
-        # suggest allowlisting any string whose EVERY instance was disabled —
-        # the review just taught us it's a recurring false positive
-        per = {}
-        for d in doc["detections"]:
-            if d["category"] in ("name",):
-                per.setdefault(d["text"], []).append(d.get("enabled", True))
-        suggest = sorted(t for t, states in per.items()
-                         if len(states) >= 2 and not any(states))
-        return jsonify({"ok": True, "total": len(doc["detections"]),
-                        "suggest_allowlist": suggest})
+    path = os.path.join(job['dir'], 'report.json')
+    prepared = lease = None
+    needs_source = False
+    try:
+        preconditions = _strict_geometry(edits)
+        while True:
+            candidate = None
+            with FILES.initialize(job).report_lock:
+                _edit_gate(job)
+                try:
+                    doc = _load_job_report(job)
+                except FileNotFoundError:
+                    abort(404, 'job report not found')
+                additions, strict_manual = _manual_candidates(doc, edits)
+                needs_source = bool(preconditions or strict_manual)
+                if needs_source and prepared is None:
+                    candidate = doc.get('provenance', {}).get('input')
+                    if not isinstance(candidate,str) or not candidate:
+                        raise exact.ExactError('report has no selected scan input')
+                else:
+                    selected = targets = None
+                    if needs_source:
+                        if (os.path.realpath(doc.get('provenance', {}).get('input','')) != prepared['path']
+                                or os.path.realpath(job['video']) != prepared['path']):
+                            raise exact.ExactError('source changed while preparing save', 409, 'geometry_conflict')
+                        selected = _select_observed_locked(job, prepared)
+                        _exact_current_locked(job, selected)
+                        fps,cum,timeline_eq,_ = _exact_policy(doc,selected)
+                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq)
+                        for manual,pc in strict_manual:
+                            _check_sample_precondition(pc,selected,fps,cum,timeline_eq)
+                            t0,t1,tref = manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])
+                            box = manual['screen_box']
+                            if (tref != pc['index']/fps or not 0 <= t0 <= tref <= t1 <= len(cum)/fps
+                                    or t1 <= t0 or not 0 <= box[0] < box[2] <= pc['width']
+                                    or not 0 <= box[1] < box[3] <= pc['height']):
+                                raise exact.ExactError('strict manual geometry outside inspected sample',400,'invalid_sample_request')
+                    enabled = edits.get('enabled',{})
+                    for i,row in enumerate(doc['detections']):
+                        if str(i) in enabled:
+                            row['enabled'] = bool(enabled[str(i)])
+                    for key,box in (edits.get('box_overrides') or {}).items():
+                        i = int(key)
+                        if key in preconditions:
+                            if not targets[key][1]:
+                                doc['detections'][i]['cbox'] = [float(v) for v in targets[key][0]['cbox']]
+                        elif 0 <= i < len(doc['detections']) and len(box) == 4:
+                            doc['detections'][i]['cbox'] = [float(v) for v in box]
+                    for key,span in (edits.get('time_overrides') or {}).items():
+                        i = int(key)
+                        if key in preconditions:
+                            if not targets[key][1]:
+                                t0,t1,last = targets[key][0]['span']
+                                doc['detections'][i].update(t_start=t0,t_end=t1,last_seen=last)
+                        elif 0 <= i < len(doc['detections']) and len(span) == 2:
+                            t0,t1 = float(span[0]),float(span[1])
+                            if t1 > t0 >= 0:
+                                row = doc['detections'][i]
+                                row.update(t_start=t0,t_end=t1,last_seen=min(max(row.get('last_seen',t0),t0),t1))
+                    doc['detections'].extend(additions)
+                    if 'audio' in edits:
+                        doc['audio_redactions'] = [
+                            dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
+                            for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0]
+                    atomic_report(path,doc)
+                    _report_committed_locked(job,doc)
+                    per = {}
+                    for row in doc['detections']:
+                        if row['category'] in ('name',):
+                            per.setdefault(row['text'],[]).append(row.get('enabled',True))
+                    result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
+                    if preconditions:
+                        result['geometry_rows'] = {key:{**pc,'row_context_eq':exact.row_context_eq(doc['detections'][int(key)]),
+                            'base':exact.row_base(doc['detections'][int(key)])} for key,pc in preconditions.items()}
+                    return jsonify(result)
+            # A genuinely new strict mutation was found, before any mutation.
+            # Reserve/probe outside report_lock, then reload/reclassify latest raw.
+            prepared, lease = _prepare_observed_source(job,candidate)
+    except exact.ExactError as error:
+        if needs_source and error.status in (409, 422) and FILES.initialize(job).source_retired:
+            error = exact.ExactError('sample source has changed; rescan required', 409, 'geometry_conflict')
+        return _exact_error(error)
+    except FileNotFoundError:
+        if not needs_source:
+            raise
+        return _exact_error(exact.ExactError('sample source is no longer available', 409, 'geometry_conflict'))
+    finally:
+        if lease is not None:
+            lease.release()
 
 
 @app.route("/api/jobs/<jid>/track_object", methods=["POST"])
@@ -1916,6 +2332,7 @@ def job_track_object(jid):
                 doc["detections"].extend(new)
                 path = os.path.join(job["dir"], "report.json")
                 atomic_report(path, doc)
+                _report_committed_locked(job, doc)
                 job["log"].append(
                     "      tracked object: %d position(s), %.1f-%.1fs "
                     "(review card added)" % (len(new),
