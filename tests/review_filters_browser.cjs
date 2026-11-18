@@ -6,7 +6,7 @@ const row=(i,category,enabled,person=-1,track=-1,confidence=.5,zone_dropped=fals
 const initial=[row(0,'face',true,0,-1,.9),row(1,'face',false,0),row(2,'face',true,0),row(3,'face',true),row(4,'plate',false,-1,4,.9),row(5,'plate',false,-1,4),row(6,'plate',true),row(7,'email',false),row(8,'face',false,0,-1,.95,true),row(9,'plate',true,-1,4,.95,true)];
 const results={browserPlugin:'unavailable',page:'full emitted PAGE',scenarios:[],errors:[],console:[]};
 let browser;
-(async()=>{browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true});
+(async()=>{browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true,isMobile:process.env.TASK150_TOUCH_ONLY==='1'});
 page.on('pageerror',e=>results.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))results.console.push(m.text())});
 let rows=structuredClone(initial),hold=false,release=null,fail=false;const requests=[];
 await page.route(origin+'/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname;requests.push({path,method:req.method()});
@@ -30,6 +30,16 @@ results.scenarios.push('native selectors present');
 if(process.env.TASK150_RED==='1')return;
 const status=async s=>assert.equal(await page.locator('#reviewFilterStatus').innerText(),s);
 const filter=async(type,output)=>{await page.locator('#reviewType').selectOption(type??'');await page.locator('#reviewOutput').selectOption(output)};
+if(process.env.TASK150_TOUCH_ONLY==='1'){
+ await page.evaluate(async flags=>{for(const [i,value]of Object.entries(flags))EDITS.enabled[i]=value;await loadReview()},Object.fromEntries(initial.map(r=>[r.i,!r.enabled])));
+ await filter('','blur');assert.deepEqual(await page.evaluate(()=>REVIEW_META.cards.filter(c=>reviewMatches(c,null,'blur')).map(c=>c.id).sort((a,b)=>a-b)),[0,4,7,8]);await status('4 of 7 cards match');
+ await filter('','visible');assert.deepEqual(await page.evaluate(()=>REVIEW_META.cards.filter(c=>reviewMatches(c,null,'visible')).map(c=>c.id).sort((a,b)=>a-b)),[0,3,6,9]);
+ await page.locator('#reviewType').click();await page.keyboard.press('Home');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await page.locator('#reviewType').inputValue(),'face');
+ await page.locator('#reviewOutput').selectOption('blur');await page.locator('#kb0').click();await status('1 of 7 cards match');assert.match(await page.locator('#reviewFilterHint').innerText(),/outside your zones/);assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
+ await page.evaluate(()=>openJob('empty'));await page.locator('#reviewOutput').waitFor();await status('0 of 0 cards match');assert.equal(await page.locator('#reviewFilterEmpty').innerText(),'No detections in this job.');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();
+ results.scenarios.push('opposite pending overlay, native Detection type pointer/keyboard, collapsed-zone-only matches and no detections');
+}
+if(process.env.TASK150_TOUCH_ONLY!=='1'){
 await status('7 of 7 cards match');await filter('','blur');await status('4 of 7 cards match');await filter('','visible');await status('4 of 7 cards match');
 await filter('face','visible');await status('2 of 7 cards match');assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
 await filter('email','blur');await status('0 of 7 cards match');assert.equal(await page.locator('#reviewFilterEmpty').isVisible(),true);
@@ -70,12 +80,16 @@ hold=true;await page.locator('#kb0').click();await page.evaluate(()=>{window.sav
 fail=true;await page.evaluate(()=>saveAndRender());assert.match(await page.locator('#reviewSaveStatus').innerText(),/controlled busy/);await page.locator('#reviewFilterReset').click();assert.equal(await page.evaluate(()=>EDITS.enabled[0]),true);
 await page.evaluate(()=>openJob('B'));await page.locator('#reviewType').waitFor();assert.equal(await page.locator('#reviewType').inputValue(),'');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewOutput').inputValue(),'all');
 results.scenarios.push('held-save newer intent, failed save, A→B→A reset and owning draft');
+}
 await page.setViewportSize({width:390,height:844});await page.locator('#reviewFilterReset').click();await page.screenshot({path:root+'/mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.locator('#reviewOutput').selectOption('visible');// A is all true from pending bb0; B3 was kept, C4/5 and E7 remain false, Z8 is false, D6/Z9 true. Thus B/C/E/Z8 match.
 await status('4 of 7 cards match');
 results.scenarios.push('390px layout and native controls');
 await page.locator('#reviewFilterReset').click();await page.locator('#det0').scrollIntoViewIfNeeded();const touch=await page.context().newCDPSession(page);
 const touchGeometry=await page.evaluate(()=>{const e=document.getElementById('detwrap');scrollTo(0,e.getBoundingClientRect().top+scrollY);return {container:'window/vertical',scrollY,max:document.documentElement.scrollHeight-innerHeight,wrap:e.getBoundingClientRect().toJSON()}});assert.ok(touchGeometry.max>touchGeometry.scrollY+150);const scrollBefore=touchGeometry.scrollY;
-await touch.send('Input.synthesizeScrollGesture',{x:150,y:500,yDistance:-140,gestureSourceType:'touch'});assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);await page.waitForFunction(before=>scrollY>before,scrollBefore);results.touchGeometry=touchGeometry;
+results.touchGeometry=touchGeometry;fs.writeFileSync(root+'/touch-precondition.json',JSON.stringify(touchGeometry,null,2));
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:190,y:700}]});
+for(let y=650;y>=300;y-=50){await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:190,y}]});await page.waitForTimeout(20)}
+await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);await page.waitForFunction(before=>scrollY>before,scrollBefore);results.touchAfter=await page.evaluate(()=>scrollY);
 await page.getByText('Advanced settings ▸',{exact:true}).click();const tip=page.locator('label:has(#faceheads) .qm');await tip.scrollIntoViewIfNeeded();const checked=await page.locator('#faceheads').isChecked();await tip.tap();assert.equal(await tip.evaluate(e=>e.classList.contains('open')),true);assert.equal(await page.locator('#faceheads').isChecked(),checked);assert.equal(await tip.evaluate(e=>e.style.getPropertyValue('--qw')),'250px');
 results.scenarios.push('native touch scrolling leaves selection empty; mobile help tap preserves checkbox and tooltip bounds');
 assert.deepEqual(results.errors,[]);await page.screenshot({path:root+'/filtered.png'});
