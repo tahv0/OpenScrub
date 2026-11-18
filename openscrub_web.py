@@ -3415,7 +3415,11 @@ function bePumpSamples(){
   try{
    if(!beSampleCurrent(view,serial))return;
    const response=await fetch(`api/jobs/${view.id}/edit_sample?t=${t}`);
-   if(!response.ok)throw Error(`Exact sample unavailable (HTTP ${response.status}). Inspect again to retry.`);
+   if(!response.ok){
+    // Error headers do not settle the cycle: retain its slot through body cleanup.
+    try{await response.text();}catch(_){}
+    throw Error(`Exact sample unavailable (HTTP ${response.status}). Inspect again to retry.`);
+   }
    const body=await response.json();
    if(!beSampleCurrent(view,serial))return;
    await beApplySample(view,serial,beValidateSample(body,t));
