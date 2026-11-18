@@ -8,7 +8,7 @@ const results={browserPlugin:'unavailable',page:'full emitted PAGE',scenarios:[]
 let browser,page;
 (async()=>{browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1365,height:1000},hasTouch:true,isMobile:process.env.TASK150_TOUCH_ONLY==='1'});
 page.on('pageerror',e=>results.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))results.console.push(m.text())});
-let rows=structuredClone(initial),hold=false,release=null,fail=false;const requests=[];
+let rows=structuredClone(initial),hold=false,release=null,fail=false,holdThumbs=false;const heldThumbs=[];const requests=[];
 await page.route(origin+'/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname;requests.push({path,method:req.method()});
 const json=body=>route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
 if(path==='/')return route.fulfill({contentType:'text/html',body:fs.readFileSync(root+'/page.html','utf8')});
@@ -20,7 +20,7 @@ if(path.endsWith('/render'))return json({ok:true});
 if(path.endsWith('/report'))return json({detections:rows.map(({box,...r})=>({...r,cbox:box,aoff:[0,0]})),audio_redactions:[],render_state:{fps:10,cum:Array(40).fill([0,0])}});
 if(path.endsWith('/mediainfo'))return json({duration:4,fps:10,width:320,height:180});
 if(path.endsWith('/boxes_at'))return json({ox:0,oy:0,boxes:rows.filter(x=>!x.zone_dropped)});
-if(/\/(thumb|detframe)\/\d+$|\/frame_at$/.test(path))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#233447"/><path d="M40 30h90v100H40z" fill="#abc"/></svg>'});
+if(/\/(thumb|detframe)\/\d+$|\/frame_at$/.test(path)){if(holdThumbs&&path.includes('/thumb/'))await new Promise(resolve=>heldThumbs.push(resolve));try{return await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#233447"/><path d="M40 30h90v100H40z" fill="#abc"/></svg>'})}catch(error){if(!route.request().failure())throw error;}}
 if(path==='/api/custom_cats')return json([]);if(path==='/api/allowlist')return json({words:[]});if(path==='/api/certinfo')return json({mode:'synthetic'});if(path==='/api/vault')return json({enabled:false});if(path==='/api/extras')return json({extras:[]});if(path==='/api/update_check')return json({update_available:false});if(path==='/api/quality_tier')return json({tier:'fast',needs:{}});if(path.startsWith('/api/models/'))return json({active:true,selected:'',models:[]});if(path==='/api/model_status')return json({face:true,plate:true,person:true});if(path==='/favicon.ico')return route.fulfill({status:204});return json({});});
 await page.goto(origin);assert.equal(await page.title(),'OpenScrub');await page.locator('#jobs a').first().click();await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>scrollTo(0,document.getElementById('detwrap').getBoundingClientRect().top+scrollY-55));await page.locator('#bb0').waitFor();
 assert.match(await page.locator('body').innerText(),/Review/);
@@ -87,12 +87,13 @@ results.scenarios.push('held-save newer intent, failed save, A→B→A reset and
 }
 
 // Modest complete metadata proves actual scheduler/filter ownership beyond mounted nodes.
+await page.setViewportSize({width:700,height:600});await page.waitForFunction(()=>THUMB_FLIGHTS.size===0);holdThumbs=true;
 rows=Array.from({length:96},(_,i)=>row(100+i,i%2?'plate':'face',i%3!==0));
 rows.push(row(220,'face',false,-1,-1,.5,true),row(221,'plate',true,-1,-1,.5,true));
 await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();
-await page.locator('#reviewFilterReset').click();await page.locator('#review').scrollIntoViewIfNeeded();
+await page.locator('#reviewFilterReset').click();await placeCard(100);
 await page.waitForFunction(()=>REVIEW_SCHED.bindings.size>0);assert.equal(await page.evaluate(()=>REVIEW_META.byId.size),98);assert.ok(await page.evaluate(()=>REVIEW_SCHED.bindings.size<REVIEW_META.byId.size));
-await filter('face','blur');await status('32 of 98 cards match');
+await page.waitForFunction(()=>THUMB_FLIGHTS.size===4);await page.evaluate(()=>window.filteredFlights=[...THUMB_FLIGHTS]);await filter('face','blur');await status('32 of 98 cards match');await page.waitForFunction(()=>filteredFlights.some(op=>op.cancelled));assert.ok(await page.evaluate(()=>THUMB_FLIGHTS.size<=4));holdThumbs=false;heldThumbs.splice(0).forEach(release=>release());await page.waitForFunction(()=>THUMB_FLIGHTS.size===0);await placeCard(102);
 const focusId=await page.evaluate(()=>{const b=[...REVIEW_SCHED.bindings.values()].find(b=>REVIEW_SCHED.matching.has(b.id));b.card.querySelector('button').focus();window.retainedFilterNode=b.card;return b.id});
 await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(id=>document.getElementById('det'+id)===window.retainedFilterNode,focusId),true);
 await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen});refreshReviewVisibleSet();});
