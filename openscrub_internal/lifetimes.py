@@ -29,6 +29,7 @@ class _JobFiles:
         self.source_status = "undiscovered"
         self.source_reason = None
         self.source_retired = False
+        self.vault_transition = None
 
 
 class FileOwners:

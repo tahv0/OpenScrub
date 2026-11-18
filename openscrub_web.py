@@ -4452,6 +4452,145 @@ def vault_locked():
     return VAULT.get("closed", False) or (vault_enabled() and VAULT["key"] is None)
 
 
+
+def _vault_entry(path):
+    # Resolve the parent, but never follow the leaf being witnessed.
+    return os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
+
+
+def _vault_live_owners():
+    with JOBS_LOCK:
+        jobs = list(JOBS.values())
+    root = os.path.realpath(JOBS_DIR)
+    owners = []
+    for job in jobs:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            selected = files.current_source
+            if (files.closed or files.source_retired or files.source_status != 'coherent'
+                    or files.active is not None or selected is None
+                    or job.get('video') != selected['path']):
+                files.vault_transition = None
+                continue
+            path = selected['path']
+            try:
+                managed = os.path.commonpath((root, path)) == root
+            except ValueError:
+                managed = False
+            if managed:
+                owners.append((job, files, selected, path))
+            else:
+                files.vault_transition = None
+    return owners
+
+
+def _vault_same_owner(job, files, selected, path):
+    return (not files.closed and not files.source_retired
+            and files.source_status == 'coherent' and files.active is None
+            and files.current_source is selected and selected['path'] == path
+            and job.get('video') == path)
+
+
+def _vault_retire(files, selected):
+    if files.current_source is selected:
+        files.source_retired = True
+        files.current_source = None
+        files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
+    files.vault_transition = None
+
+
+def _vault_observer(owners, direction, affected):
+    by_path = {}
+    for owner in owners:
+        by_path.setdefault(owner[3], []).append(owner)
+
+    def observe(actual_direction, path):
+        matches = by_path.get(_vault_entry(path), ())
+        started = []
+        for job, files, selected, canonical in matches:
+            with files.report_lock:
+                if not _vault_same_owner(job, files, selected, canonical):
+                    continue
+                marker = files.vault_transition
+                if direction == 'encrypt':
+                    marker = dict(selected=selected, old_stamp=selected['stamp'], phase='started')
+                    files.vault_transition = marker
+                elif marker is None or marker['selected'] is not selected or marker['phase'] != 'sealed':
+                    continue
+                started.append((job, files, selected, canonical, marker))
+                affected.append((job, files, selected, canonical, marker))
+        if not started:
+            return None
+
+        def finish(receipt):
+            for job, files, selected, canonical, marker in started:
+                with files.report_lock:
+                    if (files.vault_transition is not marker
+                            or not _vault_same_owner(job, files, selected, canonical)
+                            or selected['stamp'] != marker['old_stamp']):
+                        continue
+                    if direction == 'encrypt':
+                        valid = (receipt.input_stamp == marker['old_stamp']
+                                 and receipt.plaintext_bytes == marker['old_stamp'][2])
+                        if valid:
+                            marker.update(phase='sealed', cipher=receipt.output_stamp, nonce=receipt.nonce)
+                    else:
+                        valid = (receipt.input_stamp == marker['cipher']
+                                 and receipt.nonce == marker['nonce']
+                                 and receipt.plaintext_bytes == marker['old_stamp'][2])
+                        if valid:
+                            marker.update(phase='restored', restored=receipt.output_stamp)
+                    if not valid:
+                        _vault_retire(files, selected)
+        return finish
+    return observe
+
+
+def _vault_invalidate(affected):
+    for job, files, selected, path, marker in affected:
+        with files.report_lock:
+            if files.vault_transition is marker or files.current_source is selected:
+                _vault_retire(files, selected)
+
+
+def _vault_finalize(owners, affected):
+    # Prepare all outcomes before installing any stamp. Filesystem checks do
+    # not hold a report lock; admission remains closed throughout this pass.
+    with JOBS_LOCK:
+        registered = {id(job) for job in JOBS.values()}
+    outcomes = []
+    for job, files, selected, path in owners:
+        with files.report_lock:
+            marker = files.vault_transition
+            if marker is None or marker['selected'] is not selected:
+                continue
+            affected.append((job, files, selected, path, marker))
+            valid = (id(job) in registered and _vault_same_owner(job, files, selected, path)
+                     and selected['stamp'] == marker['old_stamp'] and marker['phase'] == 'restored')
+        if valid:
+            try:
+                valid = vault._entry_stamp(path) == marker['restored']
+            except OSError:
+                valid = False
+        outcomes.append((job, files, selected, path, marker, valid))
+    for job, files, selected, path, marker, valid in outcomes:
+        if valid:
+            try:
+                valid = vault._entry_stamp(path) == marker['restored']
+            except OSError:
+                valid = False
+        with files.report_lock:
+            if files.vault_transition is not marker:
+                continue
+            valid = (valid and _vault_same_owner(job, files, selected, path)
+                     and selected['stamp'] == marker['old_stamp'])
+            if valid:
+                selected['stamp'] = marker['restored']
+                files.vault_transition = None
+            else:
+                _vault_retire(files, selected)
+
+
 def _vault_lock_locked(blocking_jobs=True):
     if _files_busy_locked(blocking=blocking_jobs):
         raise FilesBusy("job files are still in use")
@@ -4459,9 +4598,15 @@ def _vault_lock_locked(blocking_jobs=True):
     if key is None:
         return 0
     VAULT["closed"] = True
+    owners = _vault_live_owners() if blocking_jobs else []
+    affected = []
     try:
-        n = vault.encrypt_tree(key, JOBS_DIR)
+        if owners:
+            n = vault.encrypt_tree(key, JOBS_DIR, _vault_observer(owners, 'encrypt', affected))
+        else:
+            n = vault.encrypt_tree(key, JOBS_DIR)
     except BaseException:
+        _vault_invalidate(affected)
         VAULT["error"] = "Encryption failed; unlock to recover before accessing jobs."
         raise
     VAULT["key"] = None
@@ -4552,10 +4697,23 @@ def vault_unlock():
         if _files_busy_locked():
             abort(409, "job files are still in use")
         VAULT["closed"] = True
+        owners = _vault_live_owners()
+        affected = []
         try:
-            n = vault.decrypt_tree(key, JOBS_DIR)
+            if owners:
+                n = vault.decrypt_tree(key, JOBS_DIR, _vault_observer(owners, 'decrypt', affected))
+            else:
+                n = vault.decrypt_tree(key, JOBS_DIR)
             _rehydrate_jobs()  # registration is part of the closed transition
+            _vault_finalize(owners, affected)
         except BaseException:
+            # Include sealed markers for entries not reached by a failed pass.
+            for job, files, selected, path in owners:
+                with files.report_lock:
+                    marker = files.vault_transition
+                    if marker is not None and marker['selected'] is selected:
+                        affected.append((job, files, selected, path, marker))
+            _vault_invalidate(affected)
             VAULT["error"] = "Decryption or recovery failed; unlock again to recover."
             raise
         VAULT["key"] = key
