@@ -108,7 +108,7 @@ await filter('plate','all');await page.evaluate(()=>{const s=REVIEW_SCHED;refres
 const explicit=await page.evaluate(()=>{const c=[...REVIEW_META.byId.values()].find(c=>c.category==='plate'&&!c.zone&&!REVIEW_SCHED.bindings.has(c.id)&&EN[c.id]===false);if(!c)throw Error('missing unmounted selected fixture');selSet.add(c.id);selSet.add(100);bulkSet(true);return c.id});assert.equal(await page.evaluate(i=>EN[i],explicit),true);assert.equal(await page.evaluate(()=>EN[100]),false);assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
 results.scenarios.push('actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership');
 // Restore the exact seven-card/mobile oracle and pending choices established above.
-rows=structuredClone(initial);await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>{applyDet(0,true);applyDet(3,false)});
+rows=structuredClone(initial);await page.evaluate(()=>{REVIEW_DRAFTS.get('A').enabled={};openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>{applyDet(0,true);applyDet(3,false)});
 await page.setViewportSize({width:390,height:844});await page.locator('#reviewFilterReset').click();await page.screenshot({path:root+'/mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.locator('#reviewOutput').selectOption('visible');// A is all true from pending bb0; B3 was kept, C4/5 and E7 remain false, Z8 is false, D6/Z9 true. Thus B/C/E/Z8 match.
 await status('4 of 7 cards match');
 results.scenarios.push('390px layout and native controls');
