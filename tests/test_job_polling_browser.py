@@ -28,7 +28,15 @@ def polling_http(monkeypatch, tmp_path):
         folder.mkdir()
         job.update(id=jid, dir=str(folder), phase='queued', progress=.2, log=web.JobLog(['log-' + jid]))
         web.JOBS[jid] = job
-    monkeypatch.setattr(web, 'enqueue', lambda *_: None)
+    # This fixture substitutes the worker queue, so it owns every accepted
+    # ticket, including tickets on jobs later replaced by control requests.
+    initial_files = web.FILES.count
+    queued_tickets = []
+    def enqueue(job, action, ticket):
+        assert ticket[3] is web.FILES.initialize(job).queued[ticket[2]]
+        assert not ticket[3].released
+        queued_tickets.append((job, ticket))
+    monkeypatch.setattr(web, 'enqueue', enqueue)
     gate = threading.Event()
     state = {'kind': None, 'entered': 0, 'released': 0}
 
@@ -142,6 +150,14 @@ def polling_http(monkeypatch, tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+        assert not thread.is_alive()
+        for job, ticket in queued_tickets:
+            files = web.FILES.initialize(job)
+            with files.report_lock:
+                assert files.queued.pop(ticket[2]) is ticket[3]
+            web._finish_operation(job, ticket[3])
+            assert ticket[3].released
+        assert web.FILES.count == initial_files
 
 
 BROWSER = r"""
