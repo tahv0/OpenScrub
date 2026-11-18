@@ -1,0 +1,591 @@
+[
+  {
+    "run": "red-003",
+    "observed_exit": 1,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "22 failed in 5.37s",
+    "runtime_configs": [
+      "runtime-86c8f23daae448eaabbdffe48b523820.json"
+    ],
+    "log_sha256": "5219d20e026a6c168f5ffafe80bad3a9f27ca0a108886bafee1c5587a0fdb841",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "green-005",
+    "observed_exit": 1,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "12 failed, 81 passed in 10.88s",
+    "runtime_configs": [
+      "runtime-e55fccf073e041c99f7c7636039bcd3a.json"
+    ],
+    "log_sha256": "6324be220d3a5223c6390749d0261218ecfcefd48bc8b942f626cab6f3dd29c5",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "focused-007",
+    "observed_exit": 1,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "10 failed, 102 passed in 11.53s",
+    "runtime_configs": [
+      "runtime-676dab78424f469e8923a28a4dccc164.json"
+    ],
+    "log_sha256": "990ad3c2aeff6c53e5aa05c9867166d9a05ae15cdf5c044fe37afcfb88377496",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "media-009",
+    "observed_exit": 0,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "51 passed in 2.66s",
+    "runtime_configs": [
+      "runtime-13433333228040219495f17ae18f8e97.json"
+    ],
+    "log_sha256": "6aab8921db1482821a958c92fcd2f365ace913d11370286a85d016604ea8ad2e",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "holds-011",
+    "observed_exit": 0,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "147 passed in 13.61s",
+    "runtime_configs": [
+      "runtime-b7e250d381f74ecd96d57d42d875ef1f.json"
+    ],
+    "log_sha256": "85eca18cb5d1fa3fb85021b0fe87a88c7b02deca5ee4eb6f52d23bbbcc7ed6b1",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "adoption-red-013",
+    "observed_exit": 1,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "1 failed in 0.31s",
+    "runtime_configs": [
+      "runtime-46558e6ae0db44f39838c20b2b6662e9.json"
+    ],
+    "log_sha256": "5e6bfcb39145b98e5ffa3b21bceccd5c6fa06645b662ea935364b524f13fad06",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py::test_report_replaced_during_adoption_never_marks_pair_coherent",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "adoption-green-015",
+    "observed_exit": 0,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "72 passed in 3.77s",
+    "runtime_configs": [
+      "runtime-97485ac41e6642318053d010d4ede4ed.json"
+    ],
+    "log_sha256": "dbb9232b52baf5974b7a861a41c1f779cebfccf121884e98222a51dc948c867a",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "strict-source-red-017",
+    "observed_exit": 1,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "2 failed in 0.32s",
+    "runtime_configs": [
+      "runtime-8fceb590f7044746a6b788530d43a217.json"
+    ],
+    "log_sha256": "cc379647bc43b3b299efe92f5f0d3c4805689b05ffe53ad70659ba68a1b4011c",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_source_freshness_failure_is_atomic_409",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "strict-source-green-019",
+    "observed_exit": 0,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "100 passed in 5.55s",
+    "runtime_configs": [
+      "runtime-5c946c8c57f042ffbbbfe2a612622c54.json"
+    ],
+    "log_sha256": "e160609f0b3e3d571252e8572bd837994ae600280d743ca5c62bf678c35cfa40",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "freeze-check-021",
+    "observed_exit": 0,
+    "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "75 passed in 3.75s",
+    "runtime_configs": [
+      "runtime-e6f18b2e4f654de49ea231474dae2fa8.json"
+    ],
+    "log_sha256": "83f0722a51bb4fe54ce9afff7caa43bca65fcd54a85b95871f4d5903058a08a5",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "full-023",
+    "observed_exit": 0,
+    "head": "631f5175d8d22b2fef9b8c3d92d9fb49aaa59559",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "469 passed in 119.81s (0:01:59)",
+    "runtime_configs": [
+      "runtime-5a6a68a7d87442ae95f3d7882f0aae12.json"
+    ],
+    "log_sha256": "ac371dd5d5cbfbd7e121bcad19675d295886eeeb2ebdf9d8d4c55d2d74e1739e",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "-q",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters",
+      "-p",
+      "roundtrip_stdout_selected",
+      "-p",
+      "task1631_fixture"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "floor-024",
+    "observed_exit": 0,
+    "head": "631f5175d8d22b2fef9b8c3d92d9fb49aaa59559",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "summary": "168 passed in 18.43s",
+    "runtime_configs": [
+      "runtime-d5ab3b55ea1f47b593abad9d20507c61.json"
+    ],
+    "log_sha256": "59872e1e621d0eb0b55491ae8599bb0c827b8fb96e95715e56403ea6b6cc841d",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_roundtrip.py",
+      "-q",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters",
+      "-p",
+      "roundtrip_stdout_selected"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "recovery-red-026",
+    "observed_exit": 1,
+    "head": "631f5175d8d22b2fef9b8c3d92d9fb49aaa59559",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "2 failed in 0.47s",
+    "runtime_configs": [
+      "runtime-e3279c0d48104503b849e629962ea369.json"
+    ],
+    "log_sha256": "3922f359b5592a2cf69285e5a02dc33b28592a346bd175ff216fad16b5be3b47",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py::test_observed_old_source_failed_normalized_adoption_recovers_only_committed_pair",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "recovery-green-028",
+    "observed_exit": 0,
+    "head": "631f5175d8d22b2fef9b8c3d92d9fb49aaa59559",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "111 passed in 6.70s",
+    "runtime_configs": [
+      "runtime-87c173b1e32f43398c1725063c6c034d.json"
+    ],
+    "log_sha256": "c7b7b219a2fbb1dd2498656dd15b19dfa1dd2931efdfafa93ba4bb232a5cbc90",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "final-full-030",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "471 passed in 116.09s (0:01:56)",
+    "runtime_configs": [
+      "runtime-80ad710e6d144901bf43bffa73a24858.json"
+    ],
+    "log_sha256": "0cc273a8cdca7a5d9e2671bd96c79ff3b02ca7250b1e2227251a3b6a8bf3adc8",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "-q",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters",
+      "-p",
+      "roundtrip_stdout_selected",
+      "-p",
+      "task1631_fixture"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "final-floor-031",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "summary": "77 passed in 4.42s",
+    "runtime_configs": [
+      "runtime-24ca86b954c245f5978a9783d63745d7.json"
+    ],
+    "log_sha256": "5bbfc666bd39cc95f07d3f298bf3c42f75809351810e8cc06888a0587f1702b1",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": "unique run-local basetemp/cache; no parallel pytest"
+  },
+  {
+    "run": "native-http-032",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": null,
+    "runtime_configs": [
+      "runtime-d9ca5ea808dd40c99dacf6ab732c8c4f.json"
+    ],
+    "log_sha256": "4d989b10dfbaedd082b3cb87f6ccf80f47a56bac4ddbbee3e44fab193f752059",
+    "workload_argv": [
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/http_smoke.py"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": null
+  },
+  {
+    "run": "package-034",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": null,
+    "runtime_configs": [
+      "runtime-2ed56a9497ae4951aea391a58001aa4b.json",
+      "runtime-8255fb55aac842e688c9e1275146c392.json"
+    ],
+    "log_sha256": null,
+    "workload_argv": null,
+    "controller_action": "package",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> package",
+    "pytest_helper_added_ownership": null
+  },
+  {
+    "run": "costs-035",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": null,
+    "runtime_configs": [
+      "runtime-1dbc99141181415babf73a1d79f3609f.json"
+    ],
+    "log_sha256": "b5fdfc79d7b4a218a7a7d103cb6b58ad48470d51b35f50d944da5c545a783a50",
+    "workload_argv": [
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/costs.py"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": null
+  },
+  {
+    "run": "admission-037",
+    "observed_exit": 0,
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "summary": "EXACT_ADMISSION_BODY_COMPATIBILITY_OK",
+    "runtime_configs": [
+      "runtime-94ad5df7523640f58e868493010546a6.json"
+    ],
+    "log_sha256": "4053fe0b945c3dc1679e53cb9dde0e0261e33b9a76899f045b44f367f71ee937",
+    "workload_argv": [
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/admission_smoke.py"
+    ],
+    "controller_action": "run",
+    "controller_recipe": "verify.py --config <retained copied runtime config> --run-id <new unique run> run -- <workload_argv>",
+    "pytest_helper_added_ownership": null
+  }
+]

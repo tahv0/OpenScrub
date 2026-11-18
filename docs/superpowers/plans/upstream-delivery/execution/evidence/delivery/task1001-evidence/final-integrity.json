@@ -1,0 +1,17 @@
+{
+  "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "runtime_runs": 20,
+  "source_clean": true,
+  "no_active_runtime": true,
+  "report_sha256": "0191f7a46a774d035763fe572b1ebe78ccb222dee752ea5c27d0f2832801bf0c",
+  "pr_sha256": "2586af7bc7a2c201ef158b239b59e62ab0a6383d55411525adb0c40f96053d4b",
+  "indexed_payload_files": 132,
+  "total_evidence_files": 135,
+  "payload_bytes": 1100974,
+  "index_files": [
+    "manifest.json",
+    "SHA256SUMS",
+    "final-integrity.json"
+  ]
+}

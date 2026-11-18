@@ -1,0 +1,17 @@
+# Return coherent exact editor samples and compare geometry baselines
+
+At native24fps `.2s`, the existing editable image and floor-index boxes can describe different frames. Add a separate `GET .../edit_sample?t=0.2` response that binds one verified integer-index JPEG, canonical/observed time, offsets and active raw rows under the declared `opencv-ffmpeg-zero-cfr-v1` policy. Existing `_JobFiles` owns observed source selection, successful report publication and fenced scan adoption/recovery. Known later source replacement requires authoritative scan adoption.
+
+Optional geometry preconditions extend the existing latest-raw save transaction with source/timeline/context checks and complete baseline/already-equal tuple rules. Strict manual replay recognizes immutable creation before current freshness. Combined conflicts publish nothing; successful strict rows return complete committed `geometry_rows`. Legacy callers and ordinary editor JS/CSS retain their behavior and bytes.
+
+Route-managed errors have JSON codes. Existing pre-route missing-job/auth/vault/deletion bodies/statuses are preserved explicitly; exact refusals remain no-store, and clients must check HTTP failure before parsing an error body as JSON.
+
+Validation on clean `5acb655` (base `12919c9`):
+
+- 471 discovered tests pass on actual3.12.16;77 affected exact/source/save/adoption/media cases pass on actual3.9.25. Prior631f517 full/floor469/168 results retain their attribution.
+- Independent production endpoint pixels/PTS pass for old native-CFR, retained real normalized-CFR and coarse1ms native Matroska reports; EOF/adjacent/unusable evidence and controlled source/report/adoption/save races are covered.
+- One offline sdist→wheel-from-sdist checks32/13 selected byte identities (41/21 total archive regular files), installed defaults/CLI/web and real HTTP strict save→render→fresh-interpreter reopen. Native and installed roundtrips retain all3 raw rows and10 output frames.
+
+The introduced timeline projection is O(N):120000 already-parsed synthetic pairs take a596.9ms median, with a separately traced1.06MB peak excluding parse/RSS. Tiny-source reused Flask requests measure9.16ms; this is not long-report latency. Choice-only instrumentation performs zero probe/source/decode/timeline work. Later UI migration must account for coalescing/bounded dispatch. Support remains a declared metadata-qualified/sample-verified subset with observed-file-stamp limits; strict seeds, UI/P16D and P17/HDR mapping remain later gates.
+
+[Full implementation report](task-1001-report.md) · [Compact evidence](task1001-evidence/README.md). Local draft only; no remote PR or publication was created.

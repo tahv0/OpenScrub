@@ -1,0 +1,26 @@
+{
+  "input": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+    "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"
+  },
+  "results": [
+    {
+      "t": 1.9,
+      "index": 9,
+      "marker": 9,
+      "pts": "9/5",
+      "observed_s": 1.8,
+      "canonical_s": 1.8,
+      "tolerance_s": 7.105427357601002e-15
+    },
+    {
+      "t": 2.0,
+      "index": 9,
+      "marker": 9,
+      "pts": "9/5",
+      "observed_s": 1.8,
+      "canonical_s": 1.8,
+      "tolerance_s": 7.105427357601002e-15
+    }
+  ]
+}

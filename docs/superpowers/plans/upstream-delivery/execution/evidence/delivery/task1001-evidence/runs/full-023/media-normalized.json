@@ -1,0 +1,44 @@
+{
+  "input": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+    "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"
+  },
+  "results": [
+    {
+      "t": 0.5,
+      "index": 6,
+      "marker": 5,
+      "pts": "6/13",
+      "observed_s": 0.46153846153846156,
+      "canonical_s": 0.46153846153846156,
+      "tolerance_s": 3.552713678800501e-15
+    },
+    {
+      "t": 0.15384615384615385,
+      "index": 2,
+      "marker": 2,
+      "pts": "2/13",
+      "observed_s": 0.15384615384615385,
+      "canonical_s": 0.15384615384615385,
+      "tolerance_s": 3.552713678800501e-15
+    },
+    {
+      "t": 0.23076923076923078,
+      "index": 3,
+      "marker": 2,
+      "pts": "3/13",
+      "observed_s": 0.23076923076923078,
+      "canonical_s": 0.23076923076923078,
+      "tolerance_s": 3.552713678800501e-15
+    },
+    {
+      "t": 1.0769230769230769,
+      "index": 13,
+      "marker": 11,
+      "pts": "1",
+      "observed_s": 1.0,
+      "canonical_s": 1.0,
+      "tolerance_s": 3.552713678800501e-15
+    }
+  ]
+}

@@ -1,0 +1,297 @@
+{
+  "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "files": 129,
+  "runtime_modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_internal": "openscrub_internal/__init__.py",
+    "openscrub_internal.exact_samples": "openscrub_internal/exact_samples.py",
+    "openscrub_internal.lifetimes": "openscrub_internal/lifetimes.py",
+    "openscrub_internal.reports": "openscrub_internal/reports.py",
+    "openscrub_setup": "openscrub_setup.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_vault": "openscrub_vault.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py"
+  },
+  "unchanged_editor_literals": [
+    "APP_JS",
+    "APP_CSS"
+  ],
+  "unchanged_files": [
+    "openscrub.py",
+    "pyproject.toml",
+    "openscrub_internal/reports.py"
+  ],
+  "preserved_refs": [
+    {
+      "ref": "refs/heads/archive/integration-all-prs-2026-11-16",
+      "expected": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+      "actual": "b4d0c75f25d91510fe1692f901d11853dc7db005"
+    },
+    {
+      "ref": "refs/heads/develop",
+      "expected": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+      "actual": "b4d0c75f25d91510fe1692f901d11853dc7db005"
+    },
+    {
+      "ref": "refs/heads/docs/upstream-delivery-plan",
+      "expected": "54f1413e4065f5368900f5518c5e616827ad60ea",
+      "actual": "54f1413e4065f5368900f5518c5e616827ad60ea"
+    },
+    {
+      "ref": "refs/heads/integration/all-prs",
+      "expected": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+      "actual": "b4d0c75f25d91510fe1692f901d11853dc7db005"
+    },
+    {
+      "ref": "refs/heads/integration/render-publication-prerequisites",
+      "expected": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+      "actual": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde"
+    },
+    {
+      "ref": "refs/heads/integration/report-prerequisites",
+      "expected": "3795d49f6293baf7b8c35534862a4881447e1b16",
+      "actual": "3795d49f6293baf7b8c35534862a4881447e1b16"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused",
+      "expected": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+      "actual": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused-browser",
+      "expected": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+      "actual": "00480c7e42ddb329f4dde9599c256555f2dabcf0"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused-core",
+      "expected": "117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+      "actual": "117e41ac5ee857a6b367caf6ccbd479d78989ff2"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused-filters",
+      "expected": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+      "actual": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused-readiness",
+      "expected": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7",
+      "actual": "d1eeebd2b12645a7284344fb16ec589c8aba0ce7"
+    },
+    {
+      "ref": "refs/heads/integration/upstream-focused-renderer",
+      "expected": "c205ef5379778f63313b519411a2d5e37d07cba5",
+      "actual": "c205ef5379778f63313b519411a2d5e37d07cba5"
+    },
+    {
+      "ref": "refs/heads/main",
+      "expected": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "actual": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f"
+    },
+    {
+      "ref": "refs/heads/pr/atomic-report-publication",
+      "expected": "66787aa09a958154e81e75f9bdc54d9788feb843",
+      "actual": "66787aa09a958154e81e75f9bdc54d9788feb843"
+    },
+    {
+      "ref": "refs/heads/pr/bounded-browser-logs",
+      "expected": "f44e0b786ad065010fbfd2b8328350bde44116ec",
+      "actual": "f44e0b786ad065010fbfd2b8328350bde44116ec"
+    },
+    {
+      "ref": "refs/heads/pr/bounded-job-logs",
+      "expected": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+      "actual": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f"
+    },
+    {
+      "ref": "refs/heads/pr/dense-smoothing-prefix",
+      "expected": "f19be5fe3b9176e568ea7bf761493bd267fee95e",
+      "actual": "f19be5fe3b9176e568ea7bf761493bd267fee95e"
+    },
+    {
+      "ref": "refs/heads/pr/editor-resize-alignment",
+      "expected": "47e9f6d5614365e00d899c87df6c209cd7aaabf6",
+      "actual": "47e9f6d5614365e00d899c87df6c209cd7aaabf6"
+    },
+    {
+      "ref": "refs/heads/pr/explicit-review-choices",
+      "expected": "2ae3257b9752e2d976ff7a0d39955a13c133273a",
+      "actual": "2ae3257b9752e2d976ff7a0d39955a13c133273a"
+    },
+    {
+      "ref": "refs/heads/pr/hdr-chroma-coverage",
+      "expected": "0c648c2e7d3e40304dce9ae878d14709966b1fe1",
+      "actual": "0c648c2e7d3e40304dce9ae878d14709966b1fe1"
+    },
+    {
+      "ref": "refs/heads/pr/hdr-decoder-cleanup",
+      "expected": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "actual": "ded411cbec308333d1416ae3d58b4f6e918d7849"
+    },
+    {
+      "ref": "refs/heads/pr/invalid-polygon-fallback",
+      "expected": "a3c3193e8dff41ec0588e66443398048a5c15ece",
+      "actual": "a3c3193e8dff41ec0588e66443398048a5c15ece"
+    },
+    {
+      "ref": "refs/heads/pr/job-file-lifetimes",
+      "expected": "c697d5a686d4dccbdf4f474567628d5d24e75a03",
+      "actual": "c697d5a686d4dccbdf4f474567628d5d24e75a03"
+    },
+    {
+      "ref": "refs/heads/pr/literal-job-filenames",
+      "expected": "f399ebe1bd3c17561b44c06f7169a61e21becb43",
+      "actual": "f399ebe1bd3c17561b44c06f7169a61e21becb43"
+    },
+    {
+      "ref": "refs/heads/pr/live-preview-cache-regressions",
+      "expected": "ac0f5e4661701e954e04dbc95eb00d9317c04cc6",
+      "actual": "ac0f5e4661701e954e04dbc95eb00d9317c04cc6"
+    },
+    {
+      "ref": "refs/heads/pr/live-preview-snapshots",
+      "expected": "b70d42011168192cdf7a9ef93a5e9419a92a1cdb",
+      "actual": "b70d42011168192cdf7a9ef93a5e9419a92a1cdb"
+    },
+    {
+      "ref": "refs/heads/pr/manual-addition-replay",
+      "expected": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "actual": "12919c96c6f7558136b50d7b4d85e5e6b62f1971"
+    },
+    {
+      "ref": "refs/heads/pr/manual-tracker-cancellation",
+      "expected": "2004b22002b8317c26ea508ff8187acbcd0cfab2",
+      "actual": "2004b22002b8317c26ea508ff8187acbcd0cfab2"
+    },
+    {
+      "ref": "refs/heads/pr/merge-candidate-discovery",
+      "expected": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+      "actual": "e21ebdf6e3ee46e6c65050dc956a9a3459152269"
+    },
+    {
+      "ref": "refs/heads/pr/no-backtrack-scan-sanity",
+      "expected": "17dfe5d575306dea395b680205038e606ad598a2",
+      "actual": "17dfe5d575306dea395b680205038e606ad598a2"
+    },
+    {
+      "ref": "refs/heads/pr/opencv-fallback-compatibility",
+      "expected": "a10e485962571a566f99225541735ab1ada1f4c0",
+      "actual": "a10e485962571a566f99225541735ab1ada1f4c0"
+    },
+    {
+      "ref": "refs/heads/pr/polygon-media-prerequisites",
+      "expected": "c7f9dcc29affe5da363094b8646b3064966e52ed",
+      "actual": "c7f9dcc29affe5da363094b8646b3064966e52ed"
+    },
+    {
+      "ref": "refs/heads/pr/readable-report-serialization",
+      "expected": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "actual": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f"
+    },
+    {
+      "ref": "refs/heads/pr/recent-stage-eta",
+      "expected": "d129e23e5fe144edb8bbd5675809c1877cfe4d0f",
+      "actual": "d129e23e5fe144edb8bbd5675809c1877cfe4d0f"
+    },
+    {
+      "ref": "refs/heads/pr/render-geometry-validation",
+      "expected": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "actual": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2"
+    },
+    {
+      "ref": "refs/heads/pr/render-output-publication",
+      "expected": "a132081f1e609ed19deb4477044ee1c9b77871cc",
+      "actual": "a132081f1e609ed19deb4477044ee1c9b77871cc"
+    },
+    {
+      "ref": "refs/heads/pr/render-recovery-comment",
+      "expected": "af862c8c9700b7b2b06426e4c4287e469fe28038",
+      "actual": "af862c8c9700b7b2b06426e4c4287e469fe28038"
+    },
+    {
+      "ref": "refs/heads/pr/render-resource-cleanup",
+      "expected": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "actual": "70ec464ca70b5e49751d778890f56029dced0b8a"
+    },
+    {
+      "ref": "refs/heads/pr/report-edit-transactions",
+      "expected": "f2cdf4813c86296644911f3f0b09bfc56d3e03c5",
+      "actual": "f2cdf4813c86296644911f3f0b09bfc56d3e03c5"
+    },
+    {
+      "ref": "refs/heads/pr/report-roundtrip-preservation",
+      "expected": "7063082ef2a2ff5e56d9aafacff9bd43363b05b3",
+      "actual": "7063082ef2a2ff5e56d9aafacff9bd43363b05b3"
+    },
+    {
+      "ref": "refs/heads/pr/resilient-progress-polling",
+      "expected": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+      "actual": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8"
+    },
+    {
+      "ref": "refs/heads/pr/reverse-recall-index",
+      "expected": "9d888708d08cccf6e5f0ec8c9cf81740d3868fa1",
+      "actual": "9d888708d08cccf6e5f0ec8c9cf81740d3868fa1"
+    },
+    {
+      "ref": "refs/heads/pr/review-save-snapshots",
+      "expected": "92124753736e287ac800af91f0ac96f3e96c01be",
+      "actual": "92124753736e287ac800af91f0ac96f3e96c01be"
+    },
+    {
+      "ref": "refs/heads/pr/review-view-filters",
+      "expected": "c0ebcc7a8c3121330730bea3619bbfea8add7992",
+      "actual": "c0ebcc7a8c3121330730bea3619bbfea8add7992"
+    },
+    {
+      "ref": "refs/heads/pr/save-as-progress",
+      "expected": "ca0f2ce7458347afd2e6156a97df580b6623767a",
+      "actual": "ca0f2ce7458347afd2e6156a97df580b6623767a"
+    },
+    {
+      "ref": "refs/heads/pr/scan-options-validation",
+      "expected": "b26b6685b237ba1c4caffaaefb47b029a3205b51",
+      "actual": "b26b6685b237ba1c4caffaaefb47b029a3205b51"
+    },
+    {
+      "ref": "refs/heads/pr/scan-sanity-test-comment",
+      "expected": "bb4e129ae620f72a691971de1010d38d8cf661ad",
+      "actual": "bb4e129ae620f72a691971de1010d38d8cf661ad"
+    },
+    {
+      "ref": "refs/heads/pr/tail-history-index",
+      "expected": "952af20da205133886ba69799e134b86d1654137",
+      "actual": "952af20da205133886ba69799e134b86d1654137"
+    },
+    {
+      "ref": "refs/heads/pr/tracker-handoff-regression",
+      "expected": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+      "actual": "e21ebdf6e3ee46e6c65050dc956a9a3459152269"
+    },
+    {
+      "ref": "refs/heads/pr/unchanged-report-saves",
+      "expected": "3457efac574d74a7d2377cbc0d44bb0b87462c3a",
+      "actual": "3457efac574d74a7d2377cbc0d44bb0b87462c3a"
+    },
+    {
+      "ref": "refs/heads/pr/visible-first-thumbnails",
+      "expected": "fe20dff7b73efb5afdbf3130e75a19c8b35ecba3",
+      "actual": "fe20dff7b73efb5afdbf3130e75a19c8b35ecba3"
+    },
+    {
+      "ref": "refs/heads/tools/local-verification",
+      "expected": "081816d93d6aaa18944fc88f251040cf11d4135f",
+      "actual": "081816d93d6aaa18944fc88f251040cf11d4135f"
+    }
+  ],
+  "packaging_source_checks": {
+    "docker": [
+      "Dockerfile:63",
+      "Dockerfile.cuda:135",
+      "Dockerfile.intel:97"
+    ],
+    "updater": "update_source iterates non-preserved sdist file paths including openscrub_internal/exact_samples.py",
+    "frozen": "windows/openscrub.spec analyzes openscrub_web.py; its direct private import is statically visible; no Windows build/runtime claimed"
+  }
+}

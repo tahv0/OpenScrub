@@ -1,0 +1,134 @@
+{
+  "packet_bytes": 16534,
+  "packet_sha256": "727667a1fa3c31d9a33c97d0e7ce1991711582b7e8419eee4704c185b3e44064",
+  "new_evidence": {
+    "payload_count": 53,
+    "errors": []
+  },
+  "original_evidence": {
+    "payload_count": 132,
+    "errors": []
+  },
+  "original_indexes_unchanged": {
+    "manifest.json": true,
+    "SHA256SUMS": true,
+    "final-integrity.json": true
+  },
+  "original_report_snapshot_matches": true,
+  "original_pr_snapshot_matches": true,
+  "original_report_prefix_matches": true,
+  "new_test_diff_bytes_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2",
+  "red_final_assertion_message_stripped_ast_equal": true,
+  "red_transformation": {
+    "original_identity_matches": true,
+    "jpeg_value_count": 3,
+    "compact_exactly_reproduced": true
+  },
+  "runtime_configs": [
+    {
+      "path": "runs/fix1-red-002/runtime-2738efedd1834c648335fa838ffcd1e3.json",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "policy": "development",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "mode": "source",
+      "installed_target": "",
+      "web_sha256": "60dd48ad887c39fddfa7bf1812fe35af865a59daf5c52d4ba1d8e9870d9350b7",
+      "race_test_sha256": "3770fcdc959c86bbd781d5e5b82ade650ca3c98aefcd8adf9dd8ba001a0f8cba"
+    },
+    {
+      "path": "runs/fix1-green-004/runtime-b0b10c4a68f94ad7b1e57f1849cf3d55.json",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "policy": "development",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "mode": "source",
+      "installed_target": "",
+      "web_sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef",
+      "race_test_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2"
+    },
+    {
+      "path": "runs/fix1-native-006/runtime-ca57c2f8e74d44b28cc24be3ad482d43.json",
+      "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+      "policy": "frozen",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "mode": "source",
+      "installed_target": "",
+      "web_sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef",
+      "race_test_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2"
+    },
+    {
+      "path": "runs/fix1-floor-007/runtime-51694d9d6aae4db284e5ab05fd7ed9a7.json",
+      "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+      "policy": "frozen",
+      "python_version": [
+        3,
+        9,
+        25
+      ],
+      "mode": "source",
+      "installed_target": "",
+      "web_sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef",
+      "race_test_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2"
+    },
+    {
+      "path": "runs/fix1-package-008/runtime-273d1102129f4e51876403dbca9b1a77.json",
+      "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+      "policy": "frozen",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "mode": "source",
+      "installed_target": "",
+      "web_sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef",
+      "race_test_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2"
+    },
+    {
+      "path": "runs/fix1-package-008/runtime-78289e2d89624e4faad638e4ad319a81.json",
+      "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+      "policy": "frozen",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "mode": "installed",
+      "installed_target": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-package-008/site-packages",
+      "web_sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef",
+      "race_test_sha256": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2"
+    }
+  ],
+  "collector_ids": {
+    "native_count": 157,
+    "floor_count": 157,
+    "verbatim_matches": 155,
+    "alias_count": 2,
+    "equal_after_exact_aliases": true
+  },
+  "archive_audit": {
+    "sdist": {
+      "archive_hash_matches": true,
+      "regular_files": 42,
+      "selected_byte_assertions": 33,
+      "selected_byte_mismatches": []
+    },
+    "wheel": {
+      "archive_hash_matches": true,
+      "regular_files": 21,
+      "selected_byte_assertions": 13,
+      "selected_byte_mismatches": []
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "base": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "source_files": 130,
+  "runtime_modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_internal": "openscrub_internal/__init__.py",
+    "openscrub_internal.exact_samples": "openscrub_internal/exact_samples.py",
+    "openscrub_internal.lifetimes": "openscrub_internal/lifetimes.py",
+    "openscrub_internal.reports": "openscrub_internal/reports.py",
+    "openscrub_setup": "openscrub_setup.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_vault": "openscrub_vault.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py"
+  },
+  "unchanged_owner_source": [
+    "openscrub.py",
+    "openscrub_internal/exact_samples.py",
+    "openscrub_internal/lifetimes.py",
+    "openscrub_internal/reports.py",
+    "pyproject.toml",
+    "tests/test_job_response_lifetime.py"
+  ],
+  "unchanged_ui": [
+    "APP_JS",
+    "APP_CSS"
+  ],
+  "other_refs_preserved": true,
+  "test_diagnostic_only_ast_equivalence": true
+}

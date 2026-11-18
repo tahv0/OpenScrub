@@ -1,0 +1,39 @@
+{
+  "total_selected": 157,
+  "verbatim_matching_ids": 155,
+  "collector_versions": {
+    "native": {
+      "version": "9.2.0",
+      "metadata_file": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/pytest-9.2.0.dist-info/METADATA",
+      "metadata_sha256": "006823d1759e40b4546ff4296945eda3f0692e799f724bb235edd0512d42eead"
+    },
+    "floor": {
+      "version": "8.4.2",
+      "metadata_file": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pytest-8.4.2.dist-info/METADATA",
+      "metadata_sha256": "93d6c5ef0a9714d53716243035037b77fa7d5f970596c48433887cf57f7f675a"
+    }
+  },
+  "source_file": "tests/test_manual_addition_replay.py",
+  "source_sha256": "732e8e6403c15e6380ecd58b1a6d7ef4f0eebf598795c725e68d34e741521d23",
+  "source_parameter_evidence": [
+    {
+      "function": "test_explicit_invalid_id_is_json_400_and_atomic",
+      "parameter": "identity",
+      "parameter_index": 7,
+      "expression": "'x'*129",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "function": "test_valid_id_boundaries_and_report_local_scope",
+      "parameter": "identity",
+      "parameter_index": 1,
+      "expression": "'A0._:-'+'x'*122",
+      "value": "A0._:-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  ],
+  "exact_floor_to_native_display_aliases": {
+    "tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]": "tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[identity7]",
+    "tests/test_manual_addition_replay.py::test_valid_id_boundaries_and_report_local_scope[A0._:-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]": "tests/test_manual_addition_replay.py::test_valid_id_boundaries_and_report_local_scope[identity1]"
+  },
+  "all_other_ids_unchanged": true
+}

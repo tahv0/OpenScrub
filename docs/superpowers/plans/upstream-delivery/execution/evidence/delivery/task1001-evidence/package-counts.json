@@ -1,0 +1,17 @@
+{
+  "validated_sdist_files": 32,
+  "validated_wheel_files": 13,
+  "total_sdist_regular_files": 41,
+  "total_wheel_regular_files": 21,
+  "requires_python": ">=3.9",
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/package-034/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "a1eba4ba2d6629fa74d4ae4d52be3d5d0665133caf7bc68aae5c9d1c1531fdf0",
+    "bytes": 584151
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/package-034/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "bf72f290015591c87abed417a86e693d57e9128ed09af4258713d66dfce7c5a9",
+    "bytes": 455162
+  }
+}

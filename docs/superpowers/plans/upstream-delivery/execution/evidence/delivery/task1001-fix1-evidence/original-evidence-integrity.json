@@ -1,0 +1,19 @@
+{
+  "payloads_checked": 132,
+  "index_files": {
+    "manifest.json": {
+      "bytes": 19789,
+      "sha256": "9e5a89eb2b15a06ace807f40b6ec2e979b32fd96e2a7eac8169b468f2b855871"
+    },
+    "SHA256SUMS": {
+      "bytes": 13703,
+      "sha256": "a76bc9f3eb8d42fad9d00a35ea46e460d00b5402315cc6c8d74b08d1b58fa019"
+    },
+    "final-integrity.json": {
+      "bytes": 537,
+      "sha256": "a70f472b7385b3141e93ea5cf00cfca9e0d4cbeb6f0915536d600c2dfcbc4e31"
+    }
+  },
+  "report_sha256": "0191f7a46a774d035763fe572b1ebe78ccb222dee752ea5c27d0f2832801bf0c",
+  "pr_sha256": "2586af7bc7a2c201ef158b239b59e62ab0a6383d55411525adb0c40f96053d4b"
+}

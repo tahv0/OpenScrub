@@ -1,0 +1,135 @@
+{
+  "scope": "stdlib read-only audit; no product imports or Git commands",
+  "packet_bytes": 93000,
+  "packet_sha256": "173871646b1fbccd09f6a6949cacec81558860e5df7ecf8756f5b4ee59e783a1",
+  "indexed_payloads_checked": 132,
+  "payload_hash_failures": [],
+  "configs": [
+    {
+      "path": "runs/final-full-030/runtime-80ad710e6d144901bf43bffa73a24858.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 13
+    },
+    {
+      "path": "runs/final-floor-031/runtime-24ca86b954c245f5978a9783d63745d7.json",
+      "python": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "python_version": [
+        3,
+        9,
+        25
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 13
+    },
+    {
+      "path": "runs/native-http-032/runtime-d9ca5ea808dd40c99dacf6ab732c8c4f.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 13
+    },
+    {
+      "path": "runs/package-034/runtime-2ed56a9497ae4951aea391a58001aa4b.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 16
+    },
+    {
+      "path": "runs/package-034/runtime-8255fb55aac842e688c9e1275146c392.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "installed",
+      "installed_target": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/package-034/site-packages",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 16
+    },
+    {
+      "path": "runs/costs-035/runtime-1dbc99141181415babf73a1d79f3609f.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 14
+    },
+    {
+      "path": "runs/admission-037/runtime-94ad5df7523640f58e868493010546a6.json",
+      "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "python_version": [
+        3,
+        12,
+        16
+      ],
+      "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+      "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+      "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "policy": "frozen",
+      "mode": "source",
+      "installed_target": "",
+      "file_count": 129,
+      "module_count": 10,
+      "prerequisite_count": 14
+    }
+  ]
+}

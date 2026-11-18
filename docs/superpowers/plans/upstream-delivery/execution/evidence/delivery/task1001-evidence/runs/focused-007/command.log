@@ -1,0 +1,295 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"fetch_plate_models": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/fetch_plate_models.py", "sha256": "da0a63c3ff96d9bd2f67fad513c880d973b27a09c23080eb53f0be5fe9974ef2"}, "install": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/install.py", "sha256": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb"}, "openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355"}, "openscrub_gui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_gui.py", "sha256": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "eff26e27c8e2fbe2349422a3cd9ddf26e4d36c39ff4395344a64045c555bcb28"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "a29668553b47c81cb11bea9bc303630522ff668985d22471c6c5591ab3ed4de7"}, "test_openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py", "sha256": "60282f4ab6bc9b20cc2a4d5e5ce1934cbade19f3a3186ad7bf0b9989ed7d4109"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.....................FFF.........FFFFFFF................................ [ 64%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+_________ test_report_commit_overlapping_encode_conflicts_and_releases _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840eca40>, url='/api/jobs/e3df1dd1c478')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb84655af0>
+
+    def test_report_commit_overlapping_encode_conflicts_and_releases(exact, monkeypatch):
+        entered, release = threading.Event(), threading.Event()
+        real = web.cv2.imencode
+        def encode(*a, **kw):
+            entered.set(); assert release.wait(8)
+            return real(*a, **kw)
+        monkeypatch.setattr(web.cv2, 'imencode', encode)
+        call = start_call('get', exact.url+'/edit_sample?t=.2')
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x7bcb846e1ac0: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:157: AssertionError
+______ test_observed_source_replacement_retires_pair_until_scan_adoption _______
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ee7a0>, url='/api/jobs/333b51754bd3')
+
+    def test_observed_source_replacement_retires_pair_until_scan_adoption(exact):
+        first = sample(exact)['sample']['source_ref']
+        source = Path(exact.job['video'])
+        replacement = source.with_name('replacement.avi')
+        replacement.write_bytes(source.read_bytes())
+        os.replace(replacement, source)
+>       assert request('get',exact.url+'/edit_sample?t=.2').status_code == 422
+E       AssertionError: assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+E        +    where <WrapperTestResponse 72 bytes [400 BAD REQUEST]> = request('get', ('/api/jobs/333b51754bd3' + '/edit_sample?t=.2'))
+E        +      where '/api/jobs/333b51754bd3' = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ee7a0>, url='/api/jobs/333b51754bd3').url
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:171: AssertionError
+__________ test_concurrent_discovery_converges_and_probes_once_reused __________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840bd300>, url='/api/jobs/2a584b711d81')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb846e2480>
+
+    def test_concurrent_discovery_converges_and_probes_once_reused(exact, monkeypatch):
+        barrier = threading.Barrier(2)
+        real = web._probe_exact_source
+        probes=[]
+        def probe(path):
+            probes.append(path); barrier.wait(5)
+            return real(path)
+        monkeypatch.setattr(web,'_probe_exact_source',probe)
+        a=start_call('get',exact.url+'/edit_sample?t=.2')
+        b=start_call('get',exact.url+'/edit_sample?t=.4')
+        x,y=finish(a),finish(b)
+>       assert x.status_code == y.status_code == 200
+E       assert 400 == 200
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:189: AssertionError
+_____________ test_encoder_failure_cleanup_and_retained_exception ______________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840bf4c0>, url='/api/jobs/14766933bf3a')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb843739b0>
+
+    def test_encoder_failure_cleanup_and_retained_exception(exact,monkeypatch):
+        errors=[];caps=[];real=web.cv2.VideoCapture
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def release(self): self.released=True;self.cap.release()
+        def encode(*a):
+            try: raise RuntimeError('retained encoding failure')
+            except RuntimeError as error: errors.append(error);raise
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        monkeypatch.setattr(web.cv2,'imencode',encode)
+        response=request('get',exact.url+'/edit_sample?t=.2')
+>       assert response.status_code==500 and response.json['error']=='sample_encode_failed'
+E       assert (400 == 500)
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:236: AssertionError
+___________ test_decoded_evidence_unavailable_without_walkback[eof] ____________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ebce0>, url='/api/jobs/dcb039605f2b')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb84374080>
+defect = 'eof'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+_________ test_decoded_evidence_unavailable_without_walkback[adjacent] _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ebb00>, url='/api/jobs/77df7155d366')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb84376300>
+defect = 'adjacent'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+________ test_decoded_evidence_unavailable_without_walkback[zero_time] _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840eb880>, url='/api/jobs/8d2a3608bb26')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb84375c40>
+defect = 'zero_time'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+________ test_decoded_evidence_unavailable_without_walkback[dimensions] ________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ec680>, url='/api/jobs/d817f148510f')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb843752b0>
+defect = 'dimensions'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+_________ test_decoded_evidence_unavailable_without_walkback[backend] __________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840ead40>, url='/api/jobs/98542df9a27d')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb845854f0>
+defect = 'backend'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+__________ test_decoded_evidence_unavailable_without_walkback[count] ___________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/focused-007/pytest/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bcb840bd760>, url='/api/jobs/517e917df4b9')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bcb845842c0>
+defect = 'count'
+
+    @pytest.mark.parametrize('defect', ['eof','adjacent','zero_time','dimensions','backend','count'])
+    def test_decoded_evidence_unavailable_without_walkback(exact,monkeypatch,defect):
+        real=web.cv2.VideoCapture;caps=[]
+        class Capture:
+            def __init__(self,*a): self.cap=real(*a);self.released=False;self.reads=0;caps.append(self)
+            def __getattr__(self,k): return getattr(self.cap,k)
+            def getBackendName(self): return 'OTHER' if defect=='backend' else self.cap.getBackendName()
+            def get(self,p):
+                if p==cv2.CAP_PROP_FRAME_COUNT and defect=='count':return 9
+                if p==cv2.CAP_PROP_POS_MSEC:
+                    if defect=='zero_time':return 0
+                    if defect=='adjacent':return self.cap.get(p)+200
+                return self.cap.get(p)
+            def read(self):
+                self.reads+=1
+                ok,pixels=self.cap.read()
+                if defect=='eof':return False,None
+                if defect=='dimensions':pixels=pixels[:20]
+                return ok,pixels
+            def release(self):self.released=True;self.cap.release()
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        response=request('get',exact.url+'/edit_sample?t=.4')
+>       assert response.status_code==422
+E       assert 400 == 422
+E        +  where 400 = <WrapperTestResponse 72 bytes [400 BAD REQUEST]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:262: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_report_commit_overlapping_encode_conflicts_and_releases
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_observed_source_replacement_retires_pair_until_scan_adoption
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_concurrent_discovery_converges_and_probes_once_reused
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_encoder_failure_cleanup_and_retained_exception
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[eof]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[adjacent]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[zero_time]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[dimensions]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[backend]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_decoded_evidence_unavailable_without_walkback[count]
+10 failed, 102 passed in 11.53s

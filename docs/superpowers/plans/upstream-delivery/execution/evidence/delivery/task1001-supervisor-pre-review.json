@@ -1,0 +1,21 @@
+{
+  "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "branch": "pr/exact-editor-samples",
+  "clean": true,
+  "preserved_ref_count": 52,
+  "changed_files": [
+    "openscrub_internal/exact_samples.py",
+    "openscrub_internal/lifetimes.py",
+    "openscrub_web.py",
+    "tests/test_exact_adoption.py",
+    "tests/test_exact_media.py",
+    "tests/test_exact_samples.py"
+  ],
+  "ordinary_js_css_equal": true,
+  "packet_bytes": 93000,
+  "packet_sha256": "173871646b1fbccd09f6a6949cacec81558860e5df7ecf8756f5b4ee59e783a1",
+  "proposal_sha256": "3d2d14325bc04dbfc513907c9aa1a756d04597205a886265c2da151e8afaa7ea",
+  "report_sha256": "0191f7a46a774d035763fe572b1ebe78ccb222dee752ea5c27d0f2832801bf0c",
+  "rulings_sha256": "9b695e5d9e0918b866fce2f49bdda15f07de30ea2a1d9a5528098540481b7b4d"
+}

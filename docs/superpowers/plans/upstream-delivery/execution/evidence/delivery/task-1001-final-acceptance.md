@@ -1,0 +1,13 @@
+# Task1001 final local acceptance
+
+Accepted candidate: pr/exact-editor-samples at **335435e1e1120de9e6773656b7dfdfabf220e27b**, based on **12919c96c6f7558136b50d7b4d85e5e6b62f1971**. The initial implementation/recovery commits631f517/5acb655 and the scoped repair335435e remain individually preserved. No C01 composition, user-data adoption or external publication has occurred.
+
+Independent review of the complete backend found two Important authority/IO gaps. [Fix-round review](task-1001-fix1-review.md) now verifies both addressed with no new findings: cancelled/completed recovery pairs cannot grant stale adoption authority, final sample acceptance checks cancellation, and disappearance of an already-selected source returns JSON409 while initial absence remains404. No other backend requirement remains open within this declared slice.
+
+The final frozen candidate passes157 affected checks on each actual Python3.12.16 and3.9.25, plus a final offline package/installed real HTTP save→render→fresh-process reopen gate. The new race test is included and byte-checked. Assertions cover33/13 selected sdist/wheel files within42/21 total regular files. The original471 full/77 affected-floor/package/cost results remain attributed to5acb655; earlier469/168 remain at631f517. This record does not relabel a broad suite or timing run as final repair-head evidence.
+
+Four genuine REDs became six race/control GREENs. Original132 evidence payloads/three indexes, the original report's15,593-byte prefix and raw original report/PR snapshots remain unchanged. The53 new repair payloads, exact two pytest display aliases and explicitly transformed synthetic-image diagnostic copy were independently audited. No test/fixture/selection was relaxed to obtain passing results.
+
+Root has read both reviews and complete reports, verified clean335435e/current branch, full task/fix ranges and52 preserved earlier refs, and confirmed the recorded covering test files/commands/output. Remaining cannot-verify items are the already-separated strict seeds, ordinary UI/P16D/C01/P08, native interruption, P17/HDR/platform/quality/long-video gates. They are not closed by this backend. Metadata-qualified sample verification and observed-file-stamp limits remain explicit; no custom training/model/workbench or new default blur policy was introduced.
+
+The next approved source direction is [Task1002 strict seeds](../research/source-plans/exact-tracker-seed-source-plan.md.txt). The ordinary editor and Track migrate together only after that adapter and the focused P16D prerequisite gate. Current working C01 stays b4fc209, and the documentation checkpoint follows this acceptance.

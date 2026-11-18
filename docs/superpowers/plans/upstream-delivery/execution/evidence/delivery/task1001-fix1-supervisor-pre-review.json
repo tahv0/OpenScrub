@@ -1,0 +1,16 @@
+{
+  "fix_base": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "branch": "pr/exact-editor-samples",
+  "clean": true,
+  "changed_files": [
+    "openscrub_web.py",
+    "tests/test_exact_recovery_races.py"
+  ],
+  "preserved_ref_count": 52,
+  "original_report_prefix_bytes": 15593,
+  "original_report_prefix_sha256": "0191f7a46a774d035763fe572b1ebe78ccb222dee752ea5c27d0f2832801bf0c",
+  "packet_bytes": 16534,
+  "packet_sha256": "727667a1fa3c31d9a33c97d0e7ce1991711582b7e8419eee4704c185b3e44064",
+  "fix_report_sha256": "19881bb0dfe5f4b6bd429ee730edd18341cdfcd6f230ed15d04a9324741c86d1"
+}

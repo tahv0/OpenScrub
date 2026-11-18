@@ -1,0 +1,454 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"fetch_plate_models": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/fetch_plate_models.py", "sha256": "da0a63c3ff96d9bd2f67fad513c880d973b27a09c23080eb53f0be5fe9974ef2"}, "install": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/install.py", "sha256": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb"}, "openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355"}, "openscrub_gui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_gui.py", "sha256": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "test_openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py", "sha256": "60282f4ab6bc9b20cc2a4d5e5ce1934cbade19f3a3186ad7bf0b9989ed7d4109"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFFFFFFFFFFFFFFFFFFFFF                                                   [100%]
+=================================== FAILURES ===================================
+_______________ test_exact_image_rows_offsets_and_final_interval _______________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157d8040>, url='/api/jobs/07892e13aee4')
+
+    def test_exact_image_rows_offsets_and_final_interval(exact):
+        import base64
+>       value = sample(exact, 1.9)
+                ^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:59: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157d8040>, url='/api/jobs/07892e13aee4')
+t = 1.9
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+__________________________ test_bad_time_is_400[NaN] ___________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786200>, url='/api/jobs/5bb238b4f20b')
+time = 'NaN'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+________________________ test_bad_time_is_400[Infinity] ________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157860c0>, url='/api/jobs/d4c3d2bd52ef')
+time = 'Infinity'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+_______________________ test_bad_time_is_400[-Infinity] ________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786c00>, url='/api/jobs/3ad9ee8c3d0e')
+time = '-Infinity'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+__________________________ test_bad_time_is_400[true] __________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786980>, url='/api/jobs/63c65e0cb8b3')
+time = 'true'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+_________________________ test_bad_time_is_400[false] __________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786e80>, url='/api/jobs/17219acd8181')
+time = 'false'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+__________________________ test_bad_time_is_400[null] __________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915787740>, url='/api/jobs/e6ac4a6e0fe6')
+time = 'null'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+___________________________ test_bad_time_is_400[[]] ___________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786ca0>, url='/api/jobs/a0b88e3dc220')
+time = '[]'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+___________________________ test_bad_time_is_400[-1] ___________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786980>, url='/api/jobs/44d6ca052f44')
+time = '-1'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+_________________________ test_bad_time_is_400[2.001] __________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786b60>, url='/api/jobs/f6aef4da84cd')
+time = '2.001'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+___________________________ test_bad_time_is_400[x] ____________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915786200>, url='/api/jobs/13cf1929002b')
+time = 'x'
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+____________________________ test_bad_time_is_400[] ____________________________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570c400>, url='/api/jobs/848acebd4443')
+time = ''
+
+    @pytest.mark.parametrize('time', ['NaN','Infinity','-Infinity','true','false','null','[]','-1','2.001','x',''])
+    def test_bad_time_is_400(exact, time):
+        response = request('get', exact.url+'/edit_sample?t='+time)
+>       assert response.status_code == 400
+E       assert 404 == 400
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:76: AssertionError
+___________ test_row_context_canonical_opaque_values_and_exclusions ____________
+
+    def test_row_context_canonical_opaque_values_and_exclusions():
+>       from openscrub_internal.exact_samples import row_context_eq
+E       ModuleNotFoundError: No module named 'openscrub_internal.exact_samples'
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:81: ModuleNotFoundError
+____________ test_strict_cas_baseline_and_already_equal_replay[box] ____________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570cea0>, url='/api/jobs/5189d331307f')
+kind = 'box'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_baseline_and_already_equal_replay(exact, kind):
+>       value = sample(exact)
+                ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570cea0>, url='/api/jobs/5189d331307f')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+___________ test_strict_cas_baseline_and_already_equal_replay[span] ____________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d440>, url='/api/jobs/d22e283f228e')
+kind = 'span'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_baseline_and_already_equal_replay(exact, kind):
+>       value = sample(exact)
+                ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d440>, url='/api/jobs/d22e283f228e')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+___________ test_strict_cas_baseline_and_already_equal_replay[both] ____________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570ccc0>, url='/api/jobs/2a146104a474')
+kind = 'both'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_baseline_and_already_equal_replay(exact, kind):
+>       value = sample(exact)
+                ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570ccc0>, url='/api/jobs/2a146104a474')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+_________ test_strict_cas_non_target_or_mixed_conflict_is_atomic[box] __________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d3a0>, url='/api/jobs/00fe6f2f0dda')
+kind = 'box'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_non_target_or_mixed_conflict_is_atomic(exact, kind):
+>       pc = precondition(sample(exact))
+                          ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d3a0>, url='/api/jobs/00fe6f2f0dda')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+_________ test_strict_cas_non_target_or_mixed_conflict_is_atomic[span] _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d080>, url='/api/jobs/3074b2a135bd')
+kind = 'span'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_non_target_or_mixed_conflict_is_atomic(exact, kind):
+>       pc = precondition(sample(exact))
+                          ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570d080>, url='/api/jobs/3074b2a135bd')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+_________ test_strict_cas_non_target_or_mixed_conflict_is_atomic[both] _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570cae0>, url='/api/jobs/44fc9402e59c')
+kind = 'both'
+
+    @pytest.mark.parametrize('kind', ['box','span','both'])
+    def test_strict_cas_non_target_or_mixed_conflict_is_atomic(exact, kind):
+>       pc = precondition(sample(exact))
+                          ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc91570cae0>, url='/api/jobs/44fc9402e59c')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+_______ test_choices_audio_unrelated_metadata_do_not_invalidate_geometry _______
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157862a0>, url='/api/jobs/ee1c0c6988f3')
+
+    def test_choices_audio_unrelated_metadata_do_not_invalidate_geometry(exact):
+>       pc = precondition(sample(exact))
+                          ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:126: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157862a0>, url='/api/jobs/ee1c0c6988f3')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+___________ test_manual_replay_precedes_current_source_and_timeline ____________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157860c0>, url='/api/jobs/b3751079dc42')
+
+    def test_manual_replay_precedes_current_source_and_timeline(exact):
+>       pc = precondition(sample(exact), None)
+                          ^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:137: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc9157860c0>, url='/api/jobs/b3751079dc42')
+t = 0.2
+
+    def sample(exact, t=.2):
+        response = request('get', exact.url+'/edit_sample?t='+str(t))
+>       assert response.status_code == 200, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>404 Not Found</title>
+E         <h1>Not Found</h1>
+E         <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+E         
+E       assert 404 == 200
+E        +  where 404 = <WrapperTestResponse 207 bytes [404 NOT FOUND]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:34: AssertionError
+_________ test_report_commit_overlapping_encode_conflicts_and_releases _________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/runs/red-003/pytest/test_...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fc915787c40>, url='/api/jobs/60f6e08ec9d4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc9164c07a0>
+
+    def test_report_commit_overlapping_encode_conflicts_and_releases(exact, monkeypatch):
+        entered, release = threading.Event(), threading.Event()
+        real = web.cv2.imencode
+        def encode(*a, **kw):
+            entered.set(); assert release.wait(8)
+            return real(*a, **kw)
+        monkeypatch.setattr(web.cv2, 'imencode', encode)
+        call = start_call('get', exact.url+'/edit_sample?t=.2')
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x7fc9164c24b0: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py:157: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_exact_image_rows_offsets_and_final_interval
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[NaN]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[Infinity]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[-Infinity]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[true]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[false]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[null]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[[]]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[-1]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[2.001]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[x]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_bad_time_is_400[]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_row_context_canonical_opaque_values_and_exclusions
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_baseline_and_already_equal_replay[box]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_baseline_and_already_equal_replay[span]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_baseline_and_already_equal_replay[both]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_non_target_or_mixed_conflict_is_atomic[box]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_non_target_or_mixed_conflict_is_atomic[span]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_strict_cas_non_target_or_mixed_conflict_is_atomic[both]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_choices_audio_unrelated_metadata_do_not_invalidate_geometry
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_manual_replay_precedes_current_source_and_timeline
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py::test_report_commit_overlapping_encode_conflicts_and_releases
+22 failed in 5.37s

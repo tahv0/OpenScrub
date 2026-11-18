@@ -1,0 +1,144 @@
+[
+  {
+    "run": "fix1-red-002",
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "actual_exit": 1,
+    "summary": "4 failed, 2 passed in 0.80s",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "runtime_configs": [
+      "runtime-2738efedd1834c648335fa838ffcd1e3.json"
+    ],
+    "original_log_sha256": "39465b69f7ba20982fa76fa8b4cdedb7da1189dbf401d54afc9a86764008b9d7"
+  },
+  {
+    "run": "fix1-green-004",
+    "head": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "actual_exit": 0,
+    "summary": "6 passed in 0.81s",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+      "-q"
+    ],
+    "controller_action": "run",
+    "runtime_configs": [
+      "runtime-b0b10c4a68f94ad7b1e57f1849cf3d55.json"
+    ],
+    "original_log_sha256": "9d81f8abc3ebbbbfc7bd544aca1b46d8b9fa9efd3be07407ead08e838ab8baae"
+  },
+  {
+    "run": "fix1-native-006",
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "actual_exit": 0,
+    "summary": "157 passed, 6 deselected in 11.46s",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+      "-q",
+      "-k",
+      "not test_configured_wsgi_closes_stream_owner_exactly_once or video"
+    ],
+    "controller_action": "run",
+    "runtime_configs": [
+      "runtime-ca57c2f8e74d44b28cc24be3ad482d43.json"
+    ],
+    "original_log_sha256": "a5f1748e975a1315adf6765b07bafccf417c693d497e4f06883dfb672df19afd"
+  },
+  {
+    "run": "fix1-floor-007",
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "actual_exit": 0,
+    "summary": "157 passed, 6 deselected in 12.03s",
+    "workload_argv": [
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+      "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+      "-q",
+      "-k",
+      "not test_configured_wsgi_closes_stream_owner_exactly_once or video"
+    ],
+    "controller_action": "run",
+    "runtime_configs": [
+      "runtime-51694d9d6aae4db284e5ab05fd7ed9a7.json"
+    ],
+    "original_log_sha256": "cd50fd99ea9a584e725c6bce6044f866270be777e2721085d4e2d7c4c742483e"
+  },
+  {
+    "run": "fix1-package-008",
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "actual_exit": 0,
+    "summary": null,
+    "workload_argv": null,
+    "controller_action": "package",
+    "runtime_configs": [
+      "runtime-273d1102129f4e51876403dbca9b1a77.json",
+      "runtime-78289e2d89624e4faad638e4ad319a81.json"
+    ],
+    "original_log_sha256": null
+  }
+]

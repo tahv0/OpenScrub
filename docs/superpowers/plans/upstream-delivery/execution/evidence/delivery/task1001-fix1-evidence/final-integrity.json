@@ -1,0 +1,17 @@
+{
+  "fix_base": "5acb655f98cc4699d4a05a5670e4e7ab33b477d6",
+  "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "source_clean": true,
+  "no_active_runtime": true,
+  "indexed_payload_files": 53,
+  "total_evidence_files": 56,
+  "payload_bytes": 444231,
+  "runtime_runs": 5,
+  "native_result": "157 passed,6 deselected",
+  "floor_result": "157 passed,6 deselected;actual3.9.25",
+  "package_exit": 0,
+  "original132_payloads_and_indexes_unchanged": true,
+  "report_sha256": "19881bb0dfe5f4b6bd429ee730edd18341cdfcd6f230ed15d04a9324741c86d1",
+  "live_report_sha256": "48077c66db4601363992bb4c70ef91635f9159b1bc3626e3ca0bb4a436d49c3f",
+  "live_pr_sha256": "3ac1dc4517db2450ec4c6ced221a8d2b917861c3f1236f053ce39a67719c8ca0"
+}

@@ -1,0 +1,48 @@
+{
+  "original_path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/logs/command.log",
+  "original_bytes": 18004,
+  "original_sha256": "39465b69f7ba20982fa76fa8b4cdedb7da1189dbf401d54afc9a86764008b9d7",
+  "archive_copy": "runs/fix1-red-002/command.compact.log",
+  "archive_bytes": 15760,
+  "archive_sha256": "81ed42b068a2a07071cbae89f18f0dd84dc3be08d4dc238e9cc2ac6c4e1b9b63",
+  "pattern": "\"base64\":\"([A-Za-z0-9+/=]+)\"",
+  "replaced_values": [
+    {
+      "original_character_span": [
+        4511,
+        5426
+      ],
+      "matched_field_bytes": 915,
+      "matched_field_sha256": "be7ad448e966f37508670b618216ce35b402d4f06434c15d38b82f4adb2c6295",
+      "base64_characters": 904,
+      "base64_sha256": "63c540cdfb37f6fea300519c41027354785742c8325d073115db6ded5289c055",
+      "jpeg_bytes": 676,
+      "jpeg_sha256": "e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9"
+    },
+    {
+      "original_character_span": [
+        8485,
+        9400
+      ],
+      "matched_field_bytes": 915,
+      "matched_field_sha256": "be7ad448e966f37508670b618216ce35b402d4f06434c15d38b82f4adb2c6295",
+      "base64_characters": 904,
+      "base64_sha256": "63c540cdfb37f6fea300519c41027354785742c8325d073115db6ded5289c055",
+      "jpeg_bytes": 676,
+      "jpeg_sha256": "e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9"
+    },
+    {
+      "original_character_span": [
+        11951,
+        12866
+      ],
+      "matched_field_bytes": 915,
+      "matched_field_sha256": "be7ad448e966f37508670b618216ce35b402d4f06434c15d38b82f4adb2c6295",
+      "base64_characters": 904,
+      "base64_sha256": "63c540cdfb37f6fea300519c41027354785742c8325d073115db6ded5289c055",
+      "jpeg_bytes": 676,
+      "jpeg_sha256": "e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9"
+    }
+  ],
+  "lossless": false
+}

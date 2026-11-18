@@ -1,0 +1,212 @@
+TRANSFORMED COMPACT DIAGNOSTIC COPY; NOT LOSSLESS. Only JPEG base64 values replaced by size/hash. Original runtime log remains unchanged.
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "d424db5a284a471fba6fd8db4a948ae597c986fde4c2d99e107da073eb940d30"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "60dd48ad887c39fddfa7bf1812fe35af865a59daf5c52d4ba1d8e9870d9350b7"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F.FFF.                                                                   [100%]
+=================================== FAILURES ===================================
+_____ test_recovery_rechecks_signalled_cancel_before_authoritative_commit ______
+
+scan = (namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/p...m': {'preserved': True}}, enable=<function store.<locals>.enable at 0x77a363dbc360>, url='/api/jobs/ff55d364c028'), [])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77a364a87290>
+
+    def test_recovery_rechecks_signalled_cancel_before_authoritative_commit(scan, monkeypatch):
+        exact, files, normalized = recoverable_pair(scan, monkeypatch)
+        before = report_before(exact, files)
+        old_source, old_video = files.current_source, exact.job['video']
+        old_epoch, pair = files.source_epoch, files.source_pair
+        failures, captures = record_failures_and_captures(monkeypatch)
+        prepared, resume = threading.Event(), threading.Event()
+        held_leases = []
+        original = web._prepare_observed_source
+        def prepare(*args):
+            value = original(*args)
+            held_leases.append(value[1])
+            prepared.set()
+            assert resume.wait(8)
+            return value
+        monkeypatch.setattr(web, '_prepare_observed_source', prepare)
+        cancel_waiting, cancel_release = delay_cancel_lock(files, monkeypatch)
+        recovery = start_named('held-exact-recovery', 'get', exact.url+'/edit_sample?t=0.2')
+        cancel = None
+        try:
+            assert prepared.wait(5)
+            cancel = start_named('held-exact-cancel', 'post', exact.url+'/cancel')
+            assert cancel_waiting.wait(5) and pair[0].is_set()
+            assert files.operation is pair[0] and files.source_pair == pair
+            resume.set()
+            response = finish(recovery)
+>           assert_conflict(response)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = <WrapperTestResponse 1277 bytes [200 OK]>
+
+    def assert_conflict(response):
+>       assert response.status_code == 409, response.get_data(as_text=True)
+E       AssertionError: {"boxes":[],"image":{"base64":"[image bytes omitted; JPEG bytes=676; SHA256=e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9]","mime":"image/jpeg"},"sample":{"canonical_s":0.2,"height":48,"index":1,"observed_s":0.2,"offset":[0,0],"origin":[0,0],"policy":"opencv-ffmpeg-zero-cfr-v1","requested_s":0.2,"source_ref":"66437c9607f0446290c58cd4692a02ce:2","stream":0,"timeline_eq":"40ba38c7282e69180de164d373c85e1139c2ea290e99f8b2d533935bb33fdcc8","width":64},"version":1}
+E         
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 1277 bytes [200 OK]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:92: AssertionError
+_____ test_completed_recovery_pair_cannot_authorize_a_second_request[True] _____
+
+scan = (namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/p...m': {'preserved': True}}, enable=<function store.<locals>.enable at 0x77a363d03a60>, url='/api/jobs/3cbea113756f'), [])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77a364a8ade0>
+replace_source = True
+
+    @pytest.mark.parametrize('replace_source', [False, True])
+    def test_completed_recovery_pair_cannot_authorize_a_second_request(scan, monkeypatch, replace_source):
+        exact, files, normalized = recoverable_pair(scan, monkeypatch)
+        before = report_before(exact, files)
+        failures, captures = record_failures_and_captures(monkeypatch)
+        entered, resume = threading.Event(), threading.Event()
+        held_leases = []
+        original = web._prepare_observed_source
+        def prepare(*args):
+            if threading.current_thread().name == 'stale-exact-recovery':
+                entered.set()  # early recovery check passed; source not opened yet
+                assert resume.wait(8)
+            value = original(*args)
+            held_leases.append(value[1])
+            return value
+        monkeypatch.setattr(web, '_prepare_observed_source', prepare)
+        stale = start_named('stale-exact-recovery', 'get', exact.url+'/edit_sample?t=0.2')
+        try:
+            assert entered.wait(5)
+            first = request('get', exact.url+'/edit_sample?t=0.2')
+            assert first.status_code == 200 and files.source_pair is None
+            selected, epoch = files.current_source, files.source_epoch
+            if replace_source:
+                replacement = normalized.with_name('replacement.avi')
+                replacement.write_bytes(normalized.read_bytes())
+                replacement.replace(normalized)
+                assert web._file_stamp(os.stat(normalized)) != selected['stamp']
+            resume.set()
+            response = finish(stale)
+            if replace_source or response.status_code == 409:
+>               assert_conflict(response)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = <WrapperTestResponse 1277 bytes [200 OK]>
+
+    def assert_conflict(response):
+>       assert response.status_code == 409, response.get_data(as_text=True)
+E       AssertionError: {"boxes":[],"image":{"base64":"[image bytes omitted; JPEG bytes=676; SHA256=e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9]","mime":"image/jpeg"},"sample":{"canonical_s":0.2,"height":48,"index":1,"observed_s":0.2,"offset":[0,0],"origin":[0,0],"policy":"opencv-ffmpeg-zero-cfr-v1","requested_s":0.2,"source_ref":"8523dea48cfa4be398c8352a86ee5ddb:3","stream":0,"timeline_eq":"40ba38c7282e69180de164d373c85e1139c2ea290e99f8b2d533935bb33fdcc8","width":64},"version":1}
+E         
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 1277 bytes [200 OK]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:92: AssertionError
+__________ test_final_sample_acceptance_rechecks_signalled_operation ___________
+
+scan = (namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/p...m': {'preserved': True}}, enable=<function store.<locals>.enable at 0x77a363da8f40>, url='/api/jobs/708b86a2156a'), [])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77a364a8c320>
+
+    def test_final_sample_acceptance_rechecks_signalled_operation(scan, monkeypatch):
+        exact, files, normalized = recoverable_pair(scan, monkeypatch)
+        before = report_before(exact, files)
+        operation = files.source_pair[0]
+        failures, captures = record_failures_and_captures(monkeypatch)
+        decoded, resume = threading.Event(), threading.Event()
+        original = web.exact.read_indexed_capture
+        def read(*args, **kwargs):
+            value = original(*args, **kwargs)
+            decoded.set()
+            assert resume.wait(8)
+            return value
+        monkeypatch.setattr(web.exact, 'read_indexed_capture', read)
+        cancel_waiting, cancel_release = delay_cancel_lock(files, monkeypatch)
+        recovery = start_named('decoding-exact-recovery', 'get', exact.url+'/edit_sample?t=0.2')
+        cancel = None
+        try:
+            assert decoded.wait(5)
+            assert files.source_pair is None and exact.job['video'] == str(normalized)
+            cancel = start_named('held-exact-cancel', 'post', exact.url+'/cancel')
+            assert cancel_waiting.wait(5) and operation.is_set()
+            resume.set()
+>           assert_conflict(finish(recovery))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:211: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = <WrapperTestResponse 1277 bytes [200 OK]>
+
+    def assert_conflict(response):
+>       assert response.status_code == 409, response.get_data(as_text=True)
+E       AssertionError: {"boxes":[],"image":{"base64":"[image bytes omitted; JPEG bytes=676; SHA256=e6d0a376db07c55ff0f9879636dca2abca22b4e459b169a26781f7e15714ebc9]","mime":"image/jpeg"},"sample":{"canonical_s":0.2,"height":48,"index":1,"observed_s":0.2,"offset":[0,0],"origin":[0,0],"policy":"opencv-ffmpeg-zero-cfr-v1","requested_s":0.2,"source_ref":"2200187f51aa4438bd52fa02b2b5a687:2","stream":0,"timeline_eq":"40ba38c7282e69180de164d373c85e1139c2ea290e99f8b2d533935bb33fdcc8","width":64},"version":1}
+E         
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 1277 bytes [200 OK]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:92: AssertionError
+_______ test_selected_source_disappearance_before_open_is_json_conflict ________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/py...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x77a363da9940>, url='/api/jobs/0f0ced1e2944')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77a364877e60>
+
+    def test_selected_source_disappearance_before_open_is_json_conflict(exact, monkeypatch):
+        files = web.FILES.initialize(exact.job)
+        before = report_before(exact, files)
+        failures, captures = record_failures_and_captures(monkeypatch)
+        selected, resume = threading.Event(), threading.Event()
+        snapshots = []
+        original = web._exact_snapshot
+        def snapshot(*args):
+            value = original(*args)
+            snapshots.append(value)  # retain the released lease on the failure path
+            selected.set()
+            assert resume.wait(8)
+            return value
+        monkeypatch.setattr(web, '_exact_snapshot', snapshot)
+        call = start_named('selected-exact-source', 'get', exact.url+'/edit_sample?t=0.2')
+        try:
+            assert selected.wait(5)
+            Path(exact.job['video']).unlink()
+            resume.set()
+>           assert_conflict(finish(call))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:242: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>
+
+    def assert_conflict(response):
+>       assert response.status_code == 409, response.get_data(as_text=True)
+E       AssertionError: <!doctype html>
+E         <html lang=en>
+E         <title>500 Internal Server Error</title>
+E         <h1>Internal Server Error</h1>
+E         <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
+E         
+E       assert 500 == 409
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py:92: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/0f0ced1e2944/edit_sample [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", line 1761, in job_edit_sample
+    with open(selected['path'], 'rb') as opened:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/fix1/runs/fix1-red-002/pytest/test_selected_source_disappear0/data/jobs/0f0ced1e2944/input.avi'
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py::test_recovery_rechecks_signalled_cancel_before_authoritative_commit
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py::test_completed_recovery_pair_cannot_authorize_a_second_request[True]
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py::test_final_sample_acceptance_rechecks_signalled_operation
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py::test_selected_source_disappearance_before_open_is_json_conflict
+4 failed, 2 passed in 0.80s

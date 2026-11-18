@@ -1,0 +1,16 @@
+{
+  "first": {
+    "actual_exit": 1,
+    "script": "finalize-first-attempt.py",
+    "script_sha256": "9d9c196f59c3fa8baf19c4edd6fe1d9d9c3ecdfc5bba726430606226bf2c92e4",
+    "assertion": "selected[0]==selected[1]",
+    "cause": "Two pytest long-string parameter display IDs differ; no product/test/selection failure"
+  },
+  "correction": "Exact two collector-display aliases backed by identical pinned parameter source; retain both original ID lists and versions; no runtime replay",
+  "corrected": {
+    "actual_exit": 0,
+    "script": "finalize.py",
+    "no_product_or_test_or_selection_changes": true,
+    "no_runtime_replay": true
+  }
+}

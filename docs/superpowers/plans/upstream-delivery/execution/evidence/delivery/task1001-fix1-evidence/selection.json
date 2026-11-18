@@ -1,0 +1,32 @@
+{
+  "workload_argv": [
+    "-m",
+    "pytest",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+    "-q",
+    "-k",
+    "not test_configured_wsgi_closes_stream_owner_exactly_once or video"
+  ],
+  "selected_count": 157,
+  "deselected_count": 6,
+  "selected_source_video_ids": [
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-video]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-video]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-video]"
+  ],
+  "deselected_ids": [
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-download]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-report]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-download]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-report]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-download]",
+    "tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-report]"
+  ],
+  "unchanged_permutation_evidence": "Original full471 at5acb655; unchanged test/stream owner bytes"
+}

@@ -1,0 +1,14 @@
+{
+  "cfr24": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+    "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"
+  },
+  "cfr5": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+    "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"
+  },
+  "normalized": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+    "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"
+  }
+}

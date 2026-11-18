@@ -14,6 +14,8 @@
 
 The user-prioritized [D01 development and verification efficiency](execution/development-efficiency-priority.md) is complete after independent tooling review and real adoption on Task1631/P16C-G. New tasks use the reviewed local verification helper and the current environment handoff, with explicit source identities and required checks. P16C-G geometry, P16C-R resource cleanup and P16C-P output preservation are independently approved on their declared bases. The reviewed core/browser/renderer assembly and small readiness follow-ups are integrated locally with P15 view filters at `b4fc209`. The selected cycle is complete; the remaining generic/optional roadmap and adoption remain open. Separate PR boundaries and upstream defaults remain in force.
 
+The focused [exact-sample backend](execution/evidence/delivery/task-1001-final-acceptance.md) is independently approved at335435e, including its source-recovery race repair and optional geometry-save preconditions. It is not yet composed into the b4fc209 application. [Strict tracker seeds](execution/evidence/research/source-plans/exact-tracker-seed-source-plan.md.txt) follow next; ordinary editor and Track migrate together after their focused P16D prerequisites. The remaining generic/optional roadmap continues.
+
 ## Global constraints
 
 - Upstream means `austinmabry/OpenScrub`; remote means the user's `tahv0/OpenScrub`, currently `origin`.
