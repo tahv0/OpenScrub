@@ -32,8 +32,8 @@ const status=async s=>assert.equal(await page.locator('#reviewFilterStatus').inn
 const filter=async(type,output)=>{await page.locator('#reviewType').selectOption(type??'');await page.locator('#reviewOutput').selectOption(output)};
 if(process.env.TASK150_TOUCH_ONLY==='1'){
  await page.evaluate(async flags=>{for(const [i,value]of Object.entries(flags))EDITS.enabled[i]=value;await loadReview()},Object.fromEntries(initial.map(r=>[r.i,!r.enabled])));
- await filter('','blur');assert.deepEqual(await page.evaluate(()=>REVIEW_META.cards.filter(c=>reviewMatches(c,null,'blur')).map(c=>c.id).sort((a,b)=>a-b)),[0,4,7,8]);await status('4 of 7 cards match');
- await filter('','visible');assert.deepEqual(await page.evaluate(()=>REVIEW_META.cards.filter(c=>reviewMatches(c,null,'visible')).map(c=>c.id).sort((a,b)=>a-b)),[0,3,6,9]);
+ await filter('','blur');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'blur')).map(c=>c.id).sort((a,b)=>a-b)),[0,4,7,8]);await status('4 of 7 cards match');
+ await filter('','visible');assert.deepEqual(await page.evaluate(()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,null,'visible')).map(c=>c.id).sort((a,b)=>a-b)),[0,3,6,9]);
  await page.locator('#reviewType').click();await page.keyboard.press('Home');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await page.locator('#reviewType').inputValue(),'face');
  await page.locator('#reviewOutput').selectOption('blur');await page.locator('#kb0').click();await status('1 of 7 cards match');assert.match(await page.locator('#reviewFilterHint').innerText(),/outside your zones/);assert.equal(await page.locator('#reviewZones').getAttribute('open'),null);
  await page.evaluate(()=>openJob('empty'));await page.locator('#reviewOutput').waitFor();await status('0 of 0 cards match');assert.equal(await page.locator('#reviewFilterEmpty').innerText(),'No detections in this job.');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();
@@ -81,6 +81,29 @@ fail=true;await page.evaluate(()=>saveAndRender());assert.match(await page.locat
 await page.evaluate(()=>openJob('B'));await page.locator('#reviewType').waitFor();assert.equal(await page.locator('#reviewType').inputValue(),'');await page.evaluate(()=>openJob('A'));await page.locator('#reviewOutput').waitFor();assert.equal(await page.locator('#reviewOutput').inputValue(),'all');
 results.scenarios.push('held-save newer intent, failed save, A→B→A reset and owning draft');
 }
+
+// Modest complete metadata proves actual scheduler/filter ownership beyond mounted nodes.
+rows=Array.from({length:96},(_,i)=>row(100+i,i%2?'plate':'face',i%3!==0));
+rows.push(row(220,'face',false,-1,-1,.5,true),row(221,'plate',true,-1,-1,.5,true));
+await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();
+await page.locator('#reviewFilterReset').click();await page.locator('#review').scrollIntoViewIfNeeded();
+await page.waitForFunction(()=>REVIEW_SCHED.bindings.size>0);assert.equal(await page.evaluate(()=>REVIEW_META.byId.size),98);assert.ok(await page.evaluate(()=>REVIEW_SCHED.bindings.size<REVIEW_META.byId.size));
+await filter('face','blur');await status('32 of 98 cards match');
+const focusId=await page.evaluate(()=>{const b=[...REVIEW_SCHED.bindings.values()].find(b=>REVIEW_SCHED.matching.has(b.id));b.card.querySelector('button').focus();window.retainedFilterNode=b.card;return b.id});
+await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(id=>document.getElementById('det'+id)===window.retainedFilterNode,focusId),true);
+await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen});refreshReviewVisibleSet();});
+assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),32);
+await page.locator('[data-review-next]').click();await page.waitForFunction(()=>[...REVIEW_SCHED.bindings.keys()].every(i=>REVIEW_SCHED.matching.has(i)));
+await page.evaluate(()=>{window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
+await page.waitForFunction(()=>REVIEW_SCHED.owns());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),32);
+// Category actions affect every unmounted/hidden ordinary member, independently of zones.
+await page.evaluate(()=>setAll('face',false));assert.equal(await page.evaluate(()=>Array.from({length:48},(_,i)=>EN[100+i*2]).every(v=>v===false)),true);assert.equal(await page.evaluate(()=>EN[221]),true);await status('0 of 98 cards match');
+await page.evaluate(()=>setAllZd(false));assert.equal(await page.evaluate(()=>EN[221]),false);
+await filter('plate','all');await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen,matchingCardIds:[]})});await page.waitForFunction(()=>REVIEW_SCHED.bindings.size===0);await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),49);
+await page.evaluate(()=>{const id=[...REVIEW_SCHED.bindings.keys()][0];selSet.add(id);selSet.add(100);bulkSet(false)});assert.equal(await page.evaluate(()=>EN[100]),false);assert.deepEqual(await page.evaluate(()=>[...selSet]),[]);
+results.scenarios.push('actual scheduler: 98 complete cards, unmounted full-scope actions, matching focus, range, empty matching, BFCache retention and queue ownership');
+// Restore the exact seven-card/mobile oracle and pending choices established above.
+rows=structuredClone(initial);await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#reviewOutput').waitFor();await page.evaluate(()=>{applyDet(0,true);applyDet(3,false)});
 await page.setViewportSize({width:390,height:844});await page.locator('#reviewFilterReset').click();await page.screenshot({path:root+'/mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.locator('#reviewOutput').selectOption('visible');// A is all true from pending bb0; B3 was kept, C4/5 and E7 remain false, Z8 is false, D6/Z9 true. Thus B/C/E/Z8 match.
 await status('4 of 7 cards match');
 results.scenarios.push('390px layout and native controls');

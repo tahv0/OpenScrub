@@ -3,13 +3,13 @@ from test_review_choices import DOM, run as run_choices
 
 FILTER_DOM = r"""
 const oldCreate=document.createElement;
-document.createElement=(tag)=>{const e=oldCreate(tag);e.focus=()=>document.activeElement=e;
+document.createElement=(tag)=>{const e=oldCreate(tag);e.isConnected=true;e.focus=()=>document.activeElement=e;
  e.closest=()=>null;e.contains=x=>x===e;return e;};
 const fixture=[row(0,true,'face',0,-1,.9),row(1,false,'face',0),row(2,true,'face',0),
  row(3,true,'face'),row(4,false,'plate',-1,4,.9),row(5,false,'plate',-1,4),
  row(6,true,'plate'),row(7,false,'email'),row(8,false,'face',0,-1,.95,true),
  row(9,true,'plate',-1,4,.95,true)];
-const ids=()=>REVIEW_META.cards.filter(c=>reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output)).map(c=>c.id).sort((a,b)=>a-b);
+const ids=()=>[...REVIEW_META.byId.values()].filter(c=>reviewMatches(c,REVIEW_FILTER.type,REVIEW_FILTER.output)).map(c=>c.id).sort((a,b)=>a-b);
 const status=()=>elements.get('reviewFilterStatus').textContent;
 """
 
@@ -31,7 +31,7 @@ def test_native_filters_and_exact_mixed_card_oracle():
     setReviewFilter('plate','blur');eq(ids(),[6,9]);
     setReviewFilter('plate','visible');eq(ids(),[4]);
     setReviewFilter('email','blur');eq(ids(),[]);eq(elements.get('reviewFilterEmpty').hidden,false);
-    eq(TRKMEM[0],[0,1,2]);eq(ROWCARD[8],8);eq(REVIEW_META.byId[8].members,[8]);
+    eq(TRKMEM[0],[0,1,2]);eq(ROWCARD[8],8);eq(REVIEW_META.byId.get(8).members,[8]);
     """)
 
 
@@ -99,4 +99,18 @@ def test_false_mixed_representative_and_stale_zone_callback():
     setReviewFilter(null,'visible');eq(ids(),[1,4,7,8]);
     let scans=0;const old=refreshReviewFilters;refreshReviewFilters=()=>{scans++;old()};
     reviewZoneToggle(document.createElement('details'));eq(scans,0);
+    """)
+
+
+def test_scheduler_matching_bridge_keeps_empty_and_rejects_stale_owner():
+    run("""await review(fixture);const owner=REVIEW_SCHED;
+    setReviewFilter('email','blur');eq([...owner.matching],[]);
+    refreshReviewVisibleSet({jobId:owner.jobId,viewGen:owner.viewGen});
+    refreshReviewVisibleSet();eq([...owner.matching],[]);
+    setReviewFilter('face','visible');eq([...owner.matching],[8,0]);
+    refreshReviewVisibleSet({jobId:'old',viewGen:owner.viewGen,matchingCardIds:[3]});
+    eq([...owner.matching],[8,0]);
+    let cancelled=0;owner.selectionCleanup=()=>{cancelled++;owner.selectionCleanup=null};
+    selSet.add(0);setReviewFilter(null,'all');eq(cancelled,1);eq([...selSet],[]);
+    eq(owner.meta.byId,REVIEW_META.byId);eq(owner.meta.byId.get(0).members,[0,1,2]);
     """)

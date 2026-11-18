@@ -27,7 +27,12 @@ for jid,n in [('A',10),('B',1),('empty',0)]:
  o.write_report(str(report),o.build_parser().parse_args([str(video)]),dict(fps=10.,cum=[(0,0)]*30,bands=[(0,0)]*30,detections=detections,input_sha256=hashlib.sha256(video.read_bytes()).hexdigest()))
  doc=json.loads(report.read_text())
  for i,r in enumerate(doc['detections']):r.update(enabled=flags[i],zone_dropped=i>=8)
- doc['audio_redactions']=[];report.write_text(json.dumps(doc,indent=1))
+ doc['audio_redactions']=[]
+ for i,r in enumerate(doc['detections']):r['unknown_fixture']={'raw_index':i,'retained':[False,'unknown',None]}
+ doc['unknown_fixture']={'retained':'full document'}
+ with w.VAULT_LOCK:lease=w.FILES.reserve(job)
+ with lease:
+  with w.FILES.initialize(job).report_lock:w._publish_job_report_locked(job,str(report),doc)
  if jid=='A':(root/'initial-report.json').write_text(json.dumps(doc,indent=2))
 render_gate=threading.Event();render_gate.set();original=w.app.view_functions['job_render']
 def gated_render(jid):
@@ -53,7 +58,8 @@ try:
   assert mean<8 if blurred else mae<10,(name,mae,mean)
   regions.append(dict(name=name,blurred=blurred,mae=mae,mean=mean))
  saved=json.loads((root/'pre-render-report.json').read_text());post=json.loads((Path(job['dir'])/'report.json').read_text())
- summary=dict(regions=regions,pre_render_rows=len(saved['detections']),post_render_rows=len(post['detections']),output_bytes=Path(job['output']).stat().st_size,post_render_boundary='Standalone lacks P06D; full raw rows after render remain C01 acceptance.')
+ assert post['detections']==saved['detections'];assert post['audio_redactions']==saved['audio_redactions'];assert post['unknown_fixture']==saved['unknown_fixture']
+ summary=dict(regions=regions,pre_render_rows=len(saved['detections']),post_render_rows=len(post['detections']),output_bytes=Path(job['output']).stat().st_size,post_render_boundary='All raw rows, disabled/zone/manual/audio/unknown fields preserved after real render and fresh HTTP reopen.')
  (root/'output-check.json').write_text(json.dumps(summary,indent=2));cv2.imwrite(str(root/'decoded-output.png'),output);print(json.dumps(summary),flush=True)
 finally:
  render_gate.set();server.stop();thread.join(10);assert not thread.is_alive()
