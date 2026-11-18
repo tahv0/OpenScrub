@@ -185,8 +185,8 @@ class _RenderDelivery:
 
     def __exit__(self, *exc):
         if self.recovery_required:
-            # Necessary leftovers remain discoverable; the report stage may
-            # still be owned by its context, so deliberately do not exit it.
+            # Close the ExitStack to discard expendable report staging; required
+            # recovery backups, final paths, and the descriptor remain discoverable.
             self._stack.close()
             return
         try:
