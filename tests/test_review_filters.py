@@ -114,3 +114,11 @@ def test_scheduler_matching_bridge_keeps_empty_and_rejects_stale_owner():
     selSet.add(0);setReviewFilter(null,'all');eq(cancelled,1);eq([...selSet],[]);
     eq(owner.meta.byId,REVIEW_META.byId);eq(owner.meta.byId.get(0).members,[0,1,2]);
     """)
+
+
+def test_selected_action_retains_explicit_matching_ids_across_virtual_unmount():
+    run("""await review(fixture);setReviewFilter('face','all');
+    selSet.add(0);selSet.add(3);elements.delete('det3');
+    bulkSet(false);eq([EN[0],EN[1],EN[2]],[false,false,false]);
+    eq(EN[3],false);eq([...selSet],[]);
+    """)

@@ -24,8 +24,9 @@ for jid,n in [('A',10),('B',1),('empty',0)]:
  w.JOBS.pop(job['id']);job.update(id=jid,phase='review',progress=1);w.JOBS[jid]=job
  detections=[o.Detection(.1,2.8,boxes[i],categories[i],'synthetic '+str(i),.9 if i in (0,4) else .5,(0,0),dense=i in (0,1,2,4,5),track=4 if i in (4,5,9) else -1,person=0 if i in (0,1,2,8) else -1) for i in range(n)]
  report=Path(job['dir'])/'report.json'
- o.write_report(str(report),o.build_parser().parse_args([str(video)]),dict(fps=10.,cum=[(0,0)]*30,bands=[(0,0)]*30,detections=detections,input_sha256=hashlib.sha256(video.read_bytes()).hexdigest()))
- doc=json.loads(report.read_text())
+ seed=root/('seed-'+jid+'.json')
+ o.write_report(str(seed),o.build_parser().parse_args([str(video)]),dict(fps=10.,cum=[(0,0)]*30,bands=[(0,0)]*30,detections=detections,input_sha256=hashlib.sha256(video.read_bytes()).hexdigest()))
+ doc=json.loads(seed.read_text())
  for i,r in enumerate(doc['detections']):r.update(enabled=flags[i],zone_dropped=i>=8)
  doc['audio_redactions']=[]
  for i,r in enumerate(doc['detections']):r['unknown_fixture']={'raw_index':i,'retained':[False,'unknown',None]}
