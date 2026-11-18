@@ -10,6 +10,7 @@ import json
 import math
 
 import cv2
+import numpy as np
 
 POLICY = 'opencv-ffmpeg-zero-cfr-v1'
 _ENCODER = json.JSONEncoder(sort_keys=True, ensure_ascii=True,
@@ -139,6 +140,49 @@ class DecodedFrame:
     observed_s: float
     width: int
     height: int
+
+
+@dataclass(frozen=True)
+class StrictSeed:
+    """Verified raw sample; lifetime is held by the caller, never a capture."""
+    pixels: object
+    source_selection: object
+    index: int
+    canonical_s: float
+    observed_s: float
+    fps: float
+    count: int
+    width: int
+    height: int
+    policy: str
+    tolerance_s: float
+
+    def __post_init__(self):
+        if (self.policy != POLICY or not finite(self.fps) or self.fps <= 0
+                or type(self.count) is not int or self.count <= 0
+                or type(self.index) is not int or not 0 <= self.index < self.count
+                or any(type(v) is not int or v <= 0 for v in (self.width, self.height))
+                or not finite(self.tolerance_s) or not 0 < self.tolerance_s <= .25/self.fps
+                or not finite(self.canonical_s) or self.canonical_s != self.index/self.fps
+                or not finite(self.observed_s)
+                or abs(self.observed_s-self.canonical_s) > self.tolerance_s
+                or not isinstance(self.pixels, np.ndarray) or self.pixels.dtype != np.uint8
+                or self.pixels.shape != (self.height,self.width,3)):
+            raise ExactError('invalid strict seed')
+
+
+def validate_strict_inputs(seed, box, t_ref, t0, t1):
+    """Reject an explicit invalid seed/window before capture or model work."""
+    if not isinstance(seed, StrictSeed):
+        raise ExactError('StrictSeed required')
+    seed.__post_init__()
+    vector(list(box) if isinstance(box, (list,tuple)) else box, 4)
+    if (not all(finite(v) for v in (t_ref,t0,t1))
+            or not 0 <= t0 <= seed.canonical_s <= t1 <= seed.count/seed.fps
+            or t_ref != seed.canonical_s
+            or not 0 <= box[0] < box[2] <= seed.width
+            or not 0 <= box[1] < box[3] <= seed.height):
+        raise ExactError('strict box/reference/window differs from selected sample')
 
 
 def read_indexed_capture(cap, index, *, fps, count, width, height, tolerance_s):
