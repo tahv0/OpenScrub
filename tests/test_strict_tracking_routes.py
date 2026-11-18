@@ -11,6 +11,7 @@ import openscrub as engine
 import openscrub_web as web
 from test_exact_samples import exact, sample, precondition, raw
 from test_exact_media import retained, install, oracle
+from artifact_support import artifact_directory
 from test_job_lifecycle import store, request, start_call, finish
 
 
@@ -251,7 +252,7 @@ def test_strict_cancel_during_compute_cannot_publish(tracking,monkeypatch):
 @pytest.mark.parametrize('label,times,indices',[
     ('cfr24',[.2],[4]),('cfr5',[1.9],[9]),
     ('normalized',[.5,2/13,3/13],[6,2,3])],ids=['native24','native5-last','normalized-duplicates'])
-def test_retained_strict_route_and_actual_engine_priming(store,retained,monkeypatch,label,times,indices):
+def test_retained_strict_route_and_actual_engine_priming(store,retained,monkeypatch,label,times,indices,tmp_path):
     value=retained[label];path=Path(value['path'])
     fps={'cfr24':24,'cfr5':5,'normalized':13}[label]
     refs,pts=oracle(path);install(store,path,fps,len(refs),label=='normalized')
@@ -294,8 +295,7 @@ def test_retained_strict_route_and_actual_engine_priming(store,retained,monkeypa
     finally:
         for thread in threads:
             thread.join(8);assert not thread.is_alive()
-    import os
-    (Path(os.environ['VERIFY_RUN'])/'logs'/('strict-media-'+label+'.json')).write_text(
+    (artifact_directory(tmp_path)/('strict-media-'+label+'.json')).write_text(
         json.dumps(dict(source=value,results=results),indent=2)+'\n')
 
 
