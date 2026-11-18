@@ -128,7 +128,11 @@ assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),
 await control({action:'replace',count:0});await poll();
 const multiline=Array.from({length:20},(_,i)=>'wide paragraph '+i+' '+('word '.repeat(25))).join('\n');
 await append(['prefix '+('words '.repeat(100)),multiline,'tail'+String.fromCharCode(10).repeat(500)]);
-await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+30});
+// Settle the actual scroll/remember event before changing its coordinate space.
+await page.locator('#log').evaluate(e=>new Promise(resolve=>{const before=e.scrollTop;
+ const settled=()=>{e.removeEventListener('scroll',settled);resolve()};e.addEventListener('scroll',settled);
+ const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+30;
+ if(e.scrollTop===before)settled()}));
 const reflowBefore=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
 await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);
 const reflowAfter=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
