@@ -202,6 +202,8 @@ def test_matcher_import_is_stdlib_only():
     # Intercept imports themselves, including cached app/third-party imports.
     code = textwrap.dedent('''
         import builtins
+        import contextlib
+        import io
         import sys
         import sysconfig
         from pathlib import Path
@@ -255,12 +257,15 @@ def test_matcher_import_is_stdlib_only():
             else:
                 sys.modules["openscrub"] = previous
         builtins.__import__ = restricted_import
-        from openscrub_internal.plate_search.matching import normalize_queries, match_text
-        assert match_text("ab-c123", normalize_queries("ABC123"))[0].match_kind == "full_equal"
-        assert not match_text("XABC123Y", normalize_queries("ABC123"))
-        assert match_text("XABC123Y", normalize_queries("ABC123", mode="fragment"))[0].match_kind == "fragment"
+        product_stdout, product_stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(product_stdout), contextlib.redirect_stderr(product_stderr):
+            from openscrub_internal.plate_search.matching import normalize_queries, match_text
+            assert match_text("ab-c123", normalize_queries("ABC123"))[0].match_kind == "full_equal"
+            assert not match_text("XABC123Y", normalize_queries("ABC123"))
+            assert match_text("XABC123Y", normalize_queries("ABC123", mode="fragment"))[0].match_kind == "fragment"
+        assert product_stdout.getvalue() == ""
+        assert product_stderr.getvalue() == ""
     ''')
     child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True)
     assert child.returncode == 0, child.stdout + child.stderr
-    assert all(line.startswith("ACTIVE_SOURCE ") for line in child.stdout.splitlines())
     assert child.stderr == ""
