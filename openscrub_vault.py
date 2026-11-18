@@ -161,6 +161,14 @@ def _entry_stamp(path):
     return _regular_stamp(os.stat(path, follow_symlinks=False))
 
 
+def _fdopen_owned(fd, mode):
+    try:
+        return os.fdopen(fd, mode)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def _witnessed_file(key, path, direction, finish):
     """Transform one tracked entry; emit evidence only after publication/removal."""
     encrypting = direction == 'encrypt'
@@ -168,13 +176,16 @@ def _witnessed_file(key, path, direction, finish):
     stage = None
     stage_identity = None
     try:
-        with open(path, 'rb') as src:
+        before_open = _entry_stamp(path)
+        flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0)
+        fd = os.open(path, flags)
+        with _fdopen_owned(fd, 'rb') as src:
             original = _regular_stamp(os.fstat(src.fileno()))
-            if _entry_stamp(path) != original:
+            if original != before_open or _entry_stamp(path) != original:
                 raise OSError("vault input changed while opening")
             fd, stage = tempfile.mkstemp(prefix='.vault-', suffix='.tmp', dir=os.path.dirname(out) or '.')
-            stage_identity = _regular_stamp(os.fstat(fd))[:2]
-            with os.fdopen(fd, 'wb') as dst:
+            with _fdopen_owned(fd, 'wb') as dst:
+                stage_identity = _regular_stamp(os.fstat(dst.fileno()))[:2]
                 aes = AESGCM(key)
                 if encrypting:
                     nonce = os.urandom(12)
@@ -185,6 +196,9 @@ def _witnessed_file(key, path, direction, finish):
                     raise OSError("vault input changed during streaming")
                 dst.flush()
                 written = _regular_stamp(os.fstat(dst.fileno()))
+                expected = getattr(finish, 'expected_plaintext_size', count)
+                if not encrypting and (written[2] != count or count != expected):
+                    raise OSError("vault plaintext size changed during writing")
                 if _entry_stamp(stage) != written:
                     raise OSError("vault stage changed during streaming")
             if _entry_stamp(stage) != written:
@@ -198,9 +212,11 @@ def _witnessed_file(key, path, direction, finish):
                 raise OSError("vault published output changed")
             if _regular_stamp(os.fstat(src.fileno())) != original or _entry_stamp(path) != original:
                 raise OSError("vault input changed before removal")
-            os.remove(path)
-            if _entry_stamp(out) != published:
-                raise OSError("vault output changed after removal")
+        if _entry_stamp(path) != original:
+            raise OSError("vault input changed before removal")
+        os.remove(path)
+        if _entry_stamp(out) != published:
+            raise OSError("vault output changed after removal")
         finish(_Receipt(direction, original, published, nonce, count))
         return out
     finally:

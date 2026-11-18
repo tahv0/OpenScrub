@@ -425,28 +425,34 @@ def test_ciphertext_mutated_during_authenticated_decrypt_cannot_reuse_receipt(ex
     files = web.FILES.initialize(exact.job)
     assert request('post', '/api/vault/lock').status_code == 200
     cipher = Path(exact.job['video'] + vault.SUFFIX)
-    original = cipher.read_bytes()
     foreign = exact.root / 'foreign'
     foreign.write_bytes(b'outside remains intact')
-    real_aes = vault.AESGCM
-    changed = []
-    class MutatingAES:
-        def __init__(self, key):
-            self.aes = real_aes(key)
-        def decrypt(self, nonce, data, associated):
-            plain = self.aes.decrypt(nonce, data, associated)
-            if associated is None and not changed:
-                with cipher.open('ab') as stream:
-                    stream.write(b'x')
-                changed.append(True)
-            return plain
-    monkeypatch.setattr(vault, 'AESGCM', MutatingAES)
+    real_stream, real_witness = vault._decrypt_stream, vault._witnessed_file
+    completed, failures = [], []
+    def mutate_at_eof(aes, src, dst, path, witnessed=False):
+        nonce, count = real_stream(aes, src, dst, path, witnessed=witnessed)
+        if path == str(cipher):
+            assert not src.closed and src.read(1) == b''
+            info = cipher.stat()
+            os.utime(cipher, ns=(info.st_atime_ns, info.st_mtime_ns + 1000000000))
+            completed.append((nonce, count))
+        return nonce, count
+    def capture(key, path, direction, finish):
+        try:
+            return real_witness(key, path, direction, finish)
+        except OSError as error:
+            if path == str(cipher):
+                failures.append(str(error))
+            raise
+    monkeypatch.setattr(vault, '_decrypt_stream', mutate_at_eof)
+    monkeypatch.setattr(vault, '_witnessed_file', capture)
     assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 500
-    assert changed and cipher.exists() and not Path(exact.job['video']).exists()
+    assert completed and failures == ['vault input changed during streaming']
+    assert cipher.exists() and not Path(exact.job['video']).exists()
     assert web.VAULT['closed'] and files.source_retired and files.vault_transition is None
     assert foreign.read_bytes() == b'outside remains intact'
-    monkeypatch.setattr(vault, 'AESGCM', real_aes)
-    cipher.write_bytes(original)
+    monkeypatch.setattr(vault, '_decrypt_stream', real_stream)
+    monkeypatch.setattr(vault, '_witnessed_file', real_witness)
     assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
     assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
     assert post(exact, geometry_preconditions={'0':pc}, box_overrides={'0':[3,4,10,11]}).status_code != 200
@@ -471,7 +477,7 @@ def test_decrypt_length_mismatch_retires_even_with_matching_cipher_and_nonce(exa
             return nonce, count - 1
         return nonce, count
     monkeypatch.setattr(vault, '_decrypt_stream', short_count)
-    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 500
     assert measured == [(expected_stamp, expected_nonce, marker['old_stamp'][2])]
     assert files.source_retired and files.current_source is None and files.vault_transition is None
     assert request('get', exact.url + '/edit_sample?t=0.2').status_code != 200
@@ -530,3 +536,213 @@ def test_later_failure_leaves_unattempted_coherent_consumer_usable(exact, monkey
     assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
     assert request('get', url + '/edit_sample?t=0.2').status_code == 200
     assert untouched.current_source is selected
+
+
+def test_alias_job_video_preserves_strict_precondition(exact):
+    from pathlib import Path
+    exact.enable()
+    source = Path(exact.job['video'])
+    exact.job['video'] = str(source.parent / '..' / source.parent.name / source.name)
+    pc = precondition(sample(exact))
+    files = web.FILES.initialize(exact.job)
+    selected = files.current_source
+    assert request('post', '/api/vault/lock').status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert precondition(sample(exact)) == pc and files.current_source is selected
+    assert post(exact, geometry_preconditions={'0':pc}, box_overrides={'0':[3,4,10,11]}).status_code == 200
+
+
+def test_short_decrypted_writer_is_rejected_before_publication(exact, monkeypatch):
+    from pathlib import Path
+    import openscrub_vault as vault
+    exact.enable()
+    sample(exact)
+    files = web.FILES.initialize(exact.job)
+    assert request('post', '/api/vault/lock').status_code == 200
+    marker = files.vault_transition
+    expected = marker['cipher'], marker['nonce'], marker['old_stamp'][2]
+    original = vault._decrypt_stream
+    observed = []
+    def shorten(aes, src, dst, path, witnessed=False):
+        stamp = vault._regular_stamp(os.fstat(src.fileno()))
+        nonce, count = original(aes, src, dst, path, witnessed=witnessed)
+        if path == exact.job['video'] + vault.SUFFIX:
+            observed.append((stamp, nonce, count))
+            dst.flush()
+            dst.truncate(count - 1)
+        return nonce, count
+    monkeypatch.setattr(vault, '_decrypt_stream', shorten)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 500
+    assert observed == [expected]
+    assert not Path(exact.job['video']).exists()
+    assert Path(exact.job['video'] + vault.SUFFIX).exists()
+    assert web.VAULT['closed'] and files.source_retired and files.vault_transition is None
+
+
+def test_observed_fifo_does_not_block_closed_store(exact):
+    from pathlib import Path
+    import pytest
+    from test_job_lifecycle import start_call, finish
+    if not hasattr(os, 'mkfifo'):
+        pytest.skip('named pipes unavailable')
+    exact.enable()
+    sample(exact)
+    files = web.FILES.initialize(exact.job)
+    source = Path(exact.job['video'])
+    source.unlink()
+    os.mkfifo(source)
+    call = start_call('post', '/api/vault/lock')
+    thread, done, _, _ = call
+    try:
+        prompt = done.wait(1)
+    finally:
+        if not done.is_set():
+            fd = os.open(str(source), os.O_WRONLY | os.O_NONBLOCK)
+            os.close(fd)
+        result = finish(call)
+    assert prompt, 'vault waited for a FIFO writer'
+    assert result.status_code == 500
+    assert source.exists() and web.VAULT['closed']
+    assert files.source_retired and files.vault_transition is None
+
+
+def test_predecessor_reader_closed_before_unlink(tmp_path, monkeypatch):
+    import openscrub_vault as vault
+    source = tmp_path / 'video'
+    source.write_bytes(b'bounded plaintext')
+    original_stream, original_remove = vault._encrypt_stream, vault.os.remove
+    readers, receipts = [], []
+    def track(aes, src, dst, nonce):
+        readers.append(src)
+        return original_stream(aes, src, dst, nonce)
+    def remove(path):
+        if str(path) == str(source):
+            assert readers and readers[0].closed, 'input reader still open at unlink'
+        return original_remove(path)
+    monkeypatch.setattr(vault, '_encrypt_stream', track)
+    monkeypatch.setattr(vault.os, 'remove', remove)
+    vault.encrypt_file(os.urandom(32), str(source), lambda *_: receipts.append)
+    assert len(receipts) == 1 and not source.exists()
+
+
+def test_interrupted_owner_preflight_does_not_mutate_multiple_sealed_owners(exact):
+    exact.enable()
+    sample(exact)
+    other, url = _second_source(exact)
+    assert request('get', url + '/edit_sample?t=0.2').status_code == 200
+    first, second = web.FILES.initialize(exact.job), web.FILES.initialize(other)
+    assert request('post', '/api/vault/lock').status_code == 200
+    markers = first.vault_transition, second.vault_transition
+    assert all(m and m['phase'] == 'sealed' for m in markers)
+    old_status = first.source_status
+    first.source_status = 'pending'
+    real_lock = second.report_lock
+    class FailingLock:
+        def __enter__(self):
+            raise OSError('injected discovery interruption')
+        def __exit__(self, *args):
+            return False
+    second.report_lock = FailingLock()
+    try:
+        assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 500
+    finally:
+        second.report_lock = real_lock
+        first.source_status = old_status
+    assert (first.vault_transition, second.vault_transition) == markers
+    assert web.VAULT['closed'] and web.VAULT['error'] is None
+    assert not os.path.exists(exact.job['video']) and not os.path.exists(other['video'])
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('get', exact.url + '/edit_sample?t=0.2').status_code == 200
+    assert request('get', url + '/edit_sample?t=0.2').status_code == 200
+
+
+def test_selected_cipher_witness_detects_change_after_authenticated_eof(tmp_path, monkeypatch):
+    import pytest
+    import openscrub_vault as vault
+    source = tmp_path / 'video'
+    source.write_bytes(bytes(range(60)))
+    key = os.urandom(32)
+    vault.encrypt_file(key, str(source))
+    cipher = str(source) + vault.SUFFIX
+    stream = vault._decrypt_stream
+    completed, receipts = [], []
+    def mutate_at_eof(aes, src, dst, path, witnessed=False):
+        nonce, count = stream(aes, src, dst, path, witnessed=witnessed)
+        assert path == cipher and not src.closed and src.read(1) == b''
+        info = os.stat(cipher)
+        os.utime(cipher, ns=(info.st_atime_ns, info.st_mtime_ns + 1000000000))
+        completed.append((nonce, count))
+        return nonce, count
+    monkeypatch.setattr(vault, '_decrypt_stream', mutate_at_eof)
+    with pytest.raises(OSError, match='vault input changed during streaming'):
+        vault.decrypt_file(key, cipher, lambda *_: receipts.append)
+    assert completed and completed[0][1] == 60 and not receipts
+    assert os.path.exists(cipher) and not source.exists()
+
+
+def test_input_replaced_by_fifo_after_precheck_is_opened_nonblocking(tmp_path, monkeypatch):
+    import pytest
+    import openscrub_vault as vault
+    if not hasattr(os, 'mkfifo') or not hasattr(os, 'O_NONBLOCK'):
+        pytest.skip('nonblocking named pipes unavailable')
+    source = tmp_path / 'source'
+    source.write_bytes(b'plaintext')
+    real_open = vault.os.open
+    attempted = []
+    def swap(path, flags, *args, **kwargs):
+        if str(path) == str(source):
+            attempted.append(flags)
+            assert flags & os.O_NONBLOCK
+            source.unlink()
+            os.mkfifo(source)
+        return real_open(path, flags, *args, **kwargs)
+    monkeypatch.setattr(vault.os, 'open', swap)
+    receipts = []
+    with pytest.raises(OSError):
+        vault.encrypt_file(os.urandom(32), str(source), lambda *_: receipts.append)
+    assert attempted and not receipts and source.exists()
+
+
+def test_stage_fd_closed_if_initial_identity_check_fails(tmp_path, monkeypatch):
+    import pytest
+    import openscrub_vault as vault
+    source = tmp_path / 'source'
+    source.write_bytes(b'plaintext')
+    real_mkstemp, real_fstat = vault.tempfile.mkstemp, vault.os.fstat
+    stage = []
+    def create(*args, **kwargs):
+        fd, path = real_mkstemp(*args, **kwargs)
+        stage.append((fd, path))
+        return fd, path
+    def fail(fd):
+        if stage and fd == stage[0][0]:
+            raise OSError('injected stage identity failure')
+        return real_fstat(fd)
+    monkeypatch.setattr(vault.tempfile, 'mkstemp', create)
+    monkeypatch.setattr(vault.os, 'fstat', fail)
+    with pytest.raises(OSError, match='stage identity failure'):
+        vault.encrypt_file(os.urandom(32), str(source), lambda *_: lambda receipt: None)
+    monkeypatch.setattr(vault.os, 'fstat', real_fstat)
+    with pytest.raises(OSError):
+        real_fstat(stage[0][0])
+    assert os.path.exists(stage[0][1]) and source.exists()
+
+
+def test_substituted_stage_is_never_cleaned_as_owned(tmp_path, monkeypatch):
+    import pytest
+    import openscrub_vault as vault
+    source = tmp_path / 'source'
+    source.write_bytes(b'plaintext')
+    original = vault._encrypt_stream
+    substituted = []
+    def swap(aes, src, dst, nonce):
+        count = original(aes, src, dst, nonce)
+        path = next(tmp_path.glob('.vault-*.tmp'))
+        path.replace(tmp_path / 'owned-stage')
+        path.write_bytes(b'foreign replacement')
+        substituted.append(path)
+        return count
+    monkeypatch.setattr(vault, '_encrypt_stream', swap)
+    with pytest.raises(OSError, match='stage changed'):
+        vault.encrypt_file(os.urandom(32), str(source), lambda *_: lambda receipt: None)
+    assert substituted[0].read_bytes() == b'foreign replacement' and source.exists()
