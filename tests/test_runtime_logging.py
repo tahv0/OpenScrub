@@ -444,3 +444,373 @@ def test_watchdog_identifies_cancelled_but_still_active_action(tmp_path, monkeyp
     sink.close('normal', 'not_enabled')
     rows = _records(tmp_path / 'logs' / 'runtime.jsonl')
     assert [r['active_action_lost'] for r in rows if r['kind'] == 'worker_restarted'] == [True]
+
+
+def test_hostile_callback_stage_cannot_mutate_marker_or_state(tmp_path):
+    from openscrub_internal import diagnostics
+    class Spoof(list):
+        def __eq__(self, other):
+            return True
+    class Sneaky(str):
+        def __eq__(self, other):
+            return True
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    ref = sink.start('scan')
+    marker = (tmp_path / 'running.json').read_bytes()
+    events = (tmp_path / 'runtime.jsonl').read_bytes()
+    for stage in (Spoof(['SECRET' * 500]), Sneaky('SECRET' * 500), 'x' * 4000):
+        sink.progress(ref, stage, 2, 10)
+        assert sink._actions[ref]['stage'] == 'prepare'
+        assert (tmp_path / 'running.json').read_bytes() == marker
+        assert (tmp_path / 'runtime.jsonl').read_bytes() == events
+    sink.close('normal', 'not_enabled')
+
+
+def test_marker_rejects_oversize_before_touching_temp(tmp_path):
+    from openscrub_internal import diagnostics
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    ref = sink.start('scan')
+    before = (tmp_path / 'running.json').read_bytes()
+    sink._actions[ref]['stage'] = 'x' * 5000
+    try:
+        sink._marker()
+    except (ValueError, OSError):
+        pass
+    assert (tmp_path / 'running.json').read_bytes() == before
+    assert not (tmp_path / 'running.json.tmp').exists()
+    sink._actions[ref]['stage'] = 'prepare'
+    sink.close('normal', 'not_enabled')
+
+
+def test_event_relationships_and_huge_integer_do_not_disable(tmp_path):
+    from openscrub_internal import diagnostics
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    ref = sink.start('scan')
+    assert not sink.emit('job_started', action_ref=ref, action='scan', stage='render')
+    assert not sink.emit('job_finished', action_ref=ref, action='scan', outcome='done', errno=1)
+    assert not sink.emit('job_heartbeat', action_ref=ref, stage='scan', current=0,
+                         total=1, idle_seconds=10**10000)
+    assert sink.emit('worker_restarted', active_action_lost=False)
+    sink.close('normal', 'not_enabled')
+
+
+def test_recovery_failure_cannot_replace_successor_marker(tmp_path, monkeypatch):
+    from openscrub_internal import diagnostics
+    (tmp_path / 'running.json').write_text('{"schema":1,"active":true,"stage":"post"}')
+    original = diagnostics.Diagnostics.emit
+    successors = []
+    def intercept(self, kind, **fields):
+        if kind == 'previous_run_unclean' and not successors:
+            successors.append(None)
+            self._disable()
+            successor = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+            successors[0] = successor
+            ref = successor.start('scan')
+            successor.progress(ref, 'scan', 1, 2)
+            return False
+        return original(self, kind, **fields)
+    monkeypatch.setattr(diagnostics.Diagnostics, 'emit', intercept)
+    failed = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    assert json.loads((tmp_path / 'running.json').read_text())['stage'] == 'scan'
+    failed.close('normal', 'not_enabled')
+    successors[0].close('normal', 'not_enabled')
+
+
+def test_disable_waits_for_inflight_marker_before_releasing_lock(tmp_path, monkeypatch):
+    import threading
+    from openscrub_internal import diagnostics
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    entered, release, disabled = threading.Event(), threading.Event(), threading.Event()
+    marker = sink._marker
+    def blocked():
+        entered.set()
+        assert release.wait(5)
+        marker()
+    monkeypatch.setattr(sink, '_marker', blocked)
+    writer = threading.Thread(target=lambda: sink.start('scan')); writer.start()
+    assert entered.wait(5)
+    def disable():
+        sink._disable(); disabled.set()
+    closer = threading.Thread(target=disable); closer.start()
+    try:
+        assert not disabled.wait(.2)
+    finally:
+        release.set(); writer.join(5); closer.join(5)
+    assert not writer.is_alive() and not closer.is_alive() and disabled.is_set()
+    successor = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    ref = successor.start('render')
+    assert ref is not None
+    successor.close('normal', 'not_enabled')
+
+
+def test_failed_compute_releases_frame_payload_without_gc(tmp_path, monkeypatch):
+    import gc
+    import queue
+    import threading
+    import weakref
+    import openscrub_web as web
+    from openscrub_internal import diagnostics
+    class Payload: pass
+    for enabled in (False, True):
+        path = tmp_path / str(enabled); path.mkdir(); jobs = path / 'jobs'; jobs.mkdir()
+        monkeypatch.setattr(web, 'JOBS_DIR', str(jobs)); monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'WORK_Q', queue.Queue())
+        monkeypatch.setattr(web, 'WORKER', {'current': None, 'thread': None})
+        monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+        sink = diagnostics.Diagnostics(path / 'logs', 'http', '1.0.0', monitor=False) if enabled else None
+        monkeypatch.setattr(web, 'DIAGNOSTICS', sink)
+        refs = []
+        def failed(*args, **kwargs):
+            payload = Payload(); refs.append(weakref.ref(payload))
+            raise RuntimeError('synthetic')
+        monkeypatch.setattr(web, 'build_args', failed)
+        job = web.new_job('', {}, 'synthetic.mp4'); web.enqueue(job, 'scan'); web.WORK_Q.put(None)
+        was_enabled = gc.isenabled(); gc.disable()
+        try:
+            worker = threading.Thread(target=web.worker); worker.start(); worker.join(10)
+            assert not worker.is_alive() and web.FILES.count == 0
+            assert refs[0]() is None
+        finally:
+            if was_enabled: gc.enable()
+            if sink is not None: sink.close('normal', 'not_enabled')
+
+
+def test_callback_setup_escape_does_not_leave_active_action(tmp_path, monkeypatch):
+    import queue
+    import threading
+    import openscrub_web as web
+    from openscrub_internal import diagnostics
+    jobs = tmp_path / 'jobs'; jobs.mkdir()
+    monkeypatch.setattr(web, 'JOBS_DIR', str(jobs)); monkeypatch.setattr(web, 'JOBS', {})
+    monkeypatch.setattr(web, 'WORK_Q', queue.Queue()); monkeypatch.setattr(web, 'WORKER', {'current':None,'thread':None})
+    monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+    sink = diagnostics.Diagnostics(tmp_path / 'logs', 'http', '1.0.0', monitor=False)
+    monkeypatch.setattr(web, 'DIAGNOSTICS', sink)
+    calls = []
+    def fail(*args, **kwargs):
+        calls.append(1); raise RuntimeError('synthetic setup failure')
+    monkeypatch.setattr(web, 'WebCallbacks', fail)
+    for _ in range(2): web.enqueue(web.new_job('', {}, 'synthetic.mp4'), 'scan')
+    web.WORK_Q.put(None)
+    worker = threading.Thread(target=web.worker); worker.start(); worker.join(10)
+    assert not worker.is_alive() and len(calls) == 2 and web.FILES.count == 0
+    assert not sink._actions
+    sink.close('normal', 'not_enabled')
+    assert not any(r['kind'] == 'job_heartbeat' for r in _records(tmp_path / 'logs' / 'runtime.jsonl'))
+
+
+def test_existing_symlink_entries_are_never_followed(tmp_path):
+    import os
+    import stat
+    import pytest
+    from openscrub_internal import diagnostics
+    for name in ('writer.lock', 'runtime.jsonl', 'runtime.jsonl.1', 'runtime.jsonl.2', 'running.json'):
+        path = tmp_path / name.replace('.', '_'); path.mkdir()
+        target = tmp_path / ('target_' + name.replace('.', '_'))
+        target.write_bytes(b'OUTSIDE_SENTINEL'); target.chmod(0o644)
+        try:
+            (path / name).symlink_to(target)
+        except (OSError, NotImplementedError):
+            pytest.skip('symlinks unavailable')
+        sink = diagnostics.Diagnostics(path, 'http', '1.0.0', monitor=False)
+        assert sink.start('scan') is None, name
+        sink.close('normal', 'not_enabled')
+        assert target.read_bytes() == b'OUTSIDE_SENTINEL'
+        if os.name != 'nt': assert stat.S_IMODE(target.stat().st_mode) == 0o644
+        assert (path / name).is_symlink()
+    outside = tmp_path / 'outside'; outside.mkdir()
+    linked = tmp_path / 'linked'; linked.symlink_to(outside, target_is_directory=True)
+    sink = diagnostics.Diagnostics(linked, 'http', '1.0.0', monitor=False)
+    assert sink.start('scan') is None
+    assert not list(outside.iterdir())
+
+
+def test_oversized_existing_event_files_refuse_without_changes(tmp_path):
+    from openscrub_internal import diagnostics
+    for name in ('runtime.jsonl', 'runtime.jsonl.1', 'runtime.jsonl.2'):
+        path = tmp_path / name.replace('.', '_'); path.mkdir()
+        original = path / name; original.write_bytes(b'A' * 501)
+        sink = diagnostics.Diagnostics(path, 'http', '1.0.0', max_file=500, monitor=False)
+        assert sink.start('scan') is None
+        sink.close('normal', 'not_enabled')
+        assert original.read_bytes() == b'A' * 501
+        assert not (path / 'running.json').exists()
+        assert {p.name for p in path.iterdir()} <= {name, 'writer.lock'}
+        original.write_bytes(b'')  # user-owned fixture correction
+        healthy = diagnostics.Diagnostics(path, 'http', '1.0.0', max_file=500, monitor=False)
+        assert healthy.start('scan') is not None
+        healthy.close('normal', 'not_enabled')
+
+
+def test_initialization_propagates_interrupt_after_releasing_lock(tmp_path, monkeypatch):
+    import pytest
+    from openscrub_internal import diagnostics
+    original = diagnostics.Diagnostics._open_private
+    for exception in (KeyboardInterrupt, SystemExit):
+        path = tmp_path / exception.__name__; path.mkdir()
+        def fail(self, name, mode, *args, **kwargs):
+            if name == 'runtime.jsonl': raise exception()
+            return original(self, name, mode, *args, **kwargs)
+        with monkeypatch.context() as context:
+            context.setattr(diagnostics.Diagnostics, '_open_private', fail)
+            with pytest.raises(exception):
+                diagnostics.Diagnostics(path, 'http', '1.0.0', monitor=False)
+        successor = diagnostics.Diagnostics(path, 'http', '1.0.0', monitor=False)
+        assert successor.start('scan') is not None
+        successor.close('normal', 'not_enabled')
+
+
+def test_marker_fifo_does_not_block_initialization(tmp_path):
+    import os
+    import subprocess
+    import sys
+    import pytest
+    if not hasattr(os, 'mkfifo'): pytest.skip('FIFO unavailable')
+    os.mkfifo(tmp_path / 'running.json')
+    script = "from openscrub_internal.diagnostics import Diagnostics; import sys; s=Diagnostics(sys.argv[1], 'http', '1.0.0', monitor=False); assert s.start('scan') is None"
+    try:
+        result = subprocess.run([sys.executable, '-B', '-c', script, str(tmp_path)], capture_output=True, timeout=3)
+    except subprocess.TimeoutExpired:
+        pytest.fail('nonregular marker blocked initialization')
+    assert result.returncode == 0, result.stderr
+
+
+def test_cleanup_escape_abandons_exact_action(tmp_path, monkeypatch):
+    import queue
+    import threading
+    import openscrub_web as web
+    from openscrub_internal import diagnostics
+    jobs = tmp_path / 'jobs'; jobs.mkdir()
+    monkeypatch.setattr(web, 'JOBS_DIR', str(jobs)); monkeypatch.setattr(web, 'JOBS', {})
+    monkeypatch.setattr(web, 'WORK_Q', queue.Queue()); monkeypatch.setattr(web, 'WORKER', {'current':None,'thread':None})
+    monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+    sink = diagnostics.Diagnostics(tmp_path / 'logs', 'http', '1.0.0', monitor=False)
+    monkeypatch.setattr(web, 'DIAGNOSTICS', sink)
+    def fail(*args, **kwargs): raise RuntimeError('synthetic compute')
+    monkeypatch.setattr(web, 'build_args', fail)
+    valid = web._operation_valid; calls = []
+    def validity(job, owner):
+        calls.append(1)
+        if len(calls) == 3: raise RuntimeError('synthetic cleanup')
+        return valid(job, owner)
+    monkeypatch.setattr(web, '_operation_valid', validity)
+    for _ in range(2): web.enqueue(web.new_job('', {}, 'synthetic.mp4'), 'scan')
+    web.WORK_Q.put(None)
+    worker = threading.Thread(target=web.worker); worker.start(); worker.join(10)
+    assert not worker.is_alive() and web.FILES.count == 0
+    assert not sink._actions
+    sink.close('normal', 'not_enabled')
+
+
+def test_failed_recovery_write_preserves_marker_for_next_owner(tmp_path, monkeypatch):
+    from openscrub_internal import diagnostics
+    marker = tmp_path / 'running.json'
+    previous = b'{"schema":1,"active":true,"stage":"post"}'
+    marker.write_bytes(previous)
+    original = diagnostics.Diagnostics._open_private
+    class BrokenWrite:
+        def __init__(self, wrapped): self.wrapped = wrapped
+        def tell(self): return self.wrapped.tell()
+        def write(self, data): raise OSError('private')
+        def close(self): return self.wrapped.close()
+    def opening(self, name, mode, *args, **kwargs):
+        result = original(self, name, mode, *args, **kwargs)
+        return BrokenWrite(result) if name == 'runtime.jsonl' else result
+    with monkeypatch.context() as context:
+        context.setattr(diagnostics.Diagnostics, '_open_private', opening)
+        first = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+        assert first.start('scan') is None
+        assert marker.read_bytes() == previous
+    second = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    assert second.start('render') is not None
+    first.close('normal', 'not_enabled')
+    assert json.loads(marker.read_text())['active'] is True
+    second.close('normal', 'not_enabled')
+    assert any(row['kind'] == 'previous_run_unclean' and row['stage'] == 'post'
+               for row in _records(tmp_path / 'runtime.jsonl'))
+
+
+def test_existing_temp_symlink_is_refused_without_touching_target(tmp_path):
+    import pytest
+    from openscrub_internal import diagnostics
+    target = tmp_path / 'external'; target.write_bytes(b'UNCHANGED')
+    path = tmp_path / 'logs'; path.mkdir()
+    try:
+        (path / 'running.json.tmp').symlink_to(target)
+    except (OSError, NotImplementedError): pytest.skip('symlinks unavailable')
+    sink = diagnostics.Diagnostics(path, 'http', '1.0.0', monitor=False)
+    assert sink.start('scan') is None
+    assert target.read_bytes() == b'UNCHANGED'
+    assert (path / 'running.json.tmp').is_symlink()
+
+
+def test_process_interrupt_during_write_releases_writer(tmp_path):
+    import pytest
+    from openscrub_internal import diagnostics
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    class Interrupted:
+        def __init__(self, wrapped): self.wrapped = wrapped
+        def tell(self): return self.wrapped.tell()
+        def write(self, data): raise KeyboardInterrupt()
+        def close(self): return self.wrapped.close()
+    sink._stream = Interrupted(sink._stream)
+    with pytest.raises(KeyboardInterrupt):
+        sink.emit('worker_restarted', active_action_lost=False)
+    successor = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    assert successor.start('scan') is not None
+    successor.close('normal', 'not_enabled')
+
+
+def test_marker_temp_and_target_are_bounded_during_replace(tmp_path, monkeypatch):
+    import os
+    from openscrub_internal import diagnostics
+    real_replace = os.replace; sizes = []
+    def checking(src, dst, **kwargs):
+        if str(src) == 'running.json.tmp':
+            fd = os.open(src, os.O_RDONLY, dir_fd=kwargs['src_dir_fd'])
+            try: sizes.append(os.fstat(fd).st_size)
+            finally: os.close(fd)
+        return real_replace(src, dst, **kwargs)
+    if os.name == 'nt':
+        import pytest
+        pytest.skip('descriptor-relative marker inspection is POSIX-specific')
+    monkeypatch.setattr(diagnostics.os, 'replace', checking)
+    sink = diagnostics.Diagnostics(tmp_path, 'http', '1.0.0', monitor=False)
+    ref = sink.start('scan'); sink.progress(ref, 'scan', 1, 5)
+    assert (tmp_path / 'running.json').stat().st_size <= 1024
+    sink.finish(ref, 'review'); sink.close('normal', 'not_enabled')
+    assert sizes and all(0 < size <= 1024 for size in sizes)
+    assert not (tmp_path / 'running.json.tmp').exists()
+
+
+def test_nonregular_event_and_lock_entries_are_refused(tmp_path):
+    from openscrub_internal import diagnostics
+    for name in ('writer.lock', 'runtime.jsonl', 'runtime.jsonl.1', 'runtime.jsonl.2', 'running.json'):
+        path = tmp_path / name.replace('.', '_'); path.mkdir()
+        (path / name).mkdir()
+        sink = diagnostics.Diagnostics(path, 'http', '1.0.0', monitor=False)
+        assert sink.start('scan') is None
+        assert (path / name).is_dir()
+        sink.close('normal', 'not_enabled')
+
+
+def test_worker_called_inside_handled_exception_still_finishes_action(tmp_path, monkeypatch):
+    import queue
+    import openscrub_web as web
+    from openscrub_internal import diagnostics
+    jobs = tmp_path / 'jobs'; jobs.mkdir()
+    monkeypatch.setattr(web, 'JOBS_DIR', str(jobs)); monkeypatch.setattr(web, 'JOBS', {})
+    monkeypatch.setattr(web, 'WORK_Q', queue.Queue()); monkeypatch.setattr(web, 'WORKER', {'current':None,'thread':None})
+    monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+    sink = diagnostics.Diagnostics(tmp_path / 'logs', 'http', '1.0.0', monitor=False)
+    monkeypatch.setattr(web, 'DIAGNOSTICS', sink)
+    def fail(*args, **kwargs): raise RuntimeError('synthetic worker failure')
+    monkeypatch.setattr(web, 'build_args', fail)
+    web.enqueue(web.new_job('', {}, 'synthetic.mp4'), 'scan'); web.WORK_Q.put(None)
+    try:
+        raise ValueError('handled by caller')
+    except ValueError:
+        web.worker()
+    assert web.FILES.count == 0 and not sink._actions
+    sink.close('normal', 'not_enabled')
+    assert [r['outcome'] for r in _records(tmp_path / 'logs' / 'runtime.jsonl') if r['kind'] == 'job_finished'] == ['error']

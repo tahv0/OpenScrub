@@ -7,6 +7,8 @@ import datetime
 import json
 import math
 import os
+import stat
+from functools import wraps
 import threading
 import time
 import uuid
@@ -58,8 +60,9 @@ def _valid_field(key, value):
     if key in ('errno', 'exit_code'):
         return type(value) is int and -_MAX_NUMBER <= value <= _MAX_NUMBER
     if key == 'idle_seconds':
-        return (type(value) in (int, float) and math.isfinite(value)
-                and 0 <= value <= _MAX_NUMBER)
+        if type(value) is int:
+            return 0 <= value <= _MAX_NUMBER
+        return type(value) is float and math.isfinite(value) and 0 <= value <= _MAX_NUMBER
     return False
 
 
@@ -76,9 +79,22 @@ def classify(exc):
             return 'value_error', None
         if isinstance(exc, RuntimeError):
             return 'runtime_error', None
-    except BaseException:
+    except Exception:
         pass
     return 'other', None
+
+
+def _serialized(method):
+    """Keep failure cleanup and ownership release serialized with every write."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._mutex:
+            try:
+                return method(self, *args, **kwargs)
+            except BaseException:
+                self._disable(notice=False)
+                raise
+    return guarded
 
 
 class Diagnostics:
@@ -93,38 +109,120 @@ class Diagnostics:
         self._max_file = max_file
         self._stream = None
         self._lockfile = None
+        self._dirfd = None
         self._enabled = False
         self._closed = False
         self._stop = threading.Event()
         self._last_notice = None
         try:
-            os.makedirs(self._directory, mode=0o700, exist_ok=True)
+            self._open_directory()
             self._lockfile = self._open_private('writer.lock', 'a+b', restrict=False)
             if not self._acquire():
-                self._lockfile.close()
-                self._lockfile = None
+                self._release_resources()
                 return
-            os.chmod(self._directory, 0o700)
-            os.chmod(os.path.join(self._directory, 'writer.lock'), 0o600)
+            if self._dirfd is not None and hasattr(os, 'fchmod'):
+                os.fchmod(self._dirfd, 0o700)
+            if hasattr(os, 'fchmod'):
+                os.fchmod(self._lockfile.fileno(), 0o600)
+            # Refuse unsuitable or oversized existing state before any marker
+            # or event write. Preserve those bytes for the owner to inspect.
+            for name in ('runtime.jsonl', 'runtime.jsonl.1', 'runtime.jsonl.2'):
+                entry = self._entry(name)
+                if entry is not None and entry.st_size > self._max_file:
+                    raise OSError('oversized diagnostics file')
+            self._entry('running.json')
+            if self._entry('running.json.tmp') is not None:
+                raise OSError('unexpected marker temporary file')
             previous = self._read_marker()
             self._stream = self._open_private('runtime.jsonl', 'ab')
             self._enabled = True
-            if previous is not None:
-                self.emit('previous_run_unclean', **previous)
+            if previous is not None and not self.emit('previous_run_unclean', **previous):
+                self._disable()
+                return
+            if not self._enabled:
+                return
             self._marker()
-            self.emit('service_started', version=version, transport=transport)
+            if not self.emit('service_started', version=version, transport=transport):
+                self._disable()
+                return
             if self._enabled and monitor:
                 threading.Thread(target=self._monitor, daemon=True,
                                  name='diagnostics-monitor').start()
-        except BaseException:
+        except Exception:
             self._disable()
+        except BaseException:
+            self._disable(notice=False)
+            raise
+
+    def _open_directory(self):
+        """Open each directory without following links; create only the leaf."""
+        path = os.path.abspath(self._directory)
+        self._directory = path
+        if os.name != 'nt' and os.open in os.supports_dir_fd:
+            parts = [part for part in path.split(os.sep) if part]
+            fd = os.open(os.sep, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                for index, part in enumerate(parts):
+                    try:
+                        st = os.stat(part, dir_fd=fd, follow_symlinks=False)
+                    except FileNotFoundError:
+                        if index != len(parts) - 1:
+                            raise
+                        os.mkdir(part, 0o700, dir_fd=fd)
+                        st = os.stat(part, dir_fd=fd, follow_symlinks=False)
+                    if not stat.S_ISDIR(st.st_mode):
+                        raise OSError('unsafe diagnostics directory')
+                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | getattr(os, 'O_NOFOLLOW', 0), dir_fd=fd)
+                    os.close(fd)
+                    fd = child
+                self._dirfd = fd
+                fd = None
+            finally:
+                if fd is not None:
+                    os.close(fd)
+        else:
+            # Windows fallback refuses links and non-directories before use.
+            parents = []
+            while path and path != os.path.dirname(path):
+                parents.append(path)
+                path = os.path.dirname(path)
+            for index, part in enumerate(reversed(parents)):
+                try:
+                    st = os.lstat(part)
+                except FileNotFoundError:
+                    if index != len(parents) - 1:
+                        raise
+                    os.mkdir(part, 0o700)
+                    st = os.lstat(part)
+                if not stat.S_ISDIR(st.st_mode):
+                    raise OSError('unsafe diagnostics directory')
+
+    def _path_args(self, name):
+        if self._dirfd is not None:
+            return name, {'dir_fd': self._dirfd}
+        return os.path.join(self._directory, name), {}
+
+    def _entry(self, name):
+        path, kw = self._path_args(name)
+        try:
+            st = os.stat(path, follow_symlinks=False, **kw)
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            raise OSError('unsafe diagnostics entry')
+        return st
 
     def _open_private(self, name, mode, restrict=True):
-        path = os.path.join(self._directory, name)
-        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_APPEND, 0o600)
+        self._entry(name)
+        path, kw = self._path_args(name)
+        flags = os.O_CREAT | os.O_RDWR | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0)
+        fd = os.open(path, flags, 0o600, **kw)
         try:
-            if restrict:
-                os.chmod(path, 0o600)
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                raise OSError('unsafe diagnostics entry')
+            if restrict and hasattr(os, 'fchmod'):
+                os.fchmod(fd, 0o600)
             return os.fdopen(fd, mode)
         except BaseException:
             os.close(fd)
@@ -144,10 +242,24 @@ class Diagnostics:
             return False
 
     def _read_marker(self):
-        path = os.path.join(self._directory, 'running.json')
+        entry = self._entry('running.json')
+        if entry is None:
+            return None
+        if entry.st_size > _MAX_EVENT:
+            return None
+        path, kw = self._path_args('running.json')
+        fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0), **kw)
         try:
-            with open(path, 'rb') as stream:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or (st.st_dev, st.st_ino) != (entry.st_dev, entry.st_ino):
+                raise OSError('unsafe marker')
+            with os.fdopen(fd, 'rb') as stream:
+                fd = None
                 data = stream.read(_MAX_EVENT + 1)
+        finally:
+            if fd is not None:
+                os.close(fd)
+        try:
             if len(data) > _MAX_EVENT:
                 return None
             marker = json.loads(data)
@@ -161,51 +273,84 @@ class Diagnostics:
                     return None
                 result['stage'] = marker['stage']
             return result
-        except (OSError, ValueError, TypeError, UnicodeError):
+        except (ValueError, TypeError, UnicodeError):
             return None
 
     def _marker(self):
+        if not self._enabled or self._lockfile is None:
+            raise OSError('diagnostics not owned')
         marker = {'schema': 1, 'active': bool(self._actions)}
         if self._actions:
             marker['stage'] = next(iter(self._actions.values()))['stage']
         data = json.dumps(marker, separators=(',', ':')).encode('ascii')
-        path = os.path.join(self._directory, 'running.json')
-        temp = os.path.join(self._directory, 'running.json.tmp')
-        fd = os.open(temp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+        if len(data) > _MAX_EVENT:
+            raise ValueError('marker exceeds limit')
+        self._entry('running.json')
+        name = 'running.json.tmp'
+        temp, kw = self._path_args(name)
+        target, _ = self._path_args('running.json')
+        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0)
+        fd = os.open(temp, flags, 0o600, **kw)
+        created = True
         try:
-            os.fchmod(fd, 0o600) if hasattr(os, 'fchmod') else None
+            if hasattr(os, 'fchmod'):
+                os.fchmod(fd, 0o600)
             with os.fdopen(fd, 'wb') as stream:
                 fd = None
                 stream.write(data)
                 stream.flush()
-            os.replace(temp, path)
+            self._entry('running.json')
+            if self._dirfd is not None:
+                os.replace(temp, target, src_dir_fd=self._dirfd, dst_dir_fd=self._dirfd)
+            else:
+                os.replace(temp, target)
+            created = False
         finally:
             if fd is not None:
                 os.close(fd)
+            if created:
+                try:
+                    os.unlink(temp, **kw)
+                except FileNotFoundError:
+                    pass
 
-    def _disable(self):
-        self._enabled = False
-        self._stop.set()
+    def _release_resources(self):
+        stream, self._stream = self._stream, None
+        directory, self._dirfd = self._dirfd, None
+        lock, self._lockfile = self._lockfile, None
         try:
-            if self._stream is not None:
-                self._stream.close()
-        except BaseException:
-            pass
-        self._stream = None
-        try:
-            if self._lockfile is not None:
-                self._lockfile.close()
-        except BaseException:
-            pass
-        self._lockfile = None
-        try:
-            now = self._clock()
-            if self._last_notice is None or now - self._last_notice >= 60:
-                print('[web] diagnostics unavailable', flush=True)
-                self._last_notice = now
-        except BaseException:
-            pass
+            try:
+                if stream is not None:
+                    stream.close()
+            except Exception:
+                pass
+        finally:
+            try:
+                if directory is not None:
+                    os.close(directory)
+            finally:
+                if lock is not None:
+                    lock.close()
 
+    def _disable(self, notice=True):
+        with self._mutex:
+            self._enabled = False
+            self._stop.set()
+            self._actions.clear()
+            try:
+                self._release_resources()
+            except Exception:
+                pass
+            if notice:
+                try:
+                    now = self._clock()
+                    if self._last_notice is None or now - self._last_notice >= 60:
+                        print('[web] diagnostics unavailable', flush=True)
+                        self._last_notice = now
+                except Exception:
+                    pass
+
+    @_serialized
     def emit(self, kind, **fields):
         try:
             with self._mutex:
@@ -218,9 +363,13 @@ class Diagnostics:
                     return False
                 if 'action_ref' in fields and fields['action_ref'] not in self._actions:
                     return False
+                if kind == 'job_started' and fields['stage'] != 'prepare':
+                    return False
                 if kind == 'job_stage' and fields['stage'] == 'prepare':
                     return False
                 if kind == 'job_finished' and ((fields['outcome'] == 'error') != ('error' in fields)):
+                    return False
+                if kind == 'job_finished' and fields['outcome'] != 'error' and ('errno' in fields or 'exit_code' in fields):
                     return False
                 record = {'schema': 1, 'time': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                           'session': self._session, 'kind': kind}
@@ -231,18 +380,31 @@ class Diagnostics:
                 if self._stream.tell() + len(data) > self._max_file:
                     self._stream.close()
                     self._stream = None
-                    path = os.path.join(self._directory, 'runtime.jsonl')
-                    if os.path.exists(path + '.1'):
-                        os.replace(path + '.1', path + '.2')
-                    os.replace(path, path + '.1')
+                    current = self._entry('runtime.jsonl')
+                    backup = self._entry('runtime.jsonl.1')
+                    backup2 = self._entry('runtime.jsonl.2')
+                    if (current is None or current.st_size > self._max_file
+                            or (backup is not None and backup.st_size > self._max_file)
+                            or (backup2 is not None and backup2.st_size > self._max_file)):
+                        raise OSError('unsafe rotation state')
+                    if self._dirfd is not None:
+                        if backup is not None:
+                            os.replace('runtime.jsonl.1', 'runtime.jsonl.2', src_dir_fd=self._dirfd, dst_dir_fd=self._dirfd)
+                        os.replace('runtime.jsonl', 'runtime.jsonl.1', src_dir_fd=self._dirfd, dst_dir_fd=self._dirfd)
+                    else:
+                        path = os.path.join(self._directory, 'runtime.jsonl')
+                        if backup is not None:
+                            os.replace(path + '.1', path + '.2')
+                        os.replace(path, path + '.1')
                     self._stream = self._open_private('runtime.jsonl', 'ab')
                 self._stream.write(data)
                 self._stream.flush()
                 return True
-        except BaseException:
+        except Exception:
             self._disable()
             return False
 
+    @_serialized
     def start(self, action):
         try:
             with self._mutex:
@@ -255,17 +417,18 @@ class Diagnostics:
                 self._marker()
                 self.emit('job_started', action_ref=ref, action=action, stage='prepare')
                 return ref
-        except BaseException:
+        except Exception:
             self._disable()
             return None
 
+    @_serialized
     def progress(self, ref, stage, current, total):
         try:
             with self._mutex:
                 if not self._enabled or not _reference(ref):
                     return
                 state = self._actions.get(ref)
-                if (state is None or stage not in ('scan', 'post', 'render')
+                if (state is None or type(stage) is not str or stage not in ('scan', 'post', 'render')
                         or not _valid_field('current', current) or not _valid_field('total', total)):
                     return
                 now = self._clock()
@@ -276,9 +439,10 @@ class Diagnostics:
                     self._marker()
                     self.emit('job_stage', action_ref=ref, stage=stage)
                 state['current'], state['total'] = current, total
-        except BaseException:
+        except Exception:
             self._disable()
 
+    @_serialized
     def heartbeat(self):
         try:
             with self._mutex:
@@ -289,16 +453,20 @@ class Diagnostics:
                         self.emit('job_heartbeat', action_ref=ref, stage=state['stage'],
                                   current=state['current'], total=state['total'],
                                   idle_seconds=min(_MAX_NUMBER, max(0, now - state['changed'])))
-        except BaseException:
+        except Exception:
             self._disable()
 
     def _monitor(self):
         try:
             while not self._stop.wait(1):
                 self.heartbeat()
-        except BaseException:
+        except Exception:
             self._disable()
+        except BaseException:
+            self._disable(notice=False)
+            raise
 
+    @_serialized
     def abandon(self, ref):
         """Forget an action lost with its worker without inventing an outcome."""
         try:
@@ -307,10 +475,11 @@ class Diagnostics:
                     return
                 if self._actions.pop(ref, None) is not None:
                     self._marker()
-        except BaseException:
+        except Exception:
             self._disable()
 
-    def finish(self, ref, outcome, exc=None):
+    @_serialized
+    def finish(self, ref, outcome, error=None):
         try:
             with self._mutex:
                 if not self._enabled or not _reference(ref) or not _valid_field('outcome', outcome):
@@ -319,17 +488,21 @@ class Diagnostics:
                 if state is None:
                     return
                 fields = {'action_ref': ref, 'action': state['action'], 'outcome': outcome}
-                if exc is not None:
-                    fields['error'], number = classify(exc)
-                    if number is not None:
+                if (type(error) is tuple and len(error) == 2
+                        and _valid_field('error', error[0])):
+                    fields['error'], number = error
+                    if (type(number) is tuple and len(number) == 2
+                            and type(number[0]) is str and number[0] in ('errno', 'exit_code')
+                            and _valid_field(number[0], number[1])):
                         fields[number[0]] = number[1]
                 self.emit('job_finished', **fields)
                 self._actions.pop(ref, None)
                 if self._enabled:
                     self._marker()
-        except BaseException:
+        except Exception:
             self._disable()
 
+    @_serialized
     def close(self, reason, vault):
         try:
             with self._mutex:
@@ -339,14 +512,11 @@ class Diagnostics:
                 self._stop.set()
                 if self._enabled and self.emit('service_stop', reason=reason,
                                                active_actions=len(self._actions), vault=vault):
-                    os.unlink(os.path.join(self._directory, 'running.json'))
+                    self._entry('running.json')
+                    path, kw = self._path_args('running.json')
+                    os.unlink(path, **kw)
                 self._actions.clear()
-                if self._stream is not None:
-                    self._stream.close()
-                self._stream = None
                 self._enabled = False
-                if self._lockfile is not None:
-                    self._lockfile.close()
-                self._lockfile = None
-        except BaseException:
+                self._release_resources()
+        except Exception:
             self._disable()

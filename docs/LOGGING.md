@@ -17,7 +17,9 @@ permissions where supported. Windows profile ACLs should be configured for
 the user; native Windows ACL behavior has not been validated here.
 
 Only one service can write these files at a time; another live service runs
-without diagnostics. A bounded `running.json` marker indicates that no clean
+without diagnostics. Existing links, nonregular entries, or event files already
+above the size limit disable diagnostics and are left untouched for the owner
+to inspect or correct. A bounded `running.json` marker indicates that no clean
 close was observed. It cannot identify a crash cause, and inactivity means
 only that no progress was reported. Storage errors disable diagnostics without
 stopping work. Records and the marker are best effort, with no fsync or crash

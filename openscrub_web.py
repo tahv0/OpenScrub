@@ -1402,201 +1402,213 @@ def _run_job(job, action, owner=None):
         job["phase"] = "scanning" if action == "scan" else "rendering"
     sink = DIAGNOSTICS
     diagnostic_ref = sink.start(action) if sink is not None else None
-    if diagnostic_ref is not None and WORKER.get("current") == jid:
-        WORKER["diagnostic_ref"] = diagnostic_ref
     outcome, diagnostic_error = "superseded", None
-    cb = WebCallbacks(job, owner.operation, sink, diagnostic_ref)
-    def publish_report(path, doc):
-        provenance = doc.get('provenance', {}) if isinstance(doc, dict) else {}
-        if isinstance(provenance, dict):
-            for role in ('input', 'original_input', 'output'):
-                if isinstance(provenance.get(role), str):
-                    _thumbnail_admit_path(provenance[role], owner)
-        with files.report_lock:
-            if not _operation_valid(job, owner) or owner.operation.is_set():
-                raise openscrub.PipelineCancelled()
-            _publish_job_report_locked(job, path, doc)
-            _report_committed_locked(job, doc, owner if action == "scan" else None)
-    cb.publish_report = publish_report
-    committed = False
-    def publish_render(delivery, summary):
-        nonlocal committed
-        _thumbnail_admit_path(summary['output'], owner)
-        with files.report_lock:
-            _recovery_gate(job)
-            if not _operation_valid(job, owner) or owner.operation.is_set():
-                raise openscrub.PipelineCancelled()
-            missing = object()
-            keys = ("output", "phase", "progress", "eta", "error")
-            previous = {key: job.get(key, missing) for key in keys}
-            def success():
-                job["output"] = summary["output"]
-                job["phase"] = "done"
-                job["progress"] = 1.0
-                job["eta"] = None
-                job["error"] = None
-            def restore():
-                for key, value in previous.items():
-                    if value is missing:
-                        job.pop(key, None)
-                    else:
-                        job[key] = value
-            def mutate():
-                files.output_epoch += 1
-            try:
-                delivery.commit(before_mutation=mutate, publish_success=success,
-                                restore_success=restore)
-            except _DeliveryRecoveryError as error:
-                files.recovery_required = True
-                files.recovery_diagnostics = error.rollback_diagnostics
-                job.update(phase="error", error="render delivery requires recovery", eta=None)
-                raise
-            committed = delivery.committed
-            if committed and delivery.report_path is not None:
-                _report_committed_locked(job)
-    cb.publish_render = publish_render
-    source = owner.source if owner is not None else job["video"]
+    escaped = False
     try:
-        if action == "scan":
-            job["log"].append("— scan started —")
-            args = build_args(dict(job, video=source))
-            state = openscrub.run_scan(args, cb)
-            openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                  args, state, publisher=cb.publish_report)
+        if diagnostic_ref is not None and WORKER.get("current") == jid:
+            WORKER["diagnostic_ref"] = diagnostic_ref
+        cb = WebCallbacks(job, owner.operation, sink, diagnostic_ref)
+        def publish_report(path, doc):
+            provenance = doc.get('provenance', {}) if isinstance(doc, dict) else {}
+            if isinstance(provenance, dict):
+                for role in ('input', 'original_input', 'output'):
+                    if isinstance(provenance.get(role), str):
+                        _thumbnail_admit_path(provenance[role], owner)
             with files.report_lock:
-                if not _operation_valid(job, owner):
-                    return
-                job["stats"] = state["stats"]
-            hdr_proof = getattr(args, '_hdr_quad_proof', None)
-            if hdr_proof is None:
-                coherent = _adopt_scan_source(job, owner)
-            else:
-                coherent = _adopt_scan_source(job, owner, hdr_proof, state.get('input_sha256'))
-            if owner.operation.is_set():
-                raise openscrub.PipelineCancelled()
-            if coherent:
-                try:
-                    thumbnail_owner = _own_files(job, work=True)
-                except Conflict as error:
-                    if error.description != "render delivery requires recovery":
-                        raise
-                    coherent = False
-                except (OSError, _ThumbnailArtifactPending):
-                    # Thumbnail generation is optional after a committed scan.
-                    # _own_files releases any provisional ownership on failure.
-                    coherent = False
-            if coherent:
-                pregen_source = files.current_source
-                def _pregen(jb=job, video=thumbnail_owner.source):
-                    cap = lease = None
-                    try:
-                        doc, selected, fence, lease = _thumbnail_snapshot(jb, operation_owner=owner)
-                        if selected is not pregen_source or selected['path'] != video:
-                            return
-                        rows, rs = _thumbnail_validate_report(doc)
-                        generation = _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
-                        cap = _open_preview_capture(video)
-                        generated = 0
-                        for index in range(len(rows)):
-                            try:
-                                _thumbnail_image(jb, index, 'crop', generation.version, operation_owner=owner,
-                                                 capture=cap, snapshot=(doc, selected, fence, rows, rs))
-                                generated += 1
-                            except _ThumbnailError as error:
-                                if error.code in ('thumbnail_obsolete', 'thumbnail_source_conflict',
-                                                  'source_report_pending'):
-                                    break
-                                if error.code == 'thumbnail_pending':
-                                    with files.report_lock:
-                                        stalled = files.thumbnail.retirement is not None
-                                    if stalled:
-                                        break
-                                continue
-                        jb['log'].append('thumbnails ready (%d)' % generated)
-                    except Exception:
-                        pass
-                    finally:
-                        try:
-                            if cap is not None:
-                                cap.release()
-                        finally:
-                            if lease is not None:
-                                _thumbnail_release_lease(jb, lease, primary_pending=sys.exc_info()[0] is not None)
-                _start_owned_thread(_pregen, thumbnail_owner)
-            next_owner = (_prepare_work(job, "render")
-                          if job["options"].get("skip_review") else None)
-            ticket = None
-            try:
-                with files.report_lock:
-                    if not _operation_valid(job, owner) or owner.operation.is_set():
-                        raise openscrub.PipelineCancelled()
-                    if next_owner is not None:
-                        job["log"].append("review skipped — rendering all detections")
-                        ticket = _reserve_queue_locked(job, "render", next_owner)
-                    else:
-                        job["phase"] = "review"
-                    outcome = "review"
-                    job["progress"] = 0.5
+                if not _operation_valid(job, owner) or owner.operation.is_set():
+                    raise openscrub.PipelineCancelled()
+                _publish_job_report_locked(job, path, doc)
+                _report_committed_locked(job, doc, owner if action == "scan" else None)
+        cb.publish_report = publish_report
+        committed = False
+        def publish_render(delivery, summary):
+            nonlocal committed
+            _thumbnail_admit_path(summary['output'], owner)
+            with files.report_lock:
+                _recovery_gate(job)
+                if not _operation_valid(job, owner) or owner.operation.is_set():
+                    raise openscrub.PipelineCancelled()
+                missing = object()
+                keys = ("output", "phase", "progress", "eta", "error")
+                previous = {key: job.get(key, missing) for key in keys}
+                def success():
+                    job["output"] = summary["output"]
+                    job["phase"] = "done"
+                    job["progress"] = 1.0
                     job["eta"] = None
-            finally:
-                if next_owner is not None and ticket is None:
-                    next_owner.release()
-            if ticket is not None:
-                enqueue(job, "render", ticket)
-        elif action == "render":
-            if not owner.report_input:  # compatibility with older queue entries
-                _select_render_input(job, owner)
-            args = build_args(dict(job, video=owner.source), for_render=True)
-            args._report_input = owner.source
-            with files.report_lock:
-                selected = files.current_source
-                if selected is not None:
-                    args._hdr_quad_render_proof = selected.get('hdr_quad_proof')
-            res = openscrub.run_pipeline(args, cb)
-            # Compatibility for substituted pipelines which do not use the new
-            # hook. Actual renders publish their terminal fields inside it.
-            if not committed:
-                _thumbnail_admit_path(res["output"], owner)
+                    job["error"] = None
+                def restore():
+                    for key, value in previous.items():
+                        if value is missing:
+                            job.pop(key, None)
+                        else:
+                            job[key] = value
+                def mutate():
+                    files.output_epoch += 1
+                try:
+                    delivery.commit(before_mutation=mutate, publish_success=success,
+                                    restore_success=restore)
+                except _DeliveryRecoveryError as error:
+                    files.recovery_required = True
+                    files.recovery_diagnostics = error.rollback_diagnostics
+                    job.update(phase="error", error="render delivery requires recovery", eta=None)
+                    raise
+                committed = delivery.committed
+                if committed and delivery.report_path is not None:
+                    _report_committed_locked(job)
+        cb.publish_render = publish_render
+        source = owner.source if owner is not None else job["video"]
+        try:
+            if action == "scan":
+                job["log"].append("— scan started —")
+                args = build_args(dict(job, video=source))
+                state = openscrub.run_scan(args, cb)
+                openscrub.write_report(os.path.join(job["dir"], "report.json"),
+                                      args, state, publisher=cb.publish_report)
                 with files.report_lock:
-                    _recovery_gate(job)
-                    if not _operation_valid(job, owner) or owner.operation.is_set():
+                    if not _operation_valid(job, owner):
                         return
-                    job.update(output=res["output"], phase="done", progress=1.0, eta=None)
-            outcome = "done"
-    except openscrub.PipelineCancelled:
-        recovery = _has_render_recovery(job["dir"])
-        with files.report_lock:
-            if recovery:
-                files.recovery_required = True
-                job.update(phase="error", error="render delivery requires recovery", eta=None)
-            if not committed and not files.recovery_required and _operation_valid(job, owner):
-                job["phase"] = "cancelled"
-                outcome = "cancelled"
-                job["error"] = "cancelled by user"
-    except BaseException as e:
-        msg = str(e) or type(e).__name__
-        if isinstance(e, SystemExit):
-            msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
-        recovery = _has_render_recovery(job["dir"])
-        with files.report_lock:
-            if recovery:
-                files.recovery_required = True
-                job.update(phase="error", error="render delivery requires recovery", eta=None)
-            if not committed and not files.recovery_required and _operation_valid(job, owner):
-                job["phase"] = "error"
-                outcome, diagnostic_error = "error", e
-                job["error"] = msg
-                job["log"].append(f"ERROR: {msg}")
+                    job["stats"] = state["stats"]
+                hdr_proof = getattr(args, '_hdr_quad_proof', None)
+                if hdr_proof is None:
+                    coherent = _adopt_scan_source(job, owner)
+                else:
+                    coherent = _adopt_scan_source(job, owner, hdr_proof, state.get('input_sha256'))
+                if owner.operation.is_set():
+                    raise openscrub.PipelineCancelled()
+                if coherent:
+                    try:
+                        thumbnail_owner = _own_files(job, work=True)
+                    except Conflict as error:
+                        if error.description != "render delivery requires recovery":
+                            raise
+                        coherent = False
+                    except (OSError, _ThumbnailArtifactPending):
+                        # Thumbnail generation is optional after a committed scan.
+                        # _own_files releases any provisional ownership on failure.
+                        coherent = False
+                if coherent:
+                    pregen_source = files.current_source
+                    def _pregen(jb=job, video=thumbnail_owner.source):
+                        cap = lease = None
+                        try:
+                            doc, selected, fence, lease = _thumbnail_snapshot(jb, operation_owner=owner)
+                            if selected is not pregen_source or selected['path'] != video:
+                                return
+                            rows, rs = _thumbnail_validate_report(doc)
+                            generation = _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
+                            cap = _open_preview_capture(video)
+                            generated = 0
+                            for index in range(len(rows)):
+                                try:
+                                    _thumbnail_image(jb, index, 'crop', generation.version, operation_owner=owner,
+                                                     capture=cap, snapshot=(doc, selected, fence, rows, rs))
+                                    generated += 1
+                                except _ThumbnailError as error:
+                                    if error.code in ('thumbnail_obsolete', 'thumbnail_source_conflict',
+                                                      'source_report_pending'):
+                                        break
+                                    if error.code == 'thumbnail_pending':
+                                        with files.report_lock:
+                                            stalled = files.thumbnail.retirement is not None
+                                        if stalled:
+                                            break
+                                    continue
+                            jb['log'].append('thumbnails ready (%d)' % generated)
+                        except Exception:
+                            pass
+                        finally:
+                            try:
+                                if cap is not None:
+                                    cap.release()
+                            finally:
+                                if lease is not None:
+                                    _thumbnail_release_lease(jb, lease, primary_pending=sys.exc_info()[0] is not None)
+                    _start_owned_thread(_pregen, thumbnail_owner)
+                next_owner = (_prepare_work(job, "render")
+                              if job["options"].get("skip_review") else None)
+                ticket = None
+                try:
+                    with files.report_lock:
+                        if not _operation_valid(job, owner) or owner.operation.is_set():
+                            raise openscrub.PipelineCancelled()
+                        if next_owner is not None:
+                            job["log"].append("review skipped — rendering all detections")
+                            ticket = _reserve_queue_locked(job, "render", next_owner)
+                        else:
+                            job["phase"] = "review"
+                        outcome = "review"
+                        job["progress"] = 0.5
+                        job["eta"] = None
+                finally:
+                    if next_owner is not None and ticket is None:
+                        next_owner.release()
+                if ticket is not None:
+                    enqueue(job, "render", ticket)
+            elif action == "render":
+                if not owner.report_input:  # compatibility with older queue entries
+                    _select_render_input(job, owner)
+                args = build_args(dict(job, video=owner.source), for_render=True)
+                args._report_input = owner.source
+                with files.report_lock:
+                    selected = files.current_source
+                    if selected is not None:
+                        args._hdr_quad_render_proof = selected.get('hdr_quad_proof')
+                res = openscrub.run_pipeline(args, cb)
+                # Compatibility for substituted pipelines which do not use the new
+                # hook. Actual renders publish their terminal fields inside it.
+                if not committed:
+                    _thumbnail_admit_path(res["output"], owner)
+                    with files.report_lock:
+                        _recovery_gate(job)
+                        if not _operation_valid(job, owner) or owner.operation.is_set():
+                            return
+                        job.update(output=res["output"], phase="done", progress=1.0, eta=None)
+                outcome = "done"
+        except openscrub.PipelineCancelled:
+            recovery = _has_render_recovery(job["dir"])
+            with files.report_lock:
+                if recovery:
+                    files.recovery_required = True
+                    job.update(phase="error", error="render delivery requires recovery", eta=None)
+                if not committed and not files.recovery_required and _operation_valid(job, owner):
+                    job["phase"] = "cancelled"
+                    outcome = "cancelled"
+                    job["error"] = "cancelled by user"
+        except BaseException as e:
+            msg = str(e) or type(e).__name__
+            if isinstance(e, SystemExit):
+                msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+            error_code = diagnostics.classify(e) if sink is not None else None
+            recovery = _has_render_recovery(job["dir"])
+            with files.report_lock:
+                if recovery:
+                    files.recovery_required = True
+                    job.update(phase="error", error="render delivery requires recovery", eta=None)
+                if not committed and not files.recovery_required and _operation_valid(job, owner):
+                    job["phase"] = "error"
+                    outcome, diagnostic_error = "error", error_code
+                    job["error"] = msg
+                    job["log"].append(f"ERROR: {msg}")
+        finally:
+            with files.report_lock:
+                if _operation_valid(job, owner):
+                    job["eta"] = None
+    except BaseException:
+        escaped = True
+        raise
     finally:
-        with files.report_lock:
-            if _operation_valid(job, owner):
-                job["eta"] = None
         if sink is not None:
-            if outcome == "superseded" and owner.operation.is_set():
-                outcome = "cancelled"
-            sink.finish(diagnostic_ref, outcome, diagnostic_error)
-            if WORKER.get("diagnostic_ref") == diagnostic_ref:
-                WORKER.pop("diagnostic_ref", None)
+            try:
+                if escaped:
+                    sink.abandon(diagnostic_ref)
+                else:
+                    if outcome == "superseded" and owner.operation.is_set():
+                        outcome = "cancelled"
+                    sink.finish(diagnostic_ref, outcome, diagnostic_error)
+            finally:
+                if WORKER.get("diagnostic_ref") == diagnostic_ref:
+                    WORKER.pop("diagnostic_ref", None)
 
 
 def start_worker():
