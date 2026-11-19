@@ -979,166 +979,179 @@ def _run_job(job, action, owner=None):
         job["phase"] = "scanning" if action == "scan" else "rendering"
     sink = DIAGNOSTICS
     diagnostic_ref = sink.start(action) if sink is not None else None
-    if diagnostic_ref is not None and WORKER.get("current") == jid:
-        WORKER["diagnostic_ref"] = diagnostic_ref
     outcome, diagnostic_error = "superseded", None
-    cb = WebCallbacks(job, owner.operation, sink, diagnostic_ref)
-    def publish_report(path, doc):
-        with files.report_lock:
-            if not _operation_valid(job, owner) or owner.operation.is_set():
-                raise openscrub.PipelineCancelled()
-            atomic_report(path, doc)
-    cb.publish_report = publish_report
-    source = owner.source if owner is not None else job["video"]
+    escaped = False
     try:
-        if action == "scan":
-            job["log"].append("— scan started —")
-            args = build_args(dict(job, video=source))
-            state = openscrub.run_scan(args, cb)
-            openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                  args, state, publisher=cb.publish_report)
+        if diagnostic_ref is not None and WORKER.get("current") == jid:
+            WORKER["diagnostic_ref"] = diagnostic_ref
+        cb = WebCallbacks(job, owner.operation, sink, diagnostic_ref)
+        def publish_report(path, doc):
             with files.report_lock:
-                if not _operation_valid(job, owner):
-                    return
-                job["stats"] = state["stats"]
-            try:
-                prov = _load_job_report(job).get("provenance", {})
-                if (prov.get("vfr_normalized")
-                        and os.path.exists(prov.get("input", ""))):
-                    _update_job_source(job, prov["input"], owner)
-                    job["log"].append(
-                        "using CFR-normalized file for previews/thumbnails")
-            except Exception:
-                pass
-            thumbnail_owner = _own_files(job, work=True)
-            def _pregen(jb=job, video=thumbnail_owner.source):
-                """One pass through the video with a single decoder:
-                thumbnails come out in seconds instead of minutes.
-                Sorting by reference time keeps seeks short and forward-
-                only, which is what codecs are fast at."""
-                cap = None
-                try:
-                    doc = _load_job_report(jb)
-                    rs = doc["render_state"]
-                    todo = []
-                    for k, d in enumerate(doc["detections"]):
-                        cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
-                        if os.path.exists(cch):
-                            continue
-                        tref = min(max(d.get("last_seen", d["t_start"]),
-                                       d["t_start"]), d["t_end"])
-                        todo.append((tref, k, d, cch))
-                    todo.sort()
-                    cap = cv2.VideoCapture(video)
-                    cur = -1
-                    frame = None
-                    for tref, k, d, cch in todo:
-                        fidx = min(int(tref * rs["fps"]),
-                                   len(rs["cum"]) - 1)
-                        if fidx != cur:
-                            if 0 <= fidx - cur <= 12:
-                                while cur < fidx:   # cheap forward decode
-                                    ok, frame = cap.read()
-                                    if not ok:
-                                        frame = None
-                                        break
-                                    cur += 1
-                            else:
-                                cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
-                                ok, frame = cap.read()
-                                cur = fidx if ok else cur
-                                if not ok:
-                                    frame = None
-                        if frame is None:
-                            continue
-                        ox, oy = rs["cum"][fidx]
-                        h, wd = frame.shape[:2]
-                        pad = 24
-                        x1 = max(0, int(d["cbox"][0] + ox) - pad)
-                        y1 = max(0, int(d["cbox"][1] + oy) - pad)
-                        x2 = min(wd, int(d["cbox"][2] + ox) + pad)
-                        y2 = min(h, int(d["cbox"][3] + oy) + pad)
-                        crop = frame[y1:y2, x1:x2].copy()
-                        if crop.size == 0:
-                            continue
-                        inner = crop[pad:-pad or None, pad:-pad or None]
-                        if not inner.size or float(inner.std()) <= 8:
-                            continue   # blank: leave for the on-demand
-                                       # path, which tries other moments
-                        cv2.rectangle(crop, (pad, pad),
-                                      (crop.shape[1] - pad,
-                                       crop.shape[0] - pad),
-                                      (0, 0, 255), 2)
-                        cv2.imwrite(cch, crop,
-                                    [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    jb["log"].append("thumbnails pre-generated "
-                                     f"({len(todo)})")
-                except Exception:
-                    pass
-                finally:
-                    if cap is not None:
-                        cap.release()
-            _start_owned_thread(_pregen, thumbnail_owner)
-            next_owner = (_prepare_work(job, "render")
-                          if job["options"].get("skip_review") else None)
-            ticket = None
-            try:
+                if not _operation_valid(job, owner) or owner.operation.is_set():
+                    raise openscrub.PipelineCancelled()
+                atomic_report(path, doc)
+        cb.publish_report = publish_report
+        source = owner.source if owner is not None else job["video"]
+        try:
+            if action == "scan":
+                job["log"].append("— scan started —")
+                args = build_args(dict(job, video=source))
+                state = openscrub.run_scan(args, cb)
+                openscrub.write_report(os.path.join(job["dir"], "report.json"),
+                                      args, state, publisher=cb.publish_report)
                 with files.report_lock:
                     if not _operation_valid(job, owner):
                         return
-                    if next_owner is not None:
-                        job["log"].append("review skipped — rendering all detections")
-                        ticket = _reserve_queue_locked(job, "render", next_owner)
-                    else:
-                        job["phase"] = "review"
-                    outcome = "review"
-                    job["progress"] = 0.5
+                    job["stats"] = state["stats"]
+                try:
+                    prov = _load_job_report(job).get("provenance", {})
+                    if (prov.get("vfr_normalized")
+                            and os.path.exists(prov.get("input", ""))):
+                        _update_job_source(job, prov["input"], owner)
+                        job["log"].append(
+                            "using CFR-normalized file for previews/thumbnails")
+                except Exception:
+                    pass
+                thumbnail_owner = _own_files(job, work=True)
+                def _pregen(jb=job, video=thumbnail_owner.source):
+                    """One pass through the video with a single decoder:
+                    thumbnails come out in seconds instead of minutes.
+                    Sorting by reference time keeps seeks short and forward-
+                    only, which is what codecs are fast at."""
+                    cap = None
+                    try:
+                        doc = _load_job_report(jb)
+                        rs = doc["render_state"]
+                        todo = []
+                        for k, d in enumerate(doc["detections"]):
+                            cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+                            if os.path.exists(cch):
+                                continue
+                            tref = min(max(d.get("last_seen", d["t_start"]),
+                                           d["t_start"]), d["t_end"])
+                            todo.append((tref, k, d, cch))
+                        todo.sort()
+                        cap = cv2.VideoCapture(video)
+                        cur = -1
+                        frame = None
+                        for tref, k, d, cch in todo:
+                            fidx = min(int(tref * rs["fps"]),
+                                       len(rs["cum"]) - 1)
+                            if fidx != cur:
+                                if 0 <= fidx - cur <= 12:
+                                    while cur < fidx:   # cheap forward decode
+                                        ok, frame = cap.read()
+                                        if not ok:
+                                            frame = None
+                                            break
+                                        cur += 1
+                                else:
+                                    cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
+                                    ok, frame = cap.read()
+                                    cur = fidx if ok else cur
+                                    if not ok:
+                                        frame = None
+                            if frame is None:
+                                continue
+                            ox, oy = rs["cum"][fidx]
+                            h, wd = frame.shape[:2]
+                            pad = 24
+                            x1 = max(0, int(d["cbox"][0] + ox) - pad)
+                            y1 = max(0, int(d["cbox"][1] + oy) - pad)
+                            x2 = min(wd, int(d["cbox"][2] + ox) + pad)
+                            y2 = min(h, int(d["cbox"][3] + oy) + pad)
+                            crop = frame[y1:y2, x1:x2].copy()
+                            if crop.size == 0:
+                                continue
+                            inner = crop[pad:-pad or None, pad:-pad or None]
+                            if not inner.size or float(inner.std()) <= 8:
+                                continue   # blank: leave for the on-demand
+                                           # path, which tries other moments
+                            cv2.rectangle(crop, (pad, pad),
+                                          (crop.shape[1] - pad,
+                                           crop.shape[0] - pad),
+                                          (0, 0, 255), 2)
+                            cv2.imwrite(cch, crop,
+                                        [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        jb["log"].append("thumbnails pre-generated "
+                                         f"({len(todo)})")
+                    except Exception:
+                        pass
+                    finally:
+                        if cap is not None:
+                            cap.release()
+                _start_owned_thread(_pregen, thumbnail_owner)
+                next_owner = (_prepare_work(job, "render")
+                              if job["options"].get("skip_review") else None)
+                ticket = None
+                try:
+                    with files.report_lock:
+                        if not _operation_valid(job, owner):
+                            return
+                        if next_owner is not None:
+                            job["log"].append("review skipped — rendering all detections")
+                            ticket = _reserve_queue_locked(job, "render", next_owner)
+                        else:
+                            job["phase"] = "review"
+                        outcome = "review"
+                        job["progress"] = 0.5
+                        job["eta"] = None
+                finally:
+                    if next_owner is not None and ticket is None:
+                        next_owner.release()
+                if ticket is not None:
+                    enqueue(job, "render", ticket)
+            elif action == "render":
+                if not owner.report_input:  # compatibility with older queue entries
+                    _select_render_input(job, owner)
+                args = build_args(dict(job, video=owner.source), for_render=True)
+                args._report_input = owner.source
+                res = openscrub.run_pipeline(args, cb)
+                with files.report_lock:
+                    if not _operation_valid(job, owner):
+                        return
+                    job["output"] = res["output"]
+                    job["phase"] = "done"
+                    outcome = "done"
+                    job["progress"] = 1.0
                     job["eta"] = None
-            finally:
-                if next_owner is not None and ticket is None:
-                    next_owner.release()
-            if ticket is not None:
-                enqueue(job, "render", ticket)
-        elif action == "render":
-            if not owner.report_input:  # compatibility with older queue entries
-                _select_render_input(job, owner)
-            args = build_args(dict(job, video=owner.source), for_render=True)
-            args._report_input = owner.source
-            res = openscrub.run_pipeline(args, cb)
+        except openscrub.PipelineCancelled:
             with files.report_lock:
-                if not _operation_valid(job, owner):
-                    return
-                job["output"] = res["output"]
-                job["phase"] = "done"
-                outcome = "done"
-                job["progress"] = 1.0
-                job["eta"] = None
-    except openscrub.PipelineCancelled:
-        with files.report_lock:
-            if _operation_valid(job, owner):
-                job["phase"] = "cancelled"
-                outcome = "cancelled"
-                job["error"] = "cancelled by user"
-    except BaseException as e:
-        msg = str(e) or type(e).__name__
-        if isinstance(e, SystemExit):
-            msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
-        with files.report_lock:
-            if _operation_valid(job, owner):
-                job["phase"] = "error"
-                outcome, diagnostic_error = "error", e
-                job["error"] = msg
-                job["log"].append(f"ERROR: {msg}")
+                if _operation_valid(job, owner):
+                    job["phase"] = "cancelled"
+                    outcome = "cancelled"
+                    job["error"] = "cancelled by user"
+        except BaseException as e:
+            msg = str(e) or type(e).__name__
+            if isinstance(e, SystemExit):
+                msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+            error_code = diagnostics.classify(e) if sink is not None else None
+            with files.report_lock:
+                if _operation_valid(job, owner):
+                    job["phase"] = "error"
+                    outcome = "error"
+                    diagnostic_error = error_code
+                    job["error"] = msg
+                    job["log"].append(f"ERROR: {msg}")
+        finally:
+            with files.report_lock:
+                if _operation_valid(job, owner):
+                    job["eta"] = None
+    except BaseException:
+        escaped = True
+        raise
     finally:
-        with files.report_lock:
-            if _operation_valid(job, owner):
-                job["eta"] = None
         if sink is not None:
-            if outcome == "superseded" and owner.operation.is_set():
-                outcome = "cancelled"
-            sink.finish(diagnostic_ref, outcome, diagnostic_error)
-            if WORKER.get("diagnostic_ref") == diagnostic_ref:
-                WORKER.pop("diagnostic_ref", None)
+            try:
+                if escaped:
+                    sink.abandon(diagnostic_ref)
+                else:
+                    if outcome == "superseded" and owner.operation.is_set():
+                        outcome = "cancelled"
+                    sink.finish(diagnostic_ref, outcome, diagnostic_error)
+            finally:
+                if WORKER.get("diagnostic_ref") == diagnostic_ref:
+                    WORKER.pop("diagnostic_ref", None)
 
 
 def start_worker():
