@@ -2152,63 +2152,59 @@ def _thumbnail_sweep(job):
         raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending')
 
 
-def _thumbnail_cleanup(job):
+def _thumbnail_cleanup(job, *, target=None):
     files = FILES.initialize(job)
     _thumbnail_sweep(job)
+    state = files.thumbnail
     while True:
         with files.report_lock:
-            fill = next((fill for fill in files.thumbnail.fills
-                         if getattr(fill, '_deferred_lease', None) is not None
-                         and not getattr(fill, '_close_claimed', False)), None)
-            if fill is None:
-                break
-            fill._close_claimed = True
-        owner = None
+            ticket, discarded = thumbs.claim_deferred_locked(state, target)
+        del discarded  # large emptied buckets leave the lock before disposal
+        if ticket is None:
+            break
+        retired = None
+        handle = ticket.file if isinstance(ticket, thumbs.ReaderTicket) else ticket.stage_writer
+        settled = getattr(ticket, '_cleanup_settled', False)
         try:
-            if fill.stage_writer is not None:
+            if not settled:
                 try:
-                    fill.stage_writer.close()
+                    if handle is not None:
+                        handle.close()
                 except OSError:
                     pass
-        finally:
-            retired = None
-            with files.report_lock:
-                fill._close_claimed = False
-                if fill.stage_writer is None or fill.stage_writer.closed:
-                    fill.stage_closed = True
-                    fill.stage_writer = None
-                    retired = thumbs.finish_fill_locked(files.thumbnail, fill)
-                    owner, fill._deferred_lease = fill._deferred_lease, None
-            del retired
-            if owner is not None:
+                with files.report_lock:
+                    if handle is None or handle.closed:
+                        if isinstance(ticket, thumbs.ReaderTicket):
+                            retired = thumbs.end_reader_locked(state, ticket)
+                        else:
+                            ticket.stage_closed = True
+                            ticket.stage_writer = None
+                            retired = thumbs.finish_fill_locked(state, ticket)
+                        ticket._cleanup_settled = settled = True
+                    else:
+                        thumbs.restore_deferred_locked(state, ticket)
+            if settled:
+                owner = ticket._deferred_lease
                 owner.release()
-        if owner is None:
-            break
-    while True:
-        with files.report_lock:
-            reader = next((reader for reader in files.thumbnail.readers
-                           if getattr(reader, '_deferred_lease', None) is not None
-                           and not getattr(reader, '_close_claimed', False)), None)
-            if reader is None:
-                break
-            reader._close_claimed = True
-        owner = None
-        try:
-            try:
-                reader.file.close()
-            except OSError:
-                pass
-        finally:
-            retired = None
+                ticket._deferred_lease = None
+                ticket._close_claimed = False
+        except BaseException:
             with files.report_lock:
-                reader._close_claimed = False
-                if reader.file.closed:
-                    retired = thumbs.end_reader_locked(files.thumbnail, reader)
-                    owner, reader._deferred_lease = reader._deferred_lease, None
+                owner = ticket._deferred_lease
+                if owner is not None and not owner.released:
+                    if (isinstance(ticket, thumbs.ReaderTicket) and ticket.released
+                            or isinstance(ticket, thumbs.FillTicket) and ticket.settled):
+                        ticket._cleanup_settled = True
+                    if ticket not in state.deferred:
+                        thumbs.restore_deferred_locked(state, ticket)
+                elif owner is not None:
+                    ticket._deferred_lease = None
+                    ticket._close_claimed = False
+            raise
+        finally:
             del retired
-            if owner is not None:
-                owner.release()
-        if owner is None:
+        del ticket, handle
+        if not settled:
             break
     while True:
         with files.report_lock:
@@ -2231,19 +2227,15 @@ def _thumbnail_lifecycle_cleanup(job, *, target=None):
     """Retry a retained reader while an existing lifecycle request can own it."""
     files = job.get('_files')
     if (files is None or files.active is not None or target is not None and target.active is not None
-            or not (files.thumbnail.readers or files.thumbnail.fills)):
+            or not files.thumbnail.deferred):
         return
     acquire = getattr(files.report_lock, 'acquire', None)
     if acquire is None or not acquire(blocking=False):
         return
     try:
-        def holds_target(reader):
-            owner = getattr(reader, '_deferred_lease', None)
-            return owner is not None and (target is None or owner.state is target
-                or any(related.state is target for related in owner.related))
-        pending = files.active is None and (
-            any(map(holds_target, files.thumbnail.readers))
-            or any(map(holds_target, files.thumbnail.fills)))
+        pending = (files.active is None and bool(
+            files.thumbnail.deferred if target is None
+            else files.thumbnail.deferred_by_owner.get(target)))
     finally:
         files.report_lock.release()
     if not pending:
@@ -2257,7 +2249,7 @@ def _thumbnail_lifecycle_cleanup(job, *, target=None):
         lease = _reserve_files_locked(job, read_source=False)
     try:
         try:
-            _thumbnail_cleanup(job)
+            _thumbnail_cleanup(job, target=target)
         except (OSError, _ThumbnailError):
             pass
     finally:
@@ -2483,7 +2475,8 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                     else:
                         if state.current is generation:
                             thumbs.invalidate_locked(state, 'cached thumbnail close failed')
-                        reader._deferred_lease, lease = lease, None
+                        thumbs.defer_resource_locked(state, reader, lease)
+                        lease = None
                 if isinstance(error, (OSError, thumbs.ThumbnailObsolete)) and state.current is generation:
                     thumbs.invalidate_locked(state, 'cached thumbnail changed')
             del retired
@@ -2516,7 +2509,8 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                 else:
                     if state.current is generation:
                         thumbs.invalidate_locked(state, 'cached thumbnail close failed')
-                    reader._deferred_lease, lease = lease, None
+                    thumbs.defer_resource_locked(state, reader, lease)
+                    lease = None
             del retired
         if (stamp(observed) != entry.stamp or len(body) != entry.size
                 or thumbs.jpeg_etag(kind, generation.version, index, body) != entry.etag):
@@ -2550,13 +2544,15 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                         retired = thumbs.finish_fill_locked(state, fill)
                     except BaseException:
                         if not fill.settled:
-                            fill._deferred_lease, lease = lease, None
+                            thumbs.defer_resource_locked(state, fill, lease)
+                            lease = None
                         if not primary_pending:
                             raise
                 else:
                     if state.current is generation:
                         thumbs.invalidate_locked(state, 'stage writer close failed')
-                    fill._deferred_lease, lease = lease, None
+                    thumbs.defer_resource_locked(state, fill, lease)
+                    lease = None
             del retired
         if lease is not None:
             try:

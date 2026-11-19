@@ -156,6 +156,8 @@ class ThumbnailState:
         self.fills = set()
         self.readers = set()
         self.pins = {}
+        self.deferred = set()
+        self.deferred_by_owner = {}
         self.retirement = None
 
 
@@ -398,6 +400,54 @@ def begin_reader_locked(state, generation, entry, file):
     ticket = reserve_reader_locked(state, generation, entry)
     ticket.file = file
     return ticket
+
+
+def _lease_owner_states(lease):
+    if lease.state is not None:
+        yield lease.state
+    for child in lease.related:
+        yield from _lease_owner_states(child)
+
+
+def defer_resource_locked(state, ticket, lease):
+    """Index an existing ticket by every owner held by its transferred lease."""
+    if lease is None or getattr(ticket, '_deferred_lease', None) is not None:
+        raise ValueError('invalid deferred lease')
+    ticket._deferred_lease = lease
+    ticket._deferred_states = tuple(set(_lease_owner_states(lease)))
+    restore_deferred_locked(state, ticket)
+
+
+def restore_deferred_locked(state, ticket):
+    state.deferred.add(ticket)
+    for owner in ticket._deferred_states:
+        state.deferred_by_owner.setdefault(owner, set()).add(ticket)
+    ticket._close_claimed = False
+
+
+def claim_deferred_locked(state, owner=None):
+    """Remove one ticket from every bucket; return empty buckets for disposal."""
+    bucket = state.deferred if owner is None else state.deferred_by_owner.get(owner)
+    if not bucket:
+        return None, ()
+    ticket = bucket.pop()
+    discarded = remove_deferred_locked(state, ticket, popped_owner=owner,
+                                        popped_global=owner is None)
+    ticket._close_claimed = True
+    return ticket, discarded
+
+
+def remove_deferred_locked(state, ticket, *, popped_owner=None, popped_global=False):
+    if not popped_global:
+        state.deferred.remove(ticket)
+    discarded = []
+    for held in ticket._deferred_states:
+        members = state.deferred_by_owner[held]
+        if held is not popped_owner:
+            members.remove(ticket)
+        if not members:
+            discarded.append(state.deferred_by_owner.pop(held))
+    return discarded
 
 
 def end_reader_locked(state, ticket):

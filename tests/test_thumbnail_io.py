@@ -1058,7 +1058,7 @@ def test_interrupted_retry_leaves_other_deferred_reader_recoverable(exact):
             opened = FailingClose(open(entry.path, 'rb'))
             with files.report_lock:
                 reader = web.thumbs.begin_reader_locked(state, state.current, entry, opened)
-                reader._deferred_lease = lease
+                web.thumbs.defer_resource_locked(state, reader, lease)
             readers.append(reader)
             with pytest.raises(OSError): opened.close()
         with files.report_lock: web.thumbs.invalidate_locked(state, 'deferred test')
@@ -1075,8 +1075,11 @@ def test_interrupted_retry_leaves_other_deferred_reader_recoverable(exact):
             if not reader.file.closed: reader.file.file.close()
             if reader in state.readers:
                 with files.report_lock:
+                    if reader in state.deferred:
+                        discarded = web.thumbs.remove_deferred_locked(state, reader)
                     web.thumbs.end_reader_locked(state, reader)
                     lease, reader._deferred_lease = reader._deferred_lease, None
+                discarded = None
                 if lease is not None: lease.release()
 
 
@@ -1383,8 +1386,11 @@ def test_rejected_cache_reader_close_failure_keeps_lease_until_retry(exact, monk
         for reader in list(files.thumbnail.readers):
             if reader.file.closed:
                 with files.report_lock:
+                    if reader in files.thumbnail.deferred:
+                        discarded = web.thumbs.remove_deferred_locked(files.thumbnail, reader)
                     web.thumbs.end_reader_locked(files.thumbnail, reader)
                     owner, reader._deferred_lease = getattr(reader, '_deferred_lease', None), None
+                discarded = None
                 if owner is not None: owner.release()
 
 
@@ -1422,8 +1428,11 @@ def test_open_wrapper_construction_failure_retains_real_handle(exact, monkeypatc
         for reader in list(files.thumbnail.readers):
             if reader.file is None or reader.file.closed:
                 with files.report_lock:
+                    if reader in files.thumbnail.deferred:
+                        discarded = web.thumbs.remove_deferred_locked(files.thumbnail, reader)
                     web.thumbs.end_reader_locked(files.thumbnail, reader)
                     owner, reader._deferred_lease = getattr(reader, '_deferred_lease', None), None
+                discarded = None
                 if owner is not None: owner.release()
 
 
@@ -1773,3 +1782,160 @@ def test_cleanup_interrupt_does_not_mask_primary_decode_cancel(exact, monkeypatc
     with pytest.raises(openscrub.PipelineCancelled) as caught:
         web._thumbnail_image(exact.job, 0, 'crop', version)
     assert caught.value is primary and web.FILES.count == 0
+
+
+def test_vault_cleanup_lookup_does_not_scan_live_nondeferred_readers(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    entry = state.entries[('crop', 0)]
+    class NoScan(set):
+        def __iter__(self): raise AssertionError('live-reader scan under report lock')
+    readers, leases = [], []
+    try:
+        for _ in range(128):
+            lease = web._own_files(exact.job)
+            leases.append(lease)
+            opened = open(entry.path, 'rb')
+            with files.report_lock:
+                readers.append(web.thumbs.begin_reader_locked(state, state.current, entry, opened))
+        state.readers = NoScan(state.readers)
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert len(state.readers) == 128
+    finally:
+        state.readers = state.readers.copy()
+        for reader in readers:
+            reader.file.close()
+            with files.report_lock: web.thumbs.end_reader_locked(state, reader)
+        for lease in leases: lease.release()
+    assert web.FILES.count == 0
+
+
+def test_target_index_retries_only_its_nested_lease_owners_and_unwinds(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    for route in ('thumb', 'detframe'):
+        assert request('get', exact.url + '/' + route + '/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    other = web.new_job('', {}, 'other')
+    containing = web.new_job('', {}, 'containing')
+    other['phase'] = containing['phase'] = 'review'
+    other_state = web.FILES.initialize(other)
+    target = web.FILES.initialize(containing)
+    leases, tickets, disposals = [], [], []
+    class Retry:
+        def __init__(self, file, failures):
+            self.file, self.failures, self.attempts = file, failures, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def close(self):
+            self.attempts += 1
+            if self.attempts <= len(self.failures): raise self.failures[self.attempts - 1]
+            self.file.close()
+    class Bucket(set):
+        def __del__(self):
+            disposals.append((files.report_lock.locked(), web.VAULT_LOCK.locked()))
+    try:
+        for index, entry in enumerate(list(state.entries.values())):
+            lease = web._own_files(exact.job)
+            leases.append(lease)
+            if index == 0:
+                with web.VAULT_LOCK:
+                    related = web.FILES.reserve(other)
+                    related.related.append(web.FILES.reserve(containing))
+                    lease.related.append(related)
+            failures = [KeyboardInterrupt('interrupt retry'), OSError('retry failed')] if index == 0 else []
+            opened = Retry(open(entry.path, 'rb'), failures)
+            with files.report_lock:
+                reader = web.thumbs.begin_reader_locked(state, state.current, entry, opened)
+                web.thumbs.defer_resource_locked(state, reader, lease)
+            tickets.append(reader)
+        with files.report_lock:
+            web.thumbs.invalidate_locked(state, 'deferred index control')
+            state.deferred_by_owner = {key: Bucket(value) for key, value in state.deferred_by_owner.items()}
+        first, unrelated = tickets
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job, target=target)
+        assert not first._close_claimed and first in state.deferred
+        assert first in state.deferred_by_owner[target] and first in state.deferred_by_owner[other_state]
+        assert unrelated.file.attempts == 0
+        web._thumbnail_lifecycle_cleanup(exact.job, target=target)
+        assert first in state.deferred and first.file.attempts == 2 and unrelated.file.attempts == 0
+        web._thumbnail_lifecycle_cleanup(exact.job, target=target)
+        assert first.file.closed and first not in state.deferred
+        assert target not in state.deferred_by_owner and other_state not in state.deferred_by_owner
+        assert unrelated.file.attempts == 0 and unrelated in state.deferred
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert unrelated.file.closed and not state.deferred and not state.deferred_by_owner
+        assert web.FILES.count == 0
+        assert disposals and all(not report and not vault for report, vault in disposals)
+    finally:
+        for ticket in tickets:
+            if not ticket.file.closed: ticket.file.file.close()
+        for _ in range(4):
+            if not state.deferred: break
+            try: web._thumbnail_cleanup(exact.job)
+            except KeyboardInterrupt: pass
+        for lease in leases: lease.release()
+
+
+def test_interrupted_deferred_lease_release_restores_retry_index(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    entry = state.entries[('crop', 0)]
+    lease = web._own_files(exact.job)
+    real_release, calls = lease.release, []
+    def release():
+        calls.append(True)
+        if len(calls) == 1: raise KeyboardInterrupt('interrupted lease release')
+        real_release()
+    monkeypatch.setattr(lease, 'release', release)
+    opened = open(entry.path, 'rb')
+    with files.report_lock:
+        reader = web.thumbs.begin_reader_locked(state, state.current, entry, opened)
+        web.thumbs.defer_resource_locked(state, reader, lease)
+        web.thumbs.invalidate_locked(state, 'interrupted release control')
+    try:
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job)
+        assert opened.closed and reader in state.deferred and not lease.released
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert lease.released and not state.deferred and not state.deferred_by_owner
+        assert len(calls) == 2 and web.FILES.count == 0
+    finally:
+        if not opened.closed: opened.close()
+        if not lease.released: real_release()
+        with files.report_lock:
+            if reader in state.deferred:
+                discarded = web.thumbs.remove_deferred_locked(state, reader)
+            else:
+                discarded = None
+            if reader in state.readers and opened.closed:
+                web.thumbs.end_reader_locked(state, reader)
+        discarded = None
+
+
+def test_deferred_claim_does_not_iterate_ticket_set(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    entry = state.entries[('crop', 0)]
+    lease = web._own_files(exact.job)
+    opened = open(entry.path, 'rb')
+    class NoIteration(set):
+        def __iter__(self): raise AssertionError('deferred set iterated under report lock')
+    with files.report_lock:
+        reader = web.thumbs.begin_reader_locked(state, state.current, entry, opened)
+        web.thumbs.defer_resource_locked(state, reader, lease)
+        web.thumbs.invalidate_locked(state, 'bounded deferred claim')
+        state.deferred = NoIteration(state.deferred)
+    try:
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert opened.closed and lease.released and not state.deferred
+        assert not state.deferred_by_owner and web.FILES.count == 0
+    finally:
+        if not opened.closed: opened.close()
+        state.deferred = state.deferred.copy()
+        if state.deferred: web._thumbnail_cleanup(exact.job)
+        if not lease.released: lease.release()
