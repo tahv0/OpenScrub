@@ -1481,7 +1481,7 @@ def _run_job(job, action, owner=None):
                             return
                         rows, rs = _thumbnail_validate_report(doc)
                         generation = _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
-                        cap = cv2.VideoCapture(video)
+                        cap = _open_preview_capture(video)
                         generated = 0
                         for index in range(len(rows)):
                             try:
@@ -2514,7 +2514,7 @@ def _read_thumbnail_ordinal(selected, index, *, count, capture=None):
     owned = capture is None
     try:
         if owned:
-            cap = cv2.VideoCapture(selected['path'])
+            cap = _open_preview_capture(selected['path'])
         try:
             result = thumbs.read_ordinal_capture(cap, index, count=count)
         except BaseException:
@@ -3624,9 +3624,33 @@ def job_plate_search(jid):
         _PLATE_SEARCH_SLOT.release()
 
 
+def _open_preview_capture(path):
+    """Open a caller-owned preview decoder, with best-effort thread control."""
+    threads = app.config.get("PREVIEW_DECODE_THREADS", 0)
+    if not threads or not hasattr(cv2, "CAP_PROP_N_THREADS") or not hasattr(cv2, "CAP_FFMPEG"):
+        return cv2.VideoCapture(path)
+    try:
+        cap = cv2.VideoCapture(path, cv2.CAP_FFMPEG,
+                               [cv2.CAP_PROP_N_THREADS, threads])
+    except (TypeError, cv2.error):
+        return cv2.VideoCapture(path)
+    accepted = False
+    try:
+        try:
+            accepted = cap.isOpened() and cap.get(cv2.CAP_PROP_N_THREADS) == threads
+        except cv2.error:
+            pass
+        if accepted:
+            return cap
+    finally:
+        if not accepted:
+            cap.release()
+    return cv2.VideoCapture(path)
+
+
 def _frame_at(job, t, rstate):
     def decode(path):
-        cap = cv2.VideoCapture(path)
+        cap = _open_preview_capture(path)
         try:
             fps = rstate["fps"]
             cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
@@ -3643,7 +3667,7 @@ def job_mediainfo(jid):
     """Basic video properties straight from the file — available in every
     job phase, no scan report required."""
     job = JOBS.get(jid) or abort(404)
-    cap = cv2.VideoCapture(_job_video(job))
+    cap = _open_preview_capture(_job_video(job))
     try:
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
@@ -3797,7 +3821,7 @@ def job_frame_at(jid):
     job = JOBS.get(jid) or abort(404)
     t = max(0.0, float(request.args.get("t", 0)))
     def decode(path):
-        cap = cv2.VideoCapture(path)
+        cap = _open_preview_capture(path)
         # Timestamp seeking/backoff preserves VFR and near-end behavior.
         try:
             frame = None

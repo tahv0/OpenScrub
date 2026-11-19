@@ -420,6 +420,8 @@ after any update to run the new version.
 
 ## Web interface (LAN) — one page, editor to review
 
+Preview decoding can optionally use fewer FFmpeg threads with `openscrub-web --preview-decode-threads 1` (choices: 0, 1, 2, 4). The default, 0, uses the ordinary decoder. Fewer threads may reduce memory use but slow seeking; builds that cannot apply the requested setting fall back to the ordinary decoder.
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/austinmabry/OpenScrub/main/assets/screenshots/track-object.png"
        alt="Drawing a track box around a subject in the editor; OpenScrub detects the object, tracks it, and blurs it through the detection window"
