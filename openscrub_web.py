@@ -4764,7 +4764,104 @@ function beHook(){
  });
  cv.addEventListener("pointerup",()=>{BE.drag=null;});
 }
+// Thumbnail ownership is separate from the review draft and box editor.
+let REVIEW_IMAGES=null;
+function thumbnailUrl(jobId,kind,index,version){
+ const u=new URL(`api/jobs/${encodeURIComponent(jobId)}/${kind}/${index}`,window.location.href);
+ if(version)u.searchParams.set("v",version);
+ return u.href;
+}
+function thumbnailGroup(x){
+ if(x.zone_dropped)return null;
+ const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+ return key===null?null:[x.category,key];
+}
+function thumbnailOwnerCurrent(o){
+ return REVIEW_IMAGES===o&&ownsView(o.jobId,o.viewGen)&&
+  document.getElementById("review")===o.root&&o.root.isConnected;
+}
+function thumbnailBindingCurrent(o,b,node,version){
+ if(!thumbnailOwnerCurrent(o)||b.node!==node||b.version!==version||!node.isConnected)return false;
+ if(b.card)return o.lightbox===b&&document.getElementById("lb")===b.overlay&&
+  b.overlay.contains(node)&&o.bindings.get(b.rawIndex)===b.card&&
+  b.card.version===version&&b.card.node.isConnected&&o.root.contains(b.card.node);
+ return o.bindings.get(b.rawIndex)===b&&o.root.contains(node);
+}
+function thumbnailUnavailable(node,b){
+ node.alt="Review changed; reopen review to refresh";
+ node.title=node.alt;node.style.visibility="hidden";
+ const card=b.card?b.card.node:node;
+ const button=card.parentElement&&card.parentElement.querySelector("[data-thumb-reopen]");
+ const status=card.parentElement&&card.parentElement.querySelector("[data-thumb-status]");
+ if(button)button.hidden=false;if(status)status.hidden=false;
+}
+function thumbnailSetSource(o,b,src){
+ const node=b.node,version=b.version;
+ node.style.visibility="hidden";
+ node.onload=()=>{
+  if(!thumbnailBindingCurrent(o,b,node,version)||node.currentSrc!==src||!node.complete||!node.naturalWidth)return;
+  node.style.visibility="";node.alt="";node.title="";
+  const card=b.card?b.card.node:node;
+  const button=card.parentElement&&card.parentElement.querySelector("[data-thumb-reopen]");
+  const status=card.parentElement&&card.parentElement.querySelector("[data-thumb-status]");
+  if(button)button.hidden=true;if(status)status.hidden=true;
+ };
+ node.onerror=()=>{if(thumbnailBindingCurrent(o,b,node,version)&&node.src===src)recoverThumbnail(o,b);};
+ node.src=src;
+}
+function reopenThumbnailReview(event){
+ event.stopPropagation();
+ const img=event.currentTarget.parentElement.querySelector("img[data-thumb-index]");
+ const o=REVIEW_IMAGES,b=o&&img&&o.bindings.get(Number(img.dataset.thumbIndex));
+ if(b&&thumbnailBindingCurrent(o,b,img,b.version))loadReview();
+}
+function thumbnailRowsMatch(b,rows,groups){
+ const row=rows.get(b.rawIndex);
+ if(!row||row.thumbnail_row!==b.thumbnailRow)return false;
+ if(!b.group)return true;
+ return JSON.stringify(groups.get(JSON.stringify(b.group))||[])===JSON.stringify(b.members);
+}
+async function recoverThumbnail(o,b){
+ const node=b.node,version=b.version;
+ if(!thumbnailBindingCurrent(o,b,node,version))return;
+ thumbnailUnavailable(node,b);
+ if(!version||!b.thumbnailRow)return; // Older servers do not supply a safe binding.
+ if(!o.attempted){
+  o.attempted=true;
+  // Capture exactly the nodes and versions owned when this attempt began.
+  const captured=[...(o.lightbox?[o.lightbox]:[]),...o.bindings.values()]
+   .map(x=>[x,x.node,x.version]);
+  o.refresh=(async()=>{
+   try{
+    const r=await fetch(`api/jobs/${encodeURIComponent(o.jobId)}/detections`,{cache:"no-store"});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(!d||!Array.isArray(d.detections)||! /^[0-9a-f]{32}$/.test(d.thumbnail_version)||
+       d.thumbnail_version===version)return;
+    const rows=new Map(),groups=new Map();
+    for(const row of d.detections){
+     if(!row||!Number.isInteger(row.i)||rows.has(row.i)||! /^[0-9a-f]{64}$/.test(row.thumbnail_row))return;
+     rows.set(row.i,row);
+     const group=thumbnailGroup(row);
+     if(group){const key=JSON.stringify(group);if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push([row.i,row.thumbnail_row]);}
+    }
+    for(const members of groups.values())members.sort((a,b)=>a[0]-b[0]);
+    for(const [item,original,oldVersion] of captured){
+     if(!thumbnailBindingCurrent(o,item,original,oldVersion))continue;
+     if(!thumbnailRowsMatch(item,rows,groups)){thumbnailUnavailable(original,item);continue;}
+     item.version=d.thumbnail_version;
+     thumbnailSetSource(o,item,thumbnailUrl(o.jobId,item.card?"detframe":"thumb",item.rawIndex,item.version));
+    }
+    o.version=d.thumbnail_version;
+   }catch(e){/* Keep the unavailable image and the spent budget. */}
+  })();
+ }
+ await o.refresh;
+}
 function zoomDet(i){
+ const o=REVIEW_IMAGES,b=o&&o.bindings.get(i);
+ if(!b||!thumbnailBindingCurrent(o,b,b.node,b.version))return;
  let ov=document.getElementById("lb");
  if(!ov){
   ov=document.createElement("div");ov.id="lb";
@@ -4774,9 +4871,13 @@ function zoomDet(i){
   ov.onclick=()=>ov.remove();
   document.body.appendChild(ov);
  }
- ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
-  style="max-width:96%;max-height:96%;border-radius:8px;
+ ov.innerHTML=`<img style="max-width:96%;max-height:96%;border-radius:8px;
   box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
+ const node=ov.querySelector("img");
+ const light={node,overlay:ov,card:b,rawIndex:b.rawIndex,thumbnailRow:b.thumbnailRow,
+  group:b.group,members:b.members,version:b.version};
+ o.lightbox=light;node.onerror=()=>recoverThumbnail(o,light);
+ node.src=b.version?thumbnailUrl(o.jobId,"detframe",i,b.version):`api/jobs/${o.jobId}/detframe/${i}`;
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -4831,12 +4932,16 @@ function cmpShow(){
 }
 
 async function loadReview(){
- const id=CUR,gen=VIEW_GEN;
+ const id=CUR,gen=VIEW_GEN,token={};
+ REVIEW_IMAGES={jobId:id,viewGen:gen,token,root:null,version:null,attempted:false,refresh:null,bindings:new Map()};
+ const owner=REVIEW_IMAGES;
  showPanel("review");
  const d=await (await fetch(`api/jobs/${id}/detections`)).json();
- if(!ownsView(id,gen))return;
+ if(!ownsView(id,gen)||REVIEW_IMAGES!==owner)return;
  DUR=d.duration;
- const groups={}; const zdrop=[]; TRKMEM={};
+ const groups={}; const zdrop=[]; const thumbMembers=new Map(); TRKMEM={};
+ const version=/^[0-9a-f]{32}$/.test(d.thumbnail_version||"")?d.thumbnail_version:null;
+ const imageUrl=x=>version&&/^[0-9a-f]{64}$/.test(x.thumbnail_row||"")?thumbnailUrl(id,"thumb",x.i,version):`api/jobs/${id}/thumb/${x.i}`;
  d.detections.forEach(x=>{
   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
   if(x.zone_dropped){zdrop.push(x);return;}
@@ -4860,8 +4965,10 @@ async function loadReview(){
    <div class="grid3">`;
   for(const x of zdrop){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
-    <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+    <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}" loading="lazy"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+    <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
+    <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
@@ -4889,6 +4996,7 @@ async function loadReview(){
    rep.frames=members.length;
    rep.personcard=key[0]==="p";
    TRKMEM[rep.i]=members.map(m=>m.i);
+   thumbMembers.set(rep.i,members.map(m=>[m.i,m.thumbnail_row]).sort((a,b)=>a[0]-b[0]));
    items.push(rep);
   }
   // person cards first, then everything else chronologically
@@ -4900,9 +5008,11 @@ async function loadReview(){
    onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
-    <img src="api/jobs/${CUR}/thumb/${x.i}"
+    <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
+    <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
+    <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
@@ -4916,6 +5026,14 @@ async function loadReview(){
   add-region tool</span></div></div>`;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
+ owner.root=document.getElementById("review");owner.version=version;
+ for(const x of d.detections){
+  const node=document.getElementById("thumb"+x.i);if(!node)continue;
+  const row=/^[0-9a-f]{64}$/.test(x.thumbnail_row||"")?x.thumbnail_row:null;
+  const binding={node,rawIndex:x.i,thumbnailRow:row,version:row?version:null,
+   group:thumbMembers.has(x.i)?thumbnailGroup(x):null,members:thumbMembers.get(x.i)||null};
+  owner.bindings.set(x.i,binding);
+ }
  initMarquee();saveStatus(EDITS,EDITS.status);
 }
 
@@ -4934,11 +5052,8 @@ function toggleDet(i){applyDet(i,!EN[i]);}
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 function thumbRetry(img){
- const n=+(img.dataset.r||0);
- if(n>=3)return;
- img.dataset.r=n+1;
- setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
-            600*(n+1));
+ const o=REVIEW_IMAGES,b=o&&o.bindings.get(Number(img.dataset.thumbIndex));
+ if(b&&b.node===img)recoverThumbnail(o,b);
 }
 function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
