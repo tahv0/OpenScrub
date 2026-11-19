@@ -29,6 +29,10 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
   if(selector.startsWith('[data-review-heading='))return {querySelector:()=>el(),querySelectorAll:()=>[el(),el()]};
   if(selector.startsWith('[data-review-card='))return {dataset:{},querySelector:()=>el()};
   return null;
+ },querySelectorAll(selector){
+  if(selector==='[data-review-heading]')return [{querySelector:()=>el(),querySelectorAll:()=>[el(),el()]}];
+  if(selector==='[data-review-card]')return [{dataset:{},querySelector:()=>el()}];
+  return [];
  },insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
 const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,

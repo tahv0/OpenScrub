@@ -1215,7 +1215,7 @@ def _run_job(job, action, owner=None):
                                     if stalled:
                                         break
                                 continue
-                        jb['log'].append('thumbnails pre-generated (%d)' % generated)
+                        jb['log'].append('thumbnails ready (%d)' % generated)
                     except Exception:
                         pass
                     finally:
@@ -2300,7 +2300,8 @@ def _thumbnail_validate_report(doc):
                 raise ValueError()
             for name in ('track', 'person'):
                 value = row.get(name, -1)
-                if type(value) is not int or not math.isfinite(value):
+                if (isinstance(value, bool) or not isinstance(value, (int, float))
+                        or not math.isfinite(value) or value != int(value)):
                     raise ValueError()
             confidence = row.get('confidence', 0)
             if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
@@ -2542,9 +2543,8 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                     raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
                 doc = saved_doc
             if doc is None:
-                _thumbnail_release_lease(job, lease)
-                lease = None
-                doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+                doc, selected, fence, snapshot_lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+                _thumbnail_release_lease(job, snapshot_lease)
                 with files.report_lock:
                     if state.current is not generation or selected is not generation.selected_source or fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
@@ -5113,16 +5113,18 @@ async function loadReview(){
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
  owner.root=document.getElementById("review");owner.version=version;REVIEW_IMAGES=owner;
+ const headingNodes=owner.root.querySelectorAll("[data-review-heading]");
+ const cardNodes=owner.root.querySelectorAll("[data-review-card]");
  headings.forEach((cat,index)=>{
-  const heading=owner.root.querySelector(`[data-review-heading="${index}"]`);
+  const heading=headingNodes[index];
   const name=Object.prototype.hasOwnProperty.call(CATDN,cat)?CATDN[cat]:cat;
   heading.querySelector("[data-review-category]").textContent=name;
   const buttons=heading.querySelectorAll("button");
   buttons[0].addEventListener("click",()=>setAll(cat,true));
   buttons[1].addEventListener("click",()=>setAll(cat,false));
  });
- for(const spec of cards){
-  const x=spec.x,card=owner.root.querySelector(`[data-review-card="${x.i}"]`);
+ for(const [index,spec] of cards.entries()){
+  const x=spec.x,card=cardNodes[index];
   card.dataset.cat=spec.category;
   const label=card.querySelector("[data-review-label]");
   if(label)label.textContent=`"${x.text}"`;

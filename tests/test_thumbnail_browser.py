@@ -19,7 +19,7 @@ def app_js():
 
 HARNESS = r'''
 const vm=require('node:vm'),assert=require('node:assert/strict');
-const elements=new Map();
+const elements=new Map(),rootSelectorCalls=[];
 function element(id='') {return {id, textContent:'', innerHTML:'', style:{},dataset:{},
  disabled:false,isConnected:true, classList:{toggle(){},remove(){}},
  remove(){this.isConnected=false;if(this.child)this.child.isConnected=false; if(elements.get(this.id)===this)elements.delete(this.id)},
@@ -35,17 +35,26 @@ detail.insertAdjacentHTML=function(_,html){
   const src=attrs.match(/src="([^"]*)"/);img.src=src?src[1]:'';
   img.dataset.thumbIndex=String(i);img.onerror=()=>vm.runInContext('thumbRetry(elements.get(\"img'+i+'\"))',ctx);const button=element('reopen'+i),status=element('status'+i);button.hidden=true;status.hidden=true;const parent={querySelector:s=>s==='[data-thumb-reopen]'?button:s==='[data-thumb-status]'?status:img};elements.set('status'+i,status);button.parentElement=parent;img.parentElement=parent;elements.set('reopen'+i,button);elements.set('img'+i,img);elements.set('thumb'+i,img);
  }
+ const cardFor=i=>{const img=elements.get('img'+i),label=element();return {dataset:{},querySelector:s=>s==='img'?img:label};};
+ const headingFor=()=>{const label=element();return {querySelector:()=>label,querySelectorAll:()=>[element(),element()]};};
  root.querySelector=selector=>{
+  rootSelectorCalls.push(['one',selector]);
   const card=selector.match(/^\[data-review-card="(\d+)"\]$/);
-  if(card){const img=elements.get('img'+card[1]),label=element();return {dataset:{},querySelector:s=>s==='img'?img:label};}
-  if(selector.startsWith('[data-review-heading=')){const label=element();return {querySelector:()=>label,querySelectorAll:()=>[element(),element()]};}
+  if(card)return cardFor(card[1]);
+  if(selector.startsWith('[data-review-heading='))return headingFor();
   return null;
+ };
+ root.querySelectorAll=selector=>{
+  rootSelectorCalls.push(['all',selector]);
+  if(selector==='[data-review-card]')return [...html.matchAll(/data-review-card="(\d+)"/g)].map(m=>cardFor(m[1]));
+  if(selector==='[data-review-heading]')return [...html.matchAll(/data-review-heading="(\d+)"/g)].map(()=>headingFor());
+  return [];
  };
 };
 for(const id of ['beslot','reviewSaveStatus'])elements.set(id,element(id));
 const document={getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:()=>element(),body:{appendChild(node){elements.set(node.id,node)}}};
-const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,URL,
+const ctx=vm.createContext({elements,rootSelectorCalls,console,assert,Set,Map,JSON,Date,Math,Promise,URL,
  location:{href:'http://localhost/'},document,detail,window:{location:{href:'http://localhost/'}},
  setInterval:()=>1,clearInterval(){},setTimeout(){},confirm:()=>false,alert(){},
  crypto:require('node:crypto').webcrypto,fetch:async()=>({ok:true,json:async()=>({})})});
@@ -388,3 +397,12 @@ def test_final_wave_node_program_uses_stdin(monkeypatch):
         return Result()
     monkeypatch.setattr(subprocess, 'run', run)
     run_js('assert.ok(true)')
+
+
+def test_residual_mount_enumerates_root_nodes_once():
+    run_js("""rootSelectorCalls.length=0;
+    await mount(Array.from({length:80},(_,i)=>row(i,{category:'category'+(i%4)})));
+    assert.equal(rootSelectorCalls.filter(x=>x[0]==='one').length,0);
+    assert.equal(rootSelectorCalls.filter(x=>x[0]==='all').map(x=>x[1]).sort().join(','),
+     '[data-review-card],[data-review-heading]');
+    assert.equal(REVIEW_IMAGES.bindings.size,80);""")

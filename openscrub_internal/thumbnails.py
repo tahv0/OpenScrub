@@ -385,13 +385,14 @@ def finish_fill_locked(state, ticket, owned_path=None):
     if ticket not in state.fills and not ticket.removing: raise ValueError('unknown fill')
     if not ticket.stage_closed: raise ValueError('stage writer remains open')
     if owned_path is not None and os.fspath(owned_path) != ticket.stage_path: raise ValueError('wrong owned stage')
-    owned_paths = {path for path in (ticket.stage_path, ticket.prospective_destination) if path is not None}
-    if owned_paths:
-        if state.current is ticket.generation:
-            invalidate_locked(state, 'failed stage')
-        if state.retirement is None: raise ValueError('missing retirement')
-        state.retirement.paths.update(os.fspath(path) for path in owned_paths)
-    ticket.removing = True
+    if not ticket.removing:
+        owned_paths = {path for path in (ticket.stage_path, ticket.prospective_destination) if path is not None}
+        if owned_paths:
+            if state.current is ticket.generation:
+                invalidate_locked(state, 'failed stage')
+            if state.retirement is None: raise ValueError('missing retirement')
+            state.retirement.paths.update(os.fspath(path) for path in owned_paths)
+        ticket.removing = True
     if ticket in state.fills: state.fills.remove(ticket)
     ticket.stage_path = None; ticket.prospective_destination = None; ticket.settled = True
     return _clear_retirement(state)

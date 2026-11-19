@@ -3013,7 +3013,7 @@ def test_final_wave_pregen_stops_at_stalled_retirement(scan, monkeypatch):
     web._run_job(fixture.job, 'scan')
     for thread in threads: join(thread)
     assert len(attempts) <= 6
-    assert any('thumbnails pre-generated (0)' in line for line in fixture.job['log'])
+    assert any('thumbnails ready (0)' in line for line in fixture.job['log'])
     assert web.FILES.count == 0
     monkeypatch.setattr(os, 'unlink', original)
     fresh = request('get', fixture.url + '/detections')
@@ -3088,3 +3088,175 @@ def test_final_wave_opaque_additive_preserved_across_projection_and_images(exact
     for kind in ('thumb', 'detframe'):
         assert request('get', exact.url + '/' + kind + '/0?v=' + version).status_code == 200
     assert exact.path.read_bytes() == before
+
+
+def test_residual_staged_fill_retirement_drains_during_claim(exact):
+    assert request('get', exact.url + '/detections').status_code == 200
+    files = web.FILES.initialize(exact.job); state = files.thumbnail
+    lease = web._own_files(exact.job)
+    class InterruptRemoval(set):
+        def remove(self, value):
+            super().remove(value)
+            raise KeyboardInterrupt('after removal')
+    with files.report_lock:
+        state.fills = InterruptRemoval(state.fills)
+        fill = web.thumbs.begin_fill_locked(state, state.current, 'crop', 0)
+    with web.VAULT_LOCK: sequence = web.FILES.thumbnail_admission
+    fill.register_stage = lambda path, fd: web._thumbnail_register_stage(exact.job, sequence, path, fd)
+    staged = web.thumbs.stage_jpeg(exact.job['dir'], fill, b'synthetic stage')
+    entered, resume = threading.Event(), threading.Event()
+    class HeldClosedHandle:
+        closed = True
+        def close(self):
+            entered.set()
+            assert resume.wait(8)
+    errors = []
+    def settle_deferred():
+        try: web._thumbnail_cleanup(exact.job)
+        except BaseException as error: errors.append(error)
+    worker = None
+    try:
+        with files.report_lock:
+            web.thumbs.invalidate_locked(state, 'obsolete staged fill')
+            with pytest.raises(KeyboardInterrupt): web.thumbs.finish_fill_locked(state, fill)
+            fill.stage_writer = HeldClosedHandle()
+            web.thumbs.defer_resource_locked(state, fill, lease)
+        worker = threading.Thread(target=settle_deferred); worker.start()
+        assert entered.wait(8) and fill._close_claimed and not files.report_lock.locked()
+        web._thumbnail_cleanup(exact.job)
+        assert state.retirement is None and not os.path.exists(staged.path)
+        resume.set(); worker.join(8)
+        assert not worker.is_alive() and not errors
+        assert fill.settled and lease.released and not state.fills and not state.deferred and web.FILES.count == 0
+        assert request('delete', exact.url).status_code == 200
+    finally:
+        resume.set()
+        if worker is not None: worker.join(8)
+        with files.report_lock:
+            if fill in state.deferred: web.thumbs.remove_deferred_locked(state, fill)
+            if fill in state.fills: state.fills.discard(fill)
+        if not lease.released: lease.release()
+
+
+def test_residual_cold_snapshot_failure_keeps_fill_owner(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    files = web.FILES.initialize(exact.job); state = files.thumbnail
+    snapshot, settle = web._thumbnail_snapshot, web.thumbs.finish_fill_locked
+    primary = RuntimeError('cold snapshot interrupted'); calls = []
+    def fail_snapshot(*args, **kwargs): raise primary
+    def interrupt_once(*args, **kwargs):
+        if not calls:
+            calls.append(1); raise KeyboardInterrupt('settlement interrupted')
+        return settle(*args, **kwargs)
+    monkeypatch.setattr(web, '_thumbnail_snapshot', fail_snapshot)
+    monkeypatch.setattr(web.thumbs, 'finish_fill_locked', interrupt_once)
+    try:
+        with pytest.raises(RuntimeError) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary
+        monkeypatch.setattr(web, '_thumbnail_snapshot', snapshot)
+        monkeypatch.setattr(web.thumbs, 'finish_fill_locked', settle)
+        web._thumbnail_cleanup(exact.job)
+        assert not state.fills and not state.deferred and web.FILES.count == 0
+        assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+        assert request('delete', exact.url).status_code == 200
+    finally:
+        monkeypatch.setattr(web, '_thumbnail_snapshot', snapshot)
+        monkeypatch.setattr(web.thumbs, 'finish_fill_locked', settle)
+        for fill in list(state.fills):
+            with files.report_lock: settle(state, fill)
+        if state.deferred: web._thumbnail_cleanup(exact.job)
+
+
+@pytest.mark.parametrize('endpoint', ['detections', 'thumb/0', 'detframe/0'])
+def test_residual_integral_decimal_ids_preserve_raw_projection(exact, endpoint):
+    doc = json.loads(exact.path.read_text())
+    doc['detections'][0].update(track=7.0, person=-1.0)
+    exact.path.write_text(json.dumps(doc))
+    before = exact.path.read_bytes()
+    metadata = request('get', exact.url + '/detections')
+    assert metadata.status_code == 200
+    row = metadata.json['detections'][0]
+    assert row['track'] == 7.0 and row['person'] == -1.0
+    assert row['thumbnail_row'] == web.thumbs.raw_row_fingerprint(doc['detections'][0])
+    response = request('get', exact.url + '/' + endpoint)
+    assert response.status_code == 200 and exact.path.read_bytes() == before
+
+
+@pytest.mark.parametrize('field,value', [('track', True), ('person', False), ('track', 7.5), ('person', -1.5)])
+def test_residual_nonintegral_ids_remain_invalid(exact, field, value):
+    doc = json.loads(exact.path.read_text()); doc['detections'][0][field] = value
+    exact.path.write_text(json.dumps(doc))
+    response = request('get', exact.url + '/detections')
+    assert response.status_code == 500 and response.json['error'] == 'thumbnail_invalid_report'
+
+
+def test_residual_pre_marker_transfer_does_not_unlink_replacement(exact):
+    assert request('get', exact.url + '/detections').status_code == 200
+    files = web.FILES.initialize(exact.job); state = files.thumbnail
+    lease = web._own_files(exact.job)
+    with files.report_lock:
+        fill = web.thumbs.begin_fill_locked(state, state.current, 'crop', 0)
+    with web.VAULT_LOCK: sequence = web.FILES.thumbnail_admission
+    fill.register_stage = lambda path, fd: web._thumbnail_register_stage(exact.job, sequence, path, fd)
+    staged = web.thumbs.stage_jpeg(exact.job['dir'], fill, b'owned stage')
+    class InterruptTransfer(set):
+        armed = True
+        def update(self, values):
+            super().update(values)
+            if self.armed:
+                self.armed = False
+                raise KeyboardInterrupt('after transfer before marker')
+    try:
+        with files.report_lock:
+            web.thumbs.invalidate_locked(state, 'pre-marker interrupt')
+            state.retirement.paths = InterruptTransfer(state.retirement.paths)
+            with pytest.raises(KeyboardInterrupt): web.thumbs.finish_fill_locked(state, fill)
+        web._thumbnail_cleanup(exact.job)
+        assert not os.path.exists(staged.path) and fill in state.fills
+        with open(staged.path, 'wb') as replacement: replacement.write(b'foreign replacement')
+        with files.report_lock: web.thumbs.finish_fill_locked(state, fill)
+        web._thumbnail_cleanup(exact.job)
+        with open(staged.path, 'rb') as replacement: assert replacement.read() == b'foreign replacement'
+        assert state.retirement is None and not state.fills
+        lease.release()
+        assert web.FILES.count == 0
+        assert request('delete', exact.url).status_code == 200
+    finally:
+        if not lease.released: lease.release()
+
+
+@pytest.mark.parametrize('which', ['original', 'replacement'])
+def test_residual_source_lease_release_failure_drains(exact, monkeypatch, which):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    original_prepare, original_snapshot = web._prepare_observed_source, web._thumbnail_snapshot
+    failure = KeyboardInterrupt('source lease release'); armed = []; prepared = []
+    def arm(lease):
+        release = lease.release
+        def once():
+            if not armed:
+                armed.append(1)
+                raise failure
+            return release()
+        monkeypatch.setattr(lease, 'release', once)
+    def prepare(*args, **kwargs):
+        result = original_prepare(*args, **kwargs)
+        prepared.append(1)
+        if which == 'original' and len(prepared) == 1: arm(result[1])
+        return result
+    def snapshot(*args, **kwargs):
+        result = original_snapshot(*args, **kwargs)
+        if which == 'replacement': arm(result[3])
+        return result
+    monkeypatch.setattr(web, '_prepare_observed_source', prepare)
+    monkeypatch.setattr(web, '_thumbnail_snapshot', snapshot)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        web._thumbnail_image(exact.job, 0, 'crop', version)
+    assert caught.value is failure
+    monkeypatch.setattr(web, '_prepare_observed_source', original_prepare)
+    monkeypatch.setattr(web, '_thumbnail_snapshot', original_snapshot)
+    web._thumbnail_cleanup(exact.job)
+    state = web.FILES.initialize(exact.job).thumbnail
+    assert web.FILES.count == 0 and not state.fills and not state.deferred
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    assert request('delete', exact.url).status_code == 200

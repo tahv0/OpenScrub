@@ -70,8 +70,8 @@ def test_final_wave_literal_labels_and_group_controls(exact, tmp_path):
     category = 'name " <tag> & literal'
     text = 'Label <b>literal</b> & "quote"'
     zone = 'Zone <i>literal</i> & "quote"'
-    doc['detections'][0].update(category=category, text=text, track=8, confidence=.95)
-    doc['detections'][1].update(category=category, text='second', track=8, confidence=.5)
+    doc['detections'][0].update(category=category, text=text, track=8.0, person=-1.0, confidence=.95)
+    doc['detections'][1].update(category=category, text='second', track=8.0, person=-1.0, confidence=.5)
     doc['detections'].append(dict(doc['detections'][0], track=-1, text=zone, zone_dropped=True))
     exact.path.write_text(json.dumps(doc))
     before = exact.path.read_bytes()
