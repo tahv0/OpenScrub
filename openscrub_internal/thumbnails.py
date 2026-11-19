@@ -28,6 +28,7 @@ import json
 import os
 import tempfile
 import uuid
+from itertools import islice
 from dataclasses import dataclass, field
 
 
@@ -118,6 +119,7 @@ class FillTicket:
     settled: bool = False
     stage_path: object = None
     stage_closed: bool = True
+    stage_writer: object = None
     prospective_destination: object = None
 
 
@@ -134,6 +136,8 @@ class Retirement:
     paths: set = field(default_factory=set)
     fills: set = field(default_factory=set)
     readers: set = field(default_factory=set)
+    entries: dict = field(default_factory=dict)
+    pinned_entries: dict = field(default_factory=dict)
     claimed: object = None
 
 
@@ -141,6 +145,7 @@ class Retirement:
 class CleanupBatch:
     retirement: Retirement
     paths: tuple
+    entries: tuple = ()
 
 
 class ThumbnailState:
@@ -150,6 +155,7 @@ class ThumbnailState:
         self.entries = {}
         self.fills = set()
         self.readers = set()
+        self.pins = {}
         self.retirement = None
 
 
@@ -222,24 +228,81 @@ def jpeg_etag(kind, version, index, jpeg):
     return '"' + digest.hexdigest() + '"'
 
 
+class _StageHandle:
+    """One raw stage descriptor, with no wrapper owning its close."""
+    def __init__(self):
+        self.fd = None
+        self.close_uncertain = False
+
+    @property
+    def closed(self):
+        return self.fd is None
+
+    def fileno(self):
+        if self.fd is None: raise ValueError('stage is closed')
+        return self.fd
+
+    def write(self, data):
+        pending = memoryview(data)
+        while pending:
+            count = os.write(self.fileno(), pending)
+            if count <= 0: raise OSError('stage write made no progress')
+            pending = pending[count:]
+
+    def flush(self):
+        pass
+
+    def close(self):
+        if self.fd is not None:
+            if self.close_uncertain: raise OSError('stage descriptor close outcome is uncertain')
+            try:
+                os.close(self.fd)
+            except OSError:
+                self.close_uncertain = True
+                raise
+            self.fd = None
+
+
+def _stage_wrap(raw, ticket):
+    return raw
+
+
 def stage_jpeg(job_dir, ticket, jpeg):
     if ticket.kind not in ('crop', 'detframe') or type(ticket.index) is not int or ticket.index < 0 or ticket.settled or ticket.stage_path is not None:
         raise ValueError('invalid thumbnail ticket')
     final = os.path.join(os.fspath(job_dir), 'thumb3_%s_%s_%d.jpg' % (ticket.generation.version, ticket.kind, ticket.index))
+    raw = _StageHandle()
     fd, path = tempfile.mkstemp(prefix='.thumb3-stage-', dir=job_dir)
+    raw.fd = fd
     ticket.stage_path = path
     ticket.stage_closed = False
+    ticket.stage_writer = raw
     try:
-        out = os.fdopen(fd, 'wb')
+        out = _stage_wrap(raw, ticket)
     except BaseException:
-        os.close(fd)
-        ticket.stage_closed = True
+        try:
+            ticket.stage_writer.close()
+        except BaseException:
+            pass
+        ticket.stage_closed = ticket.stage_writer.closed
+        if ticket.stage_closed:
+            ticket.stage_writer = None
         raise
+    ticket.stage_writer = out
     try:
-        with out:
-            out.write(jpeg); out.flush(); os.fsync(out.fileno())
+        out.write(jpeg); out.flush(); os.fsync(out.fileno())
+    except BaseException:
+        try:
+            out.close()
+        except BaseException:
+            pass
+        raise
+    else:
+        out.close()
     finally:
         ticket.stage_closed = out.closed
+        if out.closed:
+            ticket.stage_writer = None
     return StagedJPEG(path, final, _stamp(path), len(jpeg), jpeg_etag(ticket.kind, ticket.generation.version, ticket.index, jpeg))
 
 
@@ -296,16 +359,14 @@ def accept_jpeg_locked(state, ticket, staged):
 
 
 def invalidate_locked(state, reason):
-    old = state.current
     if state.entries or state.fills or state.readers:
-        if state.retirement is None: state.retirement = Retirement()
-        retirement = state.retirement
-        retirement.paths.update(entry.path for entry in state.entries.values())
-        for ticket in state.fills:
-            if ticket.generation is old:
-                ticket.obsolete = True; retirement.fills.add(ticket)
-        retirement.readers.update(t for t in state.readers if t.generation is old)
-    state.entries.clear(); state.current = None; state.discovery = None
+        if state.retirement is None:
+            state.retirement = Retirement(fills=state.fills, readers=state.readers,
+                                          entries=state.entries)
+            state.entries = {}
+        elif state.entries:
+            raise ValueError('entries created during retirement')
+    state.current = None; state.discovery = None
     return state.retirement
 
 
@@ -319,38 +380,74 @@ def finish_fill_locked(state, ticket, owned_path=None):
             invalidate_locked(state, 'failed stage')
         if state.retirement is None: raise ValueError('missing retirement')
         state.retirement.paths.update(os.fspath(path) for path in owned_paths)
-    if state.retirement is not None: state.retirement.fills.discard(ticket)
     state.fills.remove(ticket); ticket.stage_path = None; ticket.prospective_destination = None; ticket.settled = True
-    _clear_retirement(state)
+    return _clear_retirement(state)
+
+
+def reserve_reader_locked(state, generation, entry):
+    """Pin the entry before the caller opens it under the same lock."""
+    if state.current is not generation or state.entries.get((entry.kind, entry.index)) is not entry: raise ThumbnailObsolete()
+    ticket = ReaderTicket(generation, entry, None); state.readers.add(ticket)
+    state.pins[entry.path] = state.pins.get(entry.path, 0) + 1
+    return ticket
 
 
 def begin_reader_locked(state, generation, entry, file):
     """Pin an already-open file after the caller checks its identity and stamp."""
-    if state.current is not generation or state.entries.get((entry.kind, entry.index)) is not entry or file.closed: raise ThumbnailObsolete()
-    ticket = ReaderTicket(generation, entry, file); state.readers.add(ticket); return ticket
+    if file.closed: raise ThumbnailObsolete()
+    ticket = reserve_reader_locked(state, generation, entry)
+    ticket.file = file
+    return ticket
 
 
 def end_reader_locked(state, ticket):
     """Release a pin only after the caller closes its exact opened file."""
-    if ticket not in state.readers or not ticket.file.closed: raise ValueError('reader must close before release')
+    if ticket not in state.readers or ticket.file is not None and not ticket.file.closed: raise ValueError('reader must close before release')
     state.readers.remove(ticket); ticket.released = True
-    if state.retirement is not None: state.retirement.readers.discard(ticket)
-    _clear_retirement(state)
+    count = state.pins[ticket.entry.path] - 1
+    if count: state.pins[ticket.entry.path] = count
+    else:
+        del state.pins[ticket.entry.path]
+        r = state.retirement
+        if r is not None:
+            parked = r.pinned_entries.pop(ticket.entry.path, None)
+            if parked is not None:
+                key, entry = parked
+                r.entries[key] = entry
+    return _clear_retirement(state)
 
 
 def _clear_retirement(state):
     r = state.retirement
-    if r is not None and not r.paths and not r.fills and not r.readers and r.claimed is None: state.retirement = None
+    if (r is not None and not r.paths and not r.entries and not r.pinned_entries
+            and not r.fills and not r.readers and r.claimed is None):
+        state.retirement = None
+        return r
 
 
 def claim_cleanup_locked(state):
     """Claim unpinned paths; caller must complete this batch in a finally block."""
     r = state.retirement
     if r is None or r.claimed is not None: return None
-    pinned = {reader.entry.path for reader in r.readers}
-    paths = tuple(sorted(r.paths - pinned))
-    if not paths: _clear_retirement(state); return None
-    batch = CleanupBatch(r, paths); r.claimed = batch; return batch
+    selected = []
+    scanned = 0
+    while r.entries and scanned < 32:
+        key, entry = r.entries.popitem()
+        scanned += 1
+        if entry.path in state.pins:
+            r.pinned_entries[entry.path] = (key, entry)
+        else:
+            selected.append((key, entry))
+    remaining = 32 - scanned
+    stages = [path for path in islice(r.paths, remaining) if path not in state.pins]
+    paths = tuple(entry.path for _, entry in selected) + tuple(stages)
+    if not paths:
+        if scanned or not r.paths and not r.entries and not r.pinned_entries and not r.fills and not r.readers:
+            batch = CleanupBatch(r, ())
+            r.claimed = batch
+            return batch
+        return None
+    batch = CleanupBatch(r, paths, tuple(selected)); r.claimed = batch; return batch
 
 
 def cleanup(batch, unlink=os.unlink):
@@ -372,4 +469,7 @@ def complete_cleanup_locked(state, batch, succeeded):
     """Apply the outside-lock cleanup result to the same claimed batch."""
     r = state.retirement
     if r is not batch.retirement or r.claimed is not batch or not set(succeeded).issubset(batch.paths): raise ValueError('wrong cleanup batch')
+    for key, entry in batch.entries:
+        if entry.path not in succeeded:
+            r.entries[key] = entry
     r.paths.difference_update(succeeded); r.claimed = None; _clear_retirement(state)

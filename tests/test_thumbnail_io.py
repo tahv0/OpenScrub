@@ -14,6 +14,7 @@ from test_exact_adoption import scan
 from test_exact_media import retained, install, marker
 from test_job_lifecycle import request, store, start_call, finish
 from test_report_transactions import join
+from test_strict_tracking_routes import tracking, launch, joined
 
 
 def test_source_report_bound_only_after_successful_association(exact):
@@ -350,7 +351,7 @@ def test_reader_pin_blocks_new_generation_fill_until_closed(exact, monkeypatch):
     assert request('get', old_url).status_code == 200
     state = web.FILES.initialize(exact.job).thumbnail
     entry = state.entries[('crop', 0)]
-    original_open = open
+    original_open = web._thumbnail_open
     entered, resume = threading.Event(), threading.Event()
     class HeldReader:
         def __init__(self, file): self.file = file
@@ -364,7 +365,7 @@ def test_reader_pin_blocks_new_generation_fill_until_closed(exact, monkeypatch):
     def held_open(path, *args, **kwargs):
         file = original_open(path, *args, **kwargs)
         return HeldReader(file) if path == entry.path else file
-    monkeypatch.setattr(web, 'open', held_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', held_open, raising=False)
     call = start_call('get', old_url)
     try:
         assert entered.wait(5)
@@ -387,7 +388,7 @@ def test_cached_reader_failure_retires_generation(exact, monkeypatch):
     assert request('get', url).status_code == 200
     state = web.FILES.initialize(exact.job).thumbnail
     entry = state.entries[('crop', 0)]
-    original_open = open
+    original_open = web._thumbnail_open
     class BrokenReader:
         def __init__(self, file): self.file = file
         def __getattr__(self, name): return getattr(self.file, name)
@@ -397,7 +398,7 @@ def test_cached_reader_failure_retires_generation(exact, monkeypatch):
     def broken_open(path, *args, **kwargs):
         file = original_open(path, *args, **kwargs)
         return BrokenReader(file) if path == entry.path else file
-    monkeypatch.setattr(web, 'open', broken_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', broken_open, raising=False)
     response = request('get', url)
     assert response.status_code == 409 and response.json['error'] == 'thumbnail_obsolete'
     assert state.current is None and not state.readers
@@ -409,7 +410,7 @@ def test_cached_reader_close_failure_preserves_primary_exception(exact, monkeypa
     assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
     files = web.FILES.initialize(exact.job)
     entry = files.thumbnail.entries[('crop', 0)]
-    real_open = open
+    real_open = web._thumbnail_open
     class FailedReader:
         def __init__(self, file): self.file = file
         def __getattr__(self, name): return getattr(self.file, name)
@@ -422,7 +423,7 @@ def test_cached_reader_close_failure_preserves_primary_exception(exact, monkeypa
     def failed_open(path, *args, **kwargs):
         file = real_open(path, *args, **kwargs)
         return FailedReader(file) if path == entry.path else file
-    monkeypatch.setattr(web, 'open', failed_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', failed_open, raising=False)
     with pytest.raises(type(failure)) as caught:
         web._thumbnail_image(exact.job, 0, 'crop', version)
     assert caught.value is failure
@@ -436,7 +437,7 @@ def test_unclosed_cached_reader_retains_lease_until_later_cleanup(exact, monkeyp
     files = web.FILES.initialize(exact.job)
     entry = files.thumbnail.entries[('crop', 0)]
     failure = openscrub.PipelineCancelled()
-    real_open, opened = open, []
+    real_open, opened = web._thumbnail_open, []
     class RetryCloseReader:
         def __init__(self, file): self.file, self.attempts = file, 0
         def __getattr__(self, name): return getattr(self.file, name)
@@ -451,7 +452,7 @@ def test_unclosed_cached_reader_retains_lease_until_later_cleanup(exact, monkeyp
             file = RetryCloseReader(file)
             opened.append(file)
         return file
-    monkeypatch.setattr(web, 'open', failed_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', failed_open, raising=False)
     with pytest.raises(openscrub.PipelineCancelled) as caught:
         web._thumbnail_image(exact.job, 0, 'crop', version)
     assert caught.value is failure and web.FILES.count == 1
@@ -467,7 +468,7 @@ def test_lifecycle_retries_deferred_reader_without_thumbnail_request(exact, monk
     url = exact.url + '/thumb/0?v=' + version
     assert request('get', url).status_code == 200
     entry = web.FILES.initialize(exact.job).thumbnail.entries[('crop', 0)]
-    real_open, opened = open, []
+    real_open, opened = web._thumbnail_open, []
     class RetryCloseReader:
         def __init__(self, file): self.file, self.attempts = file, 0
         def __getattr__(self, name): return getattr(self.file, name)
@@ -482,7 +483,7 @@ def test_lifecycle_retries_deferred_reader_without_thumbnail_request(exact, monk
             file = RetryCloseReader(file)
             opened.append(file)
         return file
-    monkeypatch.setattr(web, 'open', failed_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', failed_open, raising=False)
     with pytest.raises(openscrub.PipelineCancelled):
         web._thumbnail_image(exact.job, 0, 'crop', version)
     assert web.FILES.count == 1 and not opened[0].closed
@@ -503,7 +504,7 @@ def test_signalled_operation_cannot_revive_a_warm_generation(exact, monkeypatch)
         assert request('get', url).status_code == 200
         entry = files.thumbnail.entries[('crop', 0)]
         entered, resume = threading.Event(), threading.Event()
-        real_open = open
+        real_open = web._thumbnail_open
         class HeldReader:
             def __init__(self, file): self.file = file
             def __getattr__(self, name): return getattr(self.file, name)
@@ -516,7 +517,7 @@ def test_signalled_operation_cannot_revive_a_warm_generation(exact, monkeypatch)
         def held_open(path, *args, **kwargs):
             file = real_open(path, *args, **kwargs)
             return HeldReader(file) if path == entry.path else file
-        monkeypatch.setattr(web, 'open', held_open, raising=False)
+        monkeypatch.setattr(web, '_thumbnail_open', held_open, raising=False)
         call = start_call('get', url)
         try:
             assert entered.wait(5)
@@ -721,7 +722,7 @@ def test_active_cleanup_is_busy_before_retrying_deferred_reader(exact, monkeypat
     assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
     files = web.FILES.initialize(exact.job)
     entry = files.thumbnail.entries[('crop', 0)]
-    real_open, readers = open, []
+    real_open, readers = web._thumbnail_open, []
     class RetryCloseReader:
         def __init__(self, file): self.file, self.attempts = file, 0
         def __getattr__(self, name): return getattr(self.file, name)
@@ -736,7 +737,7 @@ def test_active_cleanup_is_busy_before_retrying_deferred_reader(exact, monkeypat
             file = RetryCloseReader(file)
             readers.append(file)
         return file
-    monkeypatch.setattr(web, 'open', held_open, raising=False)
+    monkeypatch.setattr(web, '_thumbnail_open', held_open, raising=False)
     with pytest.raises(openscrub.PipelineCancelled):
         web._thumbnail_image(exact.job, 0, 'crop', version)
     owner = web._prepare_work(exact.job, 'scan')
@@ -983,3 +984,792 @@ def test_rehydrate_failed_sweep_blocks_until_later_owned_request(exact, monkeypa
     monkeypatch.setattr(web.os, 'unlink', real_unlink)
     assert request('get', exact.url + '/detections').status_code == 200
     assert not orphan.exists()
+
+
+def test_rehydration_never_sweeps_its_selected_matching_media(exact):
+    selected = exact.path.parent / 'thumb2_71.jpg'
+    selected.write_bytes(open(exact.job['video'], 'rb').read())
+    original = selected.read_bytes()
+    identity = (selected.stat().st_dev, selected.stat().st_ino)
+    doc = json.loads(exact.path.read_text())
+    doc['provenance']['input'] = str(selected)
+    exact.path.write_text(json.dumps(doc))
+    with web.JOBS_LOCK:
+        web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    response = request('get', exact.url + '/detections')
+    assert response.status_code == 200
+    assert selected.read_bytes() == original
+    assert (selected.stat().st_dev, selected.stat().st_ino) == identity
+
+
+@pytest.mark.parametrize('missing', ['category', 'text'])
+@pytest.mark.parametrize('route', ['/detections', '/thumb/0', '/detframe/0'])
+def test_required_projection_fields_rejected_consistently(exact, missing, route):
+    doc = json.loads(exact.path.read_text())
+    del doc['detections'][0][missing]
+    exact.path.write_text(json.dumps(doc))
+    response = request('get', exact.url + route)
+    assert response.status_code == 500
+    assert response.json['error'] == 'thumbnail_invalid_report'
+    assert web.FILES.initialize(exact.job).thumbnail.current is None
+
+
+def test_competing_discovery_after_generation_retirement_is_pending(exact, monkeypatch):
+    assert request('get', exact.url + '/detections').status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    competing = []
+    def retire_after_observation(job):
+        with files.report_lock:
+            current = state.current
+            web.thumbs.invalidate_locked(state, 'injected race')
+            competing.append(web.thumbs.begin_discovery_locked(state))
+        return current, None
+    monkeypatch.setattr(web, '_thumbnail_reserve_discovery', retire_after_observation)
+    try:
+        response = request('get', exact.url + '/detections')
+        assert response.status_code == 409
+        assert response.json['error'] == 'thumbnail_pending'
+    finally:
+        with files.report_lock:
+            if competing:
+                web.thumbs.finish_discovery_locked(state, competing[0])
+
+
+def test_interrupted_retry_leaves_other_deferred_reader_recoverable(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    for route in ('thumb', 'detframe'):
+        assert request('get', exact.url + '/' + route + '/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    state = files.thumbnail
+    readers = []
+    class FailingClose:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('first close')
+            if self.attempts == 2: raise KeyboardInterrupt('retry interrupted')
+            self.file.close()
+    try:
+        for entry in list(state.entries.values()):
+            lease = web._own_files(exact.job)
+            opened = FailingClose(open(entry.path, 'rb'))
+            with files.report_lock:
+                reader = web.thumbs.begin_reader_locked(state, state.current, entry, opened)
+                reader._deferred_lease = lease
+            readers.append(reader)
+            with pytest.raises(OSError): opened.close()
+        with files.report_lock: web.thumbs.invalidate_locked(state, 'deferred test')
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job)
+        assert all(not getattr(reader, '_close_claimed', False) for reader in state.readers)
+        for _ in range(4):
+            if not state.readers: break
+            try: web._thumbnail_cleanup(exact.job)
+            except KeyboardInterrupt: pass
+        assert not state.readers and all(reader.file.closed for reader in readers)
+        assert web.FILES.count == 0
+    finally:
+        for reader in readers:
+            if not reader.file.closed: reader.file.file.close()
+            if reader in state.readers:
+                with files.report_lock:
+                    web.thumbs.end_reader_locked(state, reader)
+                    lease, reader._deferred_lease = reader._deferred_lease, None
+                if lease is not None: lease.release()
+
+
+def test_stale_report_read_cannot_retire_managed_scan_adoption(scan, monkeypatch):
+    fixture, threads = scan
+    files = web.FILES.initialize(fixture.job)
+    assert request('get', fixture.url + '/detections').status_code == 200
+    old_path = fixture.job['video']
+    new_path = str(fixture.path.parent / 'normalized.avi')
+    with open(old_path, 'rb') as src, open(new_path, 'wb') as dst:
+        dst.write(src.read())
+    entered, resume = threading.Event(), threading.Event()
+    local = threading.local()
+    real_load, real_path = web.json.load, os.path.realpath
+    def load(*args, **kwargs):
+        result = real_load(*args, **kwargs)
+        if threading.current_thread().name == 'held-old-report': local.read_report = True
+        return result
+    def realpath(path, *args, **kwargs):
+        if (threading.current_thread().name == 'held-old-report'
+                and getattr(local, 'read_report', False) and path == old_path):
+            local.read_report = False
+            entered.set()
+            assert resume.wait(8)
+        return real_path(path, *args, **kwargs)
+    def compute(args, cb):
+        args.original_video, args.video = args.video, new_path
+        return dict(fps=5, cum=[[0, 0]] * 10, bands=[[0, 0]] * 10,
+                    detections=[], stats={})
+    monkeypatch.setattr(web.json, 'load', load)
+    monkeypatch.setattr(web.os.path, 'realpath', realpath)
+    monkeypatch.setattr(openscrub, 'run_scan', compute)
+    result, errors = [], []
+    def read_old():
+        try: result.append(request('get', fixture.url + '/detections'))
+        except BaseException as exc: errors.append(exc)
+    worker = threading.Thread(name='held-old-report', target=read_old)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        web._run_job(fixture.job, 'scan')
+        selected = files.current_source
+        assert selected is not None and selected['path'] == new_path
+        ref = selected['source_ref']
+    finally:
+        resume.set()
+        join(worker)
+    assert not errors and result[0].status_code == 409
+    assert files.current_source is selected and files.current_source['source_ref'] == ref
+    assert request('get', fixture.url + '/detections').status_code == 200
+
+
+@pytest.mark.skipif(not hasattr(os, 'mkfifo'), reason='named pipes unavailable')
+@pytest.mark.parametrize('target', ['report', 'jpeg'])
+def test_fifo_inputs_return_prompt_structured_error_without_leases(exact, target):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    if target == 'jpeg':
+        assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+        path = web.FILES.initialize(exact.job).thumbnail.entries[('crop', 0)].path
+        url = exact.url + '/thumb/0?v=' + version
+    else:
+        path, url = str(exact.path), exact.url + '/detections'
+    backup = path + '.backup-test'
+    os.rename(path, backup)
+    os.mkfifo(path)
+    done, responses, errors = threading.Event(), [], []
+    def run():
+        try: responses.append(request('get', url))
+        except BaseException as exc: errors.append(exc)
+        finally: done.set()
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        prompt = done.wait(1)
+        if not prompt:
+            fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+            try: os.write(fd, b'not-json')
+            finally: os.close(fd)
+        join(worker)
+        assert prompt
+        assert not errors and responses[0].is_json
+        assert responses[0].json['error'] == ('thumbnail_invalid_report' if target == 'report' else 'thumbnail_obsolete')
+        assert responses[0].status_code == (500 if target == 'report' else 409)
+        assert web.FILES.count == 0
+    finally:
+        if worker.is_alive():
+            fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+            try: os.write(fd, b'rescue')
+            finally: os.close(fd)
+            join(worker)
+        if os.path.lexists(path): os.unlink(path)
+        os.rename(backup, path)
+
+
+def test_deleting_source_job_drains_another_jobs_deferred_reader(exact, monkeypatch):
+    other = web.new_job('', {}, 'source.avi')
+    source = os.path.join(other['dir'], 'source.avi')
+    with open(exact.job['video'], 'rb') as src, open(source, 'wb') as dst:
+        dst.write(src.read())
+    other['video'] = source
+    other['phase'] = 'review'
+    exact.job['video'] = source
+    doc = json.loads(exact.path.read_text())
+    doc['provenance']['input'] = source
+    exact.path.write_text(json.dumps(doc))
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries[('crop', 0)]
+    real_open, opened_files = web._thumbnail_open, []
+    class DelayedClose:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def read(self): raise openscrub.PipelineCancelled()
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('transient close')
+            self.file.close()
+    def wrapped(path, *args, **kwargs):
+        f = real_open(path, *args, **kwargs)
+        if path == entry.path:
+            f = DelayedClose(f)
+            opened_files.append(f)
+        return f
+    monkeypatch.setattr(web, '_thumbnail_open', wrapped, raising=False)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled):
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert files.thumbnail.readers and not opened_files[0].closed
+        assert request('delete', '/api/jobs/' + other['id']).status_code == 200
+        assert opened_files[0].closed and not files.thumbnail.readers
+        assert web.FILES.count == 0
+        assert exact.job['id'] in web.JOBS
+    finally:
+        web._thumbnail_lifecycle_cleanup(exact.job)
+
+
+def test_rehydration_preserves_media_referenced_by_another_live_job(exact):
+    owned_dir = exact.path.parent
+    referenced = owned_dir / ('thumb3_' + 'a' * 32 + '_crop_7.jpg')
+    referenced.write_bytes(b'other job source data')
+    identity = (referenced.stat().st_dev, referenced.stat().st_ino)
+    other = web.new_job('', {}, 'other source')
+    alias = os.path.join(other['dir'], 'other-source.avi')
+    os.link(referenced, alias)
+    other['video'] = alias
+    other['phase'] = 'review'
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    assert request('get', exact.url + '/detections').status_code == 200
+    assert referenced.read_bytes() == b'other job source data'
+    assert (referenced.stat().st_dev, referenced.stat().st_ino) == identity
+    assert os.stat(alias).st_ino == identity[1]
+
+
+def test_sweep_exclusive_admission_is_released_after_exception(exact, monkeypatch):
+    files = web.FILES.initialize(exact.job)
+    files.thumbnail_sweep_pending = True
+    entered, resume = threading.Event(), threading.Event()
+    def fail_sweep(*args, **kwargs):
+        entered.set()
+        assert resume.wait(8)
+        raise RuntimeError('injected sweep failure')
+    monkeypatch.setattr(web, '_sweep_thumbnail_derivatives', fail_sweep)
+    result, errors = [], []
+    def run():
+        try: result.append(request('get', exact.url + '/detections'))
+        except BaseException as error: errors.append(error)
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        assert request('get', '/api/jobs').status_code == 409
+        assert request('delete', exact.url).status_code == 409
+    finally:
+        resume.set()
+        join(worker)
+    assert not errors and result[0].status_code == 500
+    assert request('get', '/api/jobs').status_code == 200
+    assert files.thumbnail_sweep_pending and web.FILES.count == 0
+
+
+def test_failed_stage_writer_close_retains_owner_until_lifecycle_retry(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    files = web.FILES.initialize(exact.job)
+    real_wrap, writers = web.thumbs._stage_wrap, []
+    prepare, observed_leases = web._prepare_observed_source, []
+    def tracked_prepare(*args):
+        result = prepare(*args)
+        observed_leases.append(result[1])
+        return result
+    monkeypatch.setattr(web, '_prepare_observed_source', tracked_prepare)
+    primary = openscrub.PipelineCancelled()
+    class FailingWriter:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+        def write(self, data): raise primary
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('transient writer close')
+            self.file.close()
+    def wrap(raw, ticket):
+        file = FailingWriter(real_wrap(raw, ticket))
+        writers.append(file)
+        return file
+    monkeypatch.setattr(web.thumbs, '_stage_wrap', wrap)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary
+        assert len(writers) == 1 and not writers[0].closed
+        assert len(files.thumbnail.fills) == 1 and web.FILES.count > 0
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert writers[0].closed and not files.thumbnail.fills
+        assert web.FILES.count == 0
+        assert not list(exact.path.parent.glob('.thumb3-stage-*'))
+    finally:
+        for writer in writers:
+            if not writer.closed: writer.file.close()
+        for fill in list(files.thumbnail.fills):
+            if not fill.stage_closed:
+                fill.stage_closed = True
+            with files.report_lock: web.thumbs.finish_fill_locked(files.thumbnail, fill)
+            lease = getattr(fill, '_deferred_lease', None)
+            if lease is not None: lease.release()
+        for lease in observed_leases: lease.release()
+
+
+def test_opened_cache_handle_is_pinned_before_retirement(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries[('crop', 0)].path
+    real_open = web._thumbnail_open
+    entered, resume, saved = threading.Event(), threading.Event(), threading.Event()
+    results, errors = [], []
+    def held_open(name, *args, **kwargs):
+        file = real_open(name, *args, **kwargs)
+        if name == path and threading.current_thread().name == 'held-cache-open':
+            entered.set()
+            assert resume.wait(8)
+        return file
+    monkeypatch.setattr(web, '_thumbnail_open', held_open, raising=False)
+    def read():
+        try: results.append(request('get', exact.url + '/thumb/0?v=' + version))
+        except BaseException as error: errors.append(error)
+    def save():
+        try: request('post', exact.url + '/detections', json={'enabled': {'0': False}})
+        except BaseException as error: errors.append(error)
+        finally: saved.set()
+    reader = threading.Thread(name='held-cache-open', target=read)
+    writer = threading.Thread(target=save)
+    reader.start()
+    try:
+        assert entered.wait(5)
+        writer.start()
+        save_early = saved.wait(.3)
+        if save_early:
+            web._thumbnail_cleanup(exact.job)
+        protected = os.path.exists(path)
+    finally:
+        resume.set()
+        join(reader)
+        if writer.ident is not None: join(writer)
+    assert not errors and protected
+    assert results[0].status_code in (200, 409)
+    assert web.FILES.count == 0
+
+
+def test_rejected_cache_reader_close_failure_keeps_lease_until_retry(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries[('crop', 0)].path
+    real_open, opened = web._thumbnail_open, []
+    class BadStat:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def fileno(self): raise OSError('injected descriptor rejection')
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('injected close failure')
+            self.file.close()
+    def wrapped(name, *args, **kwargs):
+        file = real_open(name, *args, **kwargs)
+        if name == path:
+            file = BadStat(file)
+            opened.append(file)
+        return file
+    monkeypatch.setattr(web, '_thumbnail_open', wrapped, raising=False)
+    try:
+        with pytest.raises(web._ThumbnailError) as error:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert error.value.code == 'thumbnail_obsolete'
+        assert len(files.thumbnail.readers) == 1 and web.FILES.count > 0
+        assert not opened[0].closed
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert opened[0].closed and not files.thumbnail.readers and web.FILES.count == 0
+    finally:
+        for file in opened:
+            if not file.closed: file.file.close()
+        for reader in list(files.thumbnail.readers):
+            if reader.file.closed:
+                with files.report_lock:
+                    web.thumbs.end_reader_locked(files.thumbnail, reader)
+                    owner, reader._deferred_lease = getattr(reader, '_deferred_lease', None), None
+                if owner is not None: owner.release()
+
+
+def test_open_wrapper_construction_failure_retains_real_handle(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    original = web._thumbnail_open
+    primary = openscrub.PipelineCancelled()
+    opened = []
+    class RetryClose:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('transient close')
+            self.file.close()
+    def fail_after_open(path, reader):
+        file = RetryClose(original(path, reader))
+        opened.append(file)
+        reader.file = file
+        raise primary
+    monkeypatch.setattr(web, '_thumbnail_open', fail_after_open)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary
+        assert len(files.thumbnail.readers) == 1 and web.FILES.count > 0
+        assert not opened[0].closed
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert opened[0].closed and not files.thumbnail.readers and web.FILES.count == 0
+    finally:
+        for file in opened:
+            if not file.closed: file.file.close()
+        for reader in list(files.thumbnail.readers):
+            if reader.file is None or reader.file.closed:
+                with files.report_lock:
+                    web.thumbs.end_reader_locked(files.thumbnail, reader)
+                    owner, reader._deferred_lease = getattr(reader, '_deferred_lease', None), None
+                if owner is not None: owner.release()
+
+
+def test_failed_managed_save_keeps_current_version_and_jpeg(exact, monkeypatch):
+    metadata = request('get', exact.url + '/detections').json
+    version = metadata['thumbnail_version']
+    url = exact.url + '/thumb/0?v=' + version
+    before = request('get', url)
+    assert before.status_code == 200
+    report = exact.path.read_bytes()
+    def fail(*args, **kwargs): raise OSError('failed managed publication')
+    monkeypatch.setattr(web, 'atomic_report', fail)
+    response = request('post', exact.url + '/detections', json={'enabled': {'0': False}})
+    assert response.status_code == 500
+    assert exact.path.read_bytes() == report
+    after = request('get', url)
+    assert after.status_code == 200 and after.data == before.data
+    assert after.headers['ETag'] == before.headers['ETag']
+    assert request('get', exact.url + '/detections').json['thumbnail_version'] == version
+
+
+def test_late_pregeneration_stage_cannot_publish_after_save(scan, monkeypatch):
+    fixture, threads = scan
+    writer = cv2.VideoWriter(fixture.job['video'], cv2.VideoWriter_fourcc(*'MJPG'), 5, (160, 120))
+    assert writer.isOpened()
+    try:
+        for _ in range(10):
+            frame = np.zeros((120, 160, 3), np.uint8)
+            frame[:, ::8] = (20, 180, 230)
+            writer.write(frame)
+    finally:
+        writer.release()
+    doc = json.loads(fixture.path.read_text())
+    for row in doc['detections']:
+        row['cbox'] = [55, 45, 105, 75]
+    entered, resume = threading.Event(), threading.Event()
+    real_stage = web.thumbs.stage_jpeg
+    def stage(job_dir, ticket, jpeg):
+        result = real_stage(job_dir, ticket, jpeg)
+        if ticket.index == 0:
+            entered.set()
+            assert resume.wait(8)
+        return result
+    monkeypatch.setattr(web.thumbs, 'stage_jpeg', stage)
+    monkeypatch.setattr(openscrub, 'run_scan', lambda args, cb: dict(source_report=doc, stats={}))
+    web._run_job(fixture.job, 'scan')
+    try:
+        assert entered.wait(5)
+        old = request('get', fixture.url + '/detections').json['thumbnail_version']
+        assert request('post', fixture.url + '/detections', json={'enabled': {'0': False}}).status_code == 200
+    finally:
+        resume.set()
+        for thread in threads: join(thread)
+    fresh = request('get', fixture.url + '/detections').json['thumbnail_version']
+    assert fresh != old
+    assert request('get', fixture.url + '/thumb/0?v=' + old).status_code == 409
+    assert request('get', fixture.url + '/thumb/0?v=' + fresh).status_code == 200
+    assert not list(fixture.path.parent.glob('.thumb3-stage-*'))
+
+
+def test_successful_track_append_retires_current_thumbnail(tracking):
+    exact = tracking.exact
+    before = request('get', exact.url + '/detections').json
+    old = before['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + old).status_code == 200
+    launch(tracking)
+    status = joined(tracking)
+    assert status['state'] == 'done' and status['added'] == 1 and status['error'] is None
+    stale = request('get', exact.url + '/thumb/0?v=' + old)
+    assert stale.status_code == 409 and stale.json['error'] == 'thumbnail_obsolete'
+    after = request('get', exact.url + '/detections').json
+    assert after['thumbnail_version'] != old
+    assert len(after['detections']) == len(before['detections']) + 1
+    assert request('get', exact.url + '/thumb/0?v=' + after['thumbnail_version']).status_code == 200
+
+
+@pytest.mark.parametrize('change', ['box', 'timing', 'last', 'fps', 'cum', 'reorder', 'source'])
+def test_managed_scan_changes_actual_thumbnail_pixels(scan, monkeypatch, change):
+    fixture, threads = scan
+    doc = json.loads(fixture.path.read_text())
+    for row in doc['detections']:
+        row.update(t_start=0, t_end=1, last_seen=.2, cbox=[10, 10, 20, 20])
+    doc['render_state']['cum'] = [[0, 0] for _ in range(10)]
+    fixture.path.write_text(json.dumps(doc))
+    old = request('get', fixture.url + '/detections').json['thumbnail_version']
+    old_image = request('get', fixture.url + '/detframe/0?v=' + old)
+    assert old_image.status_code == 200
+    before = cv2.imdecode(np.frombuffer(old_image.data, np.uint8), 1)
+    assert abs(float(before[40, 50].mean()) - 20) < 6
+    if change == 'box': doc['detections'][0]['cbox'] = [30, 10, 40, 20]
+    elif change == 'timing': doc['detections'][0].update(t_start=.6, t_end=.8, last_seen=.6)
+    elif change == 'last': doc['detections'][0]['last_seen'] = .8
+    elif change == 'fps': doc['render_state']['fps'] = 10
+    elif change == 'cum': doc['render_state']['cum'][1] = [10, 0]
+    elif change == 'reorder':
+        doc['detections'][1]['last_seen'] = .8
+        doc['detections'].reverse()
+    new_path = str(fixture.path.parent / 'new-source.avi')
+    if change == 'source':
+        writer = cv2.VideoWriter(new_path, cv2.VideoWriter_fourcc(*'MJPG'), 5, (64, 48))
+        assert writer.isOpened()
+        try:
+            for _ in range(10): writer.write(np.full((48, 64, 3), 150, np.uint8))
+        finally: writer.release()
+    def compute(args, cb):
+        if change == 'source': args.original_video, args.video = args.video, new_path
+        return dict(source_report=doc, stats={})
+    monkeypatch.setattr(openscrub, 'run_scan', compute)
+    web._run_job(fixture.job, 'scan')
+    for thread in threads: join(thread)
+    assert request('get', fixture.url + '/detframe/0?v=' + old,
+                   headers={'If-None-Match': old_image.headers['ETag']}).status_code == 409
+    newer = request('get', fixture.url + '/detections').json['thumbnail_version']
+    assert newer != old
+    image = request('get', fixture.url + '/detframe/0?v=' + newer)
+    assert image.status_code == 200
+    after = cv2.imdecode(np.frombuffer(image.data, np.uint8), 1)
+    if change in ('box', 'cum'):
+        new_x = 26 if change == 'box' else 16
+        assert int(before[6, 6, 2]) > int(before[6, 6, 0]) + 40
+        assert int(after[6, new_x, 2]) > int(after[6, new_x, 0]) + 40
+        assert int(after[6, 6, 2]) < int(after[6, 6, 0]) + 40
+    else:
+        expected = {'timing': 60, 'last': 80, 'fps': 40, 'reorder': 80, 'source': 150}[change]
+        assert abs(float(after[40, 50].mean()) - expected) < 7
+
+
+def test_raw_thumbnail_descriptor_is_closed_once(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    url = exact.url + '/thumb/0?v=' + version
+    assert request('get', url).status_code == 200
+    real_open, real_close, descriptors, closed = web._thumbnail_open, os.close, [], []
+    def tracked_open(path, reader):
+        handle = real_open(path, reader)
+        descriptors.append(handle.fileno())
+        return handle
+    def tracked_close(fd):
+        if fd in descriptors: closed.append(fd)
+        return real_close(fd)
+    monkeypatch.setattr(web, '_thumbnail_open', tracked_open)
+    monkeypatch.setattr(web.os, 'close', tracked_close)
+    assert request('get', url).status_code == 200
+    assert len(descriptors) == 1 and closed == descriptors
+    assert web.FILES.count == 0
+
+
+def test_deleting_containing_job_retries_deferred_writer(exact, monkeypatch):
+    other = web.new_job('', {}, 'source.avi')
+    source = os.path.join(other['dir'], 'source.avi')
+    with open(exact.job['video'], 'rb') as src, open(source, 'wb') as dst:
+        dst.write(src.read())
+    other['video'], other['phase'] = source, 'review'
+    exact.job['video'] = source
+    doc = json.loads(exact.path.read_text())
+    doc['provenance']['input'] = source
+    exact.path.write_text(json.dumps(doc))
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    real_wrap, writers = web.thumbs._stage_wrap, []
+    class FailingWriter:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def write(self, data): raise openscrub.PipelineCancelled()
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('transient close')
+            self.file.close()
+    def wrap(raw, ticket):
+        file = FailingWriter(real_wrap(raw, ticket))
+        writers.append(file)
+        return file
+    monkeypatch.setattr(web.thumbs, '_stage_wrap', wrap)
+    files = web.FILES.initialize(exact.job)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled):
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert len(files.thumbnail.fills) == 1 and not writers[0].closed
+        assert request('delete', '/api/jobs/' + other['id']).status_code == 200
+        assert writers[0].closed and not files.thumbnail.fills and web.FILES.count == 0
+    finally:
+        web._thumbnail_lifecycle_cleanup(exact.job)
+
+
+def test_retired_entry_collection_is_disposed_outside_report_lock(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    disposal = []
+    class TrackedEntries(dict):
+        def __del__(self): disposal.append(files.report_lock.locked())
+    files.thumbnail.entries = TrackedEntries(files.thumbnail.entries)
+    assert request('post', exact.url + '/detections', json={'enabled': {'0': False}}).status_code == 200
+    assert request('get', exact.url + '/detections').status_code == 200
+    assert disposal == [False]
+
+
+def test_stage_wrapper_construction_failure_preserves_primary_and_owner(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    files = web.FILES.initialize(exact.job)
+    real_wrap, real_close = web.thumbs._stage_wrap, os.close
+    primary = openscrub.PipelineCancelled()
+    owned, descriptors = [], []
+    class CloseOnceFailure:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('wrapper close failure')
+            self.file.close()
+    def fail_wrapper(raw, ticket):
+        file = real_wrap(raw, ticket)
+        wrapper = CloseOnceFailure(file)
+        ticket.stage_writer = wrapper
+        owned.append(wrapper)
+        descriptors.append(file.fileno())
+        raise primary
+    def fail_close(fd):
+        if fd in descriptors and owned[0].attempts == 0:
+            raise OSError('construction cleanup failed')
+        return real_close(fd)
+    monkeypatch.setattr(web.thumbs, '_stage_wrap', fail_wrapper)
+    monkeypatch.setattr(web.thumbs.os, 'close', fail_close)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary and len(files.thumbnail.fills) == 1
+        assert not owned[0].closed and web.FILES.count > 0
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert owned[0].closed and not files.thumbnail.fills and web.FILES.count == 0
+    finally:
+        for file in owned:
+            if not file.closed: file.file.close()
+        for fill in list(files.thumbnail.fills):
+            fill.stage_closed = True
+            with files.report_lock: web.thumbs.finish_fill_locked(files.thumbnail, fill)
+            owner = getattr(fill, '_deferred_lease', None)
+            if owner is not None: owner.release()
+
+
+@pytest.mark.parametrize('kind', ['thumb', 'detframe'])
+@pytest.mark.parametrize('containing_job', [False, True])
+def test_first_rehydrated_unversioned_image_can_finish_sweep(exact, kind, containing_job):
+    if containing_job:
+        other = web.new_job('', {}, 'source.avi')
+        source = os.path.join(other['dir'], 'source.avi')
+        with open(exact.job['video'], 'rb') as src, open(source, 'wb') as dst:
+            dst.write(src.read())
+        other['video'], other['phase'] = source, 'review'
+        exact.job['video'] = source
+        doc = json.loads(exact.path.read_text())
+        doc['provenance']['input'] = source
+        exact.path.write_text(json.dumps(doc))
+    orphan = exact.path.parent / 'thumb2_44.jpg'
+    orphan.write_bytes(b'obsolete')
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    response = request('get', exact.url + '/' + kind + '/0')
+    assert response.status_code == 200
+    assert not orphan.exists() and web.FILES.count == 0
+
+
+@pytest.mark.parametrize('factory', [web._ThumbnailHandle, web.thumbs._StageHandle])
+def test_ambiguous_os_close_is_never_retried_as_a_raw_integer(tmp_path, monkeypatch, factory):
+    file = tmp_path / 'descriptor'
+    file.write_bytes(b'data')
+    handle = factory()
+    handle.fd = os.open(file, os.O_RDONLY)
+    target, real_close, calls = handle.fd, os.close, []
+    def consumed_then_error(fd):
+        if fd == target:
+            calls.append(fd)
+            real_close(fd)
+            raise OSError('ambiguous close')
+        return real_close(fd)
+    monkeypatch.setattr(os, 'close', consumed_then_error)
+    with pytest.raises(OSError): handle.close()
+    assert handle.close_uncertain and not handle.closed
+    with pytest.raises(OSError): handle.close()
+    assert calls == [target]
+
+
+@pytest.mark.parametrize('owner', ['thumbnail', 'exact'])
+def test_stale_report_fence_precedes_source_retirement(exact, owner):
+    doc, selected, fence, lease = web._thumbnail_snapshot(exact.job)
+    files = web.FILES.initialize(exact.job)
+    try:
+        exact.path.write_text(json.dumps(dict(doc, future='report changed')))
+        source = exact.job['video']
+        replacement = source + '.new'
+        with open(source, 'rb') as src, open(replacement, 'wb') as dst:
+            dst.write(src.read())
+        os.replace(replacement, source)
+        with files.report_lock:
+            if owner == 'thumbnail':
+                with pytest.raises(web._ThumbnailError) as error:
+                    web._thumbnail_current_locked(exact.job, selected, fence)
+                assert error.value.code == 'thumbnail_obsolete'
+            else:
+                with pytest.raises(web.exact.ExactError) as error:
+                    web._exact_current_locked(exact.job, selected, fence)
+                assert error.value.code == 'sample_conflict'
+            assert files.current_source is selected and not files.source_retired
+    finally:
+        lease.release()
+
+
+def test_sweep_preserves_original_and_output_matching_names(exact):
+    root = exact.path.parent
+    original = root / 'thumb2_101.jpg'
+    output = root / '.thumb3-stage-output'
+    original.write_bytes(b'original media')
+    output.write_bytes(b'render output')
+    doc = json.loads(exact.path.read_text())
+    doc['provenance'].update(original_input=str(original), output=str(output))
+    exact.path.write_text(json.dumps(doc))
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    assert request('get', exact.url + '/detections').status_code == 200
+    assert original.read_bytes() == b'original media'
+    assert output.read_bytes() == b'render output'
+
+
+def test_sweep_with_unknown_other_report_preserves_all_candidates(exact):
+    orphan = exact.path.parent / 'thumb2_90.jpg'
+    orphan.write_bytes(b'could be media')
+    other = web.new_job('', {}, 'unknown report')
+    other['phase'] = 'review'
+    with open(os.path.join(other['dir'], 'report.json'), 'w') as file:
+        file.write('{bad json')
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    response = request('get', exact.url + '/detections')
+    assert response.status_code == 409 and response.json['error'] == 'thumbnail_pending'
+    assert orphan.read_bytes() == b'could be media'
+
+
+def test_cleanup_interrupt_does_not_mask_primary_decode_cancel(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    primary = openscrub.PipelineCancelled()
+    real_cleanup, calls = web._thumbnail_cleanup, []
+    def cleanup(job):
+        calls.append(True)
+        if len(calls) == 2: raise KeyboardInterrupt('cleanup interrupted')
+        return real_cleanup(job)
+    def decode(*args, **kwargs): raise primary
+    monkeypatch.setattr(web, '_thumbnail_cleanup', cleanup)
+    monkeypatch.setattr(web, '_read_thumbnail_ordinal', decode)
+    with pytest.raises(openscrub.PipelineCancelled) as caught:
+        web._thumbnail_image(exact.job, 0, 'crop', version)
+    assert caught.value is primary and web.FILES.count == 0

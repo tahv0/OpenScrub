@@ -41,6 +41,7 @@ class FileOwners:
     def __init__(self, guard):
         self.guard = guard
         self.count = 0
+        self.thumbnail_sweep_active = False
 
     @staticmethod
     def initialize(job):

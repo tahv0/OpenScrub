@@ -270,3 +270,48 @@ def test_etag_binds_kind_generation_index_and_bytes(tmp_path):
     ticket = th.begin_fill_locked(state, b, 'crop', 0)
     tags.append(th.stage_jpeg(tmp_path, ticket, b'same').etag)
     assert len(set(tags)) == 4
+
+
+def test_invalidation_transfers_populated_entries_without_traversing():
+    class GuardedEntries(dict):
+        def values(self): raise AssertionError('invalidation traversed entries')
+        def clear(self): raise AssertionError('invalidation destroyed entries')
+        def __iter__(self): raise AssertionError('invalidation iterated entries')
+    state = th.ThumbnailState()
+    th.accept_generation_locked(state, th.Candidate(), 1000)
+    entries = GuardedEntries({('crop', i): th.JPEGEntry('crop', i, str(i), None, 1, 'x')
+                              for i in range(1000)})
+    state.entries = entries
+    th.invalidate_locked(state, 'report commit')
+    assert state.entries is not entries
+    assert state.retirement is not None
+
+
+def test_populated_retirement_claims_bounded_batches_and_preserves_pin(tmp_path):
+    state = th.ThumbnailState()
+    generation = th.accept_generation_locked(state, th.Candidate(), 70)
+    for index in range(70):
+        path = str(tmp_path / ('entry-%d.jpg' % index))
+        with open(path, 'wb') as file: file.write(b'x')
+        state.entries[('crop', index)] = th.JPEGEntry('crop', index, path, None, 1, 'x')
+    first = state.entries[('crop', 0)]
+    opened = open(first.path, 'rb')
+    reader = th.begin_reader_locked(state, generation, first, opened)
+    try:
+        th.invalidate_locked(state, 'report commit')
+        counts = []
+        while True:
+            batch = th.claim_cleanup_locked(state)
+            if batch is None: break
+            counts.append(len(batch.paths))
+            assert len(batch.paths) <= 32 and first.path not in batch.paths
+            th.complete_cleanup_locked(state, batch, th.cleanup(batch))
+        assert sum(counts) == 69 and os.path.exists(first.path)
+        assert state.retirement is not None
+    finally:
+        opened.close()
+        th.end_reader_locked(state, reader)
+    batch = th.claim_cleanup_locked(state)
+    assert batch.paths == (first.path,)
+    th.complete_cleanup_locked(state, batch, th.cleanup(batch))
+    assert state.retirement is None and not list(tmp_path.iterdir())
