@@ -4,9 +4,16 @@ After rendering, users can choose a destination for a redacted video or audit re
 
 Progress counts bytes after the destination accepts each write. A valid unencoded response length gives a total and approximate remaining time; absent, encoded or invalid lengths remain indeterminate. A stall shows waiting and removes stale estimates. At end of stream the UI shows Finalizing, and reports Saved only after the destination closes successfully. Errors offer retry or direct-download guidance; cancelling the picker starts no export request. Progress stays attached to its job across polling and job switches.
 
+The video and report controls align side by side on desktop. On phones each download link sits below its Save As button. Review actions have their own row.
+
 Save As requires a supporting browser on HTTPS or localhost. Direct Download remains available and reports that the browser download started. This change adds feedback and destination selection without changing redaction behavior.
 
-Validation against v1.0.97:
+Validation on the current layout revision (0da66d1):
+
+- Chromium reproduced the label wrapping before the fix and verified layout at 1120, 390 and 320 px after it. A synthetic save exercised progress, finalization and successful close. The direct-download fallback also passed.
+- Python 3.12.16: all 24 Save As cases passed.
+
+Earlier full and package validation on 9d494e6 against v1.0.97:
 
 - Python 3.12.16/OpenCV 4 full discovery: 161 passed, including all three HDR cleanup regressions, with no skips.
 - Actual Python 3.9.25: all 24 Save As cases passed. Evaluated joined embedded JavaScript passed Node syntax validation.
@@ -15,4 +22,4 @@ Validation against v1.0.97:
 
 Native picker interaction, Windows permissions, other browser engines, multi-GB exports, physical disk durability and OpenCV 5 compatibility remain unverified. Python 3.9 execution covered the focused suite, not the full application or installed package.
 
-Private delivery status: specification, quality and description approved at 9d494e6510028bbb5db08756ab183ba579a12cc7 on Austin 50c5a9e/v1.0.97. [Current readiness and source attribution](../evidence/delivery/save-as-pr-readiness.md). No second push/PR, C01 or working-version adoption has occurred.
+Private delivery status: 0da66d1 includes the approved preview layout on top of reviewed 9d494e6. Refresh the full-suite and package results against the chosen submission revision before publication. [Evidence and source attribution](../evidence/delivery/save-as-pr-readiness.md).

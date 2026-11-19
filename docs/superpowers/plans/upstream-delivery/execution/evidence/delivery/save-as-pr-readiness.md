@@ -1,8 +1,14 @@
-# Save As progress: current upstream readiness
+# Save As progress readiness on Austin v1.0.97
 
-The private candidate pr/save-as-progress-upstream-1097 at 9d494e6510028bbb5db08756ab183ba579a12cc7 is based directly on Austin main 50c5a9e03564983ea0bc2a7841824b1fffaf35e0, v1.0.97. Independent specification, source/evidence quality and PR-description reviews approve private readiness with no material findings. The original accepted ca0f2ce7458347afd2e6156a97df580b6623767a and its evidence are preserved. [HDR PR #23 merged](../../submissions/hdr-decoder-cleanup.md), and Austin endorsed focused contributions. A read-only upstream check on 2026-11-19 still identified50c5a9e. This candidate remains private pending separate publication authorization.
+The prior reviewed revision of pr/save-as-progress-upstream-1097 at 9d494e6510028bbb5db08756ab183ba579a12cc7 is based directly on Austin main 50c5a9e03564983ea0bc2a7841824b1fffaf35e0, v1.0.97. Independent specification, source/evidence quality and PR-description reviews approve private readiness with no material findings. The original accepted ca0f2ce7458347afd2e6156a97df580b6623767a and its evidence are preserved. [HDR PR #23 merged](../../submissions/hdr-decoder-cleanup.md), and Austin endorsed focused contributions. A read-only upstream check on 2026-11-19 still identified50c5a9e. This candidate remains private pending separate publication authorization.
 
-## Behavior and scope
+## Layout follow-up at 0da66d1
+
+The export groups now align side by side with space for both labels. On phones each direct download link sits below its Save As button. The review actions appear on a separate row. The browser check reproduced split download labels at 1120 px and asymmetric button/link placement at 390 px before the corresponding changes. Chromium passed the layout checks at 1120, 390, and 320 px and exercised live progress, finalization, completion and the direct-download fallback. The 24 owning tests passed on Python 3.12 at this revision. The independent source check covered the grid and action grouping, followed by browser verification of the narrower phone arrangement.
+
+The browser checks exercised the rendered page through its visible controls, following [Austin's feedback on refactor-resistant tests](https://github.com/austinmabry/OpenScrub/pull/23#issuecomment-7018069624). The focused Node harness still extracts the production JavaScript between named functions, then asserts behavior against controlled picker and IO responses. Its source-selection approach can require maintenance if that code moves. The full-suite, Python 3.9 and package results below apply to 9d494e6. The historical browser run still describes the original transfer, with current layout and lifecycle behavior verified by the fresh Chromium check.
+
+## Behavior and scope at 9d494e6
 
 Add Save As for the redacted video and audit report, with destination selection and written/total feedback during long exports. Count bytes only after the destination accepts each write. A trustworthy unencoded response length enables a total and approximate remaining time; unknown lengths remain indeterminate. Stalls show waiting and discard stale estimates; end-of-stream shows Finalizing, and Saved follows successful close. Picker cancellation starts no request, errors offer recovery, and progress remains attached to the chosen job across polling and job switches. Direct Download remains available.
 
