@@ -132,6 +132,9 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 ### P08B — retain measured read-only report snapshots within a budget
 
+**Baseline methodology qualification:** The old 944f6df metadata samples used active tracemalloc, while the first crop was timed after tracing stopped. Warm values included counter wrappers; the held four-fill case measured occupancy. Its reported input size was stat() after a choice save reformatted the compact fixture. These observations are not directly comparable with uninstrumented HTTP latency, timed-input byte size, parallel makespan or process RSS. P08B must hash/stat immutable inputs before requests and separate timing, counters/allocation tracing and fresh-process RSS. Normal rehydration and production Cheroot can retain the real source/lifetime boundaries without a large startup parse.
+
+
 **What / why:** Share parsing among the demonstrated cold/read-only consumers while retaining fresh mutable documents for edits/tracking/render transactions. Repeated parse counts establish work, but not enough latency or memory benefit to justify a cache by themselves.
 
 **When:** After representative cold-consumer timing/RSS evidence, and after the required lifecycle/transaction interfaces. It may close without implementation if admission overhead outweighs useful reuse.

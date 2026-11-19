@@ -40,7 +40,7 @@ The final correction also preserves the complete engine, lifetime-accounting, ex
 
 The wheel comparison excludes pip's rewritten RECORD. Source-archive extraction and every eligible updater member were compared with their committed source. Installed HTTP covers metadata, crop, detframe, integral decimal IDs/raw fingerprints, strong and weak current 304, obsolete 409 and delivered DOM bytes.
 
-Earlier 1k/10k timings and Python-allocation observations remain attached to 944f6df. They are not measurements of this final head, RSS, p95 or a cache speedup.
+Earlier 1k/10k observations remain attached to 944f6df. Its metadata samples used active tracemalloc, and its saved report size was collected after a choice-save reformat. They do not establish uninstrumented latency, the original timed-input byte size, RSS, p95 or a cache speedup for this final head.
 
 ## Portable verification
 

@@ -1,18 +1,14 @@
-# Close the HDR decoder pipe during existing partial cleanup
+# Close the HDR decoder pipe during partial cleanup
 
-Base: `e21ebdf6e3ee46e6c65050dc956a9a3459152269`
-Head: `ded411cbec308333d1416ae3d58b4f6e918d7849`
-Branch: `pr/hdr-decoder-cleanup`. Draft description only; not published.
+- Branch: pr/hdr-decoder-cleanup
+- HDR-owned base: e21ebdf6e3ee46e6c65050dc956a9a3459152269
+- Reviewed head: ded411cbec308333d1416ae3d58b4f6e918d7849
+- Status: first locally prepared candidate; publication is separate.
 
-Ordinary HDR cancellation or a real encoder-write error already reaps both children, but decoder stdout stays open while the caller retains the raised exception traceback. Close that owned pipe alongside encoder stdin in the existing partial-cleanup path. The production change is two lines; existing primary errors, success, child commands, defaults and output handling are preserved.
+When HDR rendering is cancelled or the encoder's first write fails, existing cleanup waits for both children, but decoder stdout can remain open while the caller retains the exception traceback. Close decoder stdout alongside encoder stdin in the existing partial-cleanup path. The production change is two added lines; the regressions retain the real exception and process owners while checking both pipes and child reaping. A successful ten-bit PQ/BT.2020 render is the preservation control.
 
-Add actual `run_render` → `render_hdr` regressions using only synthetic three-frame 64×64 PQ/BT.2020 ten-bit media and real FFmpeg children. Keep the raised exception/traceback and diagnostic process owners alive while asserting both pipes closed and both children waited/reaped. Inject encoder failure by killing only the test's actual encoder child, so its first write raises a real `BrokenPipeError`. Harness cleanup always runs after assertions. Ship the regressions in the sdist and document full test discovery.
+This candidate is based on the separate shared test-only prerequisite `e21ebdf6e3ee46e6c65050dc956a9a3459152269`. That prerequisite changes four lines in the tracking handoff test: it checks post-occlusion sample existence while retaining the geometric rejection assertion. Relative to main at `5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f`, the raw comparison contains both that prerequisite and the four-file HDR change; they remain separate commits.
 
-Validation:
+Validation: all three HDR cleanup cases and the shared handoff test passed on Linux CPU with Python 3.12.16 and Python 3.9.25, four passed with no skips in each run. Historical checks on the same source included 137 full-suite tests, 11 focused render/codec cases on each Python version, package build and installed startup, and a baseline/candidate success comparison. Source/pre-encoder equality and equality of baseline/candidate decoded lossy output are separate observations; lossy output differs from raw source. These results do not establish Windows, GPU encoder, or arbitrary native-call cancellation behavior.
 
-- Owning RED: cancellation/write cases each fail only on open decoder stdout; success passes. GREEN: 3 passed.
-- Full discovered suite: 137 passed. Relevant render/HDR/codec cases: 11 passed on prepared Python 3.12 and 11 passed on actual Python 3.9, with native import paths/SHA asserted.
-- Tiny PQ success: exact source/pre-encoder bytes; before/after decoded output bytes and PQ/BT.2020 tags equal. Lossy decoded output is distinct from raw source.
-- Offline sdist→wheel build, exact packaged runtime/source/test checks, clean installed CLI/web startup and shutdown passed. All 114 frozen source hashes match committed bytes; native worktree clean.
-
-Broader P16C exception/geometry/output-publication handling, final encoder-wait failure and temporary stderr ownership are separate work. No cancellation-speed, native-interruption, permanent-leak, Windows or GPU claim. Evidence, full commands, failure states, source provenance and limits: [implementation report](../evidence/delivery/task-109-report.md) and [independent review](../evidence/delivery/task-109-review.md); artifacts `/tmp/openscrub-task109`.
+[Current readiness and portable checks](../evidence/delivery/hdr-decoder-pr-readiness.md).
