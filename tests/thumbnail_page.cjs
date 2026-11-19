@@ -122,6 +122,7 @@ async function reviewFixScenario(context){
   await page.locator('#lb').click();
   // A held card image load must not clear a subsequently closed failed lightbox.
   await page.evaluate(()=>window.fixOriginalLoadReview());
+  await page.waitForFunction(()=>[0,2].every(i=>document.getElementById('thumb'+i)?.naturalWidth>0));
   assert.equal((await context.request.post(base+'api/jobs/'+job+'/detections',{data:{audio:[{t0:.1,t1:.4,mode:'mute'},{t0:.5,t1:.8,mode:'bleep'}]}})).status(),200);
   let cardSeen,releaseCard;const cardStarted=new Promise(r=>cardSeen=r),cardGate=new Promise(r=>releaseCard=r);
   const holdCard=async route=>{const response=await route.fetch();assert.equal(response.status(),200);cardSeen();await cardGate;await route.fulfill({response});};
@@ -141,6 +142,7 @@ async function reviewFixScenario(context){
    const r=await window.fixRealFetch(...args);if(args[1]&&args[1].cache==='no-store'){const read=r.json.bind(r);r.json=()=>{window.staleParsed++;return read();};}return r;};});
   for(const kind of ['panel','job']){
    await page.evaluate(()=>window.fixOriginalLoadReview());
+   await page.waitForFunction(()=>[0,2].every(i=>document.getElementById('thumb'+i)?.naturalWidth>0));
    assert.equal((await context.request.post(base+'api/jobs/'+job+'/detections',{data:{audio:[{t0:.1,t1:.4,mode:'mute'},{t0:.5,t1:.8,mode:'bleep'}]}})).status(),200);
    let seen,release;const started=new Promise(r=>seen=r),gate=new Promise(r=>release=r);
    const held=async route=>{const response=await route.fetch();seen();await gate;await route.fulfill({response});};
@@ -254,6 +256,7 @@ async function reviewFixScenario(context){
   releaseMeta();await page.evaluate(()=>window.delayedRefresh);await page.unroute('**/api/jobs/'+job+'/detections',holdMetadata);
   assert.equal(await page.evaluate(()=>document.getElementById('review')===revisitedRoot&&document.getElementById('thumb2').src===revisitedSrc),true);
   if(await page.locator('#lb').count())await page.locator('#lb').click();
+  await page.waitForFunction(()=>{const n=document.getElementById('thumb2');return n&&n.complete&&n.naturalWidth>0&&getComputedStyle(n).visibility==='visible';});
   // Persistent metadata failure spends exactly one attempt; a deliberate
   // reopen is the only operation that creates a new budget.
   assert.equal((await context.request.post(base+'api/jobs/'+job+'/detections',{data:{audio:[{t0:.1,t1:.4,mode:'mute'},{t0:.5,t1:.8,mode:'bleep'}]}})).status(),200);
