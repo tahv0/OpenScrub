@@ -3,7 +3,7 @@
 - Branch: pr/hdr-decoder-cleanup
 - HDR-owned base: e21ebdf6e3ee46e6c65050dc956a9a3459152269
 - Reviewed head: ded411cbec308333d1416ae3d58b4f6e918d7849
-- Status: reviewed topic pushed to tahv0/OpenScrub under explicit authorization; upstream PR creation returned a GitHub connection permission error and is pending. See [submission status](../submissions/hdr-decoder-cleanup.md).
+- Status: [upstream PR #23 is open](https://github.com/austinmabry/OpenScrub/pull/23), submitted manually by the user. This prepared description is retained as evidence; the submitted wording belongs to the user. See [submission status](../submissions/hdr-decoder-cleanup.md).
 
 When HDR rendering is cancelled or the encoder's first write fails, existing cleanup waits for both children, but decoder stdout can remain open while the caller retains the exception traceback. Close decoder stdout alongside encoder stdin in the existing partial-cleanup path. The production change is two added lines; the regressions retain the real exception and process owners while checking both pipes and child reaping. A successful ten-bit PQ/BT.2020 render is the preservation control.
 

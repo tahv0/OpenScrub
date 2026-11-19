@@ -39,7 +39,7 @@ With project dependencies, FFmpeg/ffprobe with libx265 and the POSIX child-obser
 
 Run on both supported interpreter environments. These observations require real children; missing prerequisites can skip the optional controls, which does not establish readiness.
 
-The reviewed topic is now pushed to the user’s fork under explicit authorization; [submission status](../../submissions/hdr-decoder-cleanup.md) records the upstream PR access error. It is the first submission candidate. Keep the next candidate private while Austin reviews it; wait for initial feedback or an invitation before adding another. The shared test-only prerequisite remains explicitly included as its own commit; no intermediate PR into the fork is needed. No remaining optional feature or final combined application gate is needed to prepare this independent contribution.
+The unchanged reviewed topic is now [open as Austin upstream PR #23](https://github.com/austinmabry/OpenScrub/pull/23), submitted manually by the user after the initial connection error. [Submission status](../../submissions/hdr-decoder-cleanup.md) records the verified head/base and working GitHub CLI access. Prepare the next candidate privately while Austin reviews it and wait for feedback or an invitation before another submission. The shared test-only prerequisite remains included as its own commit; no intermediate fork PR is needed. C01 and application adoption remain separate.
 
 The evidence covers Linux CPU and POSIX/libx265. It establishes no Windows/GPU encoder, arbitrary native-interruption, cancellation-speed, permanent-leak or broader lifecycle/geometry/output-policy guarantee. Defaults and output handling remain preserved.
 
