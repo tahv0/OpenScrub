@@ -44,6 +44,19 @@ def _reference(value):
             and all(c in '0123456789abcdef' for c in value))
 
 
+def _is_reparse(st):
+    """Reject Windows reparse metadata, including junctions, without 3.12 APIs."""
+    try:
+        attributes = getattr(st, 'st_file_attributes', 0)
+        tag = getattr(st, 'st_reparse_tag', 0)
+        return (type(attributes) is not int or type(tag) is not int
+                or attributes < 0 or tag < 0
+                or bool(attributes & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400))
+                or tag != 0)
+    except Exception:
+        return True
+
+
 def _valid_field(key, value):
     if key in _ENUMS:
         return type(value) is str and value in _ENUMS[key]
@@ -186,6 +199,8 @@ class Diagnostics:
             while path and path != os.path.dirname(path):
                 parents.append(path)
                 path = os.path.dirname(path)
+            if path:
+                parents.append(path)  # Include the drive or filesystem root.
             for index, part in enumerate(reversed(parents)):
                 try:
                     st = os.lstat(part)
@@ -194,7 +209,7 @@ class Diagnostics:
                         raise
                     os.mkdir(part, 0o700)
                     st = os.lstat(part)
-                if not stat.S_ISDIR(st.st_mode):
+                if not stat.S_ISDIR(st.st_mode) or _is_reparse(st):
                     raise OSError('unsafe diagnostics directory')
 
     def _path_args(self, name):
@@ -208,7 +223,7 @@ class Diagnostics:
             st = os.stat(path, follow_symlinks=False, **kw)
         except FileNotFoundError:
             return None
-        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or _is_reparse(st):
             raise OSError('unsafe diagnostics entry')
         return st
 
@@ -219,7 +234,7 @@ class Diagnostics:
         fd = os.open(path, flags, 0o600, **kw)
         try:
             st = os.fstat(fd)
-            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or _is_reparse(st):
                 raise OSError('unsafe diagnostics entry')
             if restrict and hasattr(os, 'fchmod'):
                 os.fchmod(fd, 0o600)
@@ -251,7 +266,8 @@ class Diagnostics:
         fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0), **kw)
         try:
             st = os.fstat(fd)
-            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or (st.st_dev, st.st_ino) != (entry.st_dev, entry.st_ino):
+            if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or _is_reparse(st)
+                    or (st.st_dev, st.st_ino) != (entry.st_dev, entry.st_ino)):
                 raise OSError('unsafe marker')
             with os.fdopen(fd, 'rb') as stream:
                 fd = None

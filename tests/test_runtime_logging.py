@@ -814,3 +814,86 @@ def test_worker_called_inside_handled_exception_still_finishes_action(tmp_path, 
     assert web.FILES.count == 0 and not sink._actions
     sink.close('normal', 'not_enabled')
     assert [r['outcome'] for r in _records(tmp_path / 'logs' / 'runtime.jsonl') if r['kind'] == 'job_finished'] == ['error']
+
+
+def test_fallback_refuses_reparse_metadata_on_all_directory_components(tmp_path, monkeypatch):
+    import os
+    from openscrub_internal import diagnostics
+
+    class Metadata:
+        def __init__(self, original, attributes=0, tag=0):
+            self._original = original
+            self.st_file_attributes = attributes
+            self.st_reparse_tag = tag
+        def __getattr__(self, name):
+            return getattr(self._original, name)
+
+    original_lstat = os.lstat
+    for position in ('root', 'ancestor', 'parent', 'leaf', 'created_leaf'):
+        for attributes, tag in ((0x400, 0), (0, 0xA0000003), ('invalid', 0)):
+            case = tmp_path / ('%s-%s-%s' % (position, attributes, tag))
+            parent = case / 'parent'; parent.mkdir(parents=True)
+            leaf = parent / 'logs'
+            if position == 'leaf': leaf.mkdir()
+            flagged = {'root': leaf.anchor, 'ancestor': case, 'parent': parent, 'leaf': leaf,
+                       'created_leaf': leaf}[position]
+            def lstat(path, *args, **kwargs):
+                result = original_lstat(path, *args, **kwargs)
+                if os.fspath(path) == str(flagged):
+                    return Metadata(result, attributes, tag)
+                return result
+            with monkeypatch.context() as context:
+                context.setattr(diagnostics.os, 'supports_dir_fd', set())
+                context.setattr(diagnostics.os, 'lstat', lstat)
+                sink = diagnostics.Diagnostics(leaf, 'http', '1.0.0', monitor=False)
+                assert sink.start('scan') is None
+                sink.close('normal', 'not_enabled')
+            if position in ('leaf', 'created_leaf'): assert list(leaf.iterdir()) == []
+            else: assert not leaf.exists()
+
+
+def test_fallback_allows_normal_directories_and_refuses_reparse_regular_entries(tmp_path, monkeypatch):
+    import os
+    from openscrub_internal import diagnostics
+
+    class Metadata:
+        def __init__(self, original, attributes, tag):
+            self._original = original
+            self.st_file_attributes, self.st_reparse_tag = attributes, tag
+        def __getattr__(self, name):
+            return getattr(self._original, name)
+
+    normal = tmp_path / 'normal'
+    with monkeypatch.context() as context:
+        context.setattr(diagnostics.os, 'supports_dir_fd', set())
+        sink = diagnostics.Diagnostics(normal, 'http', '1.0.0', monitor=False)
+        assert sink.start('scan') is not None
+        sink.close('normal', 'not_enabled')
+    ordinary = tmp_path / 'ordinary'; ordinary.mkdir()
+    original_lstat = os.lstat
+    def normal_metadata(path, *args, **kwargs):
+        result = original_lstat(path, *args, **kwargs)
+        return Metadata(result, 0x10, 0) if os.fspath(path) == str(ordinary) else result
+    with monkeypatch.context() as context:
+        context.setattr(diagnostics.os, 'supports_dir_fd', set())
+        context.setattr(diagnostics.os, 'lstat', normal_metadata)
+        sink = diagnostics.Diagnostics(ordinary, 'http', '1.0.0', monitor=False)
+        assert sink.start('scan') is not None
+        sink.close('normal', 'not_enabled')
+    original_stat = os.stat
+    for index, (attributes, tag) in enumerate(((0x400, 0), (0, 0xA0000003), (0, None))):
+        case = tmp_path / ('entry-%d' % index); case.mkdir()
+        target = case / 'runtime.jsonl'; target.write_bytes(b'UNCHANGED')
+        def stat_entry(path, *args, **kwargs):
+            result = original_stat(path, *args, **kwargs)
+            if os.fspath(path) == str(target) and kwargs.get('follow_symlinks') is False:
+                return Metadata(result, attributes, tag)
+            return result
+        with monkeypatch.context() as context:
+            context.setattr(diagnostics.os, 'supports_dir_fd', set())
+            context.setattr(diagnostics.os, 'stat', stat_entry)
+            sink = diagnostics.Diagnostics(case, 'http', '1.0.0', monitor=False)
+            assert sink.start('scan') is None
+            sink.close('normal', 'not_enabled')
+        assert target.read_bytes() == b'UNCHANGED'
+        assert not (case / 'running.json').exists()
