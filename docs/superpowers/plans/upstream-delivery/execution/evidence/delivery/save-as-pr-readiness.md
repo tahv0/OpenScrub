@@ -1,6 +1,10 @@
 # Save As progress readiness on Austin v1.0.97
 
-The prior reviewed revision of pr/save-as-progress-upstream-1097 at 9d494e6510028bbb5db08756ab183ba579a12cc7 is based directly on Austin main 50c5a9e03564983ea0bc2a7841824b1fffaf35e0, v1.0.97. Independent specification, source/evidence quality and PR-description reviews approve private readiness with no material findings. The original accepted ca0f2ce7458347afd2e6156a97df580b6623767a and its evidence are preserved. [HDR PR #23 merged](../../submissions/hdr-decoder-cleanup.md), and Austin endorsed focused contributions. A read-only upstream check on 2026-11-19 still identified50c5a9e. This candidate remains private pending separate publication authorization.
+The prior reviewed revision of pr/save-as-progress-upstream-1097 at 9d494e6510028bbb5db08756ab183ba579a12cc7 is based directly on Austin main 50c5a9e03564983ea0bc2a7841824b1fffaf35e0, v1.0.97. Independent specification, source/evidence quality and PR-description reviews approve private readiness with no material findings. The original accepted ca0f2ce7458347afd2e6156a97df580b6623767a and its evidence are preserved. [HDR PR #23 merged](../../submissions/hdr-decoder-cleanup.md), and Austin endorsed focused contributions. A read-only upstream check on 2026-11-19 still identified50c5a9e. This paragraph describes the review before the layout follow-up.
+
+## Submitted revision 0da66d1
+
+[Save As PR #24](https://github.com/austinmabry/OpenScrub/pull/24) opened against Austin main at 50c5a9e, with the two Save As commits and four changed files. The submitted revision passed the full native suite on Python 3.12.16 with 161 passes, zero skips, and all three HDR cleanup cases. The owning suite passed all 24 tests on Python 3.9.25. A fresh offline sdist, wheel from extracted sdist and isolated installation passed. The audit matched 27 Git-backed sdist members, 13 Git-backed wheel members, 16 hashed RECORD entries and the unhashed self-entry. The installed 1.0.97 entry point served the video and report exports with the correct attachment names, sizes and bytes, then stopped cleanly on SIGTERM. The layout and save lifecycle checks below ran on the same web implementation.
 
 ## Layout follow-up at 0da66d1
 
