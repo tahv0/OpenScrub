@@ -214,9 +214,13 @@ The [refined source handoff](execution/evidence/research/exact-editor-contract-r
 
 ### P10B — bound demonstrated expensive decoding work
 
-**What / why / when:** Implement the parent P10 resource/deadline/queue contract only after actual cold long-GOP/4K workloads justify the mechanism. Keep exact-frame correctness from P10A. The proposed 10-second normal budget, explicit retry up to 60 seconds and two shared workers remain starting proposals, not measured optimal settings or already-implemented behavior.
+**What / why / when:** Keep exact-frame correctness from P10A and measure real cost/resource owners before choosing a decoder mechanism. Proposed 10-second normal, 60-second retry and two shared workers remain unmeasured application proposals.
 
-- [ ] **E/I/V:** Measure source/frame correctness and cost separately; use an interruptible existing FFmpeg/subprocess path if justified. Prove deadline/cancel terminates and reaps real decoder work, releases slots, rejects obsolete source results and leaves unrelated saves responsive. A stopped HTTP waiter with a live native thread does not pass. Report memory/concurrency and platform limits, preserving all parent P10 gates.
+**Qualified E1 record:** [Observed decoder costs](execution/evidence/research/p10b-decode-cost-observations.md) passed independent record review on source 1948644. Later helper 4K middle/last medians were 438/410 ms; four-client save-free batches were about 1.87/1.97 s with method overhead explicit. Four-request sampled server RSS approached 2 GB. Correct frames, saves, invalidation and owner drain were observed; original strict recovery/native-before-hash/whole-tree/overhead-free controls remain unmet. No production source or mechanism was selected.
+
+- [x] **E1 — qualified observations:** Retain actual scalar/parallel/pixel/save/lifecycle data, corrected claims, immutable snapshots and repeatable checkpoint validation. Keep historical control gaps visible.
+- [ ] **E2 — controlled hypothesis:** Compare original capture threading with requested 1/2/4 on the same fixed synthetic media, with durable pre-run identities/argv, real harness deadlines, no measured-path logging and all-TID child sampling. Report all timing/memory tradeoffs and verify exact pixels. [OpenCV's open-time thread property](https://docs.opencv.org/4.13.0/d4/d15/group__videoio__flags__base.html) makes this measurable; no benefit or default change is assumed.
+- [ ] **I/V/D/R:** Implement only a demonstrated useful change with compatible fallbacks, supported-runtime checks and a focused PR. A later cancellation/deadline mechanism must terminate/reap actual native work, release capacity and reject obsolete results while saves remain responsive. Waiter termination is insufficient; preserve all parent P10 gates and platform limits.
 
 ### P10C — cancellation polling in ordinary manual tracking
 

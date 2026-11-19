@@ -4,6 +4,7 @@ These local planning records preserve synthetic research, completed-task reports
 
 | Evidence | What it establishes |
 | --- | --- |
+| [Qualified decoder observations](research/p10b-decode-cost-observations.md) | Source 1948644 cold helper/HTTP, server RSS, saves and lifecycle data, with timing/provenance/deadline/child-coverage limits explicit. E2 thread hypothesis remains unmeasured. |
 | [Validation reuse acceptance](delivery/p08b-validation-reuse-acceptance.md) | Reviewed 9bfb9d9, platform-safe fallback, final 492/492 and fresh package/installed checks; Linux timings/RSS retain ed58a34. |
 | [Current report-read baseline](delivery/p08b-report-read-baseline.md) | Accepted 1k/10k/100k native HTTP timing, separate parse/validation counts and fresh-process RSS, actual source/report replacement and decoded-pixel controls; setup corrections and sampling limits explicit. Resulting reuse has separate acceptance; retained snapshots remain deferred. |
 | [HDR PR readiness](delivery/hdr-decoder-pr-readiness.md) | Unchanged ded411cb, four current cases on each interpreter, separated shared test prerequisite and retained archive member audit; historical full/build checks remain attributed. |
