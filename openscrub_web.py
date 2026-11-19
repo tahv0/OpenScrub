@@ -45,6 +45,7 @@ import uuid
 import cv2
 from flask import (Flask, Response, abort, jsonify, redirect, request, g,
                    send_file, has_request_context)
+from werkzeug.exceptions import Conflict
 
 import openscrub
 from openscrub_internal.reports import _staged_report
@@ -1139,7 +1140,13 @@ def _run_job(job, action, owner=None):
             if owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
             if coherent:
-                thumbnail_owner = _own_files(job, work=True)
+                try:
+                    thumbnail_owner = _own_files(job, work=True)
+                except Conflict as error:
+                    if error.description != "render delivery requires recovery":
+                        raise
+                    coherent = False
+            if coherent:
                 pregen_source = files.current_source
                 def _pregen(jb=job, video=thumbnail_owner.source):
                     """One pass through the video with a single decoder:

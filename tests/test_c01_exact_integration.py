@@ -328,7 +328,8 @@ def test_foreign_source_change_during_pregen_never_writes_thumbnail(exact, monke
     assert writes == []
 
 
-def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, monkeypatch):
+@pytest.mark.parametrize('timing', ['admission', 'worker'])
+def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, monkeypatch, timing):
     source = web.new_job('', {}, 'foreign.avi')
     foreign = Path(source['dir']) / 'output.avi'
     foreign.write_bytes(Path(exact.job['video']).read_bytes())
@@ -340,7 +341,7 @@ def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, mon
     original = web._adopt_scan_source
     def recover_after_adoption(job, operation):
         result = original(job, operation)
-        owner.recovery_required = True
+        if timing == 'admission': owner.recovery_required = True
         return result
     monkeypatch.setattr(web, '_adopt_scan_source', recover_after_adoption)
     deferred = []
@@ -348,8 +349,11 @@ def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, mon
     try:
         web._run_job(exact.job, 'scan')
         assert exact.job['phase'] == 'review'
-        target, lease = deferred.pop()
-        try: target()
-        finally: lease.release()
+        if timing == 'worker':
+            owner.recovery_required = True
+            target, lease = deferred.pop()
+            try: target()
+            finally: lease.release()
+        assert not deferred
     finally:
         owner.recovery_required = False
