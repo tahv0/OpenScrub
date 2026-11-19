@@ -226,7 +226,7 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
     published = []
     def write_report(path, args, state, *, publisher):
         assert callable(publisher)
-        publisher(path, {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        publisher(path, {'provenance': {'input': str(source)}, 'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
         published.append(Path(path).is_file())
     monkeypatch.setattr(web.openscrub, 'write_report', write_report)
     monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})

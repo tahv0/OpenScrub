@@ -1136,6 +1136,8 @@ def _run_job(job, action, owner=None):
                     return
                 job["stats"] = state["stats"]
             coherent = _adopt_scan_source(job, owner)
+            if owner.operation.is_set():
+                raise openscrub.PipelineCancelled()
             if coherent:
                 thumbnail_owner = _own_files(job, work=True)
                 pregen_source = files.current_source
@@ -1146,6 +1148,7 @@ def _run_job(job, action, owner=None):
                     only, which is what codecs are fast at."""
                     cap = None
                     try:
+                        _snapshot_exact_source_owner(jb, thumbnail_owner)
                         doc = _load_job_report(jb)
                         rs = doc["render_state"]
                         todo = []
@@ -1197,7 +1200,7 @@ def _run_job(job, action, owner=None):
                                           (crop.shape[1] - pad,
                                            crop.shape[0] - pad),
                                           (0, 0, 255), 2)
-                            with files.report_lock:
+                            with _exact_owner_guard(jb, thumbnail_owner):
                                 if (not _operation_valid(job, owner) or owner.operation.is_set()
                                         or files.current_source is not pregen_source
                                         or files.source_status != 'coherent'
@@ -1217,8 +1220,8 @@ def _run_job(job, action, owner=None):
             ticket = None
             try:
                 with files.report_lock:
-                    if not _operation_valid(job, owner):
-                        return
+                    if not _operation_valid(job, owner) or owner.operation.is_set():
+                        raise openscrub.PipelineCancelled()
                     if next_owner is not None:
                         job["log"].append("review skipped — rendering all detections")
                         ticket = _reserve_queue_locked(job, "render", next_owner)
@@ -1813,6 +1816,16 @@ def _exact_owner_guard(job, lease):
         yield
 
 
+def _snapshot_exact_source_owner(job, lease):
+    foreign = lease.source_state
+    if foreign is not None and foreign is not FILES.initialize(job):
+        with foreign.report_lock:
+            _report_current(lease.source_job)
+            if foreign.recovery_required:
+                raise exact.ExactError('containing source requires recovery', 409, 'sample_conflict')
+            lease.exact_source_epoch = foreign.output_epoch
+
+
 def _prepare_observed_source(job, path):
     """Reserve containing lifetime before first stat/probe; never under report_lock."""
     with VAULT_LOCK:
@@ -1820,12 +1833,7 @@ def _prepare_observed_source(job, path):
         lease = _reserve_files_locked(job, source=path)
     try:
         canonical = lease.source
-        if lease.source_state is not None and lease.source_state is not FILES.initialize(job):
-            with lease.source_state.report_lock:
-                _report_current(lease.source_job)
-                if lease.source_state.recovery_required:
-                    raise exact.ExactError('containing source requires recovery', 409, 'sample_conflict')
-                lease.exact_source_epoch = lease.source_state.output_epoch
+        _snapshot_exact_source_owner(job, lease)
         with open(canonical, 'rb') as opened:
             stamp = _file_stamp(os.fstat(opened.fileno()))
             if stamp != _file_stamp(os.stat(canonical)):
@@ -2430,6 +2438,16 @@ def _strict_geometry(edits):
                     raise ValueError()
         except (exact.ExactError, ValueError):
             raise exact.ExactError('invalid strict geometry target', 400, 'invalid_sample_request') from None
+    if preconditions:
+        strict_indices = {int(key) for key in preconditions}
+        for field in ('box_overrides', 'time_overrides'):
+            for key in (edits.get(field) or {}):
+                try:
+                    index = int(key)
+                except (TypeError, ValueError, OverflowError):
+                    continue
+                if index in strict_indices and key != str(index):
+                    raise exact.ExactError('strict row index has an alias', 400, 'invalid_sample_request')
     for manual in edits.get('manual', []):
         if 'sample_precondition' in manual:
             _parse_sample_precondition(manual['sample_precondition'])
@@ -2447,9 +2465,10 @@ def _manual_candidates(doc, edits):
     rs = doc['render_state']
     for manual in edits.get('manual', []):
         has_id, identity = 'manual_id' in manual, manual.get('manual_id')
-        if has_id and (not isinstance(identity,str) or re.fullmatch(r'[A-Za-z0-9._:-]{1,128}',identity) is None):
-            raise exact.ExactError('Invalid manual_id', 400, 'invalid_sample_request')
         pc = manual.get('sample_precondition')
+        if has_id and (not isinstance(identity,str) or re.fullmatch(r'[A-Za-z0-9._:-]{1,128}',identity) is None):
+            message = 'Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-'
+            raise exact.ExactError(message, 400, 'invalid_sample_request' if pc is not None else message)
         try:
             if pc is not None:
                 times = exact.vector([manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])], 3)
@@ -2468,13 +2487,15 @@ def _manual_candidates(doc, edits):
                 raise ValueError()
         except (KeyError, TypeError, ValueError, OverflowError, IndexError):
             if has_id or pc is not None:
-                raise exact.ExactError('Invalid finite manual creation', 400, 'invalid_sample_request') from None
+                message = 'Invalid manual creation: finite times, four coordinates and two offsets required'
+                raise exact.ExactError(message, 400, 'invalid_sample_request' if pc is not None else message) from None
             raise
         if has_id and identity in identified:
             rows = identified[identity]
             if (len(rows) != 1 or not _valid_manual_creation(rows[0].get('manual_creation'))
                     or rows[0]['manual_creation'] != creation):
-                raise exact.ExactError('manual_id conflict: immutable creation differs', 409, 'geometry_conflict')
+                message = 'manual_id conflict: creation differs, is missing/invalid, or matches multiple rows'
+                raise exact.ExactError(message, 409, 'geometry_conflict' if pc is not None else message)
             continue
         row = dict(creation,category='manual',text='user-drawn',confidence=1.,last_seen=t0,enabled=True)
         if has_id:
@@ -2523,6 +2544,7 @@ def job_save_edits(jid):
     path = os.path.join(job['dir'], 'report.json')
     prepared = lease = None
     needs_source = False
+    preparation_authority = None
     try:
         preconditions = _strict_geometry(edits)
         while True:
@@ -2539,9 +2561,20 @@ def job_save_edits(jid):
                     candidate = doc.get('provenance', {}).get('input')
                     if not isinstance(candidate,str) or not candidate:
                         raise exact.ExactError('report has no selected scan input')
+                    files = FILES.initialize(job)
+                    preparation_authority = (files.current_source, files.source_epoch, files.operation)
                 else:
                     selected = targets = None
                     if needs_source:
+                        files = FILES.initialize(job)
+                        previous, source_epoch, operation = preparation_authority
+                        current = files.current_source
+                        if (files.operation is not operation or
+                                (current is not previous and
+                                 (current is None or (current['path'], current['stamp']) !=
+                                  (prepared['path'], prepared['stamp']))) or
+                                (current is previous and files.source_epoch != source_epoch)):
+                            raise exact.ExactError('source authority changed during save', 409, 'geometry_conflict')
                         if (os.path.realpath(doc.get('provenance', {}).get('input','')) != prepared['path']
                                 or os.path.realpath(job['video']) != prepared['path']):
                             raise exact.ExactError('source changed while preparing save', 409, 'geometry_conflict')

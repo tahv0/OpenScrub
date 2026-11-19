@@ -6,6 +6,7 @@ import threading
 import pytest
 import openscrub_web as web
 from test_exact_samples import exact, sample, precondition, post
+from test_exact_adoption import scan
 from test_job_lifecycle import store, request, start_call, finish
 
 
@@ -181,3 +182,174 @@ def test_existing_file_owner_lookup_does_not_allocate_again(monkeypatch):
         raise AssertionError('existing owner must not construct another state')
     monkeypatch.setattr(lifetimes, '_JobFiles', forbidden)
     assert web.FILES.initialize(job) is first
+
+
+def test_strict_save_stale_preparation_does_not_retire_new_scan_authority(scan, monkeypatch):
+    import os
+    exact, threads = scan
+    pc = precondition(sample(exact)); state = web.FILES.initialize(exact.job)
+    original = web._prepare_observed_source
+    entered, release = threading.Event(), threading.Event()
+    def hold_prepared(job, path):
+        result = original(job, path)
+        if threading.current_thread() is not threading.main_thread():
+            entered.set(); assert release.wait(8)
+        return result
+    monkeypatch.setattr(web, '_prepare_observed_source', hold_prepared)
+    call = start_call('post', exact.url + '/detections', json={'geometry_preconditions': {'0':pc}, 'box_overrides': {'0':[3,4,10,11]}})
+    try:
+        assert entered.wait(5)
+        video = Path(exact.job['video']); replacement = video.with_name('replacement.avi')
+        replacement.write_bytes(video.read_bytes()); os.replace(replacement, video)
+        web._run_job(exact.job, 'scan')
+        selected = state.current_source; committed = exact.path.read_bytes()
+        assert selected is not None and state.source_status == 'coherent'
+    finally:
+        release.set(); response = finish(call)
+    assert response.status_code == 409
+    assert state.current_source is selected and state.source_status == 'coherent' and not state.source_retired
+    assert exact.path.read_bytes() == committed
+    assert sample(exact)['sample']['source_ref'] == selected['source_ref']
+
+
+@pytest.mark.parametrize('kind', ['box', 'time'])
+def test_strict_index_alias_is_rejected_atomically(exact, kind):
+    pc = precondition(sample(exact)); before = exact.path.read_bytes()
+    edits = {'geometry_preconditions': {'0':pc}, 'enabled': {'1':True}}
+    if kind == 'box': edits['box_overrides'] = {'0':[3,4,10,11], '00':[5,6,12,13]}
+    else: edits['time_overrides'] = {'0':[.2,1.8], '00':[.3,1.7]}
+    response = post(exact, **edits)
+    assert response.status_code == 400 and response.json['error'] == 'invalid_sample_request'
+    assert exact.path.read_bytes() == before
+
+
+def test_legacy_index_alias_still_updates_row(exact):
+    response = post(exact, box_overrides={'0':[3,4,10,11], '00':[5,6,12,13]})
+    assert response.status_code == 200
+    assert json.loads(exact.path.read_text())['detections'][0]['cbox'] == [5.,6.,12.,13.]
+
+
+@pytest.mark.parametrize('case', ['invalid-id', 'invalid-creation', 'conflict'])
+def test_ordinary_manual_errors_remain_actionable(exact, case):
+    manual = dict(manual_id='valid:id', t_start=0, t_end=1, t_ref=.2, screen_box=[3,4,10,11])
+    if case == 'invalid-id':
+        manual['manual_id'] = 'invalid space'; expected = 'Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-'; status = 400
+    elif case == 'invalid-creation':
+        manual['t_start'] = 'bad'; expected = 'Invalid manual creation: finite times, four coordinates and two offsets required'; status = 400
+    else:
+        assert post(exact, manual=[manual]).status_code == 200
+        manual['screen_box'] = [4,5,11,12]; expected = 'manual_id conflict: creation differs, is missing/invalid, or matches multiple rows'; status = 409
+    response = post(exact, manual=[manual])
+    assert response.status_code == status and response.json['error'] == expected
+
+
+def test_strict_save_survives_unrelated_report_publication(exact, monkeypatch):
+    pc = precondition(sample(exact)); files = web.FILES.initialize(exact.job); selected = files.current_source
+    original = web._prepare_observed_source; entered, release = threading.Event(), threading.Event()
+    def hold_prepared(job, path):
+        result = original(job, path)
+        if threading.current_thread() is not threading.main_thread():
+            entered.set(); assert release.wait(8)
+        return result
+    monkeypatch.setattr(web, '_prepare_observed_source', hold_prepared)
+    call = start_call('post', exact.url + '/detections', json={'geometry_preconditions': {'0':pc}, 'box_overrides': {'0':[3,4,10,11]}})
+    try:
+        assert entered.wait(5)
+        assert post(exact, enabled={'1':True}).status_code == 200
+    finally:
+        release.set(); response = finish(call)
+    assert response.status_code == 200 and files.current_source is selected
+    doc = json.loads(exact.path.read_text())
+    assert doc['detections'][0]['cbox'] == [3.,4.,10.,11.] and doc['detections'][1]['enabled'] is True
+
+
+@pytest.mark.parametrize('skip_review', [False, True])
+def test_signalled_cancel_prevents_scan_handoff_before_ack(scan, monkeypatch, skip_review):
+    from test_exact_recovery_races import delay_cancel_lock, start_named
+    exact, threads = scan; exact.job['options']['skip_review'] = skip_review
+    files = web.FILES.initialize(exact.job); original = web._adopt_scan_source
+    entered, release = threading.Event(), threading.Event()
+    def held_adoption(job, owner):
+        result = original(job, owner); entered.set(); assert release.wait(8); return result
+    monkeypatch.setattr(web, '_adopt_scan_source', held_adoption)
+    worker = threading.Thread(target=web._run_job, args=(exact.job, 'scan')); worker.start()
+    cancel = None
+    try:
+        assert entered.wait(5)
+        cancel_waiting, cancel_release = delay_cancel_lock(files, monkeypatch)
+        cancel = start_named('held-exact-cancel', 'post', exact.url+'/cancel')
+        assert cancel_waiting.wait(5) and files.operation.is_set()
+        release.set(); worker.join(8); assert not worker.is_alive()
+        assert exact.job['phase'] not in ('review', 'queued_render') and web.WORK_Q.empty()
+    finally:
+        release.set()
+        if cancel is not None:
+            cancel_release.set(); cancel[0].join(8); assert not cancel[0].is_alive()
+            request('post', exact.url+'/cancel')
+        worker.join(8)
+
+
+@pytest.mark.parametrize('change', ['recovery', 'publication'])
+def test_foreign_source_change_during_pregen_never_writes_thumbnail(exact, monkeypatch, change):
+    import cv2
+    import numpy as np
+    source = web.new_job('', {}, 'foreign.avi'); foreign = Path(source['dir'])/'output.avi'
+    writer = cv2.VideoWriter(str(foreign), cv2.VideoWriter_fourcc(*'MJPG'), 5, (128,96)); assert writer.isOpened()
+    try:
+        for _ in range(3): writer.write(np.random.default_rng(2).integers(0,256,(96,128,3),dtype=np.uint8))
+    finally: writer.release()
+    source.update(video=str(foreign), phase='review'); exact.job['video'] = str(foreign)
+    def scan(args, cb):
+        return dict(fps=5,cum=[[0,0]]*10,bands=[[0,0]]*10,detections=[],stats={})
+    monkeypatch.setattr(web.openscrub, 'run_scan', scan)
+    deferred = []
+    monkeypatch.setattr(web, '_start_owned_thread', lambda target, lease: deferred.append((target,lease)))
+    web._run_job(exact.job, 'scan'); assert len(deferred) == 1
+    monkeypatch.setattr(web, '_load_job_report', lambda job: {'render_state': {'fps':5,'cum':[[0,0]]*10}, 'detections':[{'last_seen':0,'t_start':0,'t_end':1,'cbox':[50,40,70,60]}]})
+    native = cv2.VideoCapture(str(foreign)); owner = web.FILES.initialize(source)
+    source_report = Path(source['dir'])/'report.json'; source_report.write_text('{}')
+    class Capture:
+        def read(self):
+            result = native.read()
+            with owner.report_lock:
+                if change == 'recovery': owner.recovery_required = True
+                else: web._publish_job_report_locked(source, str(source_report), {'updated':True})
+            return result
+        def set(self,*args): return native.set(*args)
+        def release(self): native.release()
+    monkeypatch.setattr(web.cv2, 'VideoCapture', lambda path: Capture())
+    writes = []
+    monkeypatch.setattr(web.cv2, 'imwrite', lambda *args: writes.append(args) or True)
+    target, lease = deferred.pop()
+    try: target()
+    finally:
+        lease.release()
+        with owner.report_lock: owner.recovery_required = False
+    assert writes == []
+
+
+def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, monkeypatch):
+    source = web.new_job('', {}, 'foreign.avi')
+    foreign = Path(source['dir']) / 'output.avi'
+    foreign.write_bytes(Path(exact.job['video']).read_bytes())
+    source.update(video=str(foreign), phase='review')
+    exact.job['video'] = str(foreign)
+    monkeypatch.setattr(web.openscrub, 'run_scan', lambda args, cb: dict(
+        fps=5, cum=[[0, 0]]*10, bands=[[0, 0]]*10, detections=[], stats={}))
+    owner = web.FILES.initialize(source)
+    original = web._adopt_scan_source
+    def recover_after_adoption(job, operation):
+        result = original(job, operation)
+        owner.recovery_required = True
+        return result
+    monkeypatch.setattr(web, '_adopt_scan_source', recover_after_adoption)
+    deferred = []
+    monkeypatch.setattr(web, '_start_owned_thread', lambda target, lease: deferred.append((target, lease)))
+    try:
+        web._run_job(exact.job, 'scan')
+        assert exact.job['phase'] == 'review'
+        target, lease = deferred.pop()
+        try: target()
+        finally: lease.release()
+    finally:
+        owner.recovery_required = False
