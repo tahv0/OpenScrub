@@ -257,3 +257,32 @@ def test_thumbnail_replaced_captured_card_rejects_pending_result():
     assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(BE.audio,audio);
     assert.equal(elements.get('review'),review);
     """)
+
+
+def test_thumbnail_closing_failed_lightbox_keeps_reopen_action():
+    run_js("""await mount([row(0)]);zoomDet(0);const light=REVIEW_IMAGES.lightbox;
+    light.node.onerror();await reply({error:'unavailable'},409);
+    assert.equal(elements.get('reopen0').hidden,false);light.overlay.onclick();
+    assert.equal(elements.get('reopen0').hidden,false,'closing failed lightbox must retain reopen action');
+    assert.equal(elements.get('status0').hidden,false);assert.equal(calls.length,2);
+    """)
+
+
+def test_thumbnail_new_lightbox_success_clears_closed_lightbox_status():
+    run_js("""await mount([row(0)]);zoomDet(0);const first=REVIEW_IMAGES.lightbox;
+    first.node.onerror();await reply({error:'unavailable'},409);first.overlay.onclick();
+    zoomDet(0);const second=REVIEW_IMAGES.lightbox;
+    assert.equal(elements.get('status0').hidden,false,'unresolved failure stays visible');
+    second.node.currentSrc=second.node.src;second.node.complete=true;second.node.naturalWidth=20;second.node.onload();
+    assert.equal(elements.get('status0').hidden,true,'current successful replacement resolves lightbox status');
+    assert.equal(elements.get('reopen0').hidden,true);assert.equal(calls.length,2);
+    """)
+
+
+def test_thumbnail_new_lightbox_failure_preserves_closed_lightbox_status():
+    run_js("""await mount([row(0)]);zoomDet(0);const first=REVIEW_IMAGES.lightbox;
+    first.node.onerror();await reply({error:'unavailable'},409);first.overlay.onclick();
+    zoomDet(0);const second=REVIEW_IMAGES.lightbox;second.node.onerror();await tick();
+    assert.equal(second.node.style.visibility,'hidden');assert.equal(elements.get('status0').hidden,false);
+    assert.equal(elements.get('reopen0').hidden,false);assert.equal(calls.length,2);
+    """)

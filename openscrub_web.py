@@ -4792,7 +4792,7 @@ function thumbnailStatus(o,card){
  const light=o.lightbox;
  const lightUnavailable=light&&light.card===card&&light.unavailable&&
   thumbnailBindingCurrent(o,light,light.node,light.version);
- const unavailable=!!(card.unavailable||lightUnavailable);
+ const unavailable=!!(card.unavailable||card.lightboxUnavailable||lightUnavailable);
  const parent=card.node.parentElement;
  const button=parent&&parent.querySelector("[data-thumb-reopen]");
  const status=parent&&parent.querySelector("[data-thumb-status]");
@@ -4810,7 +4810,9 @@ function thumbnailSetSource(o,b,src){
  node.onload=()=>{
   if(!thumbnailBindingCurrent(o,b,node,version)||node.currentSrc!==src||!node.complete||!node.naturalWidth)return;
   node.style.visibility="";node.alt="";node.title="";b.unavailable=false;
-  thumbnailStatus(o,b.card||b);
+  const card=b.card||b;
+  if(!b.card||card.version===version)card.lightboxUnavailable=false;
+  thumbnailStatus(o,card);
  };
  node.onerror=()=>{if(thumbnailBindingCurrent(o,b,node,version)&&node.src===src)recoverThumbnail(o,b);};
  node.src=src;
@@ -4876,12 +4878,16 @@ function zoomDet(i){
    "cursor:zoom-out;padding:18px";
   ov.onclick=()=>{
    const owner=REVIEW_IMAGES,light=owner&&owner.lightbox;
+   const current=light&&light.overlay===ov&&thumbnailBindingCurrent(owner,light,light.node,light.version);
+   if(current&&light.unavailable)light.card.lightboxUnavailable=true;
    ov.remove();
-   if(light&&light.overlay===ov){owner.lightbox=null;thumbnailStatus(owner,light.card);}
+   if(current){owner.lightbox=null;thumbnailStatus(owner,light.card);}
   };
   document.body.appendChild(ov);
  }
  const previous=o.lightbox;
+ if(previous&&previous.unavailable&&thumbnailBindingCurrent(o,previous.card,previous.card.node,previous.card.version))
+  previous.card.lightboxUnavailable=true;
  ov.innerHTML=`<img style="max-width:96%;max-height:96%;border-radius:8px;
   box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
  const node=ov.querySelector("img");
@@ -4890,8 +4896,17 @@ function zoomDet(i){
  o.lightbox=light;
  if(previous)thumbnailStatus(o,previous.card);
  thumbnailStatus(o,b);
+ let expectedSrc;
+ node.onload=()=>{
+  if(!thumbnailBindingCurrent(o,light,node,light.version)||node.src!==expectedSrc||
+     node.currentSrc!==expectedSrc||!node.complete||!node.naturalWidth)return;
+  light.unavailable=false;
+  if(light.card.version===light.version)light.card.lightboxUnavailable=false;
+  thumbnailStatus(o,light.card);
+ };
  node.onerror=()=>recoverThumbnail(o,light);
  node.src=b.version?thumbnailUrl(o.jobId,"detframe",i,b.version):`api/jobs/${o.jobId}/detframe/${i}`;
+ expectedSrc=node.src;
 }
 function beRemove(){
  if(BE.sel<0)return;
