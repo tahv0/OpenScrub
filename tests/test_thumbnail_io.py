@@ -1990,9 +1990,14 @@ def test_partial_related_lease_release_can_resume_without_double_count(exact, mo
             lease.release()
 
 
-def test_primary_failure_keeps_foreground_release_continuation(exact, monkeypatch):
+@pytest.mark.parametrize('transition', ['vault', 'delete'])
+def test_primary_failure_keeps_foreground_release_continuation(exact, monkeypatch, transition):
+    if transition == 'vault': exact.enable()
     version = request('get', exact.url + '/detections').json['thumbnail_version']
     assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    related_job = web.new_job('', {}, 'release continuation related owner')
+    related_job['phase'] = 'review'
+    files, related_files = web.FILES.initialize(exact.job), web.FILES.initialize(related_job)
     primary = openscrub.PipelineCancelled()
     real_prepare, captured = web._prepare_observed_source, []
     def prepare(*args):
@@ -2003,6 +2008,8 @@ def test_primary_failure_keeps_foreground_release_continuation(exact, monkeypatc
             if len(calls) == 1: raise KeyboardInterrupt('release guard interrupted')
             real_release()
         lease.release = interrupted
+        with web.VAULT_LOCK:
+            lease.related.append(web.FILES.reserve(related_job, work=True))
         captured.append((lease, real_release, calls))
         return prepared, lease
     original_open = web._thumbnail_open
@@ -2016,9 +2023,18 @@ def test_primary_failure_keeps_foreground_release_continuation(exact, monkeypatc
     try:
         with pytest.raises(openscrub.PipelineCancelled) as caught:
             web._thumbnail_image(exact.job, 0, 'crop', version)
-        assert caught.value is primary and web.FILES.count > 0
-        web._thumbnail_lifecycle_cleanup(exact.job)
-        assert captured[0][0].released and web.FILES.count == 0
+        lease, _, calls = captured[0]
+        assert caught.value is primary and len(calls) == 1
+        assert not lease.released and len(files.thumbnail.deferred) == 1
+        assert web.FILES.count == 2 and files.count == 1 and files.work == 0
+        assert related_files.count == 1 and related_files.work == 1
+        assert any(ticket._deferred_lease is lease for ticket in files.thumbnail.deferred)
+        response = (request('post', '/api/vault/lock') if transition == 'vault'
+                    else request('delete', exact.url))
+        assert response.status_code == 200 and len(calls) == 2
+        assert lease.released and lease.related[0].released and web.FILES.count == 0
+        assert files.count == files.work == related_files.count == related_files.work == 0
+        assert not files.thumbnail.deferred and not files.thumbnail.deferred_by_owner
     finally:
         for lease, real_release, _ in captured:
             if not lease.released: real_release()
