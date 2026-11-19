@@ -70,6 +70,6 @@ The corrected record preserves all numerical tables. Its manifest-driven checkpo
 
 ## Next delivery
 
-E2 will compare the original per-capture constructor with requested FFmpeg thread counts 1, 2 and 4, using fresh pre-run receipts, tested deadline supervision, no timed log I/O and an all-thread child sampler. OpenCV exposes an open-time thread limit, which makes this a testable hypothesis about the RAM cost; causation and benefit have not been established. [OpenCV capture properties](https://docs.opencv.org/4.13.0/d4/d15/group__videoio__flags__base.html), [constructor parameters](https://docs.opencv.org/4.13.0/d8/dfe/classcv_1_1VideoCapture.html).
+The separately reviewed [E2 decoder-thread comparison](p10b-decoder-thread-comparison.md) now measures the original constructor against requested FFmpeg thread counts 1, 2 and 4. It found a host-specific memory/seek tradeoff with preserved pixels. Its own historical accounting and pre-workload sampler-control gaps remain explicit; the later checks do not change E1’s limits. [OpenCV capture properties](https://docs.opencv.org/4.13.0/d4/d15/group__videoio__flags__base.html), [constructor parameters](https://docs.opencv.org/4.13.0/d8/dfe/classcv_1_1VideoCapture.html).
 
 A useful result needs preserved pixels, source ownership and a documented latency/memory tradeoff across the controlled cases. Any resulting code change needs its own narrow PR, supported-runtime checks and compatible fallback. Windows, GPU/inference, HDR, other codecs, raw VFR and hour-long production 4K remain separate validation.
