@@ -33,7 +33,7 @@ detail.insertAdjacentHTML=function(_,html){
  for(const match of html.matchAll(/<div class="det [\s\S]*?id="det(\d+)"[\s\S]*?<img ([\s\S]*?)>/g)){
   const i=+match[1], attrs=match[2], img=element('img'+i); img.root=root;
   const src=attrs.match(/src="([^"]*)"/);img.src=src?src[1]:'';
-  img.dataset.thumbIndex=String(i);const button=element('reopen'+i),status=element('status'+i);button.hidden=true;status.hidden=true;const parent={querySelector:s=>s==='[data-thumb-reopen]'?button:s==='[data-thumb-status]'?status:img};elements.set('status'+i,status);button.parentElement=parent;img.parentElement=parent;elements.set('reopen'+i,button);elements.set('img'+i,img);elements.set('thumb'+i,img);
+  img.dataset.thumbIndex=String(i);img.onerror=()=>vm.runInContext('thumbRetry(elements.get(\"img'+i+'\"))',ctx);const button=element('reopen'+i),status=element('status'+i);button.hidden=true;status.hidden=true;const parent={querySelector:s=>s==='[data-thumb-reopen]'?button:s==='[data-thumb-status]'?status:img};elements.set('status'+i,status);button.parentElement=parent;img.parentElement=parent;elements.set('reopen'+i,button);elements.set('img'+i,img);elements.set('thumb'+i,img);
  }
 };
 for(const id of ['beslot','reviewSaveStatus'])elements.set(id,element(id));
@@ -170,7 +170,7 @@ def test_thumbnail_same_job_remount_and_disconnected_image_reject_late_reply():
     run_js("""await mount([row(0)]);const old=elements.get('img0');thumbRetry(old);await tick();
     const mounting=loadReview();await reply(metadata([row(0)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
     await reply(metadata([row(0)],'cccccccccccccccccccccccccccccccc'));await mounting;
-    assert.match(old.src,/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa$/);assert.match(elements.get('img0').src,/cccccccccccccccccccccccccccccccc$/);
+    assert.match(old.src,/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$/,'still-mounted owner remains active until replacement succeeds');assert.match(elements.get('img0').src,/cccccccccccccccccccccccccccccccc$/);
     const current=elements.get('img0');thumbRetry(current);await tick();current.isConnected=false;
     await reply(metadata([row(0)],'dddddddddddddddddddddddddddddddd'));assert.match(current.src,/cccccccccccccccccccccccccccccccc$/);
     """)
@@ -285,4 +285,63 @@ def test_thumbnail_new_lightbox_failure_preserves_closed_lightbox_status():
     zoomDet(0);const second=REVIEW_IMAGES.lightbox;second.node.onerror();await tick();
     assert.equal(second.node.style.visibility,'hidden');assert.equal(elements.get('status0').hidden,false);
     assert.equal(elements.get('reopen0').hidden,false);assert.equal(calls.length,2);
+    """)
+
+
+@pytest.mark.parametrize('failure', ['network', '409', '503'])
+def test_fix1_failed_reopen_keeps_group_owner_and_allows_retry(failure):
+    run_js("""const rows=[row(0,{track:7,confidence:.9}),row(1,{track:7})];await mount(rows);
+    const owner=REVIEW_IMAGES,root=elements.get('review'),editor=BE,draft=EDITS,manual=MAN,audio=BE.audio,groups=TRKMEM;
+    BE.ov[0]=[1,2,3,4];MAN.push({manual_id:'pending'});EDITS.audioInFlight=true;BE.audioSaved=null;
+    const p=loadReview();if(FAIL==='network')queue.shift().reject(Error('offline'));else await reply({error:'pending'},+FAIL);
+    await p.catch(()=>{});assert.equal(REVIEW_IMAGES,owner,'failed reopen must keep owner');
+    assert.equal(elements.get('review'),root);assert.equal(TRKMEM,groups);toggleDet(0);
+    assert.equal(EN[0],false);assert.equal(EN[1],false,'group toggle keeps every member');
+    assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(BE.audio,audio);
+    assert.equal(BE.audioSaved,null);assert.equal(EDITS.audioInFlight,true);
+    const q=loadReview();await reply(metadata(rows,'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));await q;
+    assert.notEqual(REVIEW_IMAGES,owner);assert.equal(REVIEW_IMAGES.attempted,false);
+    """.replace('FAIL',json.dumps(failure)))
+
+
+def test_fix1_initial_callbacks_cannot_hide_new_version():
+    run_js("""await mount([row(0)]);const card=elements.get('img0'),oldCard=card.onerror;
+    zoomDet(0);const light=REVIEW_IMAGES.lightbox,oldLight=light.node.onerror;oldLight();
+    await reply(metadata([row(0)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
+    for(const node of [card,light.node]){node.currentSrc=node.src;node.complete=true;node.naturalWidth=20;node.onload();}
+    oldCard();oldLight();await tick();assert.equal(card.style.visibility,'');assert.equal(light.node.style.visibility,'');
+    assert.equal(elements.get('reopen0').hidden,true);assert.equal(calls.length,2);
+    """)
+
+
+def test_fix1_late_card_load_cannot_clear_closed_lightbox_failure():
+    run_js("""await mount([row(0),row(1)]);zoomDet(0);const old=REVIEW_IMAGES.lightbox;old.node.onerror();
+    old.overlay.remove();zoomDet(1);const light=REVIEW_IMAGES.lightbox;light.node.onerror();
+    await reply(metadata([row(0),row(1)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
+    const card=light.card.node;light.overlay.onclick();assert.equal(elements.get('reopen1').hidden,false);
+    card.currentSrc=card.src;card.complete=true;card.naturalWidth=20;card.onload();
+    assert.equal(elements.get('reopen1').hidden,false,'card load cannot clear closed lightbox latch');
+    zoomDet(1);const replacement=REVIEW_IMAGES.lightbox;replacement.node.currentSrc=replacement.node.src;
+    replacement.node.complete=true;replacement.node.naturalWidth=20;replacement.node.onload();
+    assert.equal(elements.get('reopen1').hidden,true);
+    """)
+
+
+@pytest.mark.parametrize('exit_kind',['job','panel'])
+def test_fix1_teardown_retires_owner_before_stale_metadata(exit_kind):
+    run_js("""await mount([row(0)]);const owner=REVIEW_IMAGES,image=elements.get('img0');thumbRetry(image);await tick();
+    if(KIND==='job')openJob('B');else showPanel('compare');const current=REVIEW_IMAGES;let parsed=0;
+    queue.shift().resolve({ok:true,status:200,json:async()=>{parsed++;return metadata([row(0)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')}});
+    await owner.refresh;assert.equal(current,null,'detached review must release global owner');
+    assert.equal(parsed,0,'obsolete response must stop before parsing/indexing');
+    assert.equal(owner.version,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    """.replace('KIND',json.dumps(exit_kind)))
+
+
+def test_fix1_competing_review_mounts_only_publish_latest():
+    run_js("""await mount([row(0)]);const first=loadReview(),second=loadReview();
+    const newer=queue.splice(1,1)[0];newer.resolve(response(metadata([row(1)],'cccccccccccccccccccccccccccccccc')));await tick();await second;
+    const owner=REVIEW_IMAGES,root=elements.get('review');await reply(metadata([row(0)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));await first;
+    assert.equal(REVIEW_IMAGES,owner);assert.equal(elements.get('review'),root);
+    assert.match(elements.get('img1').src,/cccccccccccccccccccccccccccccccc$/);
     """)

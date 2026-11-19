@@ -4188,10 +4188,11 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+ if(CUR===id){retireThumbnailReview();VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
+ retireThumbnailReview();
  const video=document.getElementById("beVid");
  if(video){try{video.pause();}catch(e){}}
  if(EDITS){
@@ -4765,7 +4766,8 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{BE.drag=null;});
 }
 // Thumbnail ownership is separate from the review draft and box editor.
-let REVIEW_IMAGES=null;
+let REVIEW_IMAGES=null, REVIEW_REQUEST=null;
+function retireThumbnailReview(){REVIEW_IMAGES=null;REVIEW_REQUEST=null;}
 function thumbnailUrl(jobId,kind,index,version){
  const u=new URL(`api/jobs/${encodeURIComponent(jobId)}/${kind}/${index}`,window.location.href);
  if(version)u.searchParams.set("v",version);
@@ -4811,7 +4813,7 @@ function thumbnailSetSource(o,b,src){
   if(!thumbnailBindingCurrent(o,b,node,version)||node.currentSrc!==src||!node.complete||!node.naturalWidth)return;
   node.style.visibility="";node.alt="";node.title="";b.unavailable=false;
   const card=b.card||b;
-  if(!b.card||card.version===version)card.lightboxUnavailable=false;
+  if(b.card&&card.version===version)card.lightboxUnavailable=false;
   thumbnailStatus(o,card);
  };
  node.onerror=()=>{if(thumbnailBindingCurrent(o,b,node,version)&&node.src===src)recoverThumbnail(o,b);};
@@ -4842,13 +4844,14 @@ async function recoverThumbnail(o,b){
   o.refresh=(async()=>{
    try{
     const r=await fetch(`api/jobs/${encodeURIComponent(o.jobId)}/detections`,{cache:"no-store"});
-    if(!r.ok)return;
+    if(!thumbnailOwnerCurrent(o)||!r.ok)return;
     const d=await r.json();
-    if(!d||!Array.isArray(d.detections)||! /^[0-9a-f]{32}$/.test(d.thumbnail_version)||
+    if(!thumbnailOwnerCurrent(o))return;
+    if(!d||!Array.isArray(d.detections)||(typeof d.thumbnail_version!=="string"||! /^[0-9a-f]{32}$/.test(d.thumbnail_version))||
        d.thumbnail_version===version)return;
     const rows=new Map(),groups=new Map();
     for(const row of d.detections){
-     if(!row||!Number.isInteger(row.i)||rows.has(row.i)||! /^[0-9a-f]{64}$/.test(row.thumbnail_row))return;
+     if(!row||!Number.isInteger(row.i)||rows.has(row.i)||typeof row.thumbnail_row!=="string"||! /^[0-9a-f]{64}$/.test(row.thumbnail_row))return;
      rows.set(row.i,row);
      const group=thumbnailGroup(row);
      if(group){const key=JSON.stringify(group);if(!groups.has(key))groups.set(key,[]);
@@ -4861,7 +4864,7 @@ async function recoverThumbnail(o,b){
      item.version=d.thumbnail_version;
      thumbnailSetSource(o,item,thumbnailUrl(o.jobId,item.card?"detframe":"thumb",item.rawIndex,item.version));
     }
-    o.version=d.thumbnail_version;
+    if(thumbnailOwnerCurrent(o))o.version=d.thumbnail_version;
    }catch(e){/* Keep the unavailable image and the spent budget. */}
   })();
  }
@@ -4896,15 +4899,15 @@ function zoomDet(i){
  o.lightbox=light;
  if(previous)thumbnailStatus(o,previous.card);
  thumbnailStatus(o,b);
- let expectedSrc;
+ const initialVersion=light.version;let expectedSrc;
  node.onload=()=>{
-  if(!thumbnailBindingCurrent(o,light,node,light.version)||node.src!==expectedSrc||
+  if(!thumbnailBindingCurrent(o,light,node,initialVersion)||node.src!==expectedSrc||
      node.currentSrc!==expectedSrc||!node.complete||!node.naturalWidth)return;
   light.unavailable=false;
-  if(light.card.version===light.version)light.card.lightboxUnavailable=false;
+  if(light.card.version===initialVersion)light.card.lightboxUnavailable=false;
   thumbnailStatus(o,light.card);
  };
- node.onerror=()=>recoverThumbnail(o,light);
+ node.onerror=()=>{if(thumbnailBindingCurrent(o,light,node,initialVersion)&&node.src===expectedSrc)recoverThumbnail(o,light);};
  node.src=b.version?thumbnailUrl(o.jobId,"detframe",i,b.version):`api/jobs/${o.jobId}/detframe/${i}`;
  expectedSrc=node.src;
 }
@@ -4921,6 +4924,7 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
+ if(which!=="review"&&which!=="boxedit_rev")retireThumbnailReview();
  // a playing box-editor video must be PAUSED before its DOM is wiped —
  // an element removed via innerHTML can keep its audio running
  try{const v=document.getElementById("beVid");
@@ -4961,18 +4965,22 @@ function cmpShow(){
 }
 
 async function loadReview(){
- const id=CUR,gen=VIEW_GEN,token={};
- REVIEW_IMAGES={jobId:id,viewGen:gen,token,root:null,version:null,attempted:false,refresh:null,bindings:new Map()};
- const owner=REVIEW_IMAGES;
- showPanel("review");
- const d=await (await fetch(`api/jobs/${id}/detections`)).json();
- if(!ownsView(id,gen)||REVIEW_IMAGES!==owner)return;
- DUR=d.duration;
- const groups={}; const zdrop=[]; const thumbMembers=new Map(); TRKMEM={};
- const version=/^[0-9a-f]{32}$/.test(d.thumbnail_version||"")?d.thumbnail_version:null;
- const imageUrl=x=>version&&/^[0-9a-f]{64}$/.test(x.thumbnail_row||"")?thumbnailUrl(id,"thumb",x.i,version):`api/jobs/${id}/thumb/${x.i}`;
+ const id=CUR,gen=VIEW_GEN,token={};REVIEW_REQUEST=token;
+ let d;
+ try{
+  const r=await fetch(`api/jobs/${id}/detections`);
+  if(!ownsView(id,gen)||REVIEW_REQUEST!==token||!r.ok)return;
+  d=await r.json();
+ }catch(e){return;}
+ if(!ownsView(id,gen)||REVIEW_REQUEST!==token||!d||!Array.isArray(d.detections)||
+    !Number.isFinite(d.duration)||d.detections.some(x=>!x||!Number.isInteger(x.i)||
+    typeof x.category!=="string"||!Number.isFinite(x.t_start)||!Number.isFinite(x.t_end)))return;
+ const owner={jobId:id,viewGen:gen,token,root:null,version:null,attempted:false,refresh:null,bindings:new Map()};
+ const nextEN={...EN},nextTRKMEM={},groups={},zdrop=[],thumbMembers=new Map();
+ const version=typeof d.thumbnail_version==="string"&&/^[0-9a-f]{32}$/.test(d.thumbnail_version)?d.thumbnail_version:null;
+ const imageUrl=x=>version&&typeof x.thumbnail_row==="string"&&/^[0-9a-f]{64}$/.test(x.thumbnail_row)?thumbnailUrl(id,"thumb",x.i,version):`api/jobs/${id}/thumb/${x.i}`;
  d.detections.forEach(x=>{
-  EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+  nextEN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
@@ -4993,14 +5001,14 @@ async function loadReview(){
     <button class="sec" onclick="setAllZd(false)">keep all</button></div>
    <div class="grid3">`;
   for(const x of zdrop){
-   html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
+   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
     <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}" loading="lazy"
-     style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+     style="cursor:zoom-in" onclick="zoomDet(${x.i})">
     <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
     <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-    <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
-     onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+    <button class="blurbtn ${nextEN[x.i]?"blur":"keep"}" id="bb${x.i}"
+     onclick="toggleDet(${x.i})">${nextEN[x.i]?"Blur":"Keep"}</button>
    </div>`;
   }
   html+=`</div></details>`;
@@ -5013,7 +5021,7 @@ async function loadReview(){
    // track; ungrouped detections stand alone
    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
-   else{TRKMEM[x.i]=[x.i];items.push(x);}
+   else{nextTRKMEM[x.i]=[x.i];items.push(x);}
   }
   for(const [key,members] of Object.entries(byGroup)){
    members.sort((a,b)=>a.t_start-b.t_start);
@@ -5024,7 +5032,7 @@ async function loadReview(){
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
    rep.personcard=key[0]==="p";
-   TRKMEM[rep.i]=members.map(m=>m.i);
+   nextTRKMEM[rep.i]=members.map(m=>m.i);
    thumbMembers.set(rep.i,members.map(m=>[m.i,m.thumbnail_row]).sort((a,b)=>a[0]-b[0]));
    items.push(rep);
   }
@@ -5036,15 +5044,14 @@ async function loadReview(){
   <button class="sec" style="padding:3px 8px;font-size:12px"
    onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
   for(const x of items){
-   html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}"
-     style="cursor:zoom-in" onclick="zoomDet(${x.i})"
-     onerror="thumbRetry(this)">
+     style="cursor:zoom-in" onclick="zoomDet(${x.i})">
     <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
     <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-    <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
-     onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+    <button class="blurbtn ${nextEN[x.i]?"blur":"keep"}" id="bb${x.i}"
+     onclick="toggleDet(${x.i})">${nextEN[x.i]?"Blur":"Keep"}</button>
    </div>`}
   html+=`</div>`}
  html+=`</div>
@@ -5053,15 +5060,19 @@ async function loadReview(){
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
+ if(!ownsView(id,gen)||REVIEW_REQUEST!==token)return;
+ showPanel("review");DUR=d.duration;Object.assign(EN,nextEN);TRKMEM=nextTRKMEM;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
- owner.root=document.getElementById("review");owner.version=version;
+ owner.root=document.getElementById("review");owner.version=version;REVIEW_IMAGES=owner;
  for(const x of d.detections){
   const node=document.getElementById("thumb"+x.i);if(!node)continue;
-  const row=/^[0-9a-f]{64}$/.test(x.thumbnail_row||"")?x.thumbnail_row:null;
+  const row=typeof x.thumbnail_row==="string"&&/^[0-9a-f]{64}$/.test(x.thumbnail_row)?x.thumbnail_row:null;
   const binding={node,rawIndex:x.i,thumbnailRow:row,version:row?version:null,
    group:thumbMembers.has(x.i)?thumbnailGroup(x):null,members:thumbMembers.get(x.i)||null};
   owner.bindings.set(x.i,binding);
+  const initialVersion=binding.version,initialSrc=node.src;
+  node.onerror=()=>{if(thumbnailBindingCurrent(owner,binding,node,initialVersion)&&node.src===initialSrc)recoverThumbnail(owner,binding);};
  }
  initMarquee();saveStatus(EDITS,EDITS.status);
 }
@@ -5080,10 +5091,7 @@ function applyDet(i,blur){
 function toggleDet(i){applyDet(i,!EN[i]);}
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
-function thumbRetry(img){
- const o=REVIEW_IMAGES,b=o&&o.bindings.get(Number(img.dataset.thumbIndex));
- if(b&&b.node===img)recoverThumbnail(o,b);
-}
+function thumbRetry(img){if(typeof img.onerror==="function")img.onerror();}
 function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 
@@ -5229,7 +5237,7 @@ async function saveAndRender(){
   }
   saveStatus(d,"Rendering with saved edits…"+allowError);
   if(ownsView(id,gen)){
-   const rv=document.getElementById("review");if(rv)rv.remove();
+   const rv=document.getElementById("review");if(rv){retireThumbnailReview();rv.remove();}
    const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
   }
   return true;
