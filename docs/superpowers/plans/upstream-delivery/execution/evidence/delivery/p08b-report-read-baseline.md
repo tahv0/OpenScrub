@@ -1,6 +1,6 @@
 # Current report-read costs before retained snapshots
 
-**Source and stage:** local P08A candidate `194864493962d9951cab482bde507d489f07c998`, measured 2026-11-19 after [thumbnail coherence acceptance](p08a-thumbnail-coherence-acceptance.md). Independent measurement review and the scoped evidence correction passed. This completes the P08B baseline gate; a performance implementation and its before/after evidence remain separate.
+**Source and stage:** local P08A candidate `194864493962d9951cab482bde507d489f07c998`, measured 2026-11-19 after [thumbnail coherence acceptance](p08a-thumbnail-coherence-acceptance.md). Independent measurement review and the scoped evidence correction passed. This completes the P08B baseline gate. The resulting [validation-reuse contribution](p08b-validation-reuse-acceptance.md) has separate implementation, matched observations and acceptance.
 
 ## What, why and when
 
@@ -59,6 +59,8 @@ At 100k, the original warm-crop window had one sample; its lifetime high-water i
 
 The first environment attempt lacked the prepared FFprobe path and followed the real missing-tool fallback. Its records are preserved and excluded from these native results. The older `944f6df` observations also have different instrumentation and post-save byte counts, so they are not a matched timing baseline. The full measurement harness/raw observations remain local; a portable benchmark should accompany any resulting performance PR.
 
-## Next delivery gate
+## Resulting delivery and remaining cache gate
 
-P08B now has a reviewed baseline. The next scope decision compares existing-generation validation reuse with immutable, single-flight report retention and declining an unjustified cache. Implementation must preserve whole-report rejection when identity changes, fresh mutation documents, source/report/operation fences, vault/deletion ownership and upstream defaults. A retained snapshot, if selected, needs owned-object accounting, oversized bypass, active-reader limits and measured admission/RSS costs. The owning focused PR supplies its actual candidate-versus-baseline measurements; this record supplies none in advance.
+The source study selected generation-validation reuse. Its [separate acceptance](p08b-validation-reuse-acceptance.md) records final platform restrictions, affected checks and matched measurements at their own pins. This baseline is not relabeled as that comparison.
+
+Retained single-flight snapshots remain deferred. A future proposal needs additional measured benefit, owned-object accounting, oversized bypass, active-reader bounds and admission/RSS evidence while preserving fresh transactions and corrupt-current-report refusal.
