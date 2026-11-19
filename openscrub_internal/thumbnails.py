@@ -3,6 +3,10 @@ import math
 import cv2
 
 
+CROP_RECIPE = 'crop-v3'
+DETFRAME_RECIPE = 'detframe-v3'
+
+
 class ThumbnailDecodeError(ValueError):
     """The requested thumbnail frame could not be obtained safely."""
 
@@ -199,7 +203,7 @@ def recipe_for_row(row, render_state, kind):
         if any(len(offset) != 2 for offset in offsets): raise ThumbnailRecipeError('invalid thumbnail recipe')
         return Recipe(kind, box, times, indices, offsets, 24, 80 if kind == 'crop' else 84,
                       0 if kind == 'crop' else 4, 2 if kind == 'crop' else 3,
-                      'crop-v3' if kind == 'crop' else 'detframe-v3')
+                      CROP_RECIPE if kind == 'crop' else DETFRAME_RECIPE)
     except (KeyError, TypeError, OverflowError, IndexError) as exc:
         raise ThumbnailRecipeError('invalid thumbnail recipe') from exc
 
@@ -324,7 +328,7 @@ def accept_generation_locked(state, candidate, row_count):
     g = Generation(uuid.uuid4().hex, candidate.incarnation, candidate.report_epoch,
                    candidate.source_epoch, candidate.operation, candidate.selected_source,
                    candidate.source_path, candidate.source_stamp, candidate.report_path,
-                   candidate.report_stamp, 'crop-v3', 'detframe-v3', row_count, True)
+                   candidate.report_stamp, CROP_RECIPE, DETFRAME_RECIPE, row_count, True)
     state.current = g
     return g
 

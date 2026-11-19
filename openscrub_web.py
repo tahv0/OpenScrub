@@ -2138,6 +2138,10 @@ def _thumbnail_current_locked(job, selected, fence, *, operation_owner=None):
         raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source changed; rescan required')
 
 
+class _FreshThumbnailSnapshot(tuple):
+    """The four values returned by a successful private fresh report parse."""
+
+
 def _thumbnail_snapshot(job, *, operation_owner=None):
     """Read one private report and associate its source under existing authority."""
     files = FILES.initialize(job)
@@ -2252,7 +2256,7 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
                 job['video'] = selected['path']
             final_fence = (fence, report_stamp)
             _thumbnail_current_locked(job, selected, final_fence, operation_owner=operation_owner)
-        return doc, selected, final_fence, lease
+        return _FreshThumbnailSnapshot((doc, selected, final_fence, lease))
     except FileNotFoundError:
         if lease is not None:
             _thumbnail_release_lease(job, lease, primary_pending=True)
@@ -2435,20 +2439,64 @@ def _thumbnail_reserve_discovery(job):
         time.sleep(.01)
 
 
-def _thumbnail_select(job, doc, selected, fence, *, operation_owner=None, discovery=None, validated=None):
+def _thumbnail_generation_matches_locked(files, job, generation, doc, selected, fence):
+    rows, rs = doc.get('detections'), doc.get('render_state')
+    return (generation is not None and generation.validated is True
+            and generation.incarnation == files.incarnation
+            and generation.source_epoch == files.source_epoch
+            and generation.selected_source is selected and files.current_source is selected
+            and generation.source_path == selected['path']
+            and generation.source_stamp == selected['stamp']
+            and generation.report_path == os.path.join(job['dir'], 'report.json')
+            and generation.report_stamp == fence[1]
+            and generation.report_epoch == fence[0][0]
+            and generation.operation is fence[0][1]
+            and generation.crop_recipe == thumbs.CROP_RECIPE
+            and generation.detframe_recipe == thumbs.DETFRAME_RECIPE
+            and isinstance(rows, list) and isinstance(rs, dict)
+            and generation.row_count == len(rows))
+
+
+def _thumbnail_validate_snapshot(job, fresh_snapshot, *, operation_owner=None, expected_generation=None):
+    """Reuse only the proof for this fresh parse and exact current generation."""
+    doc, selected, fence, _ = fresh_snapshot
+    files = FILES.initialize(job)
+    with files.report_lock:
+        _thumbnail_current_locked(job, selected, fence, operation_owner=operation_owner)
+        generation = files.thumbnail.current
+        if expected_generation is not None and generation is not expected_generation:
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+        if (type(fresh_snapshot) is _FreshThumbnailSnapshot
+                and _thumbnail_generation_matches_locked(files, job, generation, doc, selected, fence)):
+            return doc['detections'], doc['render_state'], generation
+    rows, rs = _thumbnail_validate_report(doc)
+    return rows, rs, None
+
+
+def _thumbnail_select(job, doc, selected, fence, *, operation_owner=None, discovery=None,
+                      validated=None, reuse_generation=None):
     """Converge a private coherent report on the current bounded generation."""
-    rows, _ = validated if validated is not None else _thumbnail_validate_report(doc)
     files = FILES.initialize(job)
     state = files.thumbnail
-    if discovery is None:
-        _, discovery = _thumbnail_reserve_discovery(job)
     try:
+        if reuse_generation is not None:
+            if validated is not None:
+                raise ValueError('validated data cannot accompany reused generation')
+            with files.report_lock:
+                _thumbnail_current_locked(job, selected, fence, operation_owner=operation_owner)
+                if (state.current is not reuse_generation
+                        or not _thumbnail_generation_matches_locked(files, job, reuse_generation,
+                                                                    doc, selected, fence)):
+                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
+                return reuse_generation
+        rows, _ = validated if validated is not None else _thumbnail_validate_report(doc)
+        if discovery is None:
+            _, discovery = _thumbnail_reserve_discovery(job)
         with files.report_lock:
             _thumbnail_current_locked(job, selected, fence, operation_owner=operation_owner)
             generation = state.current
-            if generation is not None and (generation.selected_source is not selected
-                    or (generation.report_epoch, generation.operation) != fence[0]
-                    or generation.report_stamp != fence[1]):
+            if generation is not None and not _thumbnail_generation_matches_locked(
+                    files, job, generation, doc, selected, fence):
                 thumbs.invalidate_locked(state, 'selection changed')
                 generation = None
             if generation is None:
@@ -2520,10 +2568,13 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                     lease = None
                 raise
         else:
-            doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
-            validated = _thumbnail_validate_report(doc)
+            # Assign the cleanup owner before the fresh witness.
+            doc, selected, fence, lease = fresh_snapshot = _thumbnail_snapshot(job, operation_owner=operation_owner)
+            rows, rs, reused = _thumbnail_validate_snapshot(job, fresh_snapshot, operation_owner=operation_owner)
+            validated = (rows, rs)
             generation = _thumbnail_select(job, doc, selected, fence, operation_owner=operation_owner,
-                                           discovery=discovery, validated=validated)
+                                           discovery=discovery, validated=None if reused else validated,
+                                           reuse_generation=reused)
         if index < 0 or index >= generation.row_count:
             raise _ThumbnailError('thumbnail_unavailable', 404, 'Thumbnail unavailable')
         with files.report_lock:
@@ -2544,14 +2595,23 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                     raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
                 doc = saved_doc
             if doc is None:
-                doc, selected, fence, snapshot_lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+                # Assign the cleanup owner before the fresh witness.
+                doc, selected, fence, snapshot_lease = fresh_snapshot = _thumbnail_snapshot(job, operation_owner=operation_owner)
                 _thumbnail_release_lease(job, snapshot_lease)
                 snapshot_lease = None
                 with files.report_lock:
                     if state.current is not generation or selected is not generation.selected_source or fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
-            rows, rs = ((saved_rows, saved_rs) if snapshot is not None else
-                        validated if validated is not None else _thumbnail_validate_report(doc))
+            if snapshot is not None:
+                rows, rs = saved_rows, saved_rs
+            elif validated is not None:
+                rows, rs = validated
+            else:
+                rows, rs, _ = _thumbnail_validate_snapshot(job, fresh_snapshot,
+                    operation_owner=operation_owner, expected_generation=generation)
+                with files.report_lock:
+                    if state.current is not generation:
+                        raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
             recipe = thumbs.recipe_for_row(rows[index], rs, kind)
             with files.report_lock:
                 _thumbnail_current_locked(job, generation.selected_source,
@@ -2906,9 +2966,11 @@ def job_detections(jid):
     lease = None
     try:
         _thumbnail_cleanup(job)
-        doc, selected, fence, lease = _thumbnail_snapshot(job)
-        rows, rs = _thumbnail_validate_report(doc)
-        generation = _thumbnail_select(job, doc, selected, fence, validated=(rows, rs))
+        # Assign the cleanup owner before the fresh witness.
+        doc, selected, fence, lease = fresh_snapshot = _thumbnail_snapshot(job)
+        rows, rs, reused = _thumbnail_validate_snapshot(job, fresh_snapshot)
+        generation = _thumbnail_select(job, doc, selected, fence,
+            validated=None if reused else (rows, rs), reuse_generation=reused)
         items = []
         for i, d in enumerate(rows):
             items.append({"i": i, "category": d["category"], "text": d["text"],
