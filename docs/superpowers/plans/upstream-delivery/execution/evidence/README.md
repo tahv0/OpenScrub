@@ -4,6 +4,7 @@ These local planning records preserve synthetic research, completed-task reports
 
 | Evidence | What it establishes |
 | --- | --- |
+| [Save As private readiness](delivery/save-as-pr-readiness.md) | Unchanged ca0f2ce, current24/24 on actual Python3.12/3.9 and independent approval; historical157+one known failure, verified archive members and controlled-picker256MiB evidence retain their scope. |
 | [Optional preview decoder threads](delivery/preview-decoder-threads-acceptance.md) | Accepted 5ef9e644, unchanged default, final 21/21 owning checks on actual Python 3.12/3.9, refreshed sdist and identical wheel; earlier full 153+one known failure/media/PAGE/installed results keep 7557d45 attribution. |
 | [Qualified decoder-thread comparison](research/p10b-decoder-thread-comparison.md) | Source 1948644, 360 matched pixel-checked helper calls and eight fresh-process memory observations; lower sampled RSS with slower long-GOP reads, corrected control/accounting/retention limits, and a later actual-sampler/process reconciliation. No product/default or app-wide gain claim. |
 | [Qualified decoder observations](research/p10b-decode-cost-observations.md) | Source 1948644 cold helper/HTTP, server RSS, saves and lifecycle data, with timing/provenance/deadline/child-coverage limits explicit. E2 has its separately attributed comparison above. |

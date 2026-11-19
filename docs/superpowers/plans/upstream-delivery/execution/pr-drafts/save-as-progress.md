@@ -1,43 +1,17 @@
 # Add streaming Save As with byte progress for exports
 
-After rendering, users can choose a destination for the redacted video or audit
-report and see accepted bytes, elapsed time and an approximate remaining time.
-This builds on Tuomas Aho's Save As implementation in `2900930f`; its static
-“Saving…” feedback was the usability trigger. Upstream's streaming downloads and
-actual-container filename behavior are preserved through shared filename metadata.
+After rendering, users can choose a destination for a redacted video or audit report and see progress while it saves. This builds on Tuomas Aho's Save As work in `2900930f`, where the control showed a static “Saving…” message during a transfer. Existing streaming download routes and actual-container filename behavior are preserved.
 
-Each destination write completes before its bytes count toward progress. The
-rolling ETA starts after three seconds, disappears during a five-second stall,
-and gives way to Finalizing until close succeeds. Unknown/encoded response sizes
-remain indeterminate. Errors retain retry/download guidance, and picker cancellation
-starts no network request. Progress remains bound to the clicked job through
-polling and job switches.
+Progress counts bytes only after the destination accepts each write, rather than bytes merely fetched. A trustworthy response length gives a total and approximate remaining time; absent, encoded or invalid lengths remain indeterminate. During a stall the UI shows waiting and removes stale estimates. At end of stream it shows Finalizing, and reports Saved only after the destination closes successfully. Errors provide retry or direct-download guidance; cancelling the picker starts no export request. Progress stays attached to the chosen job through polling and job switches.
 
-Save As requires a supporting browser on HTTPS/localhost. Direct Download links
-remain available and report only that the browser download started. This is a
-feedback/destination feature, not a transfer-speed claim.
+Save As requires a supporting browser on HTTPS or localhost. Direct Download remains available and reports that the browser download started, without claiming the local save is complete. This change adds feedback and destination selection; it does not claim faster transfers or change redaction behavior.
 
 Validation:
 
-- 24 new behavior cases pass, including actual MP4/MKV/audit attachment names and
-  HTTP lengths, delayed writes/close, cancellation, captured job targets,
-  invalid/encoded/mismatched totals, failures and announcement timing.
-- Required root + feature suite and default discovery: 157 passed; the same
-  pre-existing `test_track_person_size_jump_handoff` log assertion fails. No
-  skip, xfail or tracker/test fix is included. OpenCV-4-compatible baseline
-  environment was used; current unconstrained OpenCV 5 compatibility is separate.
-- Full sdist→wheel build and evaluated combined embedded-JS syntax pass. Focused
-  tests ship in the sdist; contributor instructions collect root and `tests/`.
-- Chromium rendered QA at 1365×950 and 390×844: cancellation, network/write/close
-  errors, retries, polling/switching and direct fallback pass. A throttled 256 MiB
-  real HTTP→OPFS export saved exactly 268,435,456 bytes, held one write at a time,
-  showed waiting/finalizing feedback and waited for close before Saved. `.blob()`
-  was blocked; maximum fetched-ahead data was one 2 MiB chunk. Sampled JS heap plus
-  backing storage peaked at ~84.8 MiB; total browser RSS was not measured.
+- Current focused behavior tests: 24 passed on Python 3.12.16 and 24 passed on actual Python 3.9.25. They cover attachment names and lengths, accepted writes, known and unknown totals, cancellation, waiting, finalizing, failures and job switching.
+- Earlier checks at this same candidate: 24 focused passes; required combined suite and default discovery each had 157 passed and one failure in the unchanged `test_track_person_size_jump_handoff` tracker-log assertion. Its separate test correction is already in HDR #23 and is not included here. Evaluated embedded JavaScript syntax and the sdist-to-wheel build passed in that earlier run.
+- Earlier headless Chromium testing used real HTTP to an OPFS writable with a controlled picker. A 256 MiB transfer saved exactly 268,435,456 bytes, had one write in flight and at most 2 MiB read by the application beyond what the destination had accepted, showed waiting and finalizing, and waited for close before Saved. Sampled JavaScript heap plus backing storage peaked at about 84.8 MiB; total browser RSS was not measured.
 
-The picker boundary was controlled in headless Chromium and wrote to real OPFS;
-OS-native Save As dialogs, Windows permissions, other browser engines and multi-GB
-files were not exercised. No runtime dependency, release/version or default
-redaction/review change is included.
+OS-native picker interaction, Windows permissions, other browser engines, multi-GB exports, physical disk durability and OpenCV 5 compatibility remain unverified. No new runtime dependency or version change is included.
 
-Local candidate commit: `ca0f2ce7458347afd2e6156a97df580b6623767a`.
+Private delivery status: reviewed ca0f2ce on Austin5d3a15a; [current readiness](../evidence/delivery/save-as-pr-readiness.md). Wait for Austin’s feedback or invitation on HDR#23 before another submission.
