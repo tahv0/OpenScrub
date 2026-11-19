@@ -5,6 +5,7 @@ This does not coordinate other processes. A lifetime token may move to a queued 
 """
 
 import threading
+import uuid
 
 
 class _JobFiles:
@@ -22,6 +23,15 @@ class _JobFiles:
         self.output_epoch = 0
         self.recovery_required = False
         self.recovery_diagnostics = ()
+        # Current observed input only; no durable identity or sample history.
+        self.incarnation = uuid.uuid4().hex
+        self.source_epoch = 0
+        self.current_source = None
+        self.committed_report_epoch = 0
+        self.source_pair = None
+        self.source_status = "undiscovered"
+        self.source_reason = None
+        self.source_retired = False
 
 
 class FileOwners:
@@ -31,7 +41,10 @@ class FileOwners:
 
     @staticmethod
     def initialize(job):
-        return job.setdefault("_files", _JobFiles())
+        try:
+            return job["_files"]
+        except KeyError:
+            return job.setdefault("_files", _JobFiles())
 
     def reserve(self, job=None, work=False):
         state = self.initialize(job) if job is not None else None
