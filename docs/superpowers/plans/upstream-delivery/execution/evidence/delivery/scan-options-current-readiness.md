@@ -17,6 +17,8 @@ The patch changes the web handler, README and route tests. Austin’s current di
 - The first installed check reached its HTTP assertions but timed out during the second test server’s SIGINT shutdown. The harness reaped that process, then the isolated retry verified the service’s SIGTERM handler. The product source remained at `43b505a`.
 - Independent source and evidence review cleared the decoder and fixture findings. The historical 170-test run at `e34313e` and 38 focused checks at `b26b6685` retain their original attribution. [Earlier delivery evidence](task-108-report.md).
 
+A follow-up byte audit matched the sdist and wheel across both attempts. It also checked all 16 wheel members other than RECORD against the retry installation. This directly verifies the payload used by the passing HTTP test.
+
 ## Delivery
 
 This is the next private scan-option candidate. The description is ready for review once Save As [PR #24](https://github.com/austinmabry/OpenScrub/pull/24) has had its review opportunity. [Prepared PR draft](../../pr-drafts/scan-options-validation.md).
