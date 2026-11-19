@@ -3260,3 +3260,45 @@ def test_residual_source_lease_release_failure_drains(exact, monkeypatch, which)
     assert web.FILES.count == 0 and not state.fills and not state.deferred
     assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
     assert request('delete', exact.url).status_code == 200
+
+
+@pytest.mark.parametrize('interruptions', [1, 2])
+def test_secondary_lease_guard_interrupt_drains_ownership(exact, monkeypatch, interruptions):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    files = web.FILES.initialize(exact.job); state = files.thumbnail
+    original_snapshot = web._thumbnail_snapshot
+    real_lock = files.report_lock
+    primary = KeyboardInterrupt('secondary release guard interrupted')
+    secondary = []; failures = []
+    class InterruptedLock:
+        def __enter__(self):
+            if len(failures) < interruptions:
+                failures.append(1)
+                raise primary if len(failures) == 1 else RuntimeError('cleanup guard interrupted')
+            return real_lock.__enter__()
+        def __exit__(self, *args): return real_lock.__exit__(*args)
+        def locked(self): return real_lock.locked()
+    def snapshot(*args, **kwargs):
+        result = original_snapshot(*args, **kwargs)
+        secondary.append(result[3])
+        files.report_lock = InterruptedLock()
+        return result
+    monkeypatch.setattr(web, '_thumbnail_snapshot', snapshot)
+    try:
+        with pytest.raises(KeyboardInterrupt) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary
+        assert len(secondary) == 1 and len(failures) == interruptions
+        files.report_lock = real_lock
+        monkeypatch.setattr(web, '_thumbnail_snapshot', original_snapshot)
+        web._thumbnail_cleanup(exact.job)
+        assert secondary[0].released and web.FILES.count == 0
+        assert not state.fills and not state.deferred
+        assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+        assert request('delete', exact.url).status_code == 200
+    finally:
+        files.report_lock = real_lock
+        monkeypatch.setattr(web, '_thumbnail_snapshot', original_snapshot)
+        for lease in secondary:
+            if not lease.released: lease.release()
+        if state.deferred: web._thumbnail_cleanup(exact.job)

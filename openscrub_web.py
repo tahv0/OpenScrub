@@ -2477,6 +2477,7 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
     files = FILES.initialize(job)
     state = files.thumbnail
     lease = None
+    snapshot_lease = None
     fill = None
     discovery = None
     try:
@@ -2545,6 +2546,7 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
             if doc is None:
                 doc, selected, fence, snapshot_lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
                 _thumbnail_release_lease(job, snapshot_lease)
+                snapshot_lease = None
                 with files.report_lock:
                     if state.current is not generation or selected is not generation.selected_source or fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
@@ -2701,39 +2703,52 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
     finally:
         primary_pending = sys.exc_info()[0] is not None
         try:
-            if discovery is not None:
-                with files.report_lock:
-                    thumbs.finish_discovery_locked(state, discovery)
-            if fill is not None:
-                retired = None
-                with files.report_lock:
-                    if fill.stage_closed:
-                        try:
-                            retired = thumbs.finish_fill_locked(state, fill)
-                        except BaseException:
-                            if not fill.settled:
-                                thumbs.defer_resource_locked(state, fill, lease)
-                                lease = None
-                            if not primary_pending:
-                                raise
-                    else:
-                        if state.current is generation:
-                            thumbs.invalidate_locked(state, 'stage writer close failed')
-                        thumbs.defer_resource_locked(state, fill, lease)
-                        lease = None
-                del retired
-        finally:
-            if lease is not None:
-                releasing_primary = primary_pending or sys.exc_info()[0] is not None
+            if snapshot_lease is not None:
                 try:
+                    _thumbnail_release_lease(job, snapshot_lease, primary_pending=primary_pending)
+                except BaseException:
+                    # The retry ticket may not exist yet. Transfer this child to
+                    # the still-owned primary before continuing its cleanup.
+                    if not snapshot_lease.released:
+                        lease.related.append(snapshot_lease)
+                    if not primary_pending:
+                        raise
+        finally:
+            primary_pending = primary_pending or sys.exc_info()[0] is not None
+            try:
+                if discovery is not None:
+                    with files.report_lock:
+                        thumbs.finish_discovery_locked(state, discovery)
+                if fill is not None:
+                    retired = None
+                    with files.report_lock:
+                        if fill.stage_closed:
+                            try:
+                                retired = thumbs.finish_fill_locked(state, fill)
+                            except BaseException:
+                                if not fill.settled:
+                                    thumbs.defer_resource_locked(state, fill, lease)
+                                    lease = None
+                                if not primary_pending:
+                                    raise
+                        else:
+                            if state.current is generation:
+                                thumbs.invalidate_locked(state, 'stage writer close failed')
+                            thumbs.defer_resource_locked(state, fill, lease)
+                            lease = None
+                    del retired
+            finally:
+                if lease is not None:
+                    releasing_primary = primary_pending or sys.exc_info()[0] is not None
                     try:
-                        _thumbnail_cleanup(job)
-                    except BaseException:
-                        if not releasing_primary:
-                            raise
-                finally:
-                    releasing_primary = releasing_primary or sys.exc_info()[0] is not None
-                    _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
+                        try:
+                            _thumbnail_cleanup(job)
+                        except BaseException:
+                            if not releasing_primary:
+                                raise
+                    finally:
+                        releasing_primary = releasing_primary or sys.exc_info()[0] is not None
+                        _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
 
 
 def _exact_policy(doc, selected):
