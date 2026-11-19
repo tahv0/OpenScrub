@@ -131,6 +131,7 @@ include = [
 
 
 
+    "docs/LOGGING.md",
 ]
 
 [tool.pytest.ini_options]

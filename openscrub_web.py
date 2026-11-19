@@ -54,6 +54,7 @@ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_rend
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import thumbnails as thumbs
+from openscrub_internal import diagnostics
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 from openscrub_internal.job_logs import JobLog
 from openscrub_internal.plate_search import worker as plate_search_worker
@@ -801,8 +802,10 @@ _ETA_STARTUP_SECONDS = 3.0
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
-    def __init__(self, job, cancel_event=None):
+    def __init__(self, job, cancel_event=None, diagnostic_sink=None, diagnostic_ref=None):
         self.job = job
+        self._diagnostic_sink = diagnostic_sink
+        self._diagnostic_ref = diagnostic_ref
         self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
         self._last_frame = 0.0
         self._stage = None          # ETA state: current stage,
@@ -816,6 +819,8 @@ class WebCallbacks(openscrub.Callbacks):
         self.job["log"].append(msg)
 
     def progress(self, stage, cur, total):
+        if self._diagnostic_sink is not None:
+            self._diagnostic_sink.progress(self._diagnostic_ref, stage, cur, total)
         # scan frame loop -> first 45% of the bar; "post" (dense-track
         # smoothing after the loop — previously a silent stall) -> 45-50%;
         # render -> back half. Jobs without a post stage jump 45 -> 50,
@@ -1106,6 +1111,7 @@ def _sanitize_argv(parser, argv, job=None):
 
 # The single job worker. WORKER["current"] is the job it is running right
 # now (read by Cancel and the watchdog); WORKER["thread"] is the live thread.
+DIAGNOSTICS = None
 WORKER = {"current": None, "thread": None}
 _PLATE_SEARCH_SLOT = threading.BoundedSemaphore(1)
 _PLATE_SEARCH_DEADLINE = 15.0
@@ -1365,6 +1371,9 @@ def worker():
             if not stale:
                 _run_job(job, action, lease)
         except BaseException as e:     # belt and braces: never die
+            if DIAGNOSTICS is not None:
+                code, _ = diagnostics.classify(e)
+                DIAGNOSTICS.emit("worker_loop_error", active_action_lost=WORKER["current"] is not None, error=code)
             print(f"[web] worker: unexpected {type(e).__name__}: {e}",
                   flush=True)
         finally:
@@ -1391,7 +1400,12 @@ def _run_job(job, action, owner=None):
         if not _operation_valid(job, owner):
             return
         job["phase"] = "scanning" if action == "scan" else "rendering"
-    cb = WebCallbacks(job, owner.operation)
+    sink = DIAGNOSTICS
+    diagnostic_ref = sink.start(action) if sink is not None else None
+    if diagnostic_ref is not None and WORKER.get("current") == jid:
+        WORKER["diagnostic_ref"] = diagnostic_ref
+    outcome, diagnostic_error = "superseded", None
+    cb = WebCallbacks(job, owner.operation, sink, diagnostic_ref)
     def publish_report(path, doc):
         provenance = doc.get('provenance', {}) if isinstance(doc, dict) else {}
         if isinstance(provenance, dict):
@@ -1521,6 +1535,7 @@ def _run_job(job, action, owner=None):
                         ticket = _reserve_queue_locked(job, "render", next_owner)
                     else:
                         job["phase"] = "review"
+                    outcome = "review"
                     job["progress"] = 0.5
                     job["eta"] = None
             finally:
@@ -1547,6 +1562,7 @@ def _run_job(job, action, owner=None):
                     if not _operation_valid(job, owner) or owner.operation.is_set():
                         return
                     job.update(output=res["output"], phase="done", progress=1.0, eta=None)
+            outcome = "done"
     except openscrub.PipelineCancelled:
         recovery = _has_render_recovery(job["dir"])
         with files.report_lock:
@@ -1555,6 +1571,7 @@ def _run_job(job, action, owner=None):
                 job.update(phase="error", error="render delivery requires recovery", eta=None)
             if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "cancelled"
+                outcome = "cancelled"
                 job["error"] = "cancelled by user"
     except BaseException as e:
         msg = str(e) or type(e).__name__
@@ -1567,12 +1584,19 @@ def _run_job(job, action, owner=None):
                 job.update(phase="error", error="render delivery requires recovery", eta=None)
             if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "error"
+                outcome, diagnostic_error = "error", e
                 job["error"] = msg
                 job["log"].append(f"ERROR: {msg}")
     finally:
         with files.report_lock:
             if _operation_valid(job, owner):
                 job["eta"] = None
+        if sink is not None:
+            if outcome == "superseded" and owner.operation.is_set():
+                outcome = "cancelled"
+            sink.finish(diagnostic_ref, outcome, diagnostic_error)
+            if WORKER.get("diagnostic_ref") == diagnostic_ref:
+                WORKER.pop("diagnostic_ref", None)
 
 
 def start_worker():
@@ -1592,7 +1616,8 @@ def check_worker():
     jid = WORKER.get("current")
     with JOBS_LOCK:
         job = JOBS.get(jid) if jid else None
-        if job is not None and job.get("phase") in _ACTIVE_PHASES:
+        lost_action = job is not None and job.get("phase") in _ACTIVE_PHASES
+        if lost_action:
             job["phase"] = "error"
             job["eta"] = None
             job["error"] = ("the job worker stopped unexpectedly — the "
@@ -1601,6 +1626,11 @@ def check_worker():
             job["log"].append("ERROR: " + job["error"])
     WORKER["current"] = None
     if t is not None:
+        if DIAGNOSTICS is not None:
+            lost_ref = WORKER.pop("diagnostic_ref", None)
+            DIAGNOSTICS.abandon(lost_ref)
+            DIAGNOSTICS.emit("worker_restarted",
+                             active_action_lost=lost_action or lost_ref is not None)
         print("[web] job worker was not running — restarted it", flush=True)
     start_worker()
     return True
@@ -8626,12 +8656,16 @@ def _vault_lock_atexit():
             JOBS_LOCK.release()
             n = _vault_lock_now(blocking=False)
             print("vault: locked on shutdown (%d file(s) encrypted)" % n)
+            return "locked"
+        return "already_locked" if vault_enabled() else "not_enabled"
     except FilesBusy:
         print("vault: NOT locking on exit — job files or a lifecycle transition "
               "are still active; files may remain in plaintext. Restart and lock.")
+        return "busy"
     except Exception:
         print("vault: LOCK ON SHUTDOWN FAILED — job files may remain in plaintext. "
               "Restart the server and use the Lock button.")
+        return "failed"
 
 
 @app.route("/api/vault")
@@ -9289,7 +9323,7 @@ def retention_loop(days):
 
 
 def main():
-    global TOKEN
+    global TOKEN, DIAGNOSTICS
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8384)
     ap.add_argument("--host", default="0.0.0.0")
@@ -9314,13 +9348,35 @@ def main():
                     default=0, help="preview decoder threads (default 0: ordinary decoder); "
                     "fewer threads may reduce memory but slow seeking; unsupported "
                     "builds use the ordinary decoder")
+    ap.add_argument("--diagnostics", action="store_true",
+                    help="retain bounded sanitized service lifecycle records")
     args = ap.parse_args()
     app.config["PREVIEW_DECODE_THREADS"] = args.preview_decode_threads
+    if args.diagnostics:
+        try:
+            DIAGNOSTICS = diagnostics.Diagnostics(os.path.join(_data_root(), "logs"),
+                                                   "http" if args.http else "https",
+                                                   openscrub.VERSION)
+        except Exception:
+            try:
+                print("[web] diagnostics unavailable", flush=True)
+            except Exception:
+                pass
     TOKEN = args.token or None
     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
     os.makedirs(JOBS_DIR, exist_ok=True)
     import atexit
-    atexit.register(_vault_lock_atexit)
+    _shutdown_state = {"failed": False, "closed": False}
+
+    def _shutdown(reason="normal"):
+        if _shutdown_state["closed"]:
+            return
+        _shutdown_state["closed"] = True
+        vault_result = _vault_lock_atexit()
+        if DIAGNOSTICS is not None and not _shutdown_state["failed"]:
+            DIAGNOSTICS.close(reason, vault_result)
+
+    atexit.register(_shutdown)
     # docker stop sends SIGTERM. Python's default SIGTERM disposition kills
     # the process WITHOUT running atexit hooks — and as PID 1 in a container
     # an unhandled SIGTERM is ignored outright, so the container just waits
@@ -9339,80 +9395,92 @@ def main():
             os._exit(1)
         _terming.append(1)
         print("SIGTERM — locking vault before exit…")
-        _vault_lock_atexit()
+        _shutdown("sigterm")
         os._exit(0)
     signal.signal(signal.SIGTERM, _on_sigterm)
-    threading.Thread(target=_autolock_watcher, daemon=True).start()
-    rehydrate_jobs()
-    start_worker()
-    threading.Thread(target=_worker_watchdog, daemon=True).start()
-    if args.retain_days > 0:
-        threading.Thread(target=retention_loop, args=(args.retain_days,),
-                         daemon=True).start()
-    print("=" * 60)
-    ssl_ctx = None
-    scheme = "http"
-    if not args.http:
-        try:
-            import cryptography  # noqa: F401 — needed for cert generation
-        except ImportError:
-            print("=" * 60)
-            print("HTTPS needs the 'cryptography' package, which isn't")
-            print("installed. Fix it with ONE of these:")
-            print()
-            print("    pip install cryptography      (recommended)")
-            print("    python install.py --yes       (installs everything)")
-            print()
-            print("or start with --http to serve unencrypted")
-            print("(not recommended: PII would cross the network in plain text).")
-            print("=" * 60)
-            if os.name == "nt":
-                input("Press Enter to close.")
-            sys.exit(1)
-        cert, key, mode = active_cert_pair()
-        ssl_ctx = (cert, key)
-        scheme = "https"
-    in_docker = _in_container()
-    # Inside a container lan_ip() returns the CONTAINER's bridge address
-    # (172.17.x.x) — unreachable from a macOS/Windows host, where only the
-    # published port on localhost works. A real Mac user followed that IP
-    # straight to a dead end while the server sat healthy on localhost:8384
-    # (and Python's block-buffered stdout kept this whole banner invisible
-    # in `docker logs` — the images now set PYTHONUNBUFFERED=1).
-    url_host = "localhost" if in_docker else lan_ip()
-    print("openscrub web — open from any device on your LAN:")
-    if TOKEN:
-        print(f"    {scheme}://{url_host}:{args.port}/?token={TOKEN}")
-    else:
-        print(f"    {scheme}://{url_host}:{args.port}/")
-        print("    (open access: no token — everyone on this network can use it;")
-        print("     add --token <secret> if you ever want a gate back)")
-    if in_docker:
-        print("    Docker: open the PUBLISHED port on localhost (or this")
-        print("    machine's LAN IP from other devices). The container's")
-        print("    internal 172.17.x.x address is NOT reachable from a")
-        print("    Mac/Windows host.")
-    if vault_enabled():
-        print("Encryption: vault is LOCKED — unlock in the web UI "
-              "(Encryption panel) to access jobs."
-              if vault_locked() else "Encryption: vault unlocked.")
-    print("Jobs folder (contains PII):", JOBS_DIR,
-          f"— auto-deleted after {args.retain_days} day(s)" if args.retain_days else "— kept forever")
-    print("Do NOT expose this port to the internet.")
-    print("=" * 60)
-    if ssl_ctx:
-        if mode == "self-signed":
-            print("    HTTPS with a self-signed certificate: your browser will")
-            print("    warn once — choose Advanced -> Proceed, or install your")
-            print("    own certificate at the bottom of the main page.")
+    def _run_service():
+        threading.Thread(target=_autolock_watcher, daemon=True).start()
+        rehydrate_jobs()
+        start_worker()
+        threading.Thread(target=_worker_watchdog, daemon=True).start()
+        if args.retain_days > 0:
+            threading.Thread(target=retention_loop, args=(args.retain_days,),
+                             daemon=True).start()
+        print("=" * 60)
+        ssl_ctx = None
+        scheme = "http"
+        if not args.http:
+            try:
+                import cryptography  # noqa: F401 — needed for cert generation
+            except ImportError:
+                print("=" * 60)
+                print("HTTPS needs the 'cryptography' package, which isn't")
+                print("installed. Fix it with ONE of these:")
+                print()
+                print("    pip install cryptography      (recommended)")
+                print("    python install.py --yes       (installs everything)")
+                print()
+                print("or start with --http to serve unencrypted")
+                print("(not recommended: PII would cross the network in plain text).")
+                print("=" * 60)
+                if os.name == "nt":
+                    input("Press Enter to close.")
+                sys.exit(1)
+            cert, key, mode = active_cert_pair()
+            ssl_ctx = (cert, key)
+            scheme = "https"
+        in_docker = _in_container()
+        # Inside a container lan_ip() returns the CONTAINER's bridge address
+        # (172.17.x.x) — unreachable from a macOS/Windows host, where only the
+        # published port on localhost works. A real Mac user followed that IP
+        # straight to a dead end while the server sat healthy on localhost:8384
+        # (and Python's block-buffered stdout kept this whole banner invisible
+        # in `docker logs` — the images now set PYTHONUNBUFFERED=1).
+        url_host = "localhost" if in_docker else lan_ip()
+        print("openscrub web — open from any device on your LAN:")
+        if TOKEN:
+            print(f"    {scheme}://{url_host}:{args.port}/?token={TOKEN}")
         else:
-            print("    HTTPS with your installed custom certificate.")
+            print(f"    {scheme}://{url_host}:{args.port}/")
+            print("    (open access: no token — everyone on this network can use it;")
+            print("     add --token <secret> if you ever want a gate back)")
+        if in_docker:
+            print("    Docker: open the PUBLISHED port on localhost (or this")
+            print("    machine's LAN IP from other devices). The container's")
+            print("    internal 172.17.x.x address is NOT reachable from a")
+            print("    Mac/Windows host.")
+        if vault_enabled():
+            print("Encryption: vault is LOCKED — unlock in the web UI "
+                  "(Encryption panel) to access jobs."
+                  if vault_locked() else "Encryption: vault unlocked.")
+        print("Jobs folder (contains PII):", JOBS_DIR,
+              f"— auto-deleted after {args.retain_days} day(s)" if args.retain_days else "— kept forever")
+        print("Do NOT expose this port to the internet.")
+        print("=" * 60)
+        if ssl_ctx:
+            if mode == "self-signed":
+                print("    HTTPS with a self-signed certificate: your browser will")
+                print("    warn once — choose Advanced -> Proceed, or install your")
+                print("    own certificate at the bottom of the main page.")
+            else:
+                print("    HTTPS with your installed custom certificate.")
+        else:
+            print("    WARNING: plain HTTP — PII crosses the network unencrypted.")
+        sys.stdout.flush()      # the banner must reach redirected logs NOW, not
+        # when an 8KB block buffer eventually fills (a container ran "silent"
+        # for minutes and the user debugged a healthy server)
+        _serve(args.host, args.port, ssl_ctx)
+
+    try:
+        _run_service()
+    except KeyboardInterrupt:
+        _shutdown("interrupt")
+        raise
+    except BaseException:
+        _shutdown_state["failed"] = True
+        raise
     else:
-        print("    WARNING: plain HTTP — PII crosses the network unencrypted.")
-    sys.stdout.flush()      # the banner must reach redirected logs NOW, not
-    # when an 8KB block buffer eventually fills (a container ran "silent"
-    # for minutes and the user debugged a healthy server)
-    _serve(args.host, args.port, ssl_ctx)
+        _shutdown("normal")
 
 
 def _serve(host, port, ssl_ctx):
