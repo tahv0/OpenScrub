@@ -201,7 +201,7 @@ def test_scan_pregen_uses_generation_cache(scan, monkeypatch):
     assert not list(fixture.path.parent.glob('thumb2_*.jpg'))
     state = web.FILES.initialize(fixture.job).thumbnail
     assert state.current is not None and ('crop', 0) in state.entries
-    assert counts == {'parse': 1, 'validate': 2}
+    assert counts == {'parse': 1, 'validate': 1}
 
 
 @pytest.mark.parametrize('first', ['pregen', 'demand'])
@@ -2109,28 +2109,21 @@ def test_raw_close_interrupt_before_fd_clearing_keeps_reused_fd(tmp_path, monkey
 @pytest.mark.parametrize('step', ['global', 'job', 'work'])
 @pytest.mark.parametrize('when', ['before', 'after'])
 def test_release_counter_interruption_reconciles_once(step, when):
-    from openscrub_internal.lifetimes import FileOwners, _JobFiles
-    class InterruptOwner(FileOwners):
-        def __setattr__(self, name, value):
-            if name == 'count' and getattr(self, 'armed', False):
-                object.__setattr__(self, 'armed', False)
-                if when == 'before': raise KeyboardInterrupt('before global count')
-                object.__setattr__(self, name, value)
-                raise KeyboardInterrupt('after global count')
-            object.__setattr__(self, name, value)
-    class InterruptJob(_JobFiles):
-        def __setattr__(self, name, value):
-            if name == ('count' if step == 'job' else step) and getattr(self, 'armed', False):
-                object.__setattr__(self, 'armed', False)
-                if when == 'before': raise KeyboardInterrupt('before job count')
-                object.__setattr__(self, name, value)
-                raise KeyboardInterrupt('after job count')
-            object.__setattr__(self, name, value)
-    owners = InterruptOwner(threading.Lock())
-    job = {'_files': InterruptJob()}
+    from openscrub_internal.lifetimes import FileOwners
+    owners = FileOwners(threading.Lock())
+    job = {}
     lease = owners.reserve(job, work=True)
     obj = owners if step == 'global' else job['_files']
-    obj.armed = True
+    attr = '_work_leases' if step == 'work' else '_leases'
+    class InterruptedSet(set):
+        armed = True
+        def discard(self, value):
+            if self.armed:
+                self.armed = False
+                if when == 'after': super().discard(value)
+                raise KeyboardInterrupt('interrupted contribution removal')
+            super().discard(value)
+    setattr(obj, attr, InterruptedSet(getattr(obj, attr)))
     with pytest.raises(KeyboardInterrupt): lease.release()
     lease.release()
     assert lease.released and owners.count == 0
@@ -2583,33 +2576,27 @@ def test_fix3_sparse_deletion_receipt_set_never_restarts_iteration(exact):
     assert not files.thumbnail_artifacts
 
 
-def test_fix3_repeated_interrupt_cannot_reuse_prior_guard_intent(monkeypatch):
-    from openscrub_internal.lifetimes import FileOwners, _Lease
+def test_fix3_repeated_interrupt_cannot_reuse_prior_guard_intent():
+    from openscrub_internal.lifetimes import FileOwners
     owners = FileOwners(threading.Lock())
     job = {}
     lease = owners.reserve(job, work=True)
-    original = _Lease.__setattr__
-    interruptions = []
-    def fail_assign(self, name, value):
-        if self is lease and name == '_work_done' and value is True and len(interruptions) < 2:
-            interruptions.append(name)
-            raise KeyboardInterrupt('progress marker interrupted')
-        if self is lease and name == '_decrement_uncertain' and value is True and len(interruptions) == 2:
-            interruptions.append(name)
-            raise KeyboardInterrupt('uncertainty handoff interrupted')
-        return original(self, name, value)
-    monkeypatch.setattr(_Lease, '__setattr__', fail_assign)
+    class InterruptTwice(set):
+        remaining = 2
+        def discard(self, value):
+            if self.remaining:
+                self.remaining -= 1
+                super().discard(value)
+                raise KeyboardInterrupt('repeated interruption')
+            super().discard(value)
+    job['_files']._work_leases = InterruptTwice(job['_files']._work_leases)
     with pytest.raises(KeyboardInterrupt): lease.release()
-    assert len(interruptions) == 3
     other = owners.reserve(job, work=True)
-    try:
-        try: lease.release()
-        except (RuntimeError, KeyboardInterrupt): pass
-        assert not lease.released
-        assert job['_files'].work == 1
-        assert owners.count == job['_files'].count == 2
-    finally:
-        other.release()
+    lease.release()
+    assert lease.released and not other.released
+    assert owners.count == job['_files'].count == job['_files'].work == 1
+    other.release()
+    assert owners.count == job['_files'].count == job['_files'].work == 0
 
 
 def test_fix3_failed_unlink_claim_retries_after_finalization_interrupt(exact, monkeypatch):
@@ -2807,3 +2794,297 @@ def test_permission_denied_unlink_keeps_receipt_for_retry(exact):
     assert not os.path.exists(path) and files.thumbnail.retirement is None
     assert path not in web.FILES.thumbnail_paths and identity not in web.FILES.thumbnail_inodes
     assert path not in files.thumbnail_artifacts
+
+
+@pytest.mark.parametrize("field,value", [("category", None), ("confidence", float("nan"))])
+@pytest.mark.parametrize("endpoint", ["detections", "thumb/0", "detframe/0"])
+def test_final_wave_invalid_projection_rejected_consistently(exact, field, value, endpoint):
+    doc = json.loads(exact.path.read_text())
+    doc["detections"][0][field] = value
+    exact.path.write_text(json.dumps(doc))
+    response = request("get", exact.url + "/" + endpoint)
+    assert response.status_code == 500 and response.json["error"] == "thumbnail_invalid_report"
+    assert response.headers["Cache-Control"] == "private, no-store"
+    assert web.FILES.count == 0
+
+
+def test_final_wave_weak_etag_matches_current_bytes(exact):
+    version = request("get", exact.url + "/detections").json["thumbnail_version"]
+    url = exact.url + "/thumb/0?v=" + version
+    image = request("get", url)
+    response = request("get", url, headers={"If-None-Match": "W/" + image.headers["ETag"]})
+    assert response.status_code == 304
+    assert response.headers["ETag"] == image.headers["ETag"]
+    assert request('post', exact.url + '/detections', json={'enabled': {'0': False}}).status_code == 200
+    stale = request('get', url, headers={'If-None-Match': 'W/' + image.headers['ETag']})
+    assert stale.status_code == 409 and stale.json['error'] == 'thumbnail_obsolete'
+
+
+def test_final_wave_settlement_interrupt_releases_source(exact, monkeypatch):
+    version = request("get", exact.url + "/detections").json["thumbnail_version"]
+    original = web.thumbs.finish_fill_locked
+    failure = KeyboardInterrupt("after settlement")
+    def interrupted(state, fill):
+        result = original(state, fill)
+        raise failure
+    monkeypatch.setattr(web.thumbs, "finish_fill_locked", interrupted)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        request("get", exact.url + "/thumb/0?v=" + version)
+    assert caught.value is failure
+    assert web.FILES.count == 0
+    assert request("delete", exact.url).status_code == 200
+
+
+def test_final_wave_repeated_release_preserves_intervening_owner(exact, monkeypatch):
+    from openscrub_internal.lifetimes import _Lease
+    with web.VAULT_LOCK:
+        lease = web.FILES.reserve(exact.job, work=True)
+    original = _Lease.__setattr__
+    interruptions = []
+    def interrupt(self, name, value):
+        if self is lease and name == "_work_done" and value is True and len(interruptions) < 2:
+            interruptions.append(name)
+            raise KeyboardInterrupt("interrupted release")
+        return original(self, name, value)
+    monkeypatch.setattr(_Lease, "__setattr__", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        lease.release()
+    with web.VAULT_LOCK:
+        other = web.FILES.reserve(exact.job, work=True)
+    monkeypatch.setattr(_Lease, "__setattr__", original)
+    lease.release()
+    assert lease.released and not other.released
+    assert web.FILES.count == exact.job["_files"].count == exact.job["_files"].work == 1
+    other.release()
+    assert web.FILES.count == 0
+    assert request("delete", exact.url).status_code == 200
+
+
+def test_final_wave_consumed_open_failure_keeps_reused_descriptor(exact, monkeypatch, tmp_path):
+    import builtins
+    source = os.path.realpath(exact.job['video'])
+    foreign = tmp_path / 'foreign'; foreign.write_bytes(b'protected')
+    original = builtins.open
+    held = []
+    failure = OSError('wrapper handoff')
+    def fail_open(path, mode='r', *args, **kwargs):
+        if str(path) == source and mode == 'rb':
+            fd = kwargs['opener'](path, os.O_RDONLY)
+            os.close(fd)
+            other = os.open(str(foreign), os.O_RDONLY)
+            if other != fd:
+                os.dup2(other, fd); os.close(other)
+            held.append(fd)
+            raise failure
+        return original(path, mode, *args, **kwargs)
+    def fail_fdopen(fd, *args, **kwargs):
+        os.close(fd)
+        other = os.open(str(foreign), os.O_RDONLY)
+        if other != fd:
+            os.dup2(other, fd); os.close(other)
+        held.append(fd)
+        raise failure
+    monkeypatch.setattr(builtins, 'open', fail_open)
+    monkeypatch.setattr(os, 'fdopen', fail_fdopen)
+    try:
+        with pytest.raises(OSError) as caught:
+            web._prepare_observed_source(exact.job, source)
+        assert caught.value is failure
+        assert os.read(held[0], 9) == b'protected'
+        assert web.FILES.count == 0
+    finally:
+        for fd in held: os.close(fd)
+
+
+def test_final_wave_refused_fills_do_no_report_work(exact, monkeypatch):
+    doc = json.loads(exact.path.read_text())
+    doc['detections'] = [dict(doc['detections'][0]) for _ in range(5)]
+    exact.path.write_text(json.dumps(doc))
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    files = web.FILES.initialize(exact.job); state = files.thumbnail
+    ready, resume, lock = threading.Event(), threading.Event(), threading.Lock()
+    entered = []
+    original_decode = web._read_thumbnail_ordinal
+    def held_decode(*args, **kwargs):
+        with lock:
+            entered.append(1)
+            if len(entered) == 4: ready.set()
+        assert resume.wait(8)
+        return original_decode(*args, **kwargs)
+    monkeypatch.setattr(web, '_read_thumbnail_ordinal', held_decode)
+    calls = []
+    real_snapshot, real_validate = web._thumbnail_snapshot, web._thumbnail_validate_report
+    def snapshot(*args, **kwargs):
+        calls.append('load'); return real_snapshot(*args, **kwargs)
+    def validate(*args, **kwargs):
+        calls.append('validate'); return real_validate(*args, **kwargs)
+    monkeypatch.setattr(web, '_thumbnail_snapshot', snapshot)
+    monkeypatch.setattr(web, '_thumbnail_validate_report', validate)
+    held = [start_call('get', exact.url + '/thumb/%d?v=%s' % (i, version)) for i in range(4)]
+    try:
+        assert ready.wait(8)
+        with files.report_lock: assert len(state.fills) == 4
+        calls.clear()
+        for i in (0, 4):
+            response = request('get', exact.url + '/thumb/%d?v=%s' % (i, version))
+            assert response.status_code == 409 and response.json['error'] == 'thumbnail_pending'
+        assert not calls
+    finally:
+        resume.set()
+        responses = [finish(call) for call in held]
+    assert all(response.status_code == 200 for response in responses)
+
+
+def test_final_wave_final_source_stat_failure_is_private_json(exact, monkeypatch):
+    original = web._thumbnail_current_locked
+    count = []
+    def observed(job, selected, fence, **kwargs):
+        count.append(1)
+        if len(count) < 3:
+            return original(job, selected, fence, **kwargs)
+        stat = os.stat
+        def denied(path, *args, **kw):
+            if str(path) == selected['path']: raise PermissionError('private path')
+            return stat(path, *args, **kw)
+        with monkeypatch.context() as patch:
+            patch.setattr(os, 'stat', denied)
+            return original(job, selected, fence, **kwargs)
+    monkeypatch.setattr(web, '_thumbnail_current_locked', observed)
+    response = request('get', exact.url + '/detections')
+    assert response.status_code == 409 and response.is_json
+    assert response.json['error'] == 'thumbnail_source_conflict'
+    assert response.headers['Cache-Control'] == 'private, no-store'
+    assert b'private path' not in response.data and web.FILES.count == 0
+
+
+@pytest.mark.parametrize('endpoint', ['thumb/0', 'detframe/0'])
+def test_final_wave_nul_source_is_invalid_report(exact, endpoint):
+    doc = json.loads(exact.path.read_text())
+    doc['provenance']['input'] = 'private\\u0000path'
+    doc['provenance']['input'] = doc['provenance']['input'].replace('\\u0000', chr(0))
+    exact.path.write_text(json.dumps(doc))
+    response = request('get', exact.url + '/' + endpoint)
+    assert response.status_code == 500 and response.json['error'] == 'thumbnail_invalid_report'
+    assert response.headers['Cache-Control'] == 'private, no-store'
+    assert b'private' not in response.data and web.FILES.count == 0
+
+
+def test_final_wave_fill_removal_interruption_can_resume():
+    state = web.thumbs.ThumbnailState()
+    gen = web.thumbs.accept_generation_locked(state, web.thumbs.Candidate(), 1)
+    fill = web.thumbs.begin_fill_locked(state, gen, 'crop', 0)
+    class InterruptRemoval(set):
+        def remove(self, item):
+            super().remove(item)
+            raise KeyboardInterrupt('after removal')
+    state.fills = InterruptRemoval(state.fills)
+    with pytest.raises(KeyboardInterrupt): web.thumbs.finish_fill_locked(state, fill)
+    web.thumbs.finish_fill_locked(state, fill)
+    assert fill.settled and not state.fills
+
+
+def test_final_wave_metadata_validates_report_once(exact, monkeypatch):
+    original = web._thumbnail_validate_report
+    calls = []
+    def counted(doc):
+        calls.append(1)
+        return original(doc)
+    monkeypatch.setattr(web, '_thumbnail_validate_report', counted)
+    assert request('get', exact.url + '/detections').status_code == 200
+    assert len(calls) == 1
+
+
+def test_final_wave_pregen_stops_at_stalled_retirement(scan, monkeypatch):
+    fixture, threads = scan
+    version = request('get', fixture.url + '/detections').json['thumbnail_version']
+    assert request('get', fixture.url + '/thumb/0?v=' + version).status_code == 200
+    state = web.FILES.initialize(fixture.job).thumbnail
+    old_path = state.entries['crop', 0].path
+    doc = json.loads(fixture.path.read_text())
+    doc['detections'] = [dict(doc['detections'][0]) for _ in range(40)]
+    monkeypatch.setattr(openscrub, 'run_scan', lambda args, cb: dict(source_report=doc, stats={}))
+    original = os.unlink; attempts = []
+    def deny(path, *args, **kwargs):
+        if str(path) == old_path:
+            attempts.append(path)
+            raise PermissionError('held owned thumbnail')
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'unlink', deny)
+    web._run_job(fixture.job, 'scan')
+    for thread in threads: join(thread)
+    assert len(attempts) <= 6
+    assert any('thumbnails pre-generated (0)' in line for line in fixture.job['log'])
+    assert web.FILES.count == 0
+    monkeypatch.setattr(os, 'unlink', original)
+    fresh = request('get', fixture.url + '/detections')
+    assert fresh.status_code == 200
+    assert request('get', fixture.url + '/thumb/0?v=' + fresh.json['thumbnail_version']).status_code == 200
+    assert not os.path.exists(old_path)
+
+
+@pytest.mark.parametrize('field,value', [('text', {'nested': float('nan')}), ('track', float('inf')), ('person', float('nan'))])
+@pytest.mark.parametrize('endpoint', ['detections', 'thumb/0', 'detframe/0'])
+def test_final_wave_nonfinite_projection_fields_are_invalid(exact, field, value, endpoint):
+    doc = json.loads(exact.path.read_text()); doc['detections'][0][field] = value
+    exact.path.write_text(json.dumps(doc))
+    response = request('get', exact.url + '/' + endpoint)
+    assert response.status_code == 500 and response.json['error'] == 'thumbnail_invalid_report'
+    assert response.headers['Cache-Control'] == 'private, no-store' and web.FILES.count == 0
+
+
+def test_final_wave_nonfinite_duration_is_invalid(exact):
+    doc = json.loads(exact.path.read_text()); doc['render_state']['fps'] = 5e-324
+    exact.path.write_text(json.dumps(doc))
+    response = request('get', exact.url + '/detections')
+    assert response.status_code == 500 and response.json['error'] == 'thumbnail_invalid_report'
+
+
+def test_final_wave_release_keeps_first_interruption():
+    from openscrub_internal.lifetimes import FileOwners
+    owners = FileOwners(threading.Lock()); job = {}; lease = owners.reserve(job, work=True)
+    first = KeyboardInterrupt('first'); second = KeyboardInterrupt('second')
+    class InterruptTwice(set):
+        errors = [first, second]
+        def discard(self, value):
+            if self.errors:
+                super().discard(value)
+                raise self.errors.pop(0)
+            super().discard(value)
+    job['_files']._work_leases = InterruptTwice(job['_files']._work_leases)
+    with pytest.raises(KeyboardInterrupt) as caught: lease.release()
+    assert caught.value is first
+    lease.release()
+    assert owners.count == job['_files'].count == job['_files'].work == 0
+
+
+def test_final_wave_settlement_primary_survives_cleanup_failure(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    settle, cleanup = web.thumbs.finish_fill_locked, web._thumbnail_cleanup
+    first, second = KeyboardInterrupt('settlement'), RuntimeError('cleanup')
+    count = []
+    def interrupted(state, fill):
+        settle(state, fill)
+        raise first
+    def failed_cleanup(*args, **kwargs):
+        count.append(1)
+        if len(count) > 1: raise second
+        return cleanup(*args, **kwargs)
+    monkeypatch.setattr(web.thumbs, 'finish_fill_locked', interrupted)
+    monkeypatch.setattr(web, '_thumbnail_cleanup', failed_cleanup)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        request('get', exact.url + '/thumb/0?v=' + version)
+    assert caught.value is first and web.FILES.count == 0
+
+
+def test_final_wave_opaque_additive_preserved_across_projection_and_images(exact):
+    doc = json.loads(exact.path.read_text())
+    doc['detections'][0]['opaque'] = {'nested': [None, 0.123456789, {'keep': True}]}
+    exact.path.write_text(json.dumps(doc))
+    before = exact.path.read_bytes()
+    metadata = request('get', exact.url + '/detections')
+    assert metadata.status_code == 200
+    assert metadata.json['detections'][0]['thumbnail_row'] == web.thumbs.raw_row_fingerprint(doc['detections'][0])
+    version = metadata.json['thumbnail_version']
+    for kind in ('thumb', 'detframe'):
+        assert request('get', exact.url + '/' + kind + '/0?v=' + version).status_code == 200
+    assert exact.path.read_bytes() == before

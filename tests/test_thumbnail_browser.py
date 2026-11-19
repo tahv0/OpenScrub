@@ -35,6 +35,12 @@ detail.insertAdjacentHTML=function(_,html){
   const src=attrs.match(/src="([^"]*)"/);img.src=src?src[1]:'';
   img.dataset.thumbIndex=String(i);img.onerror=()=>vm.runInContext('thumbRetry(elements.get(\"img'+i+'\"))',ctx);const button=element('reopen'+i),status=element('status'+i);button.hidden=true;status.hidden=true;const parent={querySelector:s=>s==='[data-thumb-reopen]'?button:s==='[data-thumb-status]'?status:img};elements.set('status'+i,status);button.parentElement=parent;img.parentElement=parent;elements.set('reopen'+i,button);elements.set('img'+i,img);elements.set('thumb'+i,img);
  }
+ root.querySelector=selector=>{
+  const card=selector.match(/^\[data-review-card="(\d+)"\]$/);
+  if(card){const img=elements.get('img'+card[1]),label=element();return {dataset:{},querySelector:s=>s==='img'?img:label};}
+  if(selector.startsWith('[data-review-heading=')){const label=element();return {querySelector:()=>label,querySelectorAll:()=>[element(),element()]};}
+  return null;
+ };
 };
 for(const id of ['beslot','reviewSaveStatus'])elements.set(id,element(id));
 const document={getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
@@ -66,7 +72,7 @@ def run_js(scenario):
     if not node:
         pytest.skip('Node is needed to evaluate the shipped JavaScript')
     script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(scenario) + ';' + HARNESS
-    result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([node], input=script, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -369,3 +375,16 @@ def test_fix2_retirement_disconnects_only_owned_lightbox(exit_kind):
     assert.notEqual(current.overlay,light.overlay);assert.equal(current.overlay.isConnected,true);assert.equal(current.node.src,src);
     assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(MAN[0].manual_id,'current');
     """.replace('KIND',json.dumps(exit_kind)))
+
+
+def test_final_wave_node_program_uses_stdin(monkeypatch):
+    class Result:
+        returncode = 0
+        stdout = stderr = ''
+    def run(args, **kwargs):
+        assert args == [shutil.which('node')]
+        assert 'const SOURCE=' in kwargs['input']
+        assert kwargs['timeout'] == 15 and kwargs['capture_output'] and kwargs['text']
+        return Result()
+    monkeypatch.setattr(subprocess, 'run', run)
+    run_js('assert.ok(true)')

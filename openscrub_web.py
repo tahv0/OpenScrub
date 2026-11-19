@@ -1197,18 +1197,25 @@ def _run_job(job, action, owner=None):
                         if selected is not pregen_source or selected['path'] != video:
                             return
                         rows, rs = _thumbnail_validate_report(doc)
-                        _thumbnail_select(jb, doc, selected, fence, operation_owner=owner)
+                        _thumbnail_select(jb, doc, selected, fence, operation_owner=owner, validated=(rows, rs))
                         cap = cv2.VideoCapture(video)
+                        generated = 0
                         for index in range(len(rows)):
                             try:
                                 _thumbnail_image(jb, index, 'crop', operation_owner=owner,
                                                  capture=cap, snapshot=(doc, selected, fence, rows, rs))
+                                generated += 1
                             except _ThumbnailError as error:
                                 if error.code in ('thumbnail_obsolete', 'thumbnail_source_conflict',
                                                   'source_report_pending'):
-                                    return
+                                    break
+                                if error.code == 'thumbnail_pending':
+                                    with files.report_lock:
+                                        stalled = files.thumbnail.retirement is not None
+                                    if stalled:
+                                        break
                                 continue
-                        jb['log'].append('thumbnails pre-generated (%d)' % len(rows))
+                        jb['log'].append('thumbnails pre-generated (%d)' % generated)
                     except Exception:
                         pass
                     finally:
@@ -1761,14 +1768,7 @@ def _prepare_observed_source(job, path):
     try:
         canonical = lease.source
         _thumbnail_resolve_admission(lease, canonical)
-        flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NONBLOCK', 0)
-        fd = os.open(canonical, flags)
-        try:
-            opened = os.fdopen(fd, 'rb')
-        except BaseException:
-            os.close(fd)
-            raise
-        with opened:
+        with open(canonical, 'rb', opener=_thumbnail_nonblocking_opener) as opened:
             observed = os.fstat(opened.fileno())
             if not stat.S_ISREG(observed.st_mode):
                 raise exact.ExactError('source is not a regular file', 409, 'sample_conflict')
@@ -2121,11 +2121,15 @@ def _thumbnail_current_locked(job, selected, fence, *, operation_owner=None):
         if current is not None and current.selected_source is selected and current.report_stamp == fence[1]:
             thumbs.invalidate_locked(files.thumbnail, 'source or report disappeared')
         raise _ThumbnailError('thumbnail_obsolete', 409, 'Source or report changed') from None
+    except OSError:
+        raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report unavailable') from None
 
     try:
         source_stat = os.stat(selected['path'])
     except FileNotFoundError:
         source_stat = None
+    except OSError:
+        raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source unavailable') from None
     if source_stat is None or not stat.S_ISREG(source_stat.st_mode) or _file_stamp(source_stat) != selected['stamp']:
         files.source_retired = True
         files.current_source = None
@@ -2194,7 +2198,11 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
             if not _source_observation_current_locked(job, observation, fence, report_stamp):
                 raise _ThumbnailError('thumbnail_obsolete', 409, 'Source or report changed')
             raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
-    canonical = os.path.realpath(candidate)
+    try:
+        canonical = os.path.realpath(candidate)
+    except ValueError:
+        raise _thumbnail_observation_error(job, observation, fence, report_stamp,
+            _ThumbnailError('thumbnail_invalid_report', 500, 'Report provenance invalid')) from None
     if recovery is None and canonical != os.path.realpath(job['video']):
         with files.report_lock:
             if not _source_observation_current_locked(job, observation, fence, report_stamp):
@@ -2274,7 +2282,7 @@ def _thumbnail_validate_report(doc):
         fps, cum = rs['fps'], rs['cum']
         if isinstance(fps, bool) or not isinstance(fps, (float, int)) or not math.isfinite(fps) or fps <= 0:
             raise ValueError()
-        if not isinstance(cum, list) or not cum:
+        if not isinstance(cum, list) or not cum or not math.isfinite(len(cum) / fps):
             raise ValueError()
         for pair in cum:
             if (not isinstance(pair, (list, tuple)) or len(pair) != 2 or any(
@@ -2286,7 +2294,18 @@ def _thumbnail_validate_report(doc):
                 raise ValueError()
             # These fields are required by the shared metadata projection as
             # well as by image requests selecting the same generation.
-            row['category'], row['text']
+            if not isinstance(row['category'], str) or not isinstance(row['text'], str):
+                raise ValueError()
+            if not isinstance(row.get('enabled', True), bool):
+                raise ValueError()
+            for name in ('track', 'person'):
+                value = row.get(name, -1)
+                if type(value) is not int or not math.isfinite(value):
+                    raise ValueError()
+            confidence = row.get('confidence', 0)
+            if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
+                    or not math.isfinite(confidence)):
+                raise ValueError()
             thumbs.recipe_for_row(row, rs, 'crop')
         return rows, rs
     except (KeyError, TypeError, ValueError, OverflowError):
@@ -2415,9 +2434,9 @@ def _thumbnail_reserve_discovery(job):
         time.sleep(.01)
 
 
-def _thumbnail_select(job, doc, selected, fence, *, operation_owner=None, discovery=None):
+def _thumbnail_select(job, doc, selected, fence, *, operation_owner=None, discovery=None, validated=None):
     """Converge a private coherent report on the current bounded generation."""
-    rows, _ = _thumbnail_validate_report(doc)
+    rows, _ = validated if validated is not None else _thumbnail_validate_report(doc)
     files = FILES.initialize(job)
     state = files.thumbnail
     if discovery is None:
@@ -2468,6 +2487,7 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
         if generation is None:
             generation, discovery = _thumbnail_reserve_discovery(job)
         doc = None
+        validated = None
         if generation is not None:
             with files.report_lock:
                 if (state.current is not generation or files.current_source is not generation.selected_source
@@ -2499,14 +2519,22 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                 raise
         else:
             doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
+            validated = _thumbnail_validate_report(doc)
             generation = _thumbnail_select(job, doc, selected, fence, operation_owner=operation_owner,
-                                           discovery=discovery)
+                                           discovery=discovery, validated=validated)
         if index < 0 or index >= generation.row_count:
             raise _ThumbnailError('thumbnail_unavailable', 404, 'Thumbnail unavailable')
         with files.report_lock:
             if state.current is not generation:
                 raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
             entry = state.entries.get((kind, index))
+            if entry is None:
+                try:
+                    fill = thumbs.begin_fill_locked(state, generation, kind, index)
+                except thumbs.ThumbnailPending:
+                    raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail pending') from None
+                except thumbs.ThumbnailObsolete:
+                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
         if entry is None:
             if snapshot is not None:
                 saved_doc, saved_source, saved_fence, saved_rows, saved_rs = snapshot
@@ -2520,18 +2548,13 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                 with files.report_lock:
                     if state.current is not generation or selected is not generation.selected_source or fence != ((generation.report_epoch, generation.operation), generation.report_stamp):
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
-            rows, rs = (saved_rows, saved_rs) if snapshot is not None else _thumbnail_validate_report(doc)
+            rows, rs = ((saved_rows, saved_rs) if snapshot is not None else
+                        validated if validated is not None else _thumbnail_validate_report(doc))
             recipe = thumbs.recipe_for_row(rows[index], rs, kind)
             with files.report_lock:
                 _thumbnail_current_locked(job, generation.selected_source,
                     ((generation.report_epoch, generation.operation), generation.report_stamp),
                     operation_owner=operation_owner)
-                try:
-                    fill = thumbs.begin_fill_locked(state, generation, kind, index)
-                except thumbs.ThumbnailPending:
-                    raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail pending') from None
-                except thumbs.ThumbnailObsolete:
-                    raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed') from None
             image = None
             for ordinal, offset in zip(recipe.indices, recipe.offsets):
                 try:
@@ -2677,37 +2700,40 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
         return body, entry.etag
     finally:
         primary_pending = sys.exc_info()[0] is not None
-        if discovery is not None:
-            with files.report_lock:
-                thumbs.finish_discovery_locked(state, discovery)
-        if fill is not None:
-            retired = None
-            with files.report_lock:
-                if fill.stage_closed:
-                    try:
-                        retired = thumbs.finish_fill_locked(state, fill)
-                    except BaseException:
-                        if not fill.settled:
-                            thumbs.defer_resource_locked(state, fill, lease)
-                            lease = None
-                        if not primary_pending:
-                            raise
-                else:
-                    if state.current is generation:
-                        thumbs.invalidate_locked(state, 'stage writer close failed')
-                    thumbs.defer_resource_locked(state, fill, lease)
-                    lease = None
-            del retired
-        if lease is not None:
-            try:
-                try:
-                    _thumbnail_cleanup(job)
-                except BaseException:
-                    if not primary_pending:
-                        raise
-            finally:
+        try:
+            if discovery is not None:
+                with files.report_lock:
+                    thumbs.finish_discovery_locked(state, discovery)
+            if fill is not None:
+                retired = None
+                with files.report_lock:
+                    if fill.stage_closed:
+                        try:
+                            retired = thumbs.finish_fill_locked(state, fill)
+                        except BaseException:
+                            if not fill.settled:
+                                thumbs.defer_resource_locked(state, fill, lease)
+                                lease = None
+                            if not primary_pending:
+                                raise
+                    else:
+                        if state.current is generation:
+                            thumbs.invalidate_locked(state, 'stage writer close failed')
+                        thumbs.defer_resource_locked(state, fill, lease)
+                        lease = None
+                del retired
+        finally:
+            if lease is not None:
                 releasing_primary = primary_pending or sys.exc_info()[0] is not None
-                _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
+                try:
+                    try:
+                        _thumbnail_cleanup(job)
+                    except BaseException:
+                        if not releasing_primary:
+                            raise
+                finally:
+                    releasing_primary = releasing_primary or sys.exc_info()[0] is not None
+                    _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
 
 
 def _exact_policy(doc, selected):
@@ -2867,7 +2893,7 @@ def job_detections(jid):
         _thumbnail_cleanup(job)
         doc, selected, fence, lease = _thumbnail_snapshot(job)
         rows, rs = _thumbnail_validate_report(doc)
-        generation = _thumbnail_select(job, doc, selected, fence)
+        generation = _thumbnail_select(job, doc, selected, fence, validated=(rows, rs))
         items = []
         for i, d in enumerate(rows):
             items.append({"i": i, "category": d["category"], "text": d["text"],
@@ -2900,7 +2926,7 @@ def _thumbnail_route(job, index, kind):
     for attempt in range(2 if version is None else 1):
         try:
             body, etag = _thumbnail_image(job, index, kind, version)
-            if version is not None and request.if_none_match.contains(etag[1:-1]):
+            if version is not None and request.if_none_match.contains_weak(etag[1:-1]):
                 response = Response(status=304)
             else:
                 response = Response(body, mimetype='image/jpeg')
@@ -4928,7 +4954,10 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
- if(which!=="review"&&which!=="boxedit_rev")retireThumbnailReview();
+ if(which!=="review"&&which!=="boxedit_rev"){
+  retireThumbnailReview();
+  const error=document.getElementById("review-load-error");if(error)error.remove();
+ }
  // a playing box-editor video must be PAUSED before its DOM is wiped —
  // an element removed via innerHTML can keep its audio running
  try{const v=document.getElementById("beVid");
@@ -4970,17 +4999,29 @@ function cmpShow(){
 
 async function loadReview(){
  const id=CUR,gen=VIEW_GEN,token={};REVIEW_REQUEST=token;
+ const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===token;
+ const failed=()=>{
+  if(!current()||document.getElementById("review"))return;
+  const old=document.getElementById("review-load-error");if(old)old.remove();
+  const box=document.createElement("div");box.id="review-load-error";box.className="card";
+  const message=document.createElement("p");message.textContent="Review could not be loaded. Try again.";
+  const retry=document.createElement("button");retry.type="button";retry.dataset.reviewRetry="";retry.textContent="Retry review";
+  retry.addEventListener("click",()=>{if(current())loadReview();});
+  box.appendChild(message);box.appendChild(retry);detail.appendChild(box);
+ };
  let d;
  try{
   const r=await fetch(`api/jobs/${id}/detections`);
-  if(!ownsView(id,gen)||REVIEW_REQUEST!==token||!r.ok)return;
+  if(!current())return;
+  if(!r.ok){failed();return;}
   d=await r.json();
- }catch(e){return;}
- if(!ownsView(id,gen)||REVIEW_REQUEST!==token||!d||!Array.isArray(d.detections)||
-    !Number.isFinite(d.duration)||d.detections.some(x=>!x||!Number.isInteger(x.i)||
-    typeof x.category!=="string"||!Number.isFinite(x.t_start)||!Number.isFinite(x.t_end)))return;
+ }catch(e){failed();return;}
+ if(!current())return;
+ if(!d||!Array.isArray(d.detections)||!Number.isFinite(d.duration)||
+    d.detections.some(x=>!x||!Number.isInteger(x.i)||typeof x.category!=="string"||
+    !Number.isFinite(x.t_start)||!Number.isFinite(x.t_end))){failed();return;}
  const owner={jobId:id,viewGen:gen,token,root:null,version:null,attempted:false,refresh:null,bindings:new Map()};
- const nextEN={...EN},nextTRKMEM={},groups={},zdrop=[],thumbMembers=new Map();
+ const nextEN={...EN},nextTRKMEM={},groups=Object.create(null),zdrop=[],thumbMembers=new Map(),cards=[],headings=[];
  const version=typeof d.thumbnail_version==="string"&&/^[0-9a-f]{32}$/.test(d.thumbnail_version)?d.thumbnail_version:null;
  const imageUrl=x=>version&&typeof x.thumbnail_row==="string"&&/^[0-9a-f]{64}$/.test(x.thumbnail_row)?thumbnailUrl(id,"thumb",x.i,version):`api/jobs/${id}/thumb/${x.i}`;
  d.detections.forEach(x=>{
@@ -5005,12 +5046,13 @@ async function loadReview(){
     <button class="sec" onclick="setAllZd(false)">keep all</button></div>
    <div class="grid3">`;
   for(const x of zdrop){
-   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
+   cards.push({x,category:"zdrop",zone:true});
+   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-review-card="${x.i}" data-zone="true">
     <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}" loading="lazy"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})">
     <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
     <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
-    <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div><span data-review-label></span> <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${nextEN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${nextEN[x.i]?"Blur":"Keep"}</button>
    </div>`;
@@ -5019,11 +5061,11 @@ async function loadReview(){
  }
  for(const[cat,rawItems] of Object.entries(groups)){
   // collapse dense tracks: one card per physical object, not per frame
-  const byGroup={},items=[];
+  const byGroup=Object.create(null),items=[];
   for(const x of rawItems){
    // identity first: one card per PERSON (all their tracks); then per
    // track; ungrouped detections stand alone
-   const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+   const group=thumbnailGroup(x),key=group?group[1]:null;
    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
    else{nextTRKMEM[x.i]=[x.i];items.push(x);}
   }
@@ -5042,18 +5084,18 @@ async function loadReview(){
   }
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
-  html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
-  <button class="sec" style="padding:3px 8px;font-size:12px"
-   onclick="setAll('${cat}',true)">all on</button>
-  <button class="sec" style="padding:3px 8px;font-size:12px"
-   onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
+  const headingIndex=headings.length;headings.push(cat);
+  html+=`<h3 data-review-heading="${headingIndex}" style="margin:10px 0 6px"><span data-review-category></span> <span class="badge">${items.length}</span>
+  <button type="button" class="sec" style="padding:3px 8px;font-size:12px">all on</button>
+  <button type="button" class="sec" style="padding:3px 8px;font-size:12px">all off</button></h3><div class="grid3">`;
   for(const x of items){
-   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+   cards.push({x,category:cat,zone:false});
+   html+=`<div class="det ${nextEN[x.i]?'':'off'}" id="det${x.i}" data-review-card="${x.i}">
     <img id="thumb${x.i}" data-thumb-index="${x.i}" src="${imageUrl(x)}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})">
     <span data-thumb-status hidden>Review changed; reopen review to refresh.</span>
     <button type="button" class="sec" data-thumb-reopen hidden onclick="reopenThumbnailReview(event)">Re-open review</button>
-    <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`<span data-review-label></span>`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${nextEN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${nextEN[x.i]?"Blur":"Keep"}</button>
    </div>`}
@@ -5065,12 +5107,26 @@ async function loadReview(){
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
  if(!ownsView(id,gen)||REVIEW_REQUEST!==token)return;
- showPanel("review");retireThumbnailReview();DUR=d.duration;Object.assign(EN,nextEN);TRKMEM=nextTRKMEM;
+ showPanel("review");retireThumbnailReview();
+ const loadError=document.getElementById("review-load-error");if(loadError)loadError.remove();
+ DUR=d.duration;Object.assign(EN,nextEN);TRKMEM=nextTRKMEM;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
  owner.root=document.getElementById("review");owner.version=version;REVIEW_IMAGES=owner;
- for(const x of d.detections){
-  const node=document.getElementById("thumb"+x.i);if(!node)continue;
+ headings.forEach((cat,index)=>{
+  const heading=owner.root.querySelector(`[data-review-heading="${index}"]`);
+  const name=Object.prototype.hasOwnProperty.call(CATDN,cat)?CATDN[cat]:cat;
+  heading.querySelector("[data-review-category]").textContent=name;
+  const buttons=heading.querySelectorAll("button");
+  buttons[0].addEventListener("click",()=>setAll(cat,true));
+  buttons[1].addEventListener("click",()=>setAll(cat,false));
+ });
+ for(const spec of cards){
+  const x=spec.x,card=owner.root.querySelector(`[data-review-card="${x.i}"]`);
+  card.dataset.cat=spec.category;
+  const label=card.querySelector("[data-review-label]");
+  if(label)label.textContent=`"${x.text}"`;
+  const node=card.querySelector("img");
   const row=typeof x.thumbnail_row==="string"&&/^[0-9a-f]{64}$/.test(x.thumbnail_row)?x.thumbnail_row:null;
   const binding={node,rawIndex:x.i,thumbnailRow:row,version:row?version:null,
    group:thumbMembers.has(x.i)?thumbnailGroup(x):null,members:thumbMembers.get(x.i)||null};
@@ -5093,10 +5149,10 @@ function applyDet(i,blur){
  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
 }
 function toggleDet(i){applyDet(i,!EN[i]);}
-function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
- .forEach(el=>applyDet(+el.id.slice(3),on));}
+function setAll(cat,on){document.querySelectorAll("#review .det[data-cat]")
+ .forEach(el=>{if(!el.dataset.zone&&el.dataset.cat===cat)applyDet(+el.id.slice(3),on);});}
 function thumbRetry(img){if(typeof img.onerror==="function")img.onerror();}
-function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+function setAllZd(on){document.querySelectorAll("#review .det[data-zone]")
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 
 let selSet=new Set(),marqEl=null,menuEl=null,mStart=null;

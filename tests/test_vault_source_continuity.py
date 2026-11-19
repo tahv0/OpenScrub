@@ -1,4 +1,5 @@
 """Live exact-source continuity across real vault transitions."""
+import errno
 import os
 
 import pytest
@@ -597,10 +598,16 @@ def test_observed_fifo_does_not_block_closed_store(exact):
     try:
         prompt = done.wait(1)
     finally:
-        if not done.is_set():
-            fd = os.open(str(source), os.O_WRONLY | os.O_NONBLOCK)
-            os.close(fd)
-        result = finish(call)
+        try:
+            if not done.is_set():
+                try:
+                    fd = os.open(str(source), os.O_WRONLY | os.O_NONBLOCK)
+                except OSError as error:
+                    if error.errno != errno.ENXIO: raise
+                else:
+                    os.close(fd)
+        finally:
+            result = finish(call)
     assert prompt, 'vault waited for a FIFO writer'
     assert result.status_code == 500
     assert source.exists() and web.VAULT['closed']

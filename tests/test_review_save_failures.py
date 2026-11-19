@@ -25,7 +25,11 @@ const vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map();
 function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:false,
  classList:{toggle(){},remove(){}},remove(){this.removed=true},
- addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
+ addEventListener(){},querySelector(selector){
+  if(selector.startsWith('[data-review-heading='))return {querySelector:()=>el(),querySelectorAll:()=>[el(),el()]};
+  if(selector.startsWith('[data-review-card='))return {dataset:{},querySelector:()=>el()};
+  return null;
+ },insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
 const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
@@ -60,7 +64,7 @@ def run_js(scenario):
     if not node:
         pytest.skip("Node is needed to evaluate the embedded review JavaScript")
     script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
-    result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([node], input=script, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
