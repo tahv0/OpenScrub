@@ -3,6 +3,77 @@ const path=require('node:path');
 const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE);
 const base=process.env.OPENSCRUB_PAGE_URL,job=process.env.OPENSCRUB_PAGE_JOB,jobB=process.env.OPENSCRUB_PAGE_JOB_B;
 const artifacts=process.env.OPENSCRUB_BROWSER_ARTIFACTS;
+async function pendingDomScenario(context,order){
+ const page=await context.newPage(),errors=[],requests=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
+ let releaseMeta=()=>{},releaseImage=()=>{};
+ try{
+  await page.goto(base);assert.equal(await page.title(),'OpenScrub');
+  await page.evaluate(id=>openJob(id),job);await page.waitForSelector('#thumb2');
+  await page.waitForFunction(()=>[0,2].every(i=>document.getElementById('thumb'+i)?.naturalWidth>0));
+  await page.evaluate(()=>{
+   const slot=document.getElementById('beslot');slot.innerHTML='<div id="dom-editor-proof">editor</div>';
+   BE.sel=7;BE.playing=true;BE.audio=[{t0:.1,t1:.2,mode:'mute'}];BE.audioSaved=[];BE.audioLoaded=true;
+   BE.ov[2]=[1,2,12,13];EDITS.audioInFlight=true;EDITS.enabled[2]=false;MAN.push({manual_id:'dom-draft'});
+   window.domRefs={root:document.getElementById('review'),editor:BE,editorNode:document.getElementById('dom-editor-proof'),
+    draft:EDITS,drafts:REVIEW_DRAFTS,en:EN,manual:MAN,audio:BE.audio,saved:BE.audioSaved};
+  });
+  const published=await context.request.post(base+'api/jobs/'+job+'/detections',
+   {data:{audio:[{t0:.1,t1:.4,mode:'mute'},{t0:.5,t1:.8,mode:'bleep'}]}});
+  assert.equal(published.status(),200);
+  let metadataSeen,metadataDone,imageSeen;
+  const metaStarted=new Promise(r=>metadataSeen=r),metaFinished=new Promise(r=>metadataDone=r);
+  const metaGate=new Promise(r=>releaseMeta=r),imageStarted=new Promise(r=>imageSeen=r),imageGate=new Promise(r=>releaseImage=r);
+  let metadataCalls=0;
+  const holdMetadata=async route=>{if(route.request().method()!=='GET')return route.continue();
+   metadataCalls++;const response=await route.fetch();assert.equal(response.status(),200);
+   metadataSeen();await metaGate;await route.fulfill({response});metadataDone();};
+  const holdImage=async route=>{const response=await route.fetch();assert.equal(response.status(),409);
+   imageSeen();if(order==='after')await imageGate;await route.fulfill({response});};
+  await page.route('**/api/jobs/'+job+'/detections',holdMetadata);
+  await page.route('**/api/jobs/'+job+'/detframe/2?*',holdImage);
+  const requestStart=requests.length;
+  await page.locator('#thumb0').click();
+  await Promise.race([metaStarted,new Promise((_,reject)=>setTimeout(()=>reject(Error('pending metadata not observed')),10000))]);
+  await page.evaluate(()=>{
+   const owner=REVIEW_IMAGES,old=owner.lightbox;
+   window.domOld={light:old,node:old.node,src:old.node.src,callback:old.node.onerror};
+   old.overlay.remove();zoomDet(2);
+   const img=document.getElementById('thumb0'),replacement=img.cloneNode(false);
+   replacement.removeAttribute('onerror');replacement.removeAttribute('onclick');
+   replacement.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+   replacement.style.visibility='visible';img.replaceWith(replacement);
+   window.domOld.card=img;window.domReplacement={light:owner.lightbox,node:owner.lightbox.node,
+    src:owner.lightbox.node.src,card:replacement,cardSrc:replacement.src,cardVisibility:replacement.style.visibility};
+  });
+  await Promise.race([imageStarted,new Promise((_,reject)=>setTimeout(()=>reject(Error('replacement image request not observed')),10000))]);
+  if(order==='before')await page.waitForFunction(()=>domReplacement.node.style.visibility==='hidden');
+  releaseMeta();await metaFinished;await page.evaluate(()=>REVIEW_IMAGES.refresh);
+  await page.waitForFunction(()=>{
+   const card=REVIEW_IMAGES.bindings.get(2);return card.version!==domReplacement.light.version&&
+    card.node.complete&&card.node.naturalWidth>0&&getComputedStyle(card.node).visibility!=='hidden';
+  });
+  if(order==='after'){releaseImage();await page.waitForFunction(()=>domReplacement.node.style.visibility==='hidden');}
+  await page.evaluate(()=>domOld.callback());
+  assert.equal(await page.evaluate(()=>{
+   const r=domRefs,n=domReplacement,old=domOld;
+   return !old.node.isConnected&&!old.card.isConnected&&n.node.isConnected&&n.node.src===n.src&&
+    n.node.style.visibility==='hidden'&&n.card.isConnected&&n.card.src===n.cardSrc&&
+    n.card.style.visibility===n.cardVisibility&&document.getElementById('review')===r.root&&
+    document.getElementById('dom-editor-proof')===r.editorNode&&BE===r.editor&&EDITS===r.draft&&
+    REVIEW_DRAFTS===r.drafts&&EN===r.en&&MAN===r.manual&&BE.audio===r.audio&&BE.audioSaved===r.saved&&
+    BE.audioLoaded&&EDITS.audioInFlight&&BE.sel===7&&BE.playing&&BE.ov[2][0]===1&&
+    EDITS.enabled[2]===false&&MAN[0].manual_id==='dom-draft'&&
+    !document.querySelector('#det2 [data-thumb-status]').hidden&&
+    !document.querySelector('#det2 [data-thumb-reopen]').hidden;
+  }),true);
+  assert.equal(metadataCalls,1);
+  assert.equal(requests.slice(requestStart).filter(r=>r.method==='POST'||r.url.includes('/render')||r.url.includes('/edit_sample')).length,0);
+  assert.deepEqual(errors,[]);
+  return {order,metadataCalls,oldDetached:true,replacementIntact:true,draftsIntact:true};
+ }finally{releaseMeta();releaseImage();await page.close();}
+}
 (async()=>{
  const browser=await chromium.launch({executablePath:process.env.OPENSCRUB_CHROMIUM,args:['--no-sandbox']});
  try{
@@ -115,7 +186,8 @@ const artifacts=process.env.OPENSCRUB_BROWSER_ARTIFACTS;
   assert.deepEqual(errors,[]);
   assert.deepEqual(consoleMessages.filter(m=>!/Failed to load resource: (the server responded with a status of (409|503)|net::ERR_FAILED)/.test(m)),[]);
   const persisted=await context.request.get(base+'api/jobs/'+job+'/detections');assert.equal(persisted.status(),200);
-  console.log(JSON.stringify({url:page.url(),title:await page.title(),screenshots:['review-desktop.png','review-unavailable.png','review-small.png'],
+  const pendingDom=[await pendingDomScenario(context,'before'),await pendingDomScenario(context,'after')];
+  console.log(JSON.stringify({url:page.url(),title:await page.title(),pendingDom,screenshots:['review-desktop.png','review-unavailable.png','review-small.png'],
    oldStatus:obsolete.status(),pixelChanged:true,recovery:true,pageErrors:errors,consoleMessages,rawRows:(await persisted.json()).detections.length,heldLostAckAndReopen:true,lateABA:true,persistentFailure:true}));
   await context.close();
  }finally{await browser.close()}

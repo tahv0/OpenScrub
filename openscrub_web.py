@@ -4784,27 +4784,33 @@ function thumbnailBindingCurrent(o,b,node,version){
  if(!thumbnailOwnerCurrent(o)||b.node!==node||b.version!==version||!node.isConnected)return false;
  if(b.card)return o.lightbox===b&&document.getElementById("lb")===b.overlay&&
   b.overlay.contains(node)&&o.bindings.get(b.rawIndex)===b.card&&
-  b.card.version===version&&b.card.node.isConnected&&o.root.contains(b.card.node);
+  b.card.node.isConnected&&o.root.contains(b.card.node);
  return o.bindings.get(b.rawIndex)===b&&o.root.contains(node);
 }
-function thumbnailUnavailable(node,b){
+function thumbnailStatus(o,card){
+ if(!thumbnailBindingCurrent(o,card,card.node,card.version))return;
+ const light=o.lightbox;
+ const lightUnavailable=light&&light.card===card&&light.unavailable&&
+  thumbnailBindingCurrent(o,light,light.node,light.version);
+ const unavailable=!!(card.unavailable||lightUnavailable);
+ const parent=card.node.parentElement;
+ const button=parent&&parent.querySelector("[data-thumb-reopen]");
+ const status=parent&&parent.querySelector("[data-thumb-status]");
+ if(button)button.hidden=!unavailable;if(status)status.hidden=!unavailable;
+}
+function thumbnailUnavailable(o,node,b){
+ b.unavailable=true;
  node.alt="Review changed; reopen review to refresh";
  node.title=node.alt;node.style.visibility="hidden";
- const card=b.card?b.card.node:node;
- const button=card.parentElement&&card.parentElement.querySelector("[data-thumb-reopen]");
- const status=card.parentElement&&card.parentElement.querySelector("[data-thumb-status]");
- if(button)button.hidden=false;if(status)status.hidden=false;
+ thumbnailStatus(o,b.card||b);
 }
 function thumbnailSetSource(o,b,src){
  const node=b.node,version=b.version;
  node.style.visibility="hidden";
  node.onload=()=>{
   if(!thumbnailBindingCurrent(o,b,node,version)||node.currentSrc!==src||!node.complete||!node.naturalWidth)return;
-  node.style.visibility="";node.alt="";node.title="";
-  const card=b.card?b.card.node:node;
-  const button=card.parentElement&&card.parentElement.querySelector("[data-thumb-reopen]");
-  const status=card.parentElement&&card.parentElement.querySelector("[data-thumb-status]");
-  if(button)button.hidden=true;if(status)status.hidden=true;
+  node.style.visibility="";node.alt="";node.title="";b.unavailable=false;
+  thumbnailStatus(o,b.card||b);
  };
  node.onerror=()=>{if(thumbnailBindingCurrent(o,b,node,version)&&node.src===src)recoverThumbnail(o,b);};
  node.src=src;
@@ -4824,7 +4830,7 @@ function thumbnailRowsMatch(b,rows,groups){
 async function recoverThumbnail(o,b){
  const node=b.node,version=b.version;
  if(!thumbnailBindingCurrent(o,b,node,version))return;
- thumbnailUnavailable(node,b);
+ thumbnailUnavailable(o,node,b);
  if(!version||!b.thumbnailRow)return; // Older servers do not supply a safe binding.
  if(!o.attempted){
   o.attempted=true;
@@ -4849,7 +4855,7 @@ async function recoverThumbnail(o,b){
     for(const members of groups.values())members.sort((a,b)=>a[0]-b[0]);
     for(const [item,original,oldVersion] of captured){
      if(!thumbnailBindingCurrent(o,item,original,oldVersion))continue;
-     if(!thumbnailRowsMatch(item,rows,groups)){thumbnailUnavailable(original,item);continue;}
+     if(!thumbnailRowsMatch(item,rows,groups)){thumbnailUnavailable(o,original,item);continue;}
      item.version=d.thumbnail_version;
      thumbnailSetSource(o,item,thumbnailUrl(o.jobId,item.card?"detframe":"thumb",item.rawIndex,item.version));
     }
@@ -4868,15 +4874,23 @@ function zoomDet(i){
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
    "z-index:100;display:flex;align-items:center;justify-content:center;"+
    "cursor:zoom-out;padding:18px";
-  ov.onclick=()=>ov.remove();
+  ov.onclick=()=>{
+   const owner=REVIEW_IMAGES,light=owner&&owner.lightbox;
+   ov.remove();
+   if(light&&light.overlay===ov){owner.lightbox=null;thumbnailStatus(owner,light.card);}
+  };
   document.body.appendChild(ov);
  }
+ const previous=o.lightbox;
  ov.innerHTML=`<img style="max-width:96%;max-height:96%;border-radius:8px;
   box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
  const node=ov.querySelector("img");
  const light={node,overlay:ov,card:b,rawIndex:b.rawIndex,thumbnailRow:b.thumbnailRow,
   group:b.group,members:b.members,version:b.version};
- o.lightbox=light;node.onerror=()=>recoverThumbnail(o,light);
+ o.lightbox=light;
+ if(previous)thumbnailStatus(o,previous.card);
+ thumbnailStatus(o,b);
+ node.onerror=()=>recoverThumbnail(o,light);
  node.src=b.version?thumbnailUrl(o.jobId,"detframe",i,b.version):`api/jobs/${o.jobId}/detframe/${i}`;
 }
 function beRemove(){

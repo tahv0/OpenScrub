@@ -219,3 +219,41 @@ def test_thumbnail_late_load_cannot_reveal_disconnected_image():
     image.currentSrc=image.src;image.complete=true;image.naturalWidth=20;openJob('B');openJob('A');
     load();assert.equal(image.style.visibility,'hidden');
     """)
+
+
+@pytest.mark.parametrize('error_order', ['before', 'after'])
+def test_thumbnail_replacement_lightbox_error_survives_card_refresh(error_order):
+    run_js("""await mount([row(0),row(1)]);const o=REVIEW_IMAGES;
+    const editor=BE,draft=EDITS,manual=MAN,audio=BE.audio,review=elements.get('review');
+    zoomDet(0);const old=o.lightbox,oldError=old.node.onerror;oldError();await tick();
+    assert.equal(calls.length,2);assert.equal(calls[1].options.cache,'no-store');
+    old.overlay.remove();zoomDet(1);const replacement=o.lightbox;
+    assert.notEqual(replacement.node,old.node);const replacementSrc=replacement.node.src;
+    if(ORDER==='before')replacement.node.onerror();
+    await reply(metadata([row(0),row(1)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
+    const card=replacement.card.node;assert.match(card.src,/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$/);
+    card.currentSrc=card.src;card.complete=true;card.naturalWidth=20;card.onload();
+    if(ORDER==='after')replacement.node.onerror();
+    oldError();await tick();
+    assert.equal(replacement.node.src,replacementSrc,'late response must not rebind replacement');
+    assert.equal(replacement.node.style.visibility,'hidden','actual failed replacement is unavailable');
+    assert.equal(elements.get('reopen1').hidden,false,'card load cannot hide lightbox failure');
+    assert.equal(elements.get('status1').hidden,false);assert.equal(calls.length,2);
+    assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(BE.audio,audio);
+    assert.equal(elements.get('review'),review);
+    """.replace('ORDER',json.dumps(error_order)))
+
+
+def test_thumbnail_replaced_captured_card_rejects_pending_result():
+    run_js("""await mount([row(0),row(1)]);const o=REVIEW_IMAGES,old=elements.get('img0');
+    const editor=BE,draft=EDITS,manual=MAN,audio=BE.audio,review=elements.get('review');
+    thumbRetry(old);await tick();old.isConnected=false;
+    const replacement={...old,isConnected:true,style:{visibility:'visible'},src:'data:image/gif;base64,replacement'};
+    elements.set('img0',replacement);elements.set('thumb0',replacement);
+    await reply(metadata([row(0),row(1)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
+    thumbRetry(old);await tick();
+    assert.equal(replacement.src,'data:image/gif;base64,replacement');assert.equal(replacement.style.visibility,'visible');
+    assert.match(elements.get('img1').src,/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$/);assert.equal(calls.length,2);
+    assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(BE.audio,audio);
+    assert.equal(elements.get('review'),review);
+    """)
