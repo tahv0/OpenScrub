@@ -132,6 +132,12 @@ class ReaderTicket:
 
 
 @dataclass(eq=False)
+class ReleaseTicket:
+    """A settled resource whose lease release still needs a continuation."""
+    _cleanup_settled: bool = True
+
+
+@dataclass(eq=False)
 class Retirement:
     paths: set = field(default_factory=set)
     fills: set = field(default_factory=set)
@@ -257,12 +263,10 @@ class _StageHandle:
     def close(self):
         if self.fd is not None:
             if self.close_uncertain: raise OSError('stage descriptor close outcome is uncertain')
-            try:
-                os.close(self.fd)
-            except OSError:
-                self.close_uncertain = True
-                raise
+            self.close_uncertain = True
+            os.close(self.fd)
             self.fd = None
+            self.close_uncertain = False
 
 
 def _stage_wrap(raw, ticket):
@@ -272,7 +276,6 @@ def _stage_wrap(raw, ticket):
 def stage_jpeg(job_dir, ticket, jpeg):
     if ticket.kind not in ('crop', 'detframe') or type(ticket.index) is not int or ticket.index < 0 or ticket.settled or ticket.stage_path is not None:
         raise ValueError('invalid thumbnail ticket')
-    final = os.path.join(os.fspath(job_dir), 'thumb3_%s_%s_%d.jpg' % (ticket.generation.version, ticket.kind, ticket.index))
     raw = _StageHandle()
     fd, path = tempfile.mkstemp(prefix='.thumb3-stage-', dir=job_dir)
     raw.fd = fd
@@ -280,6 +283,9 @@ def stage_jpeg(job_dir, ticket, jpeg):
     ticket.stage_closed = False
     ticket.stage_writer = raw
     try:
+        register = getattr(ticket, 'register_stage', None)
+        if register is not None:
+            register(path, fd)
         out = _stage_wrap(raw, ticket)
     except BaseException:
         try:
@@ -305,7 +311,7 @@ def stage_jpeg(job_dir, ticket, jpeg):
         ticket.stage_closed = out.closed
         if out.closed:
             ticket.stage_writer = None
-    return StagedJPEG(path, final, _stamp(path), len(jpeg), jpeg_etag(ticket.kind, ticket.generation.version, ticket.index, jpeg))
+    return StagedJPEG(path, path, _stamp(path), len(jpeg), jpeg_etag(ticket.kind, ticket.generation.version, ticket.index, jpeg))
 
 
 def accept_generation_locked(state, candidate, row_count):
@@ -348,12 +354,9 @@ def begin_fill_locked(state, generation, kind, index):
 def accept_jpeg_locked(state, ticket, staged):
     if ticket not in state.fills or ticket.obsolete or state.current is not ticket.generation or state.retirement is not None: raise ThumbnailObsolete()
     key = ticket.kind, ticket.index
-    expected = 'thumb3_%s_%s_%d.jpg' % (ticket.generation.version, ticket.kind, ticket.index)
-    if not ticket.stage_closed or staged.path != ticket.stage_path or os.path.basename(staged.destination) != expected or os.path.dirname(staged.path) != os.path.dirname(staged.destination): raise ValueError('stage does not belong to ticket')
+    if not ticket.stage_closed or staged.path != ticket.stage_path or staged.destination != staged.path: raise ValueError('stage does not belong to ticket')
     if key in state.entries: raise ThumbnailObsolete()
-    ticket.prospective_destination = staged.destination
-    os.replace(staged.path, staged.destination)
-    entry = JPEGEntry(ticket.kind, ticket.index, staged.destination, staged.stamp, staged.size, staged.etag)
+    entry = JPEGEntry(ticket.kind, ticket.index, staged.path, staged.stamp, staged.size, staged.etag)
     state.entries[key] = entry
     ticket.stage_path = None
     ticket.prospective_destination = None

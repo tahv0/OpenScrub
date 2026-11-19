@@ -240,16 +240,16 @@ def test_invalidation_before_stage_creation_keeps_fill_until_finished(tmp_path):
     assert th.begin_fill_locked(state, current, 'crop', 0)
 
 
-def test_publication_that_renames_then_raises_keeps_final_path_owned(tmp_path, monkeypatch):
+def test_publication_interrupted_after_in_memory_insert_keeps_stage_owned(tmp_path):
     state = th.ThumbnailState(); g = th.accept_generation_locked(state, th.Candidate(), 1)
     fill = th.begin_fill_locked(state, g, 'crop', 0)
     staged = th.stage_jpeg(tmp_path, fill, b'first')
-    real_replace = os.replace
-    error = OSError('injected after rename')
-    def replace_then_fail(source, destination):
-        real_replace(source, destination)
-        raise error
-    monkeypatch.setattr(th.os, 'replace', replace_then_fail)
+    error = OSError('injected after entry insertion')
+    class InterruptedEntries(dict):
+        def __setitem__(self, key, value):
+            super().__setitem__(key, value)
+            raise error
+    state.entries = InterruptedEntries()
     with pytest.raises(OSError) as caught: th.accept_jpeg_locked(state, fill, staged)
     assert caught.value is error and os.path.exists(staged.destination)
     th.finish_fill_locked(state, fill)

@@ -334,10 +334,116 @@ class FilesBusy(RuntimeError):
     pass
 
 
+class _ThumbnailArtifactPending(FilesBusy):
+    pass
+
+
+def _thumbnail_begin_admission_locked(lease):
+    FILES.thumbnail_admission += 1
+    FILES.thumbnail_resolving.add(lease)
+
+
+def _thumbnail_resolve_admission(lease, path):
+    """Resolve an owned source outside the guard, then fence its inode."""
+    try:
+        try:
+            observed = os.stat(path)
+            identity = (observed.st_dev, observed.st_ino)
+        except FileNotFoundError:
+            identity = None
+        with VAULT_LOCK:
+            records = []
+            by_path = FILES.thumbnail_paths.get(path)
+            by_inode = FILES.thumbnail_inodes.get(identity)
+            if by_path is not None:
+                records.append(by_path)
+            if by_inode is not None and by_inode is not by_path:
+                records.append(by_inode)
+            if any(record['claimed'] for record in records):
+                raise _ThumbnailArtifactPending()
+            for record in records:
+                record['protected'] = True
+    finally:
+        with VAULT_LOCK:
+            FILES.thumbnail_resolving.discard(lease)
+
+
+def _thumbnail_admit_path(path, lease):
+    if not path:
+        return
+    canonical = os.path.realpath(path)
+    with VAULT_LOCK:
+        source_job = _source_job_locked(canonical)
+        if source_job is not None and all(
+                token.state is not FILES.initialize(source_job)
+                for token in [lease] + lease.related):
+            lease.related.append(FILES.reserve(source_job))
+        _thumbnail_begin_admission_locked(lease)
+    _thumbnail_resolve_admission(lease, canonical)
+
+
+def _thumbnail_register_stage(job, sequence, path, fd):
+    observed = os.fstat(fd)
+    canonical = os.path.realpath(path)
+    identity = (observed.st_dev, observed.st_ino)
+    record = dict(path=canonical, identity=identity, job=job,
+                  protected=True, claimed=False)
+    with VAULT_LOCK:
+        protected = (FILES.thumbnail_admission != sequence
+                     or bool(FILES.thumbnail_resolving))
+        FILES.thumbnail_paths[canonical] = record
+        FILES.thumbnail_inodes[identity] = record
+        FILES.initialize(job).thumbnail_artifacts.add(canonical)
+        record['protected'] = protected
+
+
+def _thumbnail_forget_artifact_locked(record):
+    FILES.initialize(record['job']).thumbnail_artifacts.discard(record['path'])
+    if FILES.thumbnail_paths.get(record['path']) is record:
+        del FILES.thumbnail_paths[record['path']]
+    if FILES.thumbnail_inodes.get(record['identity']) is record:
+        del FILES.thumbnail_inodes[record['identity']]
+
+
+def _thumbnail_unlink_owned(path):
+    # Do not follow a replacement at the owned leaf while finding its receipt.
+    canonical = os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
+    if not VAULT_LOCK.acquire(blocking=False):
+        raise OSError('thumbnail cleanup guard busy')
+    try:
+        record = FILES.thumbnail_paths.get(canonical)
+        if record is None:
+            return  # Unknown/replaced ownership is preserved, never removed.
+        if record['claimed']:
+            raise OSError('thumbnail cleanup already claimed')
+        if record['protected'] or FILES.thumbnail_resolving:
+            _thumbnail_forget_artifact_locked(record)
+            return
+        record['claimed'] = True
+    finally:
+        VAULT_LOCK.release()
+    settled = False
+    try:
+        try:
+            observed = os.stat(path, follow_symlinks=False)
+        except FileNotFoundError:
+            settled = True
+            return
+        if ((observed.st_dev, observed.st_ino) != record['identity']
+                or not stat.S_ISREG(observed.st_mode)):
+            settled = True  # Replaced/indeterminate: relinquish, do not unlink.
+            return
+        os.unlink(path)
+        settled = True
+    finally:
+        with VAULT_LOCK:
+            record['claimed'] = False
+            if settled:
+                _thumbnail_forget_artifact_locked(record)
+
+
 def _validate_files_locked(job=None):
     # Admission always rechecks after waiting for the transition guard.
-    if FILES.thumbnail_sweep_active:
-        abort(409, 'thumbnail cleanup pending')
     if vault_locked():
         abort(423, "vault is locked or needs recovery — unlock it to access jobs")
     if job is not None:
@@ -368,9 +474,18 @@ def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
               if read_source and job and (source is not None or job.get("video")) else None)
     source_job = _source_job_locked(source) if source else None
     lease = FILES.reserve(job, work)
-    lease.source = source
-    if source_job is not None and source_job is not job:
-        lease.related.append(FILES.reserve(source_job))
+    try:
+        lease.source = source
+        if source_job is not None and source_job is not job:
+            lease.related.append(FILES.reserve(source_job))
+        if source:
+            _thumbnail_begin_admission_locked(lease)
+    except BaseException:
+        try:
+            lease.release_locked()
+        except BaseException:
+            pass
+        raise
     return lease
 
 
@@ -407,8 +522,10 @@ def _select_render_input(job, owner):
                     for token in [owner] + owner.related):
                 added = FILES.reserve(source_job)
                 owner.related.append(added)
+            _thumbnail_begin_admission_locked(owner)
         selected = False
         try:
+            _thumbnail_resolve_admission(owner, candidate)
             # Live containing jobs are reserved BEFORE this first source stat.
             # External filesystem changes remain outside web coordination.
             if os.path.exists(candidate):
@@ -434,6 +551,16 @@ def _request_source_path(path):
                 g.file_owner = lease
             else:
                 g.setdefault("file_children", []).append(lease)
+        else:
+            lease = g.get('file_owner')
+            if lease is None:
+                lease = FILES.reserve()
+                g.file_owner = lease
+        _thumbnail_begin_admission_locked(lease)
+    try:
+        _thumbnail_resolve_admission(lease, canonical)
+    except _ThumbnailArtifactPending:
+        abort(409, 'source cleanup is in progress')
     return canonical
 
 
@@ -460,13 +587,29 @@ def _update_job_source(job, path, owner):
                     token.state is not FILES.initialize(source_job)
                     for token in [owner] + owner.related):
                 owner.related.append(FILES.reserve(source_job))
+        if owner is not None:
+            _thumbnail_begin_admission_locked(owner)
+    if owner is not None:
+        _thumbnail_resolve_admission(owner, canonical)
+    with VAULT_LOCK:
+        _validate_files_locked(job)
         job["video"] = canonical
 
 
 def _own_files(job=None, work=False):
     with VAULT_LOCK:
         _validate_files_locked(job)
-        return _reserve_files_locked(job, work)
+        lease = _reserve_files_locked(job, work)
+    try:
+        if lease.source:
+            _thumbnail_resolve_admission(lease, lease.source)
+        return lease
+    except BaseException:
+        try:
+            lease.release()
+        except BaseException:
+            pass
+        raise
 
 
 def _files_busy_locked(blocking=True):
@@ -500,7 +643,8 @@ def _start_owned_thread(target, lease):
 
 
 def new_job(video_path, options, name):
-    with _own_files():
+    with _own_files() as owner:
+        _thumbnail_admit_path(video_path, owner)
         return _new_job(video_path, options, name)
 
 
@@ -934,6 +1078,7 @@ def worker():
             WORK_Q.task_done()         # starts a fresh worker in production
             return
         lease = None
+        resolve_legacy = False
         try:
             jid, action = item[0], item[1]
             gen = item[2] if len(item) > 2 else None
@@ -944,7 +1089,7 @@ def worker():
                     stale = (job is None
                              or (gen is not None and gen != job.get("qgen", 0))
                              or job.get("phase") == "cancelled"
-                             or (lease is not None and (lease.released
+                             or (lease is not None and (lease.release_started
                                  or FILES.initialize(job) is not lease.state))
                              or FILES.initialize(job).closed)
                     if job is not None:
@@ -956,6 +1101,9 @@ def worker():
                 if not stale and lease is None:  # old queue entries
                     _validate_files_locked(job)
                     lease = _reserve_files_locked(job, work=True)
+                    resolve_legacy = bool(lease.source)
+            if not stale and resolve_legacy:
+                _thumbnail_resolve_admission(lease, lease.source)
             if not stale:
                 _run_job(job, action, lease)
         except BaseException as e:     # belt and braces: never die
@@ -987,6 +1135,11 @@ def _run_job(job, action, owner=None):
         job["phase"] = "scanning" if action == "scan" else "rendering"
     cb = WebCallbacks(job, owner.operation)
     def publish_report(path, doc):
+        provenance = doc.get('provenance', {}) if isinstance(doc, dict) else {}
+        if isinstance(provenance, dict):
+            for role in ('input', 'original_input', 'output'):
+                if isinstance(provenance.get(role), str):
+                    _thumbnail_admit_path(provenance[role], owner)
         with files.report_lock:
             if not _operation_valid(job, owner) or owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
@@ -1036,7 +1189,7 @@ def _run_job(job, action, owner=None):
                                 cap.release()
                         finally:
                             if lease is not None:
-                                lease.release()
+                                _thumbnail_release_lease(jb, lease, primary_pending=sys.exc_info()[0] is not None)
                 _start_owned_thread(_pregen, thumbnail_owner)
             next_owner = (_prepare_work(job, "render")
                           if job["options"].get("skip_review") else None)
@@ -1063,6 +1216,7 @@ def _run_job(job, action, owner=None):
             args = build_args(dict(job, video=owner.source), for_render=True)
             args._report_input = owner.source
             res = openscrub.run_pipeline(args, cb)
+            _thumbnail_admit_path(res['output'], owner)
             with files.report_lock:
                 if not _operation_valid(job, owner):
                     return
@@ -1172,6 +1326,14 @@ def enforce_vault_lock():
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
                 "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
             g.file_owner = _reserve_files_locked(job, read_source=read_source)
+        try:
+            if g.file_owner.source:
+                _thumbnail_resolve_admission(g.file_owner, g.file_owner.source)
+        except _ThumbnailArtifactPending:
+            if request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
+                return _thumbnail_error_response(_ThumbnailError(
+                    'thumbnail_pending', 409, 'Thumbnail cleanup is in progress'))
+            abort(409, 'source cleanup is in progress')
 
 
 @app.after_request
@@ -1186,7 +1348,7 @@ def _finish_file_response(response):
         if response.direct_passthrough:
             response.response = OwnedIterable(response.response, lease)
         else:
-            lease.release()  # detached JSON/JPEG bytes no longer read job files
+            _release_thumbnail_request_lease(lease)
     return response
 
 
@@ -1196,7 +1358,16 @@ def _release_failed_request(error):
         child.release()
     lease = g.pop("file_owner", None)
     if lease is not None:
-        lease.release()
+        _release_thumbnail_request_lease(lease, primary_pending=error is not None)
+
+
+def _release_thumbnail_request_lease(lease, *, primary_pending=False):
+    if request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
+        job = JOBS.get((request.view_args or {}).get('jid'))
+        if job is not None and job.get('_files') is lease.state:
+            _thumbnail_release_lease(job, lease, primary_pending=primary_pending)
+            return
+    lease.release()
 
 
 
@@ -1357,6 +1528,27 @@ def _delete_job(job):
         state.closed = True
         lease = FILES.reserve()  # deletion owns the tree, not an admitted job
     with lease:
+        # Forget current receipts in bounded batches; their last references and
+        # associated job data are disposed outside the store guard.
+        while True:
+            discarded = []
+            record = None
+            with VAULT_LOCK:
+                for _ in range(32):
+                    if not state.thumbnail_artifacts:
+                        break
+                    path = next(iter(state.thumbnail_artifacts))
+                    record = FILES.thumbnail_paths.get(path)
+                    if record is not None and record['job'] is job:
+                        discarded.append(record)
+                        _thumbnail_forget_artifact_locked(record)
+                    else:
+                        state.thumbnail_artifacts.discard(path)
+                done = not state.thumbnail_artifacts
+            del discarded
+            record = None
+            if done:
+                break
         with state.report_lock:
             state.operation = None
         if _reap_job_dir(job["dir"], jid):
@@ -1535,6 +1727,7 @@ def _prepare_observed_source(job, path):
         lease = _reserve_files_locked(job, source=path)
     try:
         canonical = lease.source
+        _thumbnail_resolve_admission(lease, canonical)
         flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NONBLOCK', 0)
         fd = os.open(canonical, flags)
         try:
@@ -1563,8 +1756,13 @@ def _prepare_observed_source(job, path):
             if stamp != _file_stamp(os.fstat(opened.fileno())) or stamp != _file_stamp(os.stat(canonical)):
                 raise exact.ExactError('source changed during preparation', 409, 'sample_conflict')
         return dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error), lease
+    except _ThumbnailArtifactPending:
+        _thumbnail_release_lease(job, lease, primary_pending=True)
+        if has_request_context() and request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
+            raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup is in progress') from None
+        raise exact.ExactError('source cleanup is in progress', 409, 'sample_conflict') from None
     except BaseException:
-        lease.release()
+        _thumbnail_release_lease(job, lease, primary_pending=True)
         raise
 
 
@@ -1752,14 +1950,11 @@ class _ThumbnailHandle:
         if self.fd is not None:
             if self.close_uncertain:
                 raise OSError('thumbnail descriptor close outcome is uncertain')
-            try:
-                os.close(self.fd)
-            except OSError:
-                # A failed OS close may nevertheless have consumed the fd;
-                # retrying its integer could close an unrelated reused fd.
-                self.close_uncertain = True
-                raise
+            # Any interruption can occur after the descriptor was consumed.
+            self.close_uncertain = True
+            os.close(self.fd)
             self.fd = None
+            self.close_uncertain = False
 
 
 def _thumbnail_open(path, reader):
@@ -1808,6 +2003,33 @@ def _thumbnail_observation_error(job, observation, fence, report_stamp, fallback
         if not _source_observation_current_locked(job, observation, fence, report_stamp):
             return _ThumbnailError('thumbnail_obsolete', 409, 'Source or report changed')
     return fallback
+
+
+def _thumbnail_release_lease(job, lease, *, primary_pending=False):
+    """Install a retry owner before releasing a detached thumbnail lease."""
+    if lease is None:
+        return
+    files = FILES.initialize(job)
+    ticket = thumbs.ReleaseTicket()
+    with files.report_lock:
+        thumbs.defer_resource_locked(files.thumbnail, ticket, lease)
+    try:
+        lease.release()
+    except BaseException:
+        if not primary_pending:
+            raise
+    finally:
+        if lease.released:
+            try:
+                with files.report_lock:
+                    if ticket in files.thumbnail.deferred:
+                        discarded = thumbs.remove_deferred_locked(files.thumbnail, ticket)
+                    else:
+                        discarded = None
+                del discarded
+            except BaseException:
+                if not primary_pending:
+                    raise
 
 
 def _read_thumbnail_ordinal(selected, index, *, count, capture=None):
@@ -1992,21 +2214,21 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
         return doc, selected, final_fence, lease
     except FileNotFoundError:
         if lease is not None:
-            lease.release()
+            _thumbnail_release_lease(job, lease, primary_pending=True)
         raise _thumbnail_missing_source(job, canonical, observation, fence, report_stamp) from None
     except exact.ExactError:
         if lease is not None:
-            lease.release()
+            _thumbnail_release_lease(job, lease, primary_pending=True)
         raise _thumbnail_observation_error(job, observation, fence, report_stamp,
             _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')) from None
     except OSError:
         if lease is not None:
-            lease.release()
+            _thumbnail_release_lease(job, lease, primary_pending=True)
         raise _thumbnail_observation_error(job, observation, fence, report_stamp,
             _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')) from None
     except BaseException:
         if lease is not None:
-            lease.release()
+            _thumbnail_release_lease(job, lease, primary_pending=True)
         raise
 
 
@@ -2038,123 +2260,8 @@ def _thumbnail_validate_report(doc):
         raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid') from None
 
 
-def _sweep_thumbnail_derivatives(job_dir, protected_paths, protected_ids):
-    """Remove only validated, regular thumbnail artifacts from a drained job."""
-    pattern = re.compile(r'(?:thumb2_[0-9]+\.jpg|thumb3_[0-9a-f]{32}_(?:crop|detframe)_[0-9]+\.jpg|\.thumb3-stage-[A-Za-z0-9_-]+)')
-    try:
-        with os.scandir(job_dir) as entries:
-            paths = []
-            for entry in entries:
-                if not pattern.fullmatch(entry.name):
-                    continue
-                observed = entry.stat(follow_symlinks=False)
-                if (stat.S_ISREG(observed.st_mode)
-                        and os.path.realpath(entry.path) not in protected_paths
-                        and (observed.st_dev, observed.st_ino) not in protected_ids):
-                    paths.append(entry.path)
-    except OSError:
-        return False
-    success = True
-    for path in paths:
-        for _ in range(3):
-            try:
-                os.unlink(path)
-            except FileNotFoundError:
-                break
-            except OSError:
-                continue
-            else:
-                break
-        else:
-            success = False
-    return success
-
-
-def _thumbnail_sweep_protection(jobs):
-    paths, identities = set(), set()
-    def protect(path):
-        if path is None or path == '':
-            return
-        if not isinstance(path, str):
-            raise ValueError('unrecognized protected path')
-        path = os.path.realpath(path)
-        paths.add(path)
-        try:
-            observed = os.stat(path)
-        except FileNotFoundError:
-            return
-        identities.add((observed.st_dev, observed.st_ino))
-    for current in jobs:
-        files = FILES.initialize(current)
-        protect(current.get('video'))
-        protect(current.get('output'))
-        if files.current_source is not None:
-            protect(files.current_source['path'])
-        report = os.path.join(current['dir'], 'report.json')
-        protect(report)
-        try:
-            with open(report, encoding='utf-8', opener=_thumbnail_nonblocking_opener) as opened:
-                before = os.fstat(opened.fileno())
-                if not stat.S_ISREG(before.st_mode):
-                    raise ValueError('report is not regular')
-                doc = json.load(opened)
-                if (_file_stamp(before) != _file_stamp(os.fstat(opened.fileno()))
-                        or _file_stamp(before) != _file_stamp(os.stat(report))):
-                    raise ValueError('report changed during protection')
-        except FileNotFoundError:
-            continue
-        if not isinstance(doc, dict) or not isinstance(doc.get('provenance', {}), dict):
-            raise ValueError('report provenance is unknown')
-        provenance = doc.get('provenance', {})
-        protect(provenance.get('input'))
-        protect(provenance.get('original_input'))
-        protect(provenance.get('output'))
-    return paths, identities
-
-
-def _thumbnail_sweep(job):
-    files = FILES.initialize(job)
-    with files.report_lock:
-        if not files.thumbnail_sweep_pending:
-            return
-    owner = g.get('file_owner') if has_request_context() else None
-    def reservation_count(lease):
-        return 1 + sum(reservation_count(child) for child in lease.related)
-    with VAULT_LOCK:
-        with JOBS_LOCK:
-            jobs = list(JOBS.values())
-        if (owner is None or owner.released or FILES.thumbnail_sweep_active
-                or FILES.count != reservation_count(owner)
-                or any(current.get('_files') is not None and current['_files'].active is not None
-                       for current in jobs)):
-            raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending')
-        FILES.thumbnail_sweep_active = True
-    try:
-        try:
-            paths, identities = _thumbnail_sweep_protection(jobs)
-        except (OSError, ValueError, TypeError, UnicodeError):
-            raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending') from None
-        for current in jobs:
-            state = FILES.initialize(current)
-            with state.report_lock:
-                pending = state.thumbnail_sweep_pending
-            if not pending:
-                continue
-            complete = _sweep_thumbnail_derivatives(current['dir'], paths, identities)
-            if complete:
-                with state.report_lock:
-                    _report_current(current)
-                    state.thumbnail_sweep_pending = False
-    finally:
-        with VAULT_LOCK:
-            FILES.thumbnail_sweep_active = False
-    if files.thumbnail_sweep_pending:
-        raise _ThumbnailError('thumbnail_pending', 409, 'Thumbnail cleanup pending')
-
-
 def _thumbnail_cleanup(job, *, target=None):
     files = FILES.initialize(job)
-    _thumbnail_sweep(job)
     state = files.thumbnail
     while True:
         with files.report_lock:
@@ -2163,7 +2270,8 @@ def _thumbnail_cleanup(job, *, target=None):
         if ticket is None:
             break
         retired = None
-        handle = ticket.file if isinstance(ticket, thumbs.ReaderTicket) else ticket.stage_writer
+        handle = (ticket.file if isinstance(ticket, thumbs.ReaderTicket)
+                  else getattr(ticket, 'stage_writer', None))
         settled = getattr(ticket, '_cleanup_settled', False)
         try:
             if not settled:
@@ -2213,7 +2321,7 @@ def _thumbnail_cleanup(job, *, target=None):
             break
         succeeded = set()
         try:
-            succeeded = thumbs.cleanup(batch)
+            succeeded = thumbs.cleanup(batch, unlink=_thumbnail_unlink_owned)
         finally:
             with files.report_lock:
                 thumbs.complete_cleanup_locked(files.thumbnail, batch, succeeded)
@@ -2243,7 +2351,7 @@ def _thumbnail_lifecycle_cleanup(job, *, target=None):
     with VAULT_LOCK:
         with JOBS_LOCK:
             registered = any(current is job for current in JOBS.values())
-        if (FILES.thumbnail_sweep_active or not registered or files.closed or files.active is not None
+        if (not registered or files.closed or files.active is not None
                 or target is not None and target.active is not None or vault_locked()):
             return
         lease = _reserve_files_locked(job, read_source=False)
@@ -2347,13 +2455,13 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
             except FileNotFoundError:
                 if lease is not None:
-                    lease.release()
+                    _thumbnail_release_lease(job, lease, primary_pending=True)
                     lease = None
                 raise _thumbnail_missing_source(job, generation.source_path, observation,
                     (generation.report_epoch, generation.operation), generation.report_stamp) from None
             except BaseException:
                 if lease is not None:
-                    lease.release()
+                    _thumbnail_release_lease(job, lease, primary_pending=True)
                     lease = None
                 raise
         else:
@@ -2373,7 +2481,7 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                     raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
                 doc = saved_doc
             if doc is None:
-                lease.release()
+                _thumbnail_release_lease(job, lease)
                 lease = None
                 doc, selected, fence, lease = _thumbnail_snapshot(job, operation_owner=operation_owner)
                 with files.report_lock:
@@ -2434,6 +2542,9 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
             except Exception:
                 raise _ThumbnailError('thumbnail_encode_failed', 500, 'Thumbnail encoding failed') from None
             try:
+                with VAULT_LOCK:
+                    stage_sequence = FILES.thumbnail_admission
+                fill.register_stage = lambda path, fd: _thumbnail_register_stage(job, stage_sequence, path, fd)
                 staged = thumbs.stage_jpeg(job['dir'], fill, jpeg)
                 with files.report_lock:
                     _thumbnail_current_locked(job, generation.selected_source,
@@ -2563,11 +2674,7 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                         raise
             finally:
                 releasing_primary = primary_pending or sys.exc_info()[0] is not None
-                try:
-                    lease.release()
-                except BaseException:
-                    if not releasing_primary:
-                        raise
+                _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
 
 
 def _exact_policy(doc, selected):
@@ -2750,7 +2857,7 @@ def job_detections(jid):
         return _thumbnail_error_response(_ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid'))
     finally:
         if lease is not None:
-            lease.release()
+            _thumbnail_release_lease(job, lease, primary_pending=sys.exc_info()[0] is not None)
 
 
 def _thumbnail_route(job, index, kind):
@@ -6091,7 +6198,6 @@ def _rehydrate_jobs():
                 "cancel": threading.Event(), "stats": {},
             }
             files = FILES.initialize(job)
-            files.thumbnail_sweep_pending = True
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1
@@ -6127,7 +6233,6 @@ def _rehydrate_jobs():
             except OSError:
                 pass
             files = FILES.initialize(job)
-            files.thumbnail_sweep_pending = True
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1

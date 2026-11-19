@@ -945,7 +945,7 @@ def test_active_render_may_own_cross_job_original_while_images_use_preview(exact
     assert web.FILES.count == 0
 
 
-def test_rehydrate_sweeps_only_owned_derivatives(exact):
+def test_rehydrate_preserves_unverified_matching_files(exact):
     root = exact.path.parent
     owned = [root / 'thumb2_12.jpg', root / ('thumb3_' + 'a' * 32 + '_crop_2.jpg'),
              root / '.thumb3-stage-owned']
@@ -959,31 +959,23 @@ def test_rehydrate_sweeps_only_owned_derivatives(exact):
     web.rehydrate_jobs()
     assert exact.job['id'] in web.JOBS
     assert request('get', exact.url + '/detections').status_code == 200
-    assert all(not path.exists() for path in owned)
-    assert all(path.read_bytes() == b'not media' for path in unrelated)
+    assert all(path.read_bytes() == b'not media' for path in owned + unrelated)
     assert exact.path.read_bytes() == original_report
 
 
-def test_rehydrate_failed_sweep_blocks_until_later_owned_request(exact, monkeypatch):
+def test_rehydrate_never_unlinks_an_unverified_matching_path(exact, monkeypatch):
     orphan = exact.path.parent / 'thumb2_0.jpg'
     orphan.write_bytes(b'orphan')
     with web.JOBS_LOCK:
         web.JOBS.pop(exact.job['id'])
     web.rehydrate_jobs()
-    real_unlink = os.unlink
-    attempts = []
-    def fail_owned(path, *args, **kwargs):
-        if os.fspath(path) == str(orphan):
-            attempts.append(path)
-            raise PermissionError('held artifact')
+    real_unlink, attempts = os.unlink, []
+    def observed_unlink(path, *args, **kwargs):
+        if os.fspath(path) == str(orphan): attempts.append(path)
         return real_unlink(path, *args, **kwargs)
-    monkeypatch.setattr(web.os, 'unlink', fail_owned)
-    response = request('get', exact.url + '/detections')
-    assert response.status_code == 409 and response.json['error'] == 'thumbnail_pending'
-    assert len(attempts) == 3 and orphan.exists()
-    monkeypatch.setattr(web.os, 'unlink', real_unlink)
+    monkeypatch.setattr(web.os, 'unlink', observed_unlink)
     assert request('get', exact.url + '/detections').status_code == 200
-    assert not orphan.exists()
+    assert not attempts and orphan.read_bytes() == b'orphan'
 
 
 def test_rehydration_never_sweeps_its_selected_matching_media(exact):
@@ -1235,31 +1227,14 @@ def test_rehydration_preserves_media_referenced_by_another_live_job(exact):
     assert os.stat(alias).st_ino == identity[1]
 
 
-def test_sweep_exclusive_admission_is_released_after_exception(exact, monkeypatch):
-    files = web.FILES.initialize(exact.job)
-    files.thumbnail_sweep_pending = True
-    entered, resume = threading.Event(), threading.Event()
-    def fail_sweep(*args, **kwargs):
-        entered.set()
-        assert resume.wait(8)
-        raise RuntimeError('injected sweep failure')
-    monkeypatch.setattr(web, '_sweep_thumbnail_derivatives', fail_sweep)
-    result, errors = [], []
-    def run():
-        try: result.append(request('get', exact.url + '/detections'))
-        except BaseException as error: errors.append(error)
-    worker = threading.Thread(target=run)
-    worker.start()
-    try:
-        assert entered.wait(5)
-        assert request('get', '/api/jobs').status_code == 409
-        assert request('delete', exact.url).status_code == 409
-    finally:
-        resume.set()
-        join(worker)
-    assert not errors and result[0].status_code == 500
+def test_rehydrated_unknown_files_do_not_block_unrelated_admission(exact):
+    orphan = exact.path.parent / 'thumb2_141.jpg'
+    orphan.write_bytes(b'unknown')
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    assert request('get', exact.url + '/detections').status_code == 200
     assert request('get', '/api/jobs').status_code == 200
-    assert files.thumbnail_sweep_pending and web.FILES.count == 0
+    assert orphan.read_bytes() == b'unknown' and web.FILES.count == 0
 
 
 def test_failed_stage_writer_close_retains_owner_until_lifecycle_retry(exact, monkeypatch):
@@ -1490,7 +1465,9 @@ def test_late_pregeneration_stage_cannot_publish_after_save(scan, monkeypatch):
     assert fresh != old
     assert request('get', fixture.url + '/thumb/0?v=' + old).status_code == 409
     assert request('get', fixture.url + '/thumb/0?v=' + fresh).status_code == 200
-    assert not list(fixture.path.parent.glob('.thumb3-stage-*'))
+    entries = web.FILES.initialize(fixture.job).thumbnail.entries
+    assert {str(path) for path in fixture.path.parent.glob('.thumb3-stage-*')} == {
+        entry.path for entry in entries.values()}
 
 
 def test_successful_track_append_retires_current_thumbnail(tracking):
@@ -1690,7 +1667,7 @@ def test_first_rehydrated_unversioned_image_can_finish_sweep(exact, kind, contai
     web.rehydrate_jobs()
     response = request('get', exact.url + '/' + kind + '/0')
     assert response.status_code == 200
-    assert not orphan.exists() and web.FILES.count == 0
+    assert orphan.read_bytes() == b'obsolete' and web.FILES.count == 0
 
 
 @pytest.mark.parametrize('factory', [web._ThumbnailHandle, web.thumbs._StageHandle])
@@ -1764,7 +1741,7 @@ def test_sweep_with_unknown_other_report_preserves_all_candidates(exact):
     with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
     web.rehydrate_jobs()
     response = request('get', exact.url + '/detections')
-    assert response.status_code == 409 and response.json['error'] == 'thumbnail_pending'
+    assert response.status_code == 200
     assert orphan.read_bytes() == b'could be media'
 
 
@@ -1939,3 +1916,487 @@ def test_deferred_claim_does_not_iterate_ticket_set(exact):
         state.deferred = state.deferred.copy()
         if state.deferred: web._thumbnail_cleanup(exact.job)
         if not lease.released: lease.release()
+
+
+def test_missing_other_report_does_not_authorize_rehydrate_deletion(exact):
+    original = exact.path.parent / 'thumb2_170.jpg'
+    original.write_bytes(b'other job former original')
+    other = web.new_job('', {}, 'retained job')
+    other['phase'] = 'review'
+    other['video'] = str(exact.path.parent / 'independent-input.avi')
+    with open(exact.job['video'], 'rb') as src, open(other['video'], 'wb') as dst:
+        dst.write(src.read())
+    # The other job had a report but it is now missing; its original is unknowable.
+    with web.JOBS_LOCK: web.JOBS.pop(exact.job['id'])
+    web.rehydrate_jobs()
+    response = request('get', exact.url + '/detections')
+    assert original.read_bytes() == b'other job former original'
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize('kind', ['detections', 'thumb/0', 'detframe/0'])
+def test_unrelated_old_file_collection_never_blocks_thumbnail_admission(exact, monkeypatch, kind):
+    files = web.FILES.initialize(exact.job)
+    files.thumbnail_sweep_pending = True
+    entered, resume, done = threading.Event(), threading.Event(), threading.Event()
+    real = getattr(web, '_sweep_thumbnail_derivatives', None)
+    def held(*args, **kwargs):
+        entered.set()
+        assert resume.wait(8)
+        return real(*args, **kwargs) if real is not None else True
+    monkeypatch.setattr(web, '_sweep_thumbnail_derivatives', held, raising=False)
+    responses, errors = [], []
+    def first():
+        try: responses.append(request('get', exact.url + '/detections'))
+        except BaseException as exc: errors.append(exc)
+        finally: done.set()
+    worker = threading.Thread(target=first)
+    worker.start()
+    try:
+        if entered.wait(.5):
+            second = request('get', exact.url + '/' + kind)
+            assert second.status_code == 200 and second.is_json == (kind == 'detections')
+        else:
+            assert done.wait(5)
+    finally:
+        resume.set()
+        join(worker)
+    assert not errors and responses[0].status_code == 200
+
+
+def test_partial_related_lease_release_can_resume_without_double_count(exact, monkeypatch):
+    other = web.new_job('', {}, 'related')
+    lease = web._own_files(exact.job)
+    with web.VAULT_LOCK:
+        child = web.FILES.reserve(other)
+        lease.related.append(child)
+    real_child, calls = child.release_locked, []
+    def interrupted():
+        real_child()
+        calls.append(True)
+        if len(calls) == 1: raise KeyboardInterrupt('after child released')
+    monkeypatch.setattr(child, 'release_locked', interrupted)
+    try:
+        with pytest.raises(KeyboardInterrupt): lease.release()
+        assert not lease.released
+        lease.release()
+        assert lease.released and child.released
+        assert web.FILES.count == 0
+        assert web.FILES.initialize(exact.job).count == 0
+        assert web.FILES.initialize(other).count == 0
+    finally:
+        if web.FILES.count:
+            lease.released = False
+            lease.release()
+
+
+def test_primary_failure_keeps_foreground_release_continuation(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    primary = openscrub.PipelineCancelled()
+    real_prepare, captured = web._prepare_observed_source, []
+    def prepare(*args):
+        prepared, lease = real_prepare(*args)
+        real_release, calls = lease.release, []
+        def interrupted():
+            calls.append(True)
+            if len(calls) == 1: raise KeyboardInterrupt('release guard interrupted')
+            real_release()
+        lease.release = interrupted
+        captured.append((lease, real_release, calls))
+        return prepared, lease
+    original_open = web._thumbnail_open
+    class BadRead:
+        def __init__(self, file): self.file = file
+        def __getattr__(self, name): return getattr(self.file, name)
+        def read(self): raise primary
+    def fail_read(path, reader): return BadRead(original_open(path, reader))
+    monkeypatch.setattr(web, '_prepare_observed_source', prepare)
+    monkeypatch.setattr(web, '_thumbnail_open', fail_read)
+    try:
+        with pytest.raises(openscrub.PipelineCancelled) as caught:
+            web._thumbnail_image(exact.job, 0, 'crop', version)
+        assert caught.value is primary and web.FILES.count > 0
+        web._thumbnail_lifecycle_cleanup(exact.job)
+        assert captured[0][0].released and web.FILES.count == 0
+    finally:
+        for lease, real_release, _ in captured:
+            if not lease.released: real_release()
+
+
+@pytest.mark.parametrize('factory', [web._ThumbnailHandle, web.thumbs._StageHandle])
+def test_consumed_raw_close_interruption_never_recloses_reused_fd(tmp_path, monkeypatch, factory):
+    source, other = tmp_path / 'source', tmp_path / 'other'
+    source.write_bytes(b'original')
+    other.write_bytes(b'protected')
+    handle = factory()
+    handle.fd = os.open(source, os.O_RDONLY)
+    target, real_close, calls, replacement = handle.fd, os.close, [], []
+    def close_then_interrupt(fd):
+        if fd == target:
+            calls.append(fd)
+            real_close(fd)
+            replacement.append(os.open(other, os.O_RDONLY))
+            assert replacement[-1] == target
+            raise KeyboardInterrupt('after raw close')
+        return real_close(fd)
+    monkeypatch.setattr(os, 'close', close_then_interrupt)
+    try:
+        with pytest.raises(KeyboardInterrupt): handle.close()
+        with pytest.raises(BaseException): handle.close()
+        assert calls == [target]
+        assert os.read(replacement[0], 9) == b'protected'
+    finally:
+        for fd in replacement:
+            try: real_close(fd)
+            except OSError: pass
+
+
+@pytest.mark.parametrize('factory', [web._ThumbnailHandle, web.thumbs._StageHandle])
+def test_raw_close_interrupt_before_fd_clearing_keeps_reused_fd(tmp_path, monkeypatch, factory):
+    import inspect
+    import sys
+    source, other = tmp_path / 'source', tmp_path / 'other'
+    source.write_bytes(b'original')
+    other.write_bytes(b'protected')
+    handle = factory()
+    handle.fd = os.open(source, os.O_RDONLY)
+    target, real_close, calls, replacement = handle.fd, os.close, [], []
+    lines, first = inspect.getsourcelines(factory.close)
+    clear_line = first + next(i for i, line in enumerate(lines) if 'self.fd = None' in line)
+    def tracked_close(fd):
+        if fd == target:
+            calls.append(fd)
+            real_close(fd)
+            replacement.append(os.open(other, os.O_RDONLY))
+            assert replacement[-1] == target
+            return
+        return real_close(fd)
+    def trace(frame, event, arg):
+        if frame.f_code is factory.close.__code__ and event == 'line' and frame.f_lineno == clear_line:
+            raise KeyboardInterrupt('before descriptor clearing')
+        return trace
+    monkeypatch.setattr(os, 'close', tracked_close)
+    try:
+        sys.settrace(trace)
+        with pytest.raises(KeyboardInterrupt): handle.close()
+        sys.settrace(None)
+        with pytest.raises(OSError): handle.close()
+        assert calls == [target] and os.read(replacement[0], 9) == b'protected'
+    finally:
+        sys.settrace(None)
+        for fd in replacement:
+            try: real_close(fd)
+            except OSError: pass
+
+
+@pytest.mark.parametrize('step', ['global', 'job', 'work'])
+@pytest.mark.parametrize('when', ['before', 'after'])
+def test_release_counter_interruption_reconciles_once(step, when):
+    from openscrub_internal.lifetimes import FileOwners, _JobFiles
+    class InterruptOwner(FileOwners):
+        def __setattr__(self, name, value):
+            if name == 'count' and getattr(self, 'armed', False):
+                object.__setattr__(self, 'armed', False)
+                if when == 'before': raise KeyboardInterrupt('before global count')
+                object.__setattr__(self, name, value)
+                raise KeyboardInterrupt('after global count')
+            object.__setattr__(self, name, value)
+    class InterruptJob(_JobFiles):
+        def __setattr__(self, name, value):
+            if name == ('count' if step == 'job' else step) and getattr(self, 'armed', False):
+                object.__setattr__(self, 'armed', False)
+                if when == 'before': raise KeyboardInterrupt('before job count')
+                object.__setattr__(self, name, value)
+                raise KeyboardInterrupt('after job count')
+            object.__setattr__(self, name, value)
+    owners = InterruptOwner(threading.Lock())
+    job = {'_files': InterruptJob()}
+    lease = owners.reserve(job, work=True)
+    obj = owners if step == 'global' else job['_files']
+    obj.armed = True
+    with pytest.raises(KeyboardInterrupt): lease.release()
+    lease.release()
+    assert lease.released and owners.count == 0
+    assert job['_files'].count == 0 and job['_files'].work == 0
+
+
+def test_unowned_final_thumbnail_name_is_never_clobbered(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    old = exact.path.parent / ('thumb3_%s_crop_0.jpg' % version)
+    old.write_bytes(b'unowned authoritative bytes')
+    response = request('get', exact.url + '/thumb/0?v=' + version)
+    assert response.status_code == 200
+    assert old.read_bytes() == b'unowned authoritative bytes'
+
+
+def test_interrupt_between_decrement_and_progress_marker_reconciles_once():
+    import inspect
+    import sys
+    from openscrub_internal.lifetimes import FileOwners, _Lease
+    owners = FileOwners(threading.Lock())
+    job = {}
+    lease = owners.reserve(job, work=True)
+    lines, first = inspect.getsourcelines(_Lease._decrement_locked)
+    marker_line = first + next(i for i, line in enumerate(lines) if 'setattr(self, marker, True)' in line)
+    def trace(frame, event, arg):
+        if frame.f_code is _Lease._decrement_locked.__code__ and event == 'line' and frame.f_lineno == marker_line:
+            sys.settrace(None)
+            raise KeyboardInterrupt('before progress marker')
+        return trace
+    try:
+        sys.settrace(trace)
+        with pytest.raises(KeyboardInterrupt): lease.release()
+        sys.settrace(None)
+        lease.release()
+        assert lease.released and owners.count == 0
+        assert job['_files'].count == 0 and job['_files'].work == 0
+    finally:
+        sys.settrace(None)
+
+
+@pytest.mark.parametrize('alias', [False, True])
+def test_current_thumbnail_promoted_to_another_job_source_is_preserved(exact, alias):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    source = entry.path
+    if alias:
+        source = str(exact.root / 'alias-source.avi')
+        os.link(entry.path, source)
+    other = web.new_job(source, {}, 'promoted source')
+    other['phase'] = 'review'
+    with files.report_lock:
+        web.thumbs.invalidate_locked(files.thumbnail, 'retire after promotion')
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.exists(entry.path)
+    assert files.thumbnail.retirement is None
+
+
+def test_unprotected_current_artifact_is_really_unlinked(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'ordinary retirement')
+    web._thumbnail_cleanup(exact.job)
+    assert not os.path.exists(entry.path)
+    assert files.thumbnail.retirement is None
+    assert entry.path not in web.FILES.thumbnail_paths
+
+
+@pytest.mark.parametrize('endpoint', ['detections', 'thumb/0', 'detframe/0'])
+def test_claimed_artifact_refuses_matching_thumbnail_admission_with_json(exact, monkeypatch, endpoint):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    other = web.new_job('', {}, 'claim contender')
+    other['video'] = entry.path
+    other['phase'] = 'review'
+    entered, resume = threading.Event(), threading.Event()
+    real_unlink = os.unlink
+    def held_unlink(path, *args, **kwargs):
+        if str(path) == entry.path:
+            entered.set()
+            assert resume.wait(8)
+        return real_unlink(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'unlink', held_unlink)
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'claim test')
+    worker = threading.Thread(target=web._thumbnail_cleanup, args=(exact.job,))
+    worker.start()
+    try:
+        assert entered.wait(5)
+        response = request('get', '/api/jobs/' + other['id'] + '/' + endpoint)
+        assert response.status_code == 409
+        assert response.is_json and response.json['error'] == 'thumbnail_pending'
+        assert response.headers['Cache-Control'] == 'private, no-store'
+    finally:
+        resume.set()
+        join(worker)
+    assert not os.path.exists(entry.path) and not web.FILES.thumbnail_resolving
+
+
+def test_unresolved_alias_admission_relinquishes_candidate_without_blocking_metadata(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    alias = str(exact.root / 'pending-alias.avi')
+    os.link(entry.path, alias)
+    entered, resume, errors = threading.Event(), threading.Event(), []
+    real_stat = os.stat
+    def held_stat(path, *args, **kwargs):
+        if str(path) == alias and threading.current_thread() is worker:
+            entered.set()
+            assert resume.wait(8)
+        return real_stat(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'stat', held_stat)
+    def admit():
+        try: web.new_job(alias, {}, 'pending alias')
+        except BaseException as error: errors.append(error)
+    worker = threading.Thread(target=admit)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'pending alias')
+        web._thumbnail_cleanup(exact.job)
+        assert os.path.exists(entry.path) and files.thumbnail.retirement is None
+        assert request('get', exact.url + '/detections').status_code == 200
+    finally:
+        resume.set()
+        join(worker)
+    assert not errors and not web.FILES.thumbnail_resolving
+
+
+@pytest.mark.parametrize('error', [OSError('identity unavailable'), KeyboardInterrupt('identity interrupted')])
+def test_identity_resolution_failure_drains_its_owned_marker(exact, monkeypatch, error):
+    target = str(exact.root / 'identity-error.avi')
+    real_stat = os.stat
+    def failed_stat(path, *args, **kwargs):
+        if str(path) == target: raise error
+        return real_stat(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'stat', failed_stat)
+    with pytest.raises(type(error)) as caught:
+        web.new_job(target, {}, 'failed source admission')
+    assert caught.value is error
+    assert not web.FILES.thumbnail_resolving and web.FILES.count == 0
+
+
+def test_mkstemp_collision_preserves_existing_unowned_file(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    old = exact.path.parent / '.thumb3-stage-collision'
+    old.write_bytes(b'unowned file')
+    def collision(*args, **kwargs): raise FileExistsError(str(old))
+    monkeypatch.setattr(web.thumbs.tempfile, 'mkstemp', collision)
+    response = request('get', exact.url + '/thumb/0?v=' + version)
+    assert response.status_code == 500 and response.json['error'] == 'thumbnail_io_failed'
+    assert old.read_bytes() == b'unowned file'
+
+
+def test_render_original_input_alias_protects_owned_artifact(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    alias = str(exact.root / 'original-input.avi')
+    os.link(entry.path, alias)
+    other = web.new_job(exact.job['video'], {}, 'render original')
+    other['phase'] = 'review'
+    monkeypatch.setattr(web, '_load_job_report', lambda job: {'provenance': {'original_input': alias}})
+    owner = web._own_files(other, work=True)
+    try:
+        web._select_render_input(other, owner)
+        assert owner.source == alias
+        with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'original input')
+        web._thumbnail_cleanup(exact.job)
+        assert os.path.exists(entry.path) and files.thumbnail.retirement is None
+    finally:
+        owner.release()
+
+
+def test_stage_receipt_interruption_preserves_private_inode(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    original = web.FILES.thumbnail_inodes
+    error = RuntimeError('receipt insertion interrupted')
+    class InterruptedIndex(dict):
+        def __setitem__(self, key, value):
+            super().__setitem__(key, value)
+            raise error
+    index = InterruptedIndex(original)
+    monkeypatch.setattr(web.FILES, 'thumbnail_inodes', index)
+    with pytest.raises(RuntimeError) as caught:
+        web._thumbnail_image(exact.job, 0, 'crop', version)
+    assert caught.value is error
+    files = web.FILES.initialize(exact.job)
+    paths = list(exact.path.parent.glob('.thumb3-stage-*'))
+    assert len(paths) == 1 and paths[0].exists()
+    web._thumbnail_cleanup(exact.job)
+    assert paths[0].exists() and files.thumbnail.retirement is None
+    assert str(paths[0]) not in web.FILES.thumbnail_paths
+
+
+def test_overlapping_admission_protects_unregistered_new_stage(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    entered, resume, responses, errors = threading.Event(), threading.Event(), [], []
+    real_mkstemp = web.thumbs.tempfile.mkstemp
+    def held_mkstemp(*args, **kwargs):
+        result = real_mkstemp(*args, **kwargs)
+        entered.set()
+        assert resume.wait(8)
+        return result
+    monkeypatch.setattr(web.thumbs.tempfile, 'mkstemp', held_mkstemp)
+    def generate():
+        try: responses.append(request('get', exact.url + '/thumb/0?v=' + version))
+        except BaseException as error: errors.append(error)
+    worker = threading.Thread(target=generate)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        other = web.new_job(exact.job['video'], {}, 'overlap')
+        other['phase'] = 'review'
+        assert request('get', exact.url + '/detections').status_code == 200
+    finally:
+        resume.set()
+        join(worker)
+    assert not errors and responses[0].status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'overlap')
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.exists(entry.path) and files.thumbnail.retirement is None
+    assert entry.path not in web.FILES.thumbnail_paths
+
+
+def test_replaced_owned_leaf_is_relinquished_without_unlink(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    protected = exact.root / 'protected-file'
+    protected.write_bytes(b'keep me')
+    os.unlink(entry.path)
+    os.symlink(protected, entry.path)
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'replaced file')
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.islink(entry.path) and protected.read_bytes() == b'keep me'
+    assert files.thumbnail.retirement is None and entry.path not in web.FILES.thumbnail_paths
+
+
+def test_successful_render_output_alias_protects_owned_artifact(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries['crop', 0]
+    alias = str(exact.root / 'rendered-output.avi')
+    os.link(entry.path, alias)
+    other = web.new_job(exact.job['video'], {}, 'render output')
+    other['phase'] = 'review'
+    monkeypatch.setattr(openscrub, 'run_pipeline', lambda args, cb: {'output': alias})
+    web._run_job(other, 'render')
+    assert other['phase'] == 'done' and other['output'] == alias
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'render output')
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.exists(entry.path) and files.thumbnail.retirement is None
+
+
+def test_deletion_drains_owned_receipts_in_bounded_batches_outside_guard(exact):
+    files = web.FILES.initialize(exact.job)
+    released = []
+    class TrackedReceipt(dict):
+        def __del__(self): released.append(web.VAULT_LOCK.locked())
+    with web.VAULT_LOCK:
+        for number in range(65):
+            path = str(exact.path.parent / ('synthetic-owned-%d' % number))
+            identity = (-9912, number)
+            record = TrackedReceipt(path=path, identity=identity, job=exact.job,
+                                    protected=False, claimed=False)
+            files.thumbnail_artifacts.add(path)
+            web.FILES.thumbnail_paths[path] = record
+            web.FILES.thumbnail_inodes[identity] = record
+        del record
+    response = request('delete', exact.url)
+    assert response.status_code == 200 and response.json['ok']
+    assert not files.thumbnail_artifacts
+    assert len(released) == 65 and not any(released)
