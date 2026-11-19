@@ -701,7 +701,7 @@ def _run_job(job, action):
                                        d["t_start"]), d["t_end"])
                         todo.append((tref, k, d, cch))
                     todo.sort()
-                    cap = cv2.VideoCapture(jb["video"])
+                    cap = _open_preview_capture(jb["video"])
                     cur = -1
                     frame = None
                     for tref, k, d, cch in todo:
@@ -1105,8 +1105,32 @@ def _load_job_report(job):
         return json.load(f)
 
 
+def _open_preview_capture(path):
+    """Open a caller-owned preview decoder, with best-effort thread control."""
+    threads = app.config.get("PREVIEW_DECODE_THREADS", 0)
+    if not threads or not hasattr(cv2, "CAP_PROP_N_THREADS") or not hasattr(cv2, "CAP_FFMPEG"):
+        return cv2.VideoCapture(path)
+    try:
+        cap = cv2.VideoCapture(path, cv2.CAP_FFMPEG,
+                               [cv2.CAP_PROP_N_THREADS, threads])
+    except (TypeError, cv2.error):
+        return cv2.VideoCapture(path)
+    accepted = False
+    try:
+        try:
+            accepted = cap.isOpened() and cap.get(cv2.CAP_PROP_N_THREADS) == threads
+        except cv2.error:
+            pass
+        if accepted:
+            return cap
+    finally:
+        if not accepted:
+            cap.release()
+    return cv2.VideoCapture(path)
+
+
 def _frame_at(job, t, rstate):
-    cap = cv2.VideoCapture(job["video"])
+    cap = _open_preview_capture(job["video"])
     fps = rstate["fps"]
     cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
     ok, frame = cap.read()
@@ -1119,7 +1143,7 @@ def job_mediainfo(jid):
     """Basic video properties straight from the file — available in every
     job phase, no scan report required."""
     job = JOBS.get(jid) or abort(404)
-    cap = cv2.VideoCapture(job["video"])
+    cap = _open_preview_capture(job["video"])
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
     w_ = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -1254,7 +1278,7 @@ def job_frame_at(jid):
     t = max(0.0, float(request.args.get("t", 0)))
     path = (job["output"] if request.args.get("src") == "output"
             and job.get("output") else job["video"])
-    cap = cv2.VideoCapture(path)
+    cap = _open_preview_capture(path)
     # seek by TIMESTAMP, not frame index: the original upload is often VFR
     # (iPhone), where index = t*fps drifts out of sync with the CFR output
     # and can overshoot the file entirely (broken compare pane)
@@ -3865,7 +3889,12 @@ def main():
                          "0 = unlimited; env OPENSCRUB_MAX_UPLOAD_GB works "
                          "too). Very large files are better served in place "
                          "via the 'path on the server' box than uploaded.")
+    ap.add_argument("--preview-decode-threads", type=int, choices=(0, 1, 2, 4),
+                    default=0, help="preview decoder threads (default 0: ordinary decoder); "
+                    "fewer threads may reduce memory but slow seeking; unsupported "
+                    "builds use the ordinary decoder")
     args = ap.parse_args()
+    app.config["PREVIEW_DECODE_THREADS"] = args.preview_decode_threads
     TOKEN = args.token or None
     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
     os.makedirs(JOBS_DIR, exist_ok=True)
