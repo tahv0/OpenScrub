@@ -714,6 +714,72 @@ def test_nonblocking_vault_lock_does_not_wait_for_thumbnail_report_lock(exact):
     assert not web.vault_locked()
 
 
+@pytest.mark.parametrize('transition', ['vault', 'delete'])
+def test_active_cleanup_is_busy_before_retrying_deferred_reader(exact, monkeypatch, transition):
+    exact.enable()
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    entry = files.thumbnail.entries[('crop', 0)]
+    real_open, readers = open, []
+    class RetryCloseReader:
+        def __init__(self, file): self.file, self.attempts = file, 0
+        def __getattr__(self, name): return getattr(self.file, name)
+        def read(self): raise openscrub.PipelineCancelled()
+        def close(self):
+            self.attempts += 1
+            if self.attempts == 1: raise OSError('injected close failure')
+            self.file.close()
+    def held_open(path, *args, **kwargs):
+        file = real_open(path, *args, **kwargs)
+        if path == entry.path:
+            file = RetryCloseReader(file)
+            readers.append(file)
+        return file
+    monkeypatch.setattr(web, 'open', held_open, raising=False)
+    with pytest.raises(openscrub.PipelineCancelled):
+        web._thumbnail_image(exact.job, 0, 'crop', version)
+    owner = web._prepare_work(exact.job, 'scan')
+    with files.report_lock:
+        web._begin_operation(exact.job, owner)
+    exact.job['phase'] = 'review'
+    real_lock = files.report_lock
+    entered, resume, admission_locks = threading.Event(), threading.Event(), []
+    errors = []
+    class FinishGate:
+        def __enter__(self):
+            if threading.current_thread() is worker:
+                entered.set()
+                assert resume.wait(8)
+            else:
+                admission_locks.append(True)
+            return real_lock.__enter__()
+        def __exit__(self, *args): return real_lock.__exit__(*args)
+    def finish_owner():
+        try: web._finish_operation(exact.job, owner)
+        except BaseException as error: errors.append(error)
+    worker = threading.Thread(target=finish_owner)
+    files.report_lock = FinishGate()
+    worker.start()
+    checked_busy = False
+    try:
+        assert entered.wait(5) and owner.released and files.active is owner
+        assert request('post', '/api/vault/lock').status_code == 409
+        assert not admission_locks and readers[0].attempts == 1 and not readers[0].closed
+        checked_busy = True
+    finally:
+        resume.set()
+        join(worker)
+        files.report_lock = real_lock
+        assert not errors
+        if not checked_busy:
+            web._thumbnail_lifecycle_cleanup(exact.job)
+    response = (request('post', '/api/vault/lock') if transition == 'vault'
+                else request('delete', exact.url))
+    assert response.status_code == 200
+    assert readers[0].closed and web.FILES.count == 0
+
+
 def test_detframe_end_ordinal_matches_sequential_oracle_and_offset(exact):
     writer = cv2.VideoWriter(exact.job['video'], cv2.VideoWriter_fourcc(*'MJPG'), 5, (160, 120))
     assert writer.isOpened()

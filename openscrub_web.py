@@ -471,8 +471,13 @@ def _files_busy_locked(blocking=True):
     if not JOBS_LOCK.acquire(blocking=blocking):
         return True  # shutdown cannot safely inspect the registry now
     try:
-        return bool(FILES.count or any(j.get("phase") in _ACTIVE_PHASES
-                                       for j in JOBS.values()))
+        # Cleanup releases its lease before clearing the active operation.
+        # Inspect only existing owners while admission is held, without waiting
+        # for a report transaction or constructing a new owner.
+        return bool(FILES.count or any(
+            j.get("phase") in _ACTIVE_PHASES
+            or (j.get("_files") is not None and j["_files"].active is not None)
+            for j in JOBS.values()))
     finally:
         JOBS_LOCK.release()
 
@@ -2003,12 +2008,16 @@ def _thumbnail_cleanup(job):
 
 def _thumbnail_lifecycle_cleanup(job):
     """Retry a retained reader while an existing lifecycle request can own it."""
-    files = FILES.initialize(job)
-    if not files.thumbnail.readers or not files.report_lock.acquire(blocking=False):
+    files = job.get('_files')
+    if files is None or files.active is not None or not files.thumbnail.readers:
+        return
+    acquire = getattr(files.report_lock, 'acquire', None)
+    if acquire is None or not acquire(blocking=False):
         return
     try:
-        pending = any(getattr(reader, '_deferred_lease', None) is not None
-                      for reader in files.thumbnail.readers)
+        pending = (files.active is None and any(
+            getattr(reader, '_deferred_lease', None) is not None
+            for reader in files.thumbnail.readers))
     finally:
         files.report_lock.release()
     if not pending:
@@ -2016,7 +2025,7 @@ def _thumbnail_lifecycle_cleanup(job):
     with VAULT_LOCK:
         with JOBS_LOCK:
             registered = any(current is job for current in JOBS.values())
-        if not registered or files.closed or vault_locked():
+        if not registered or files.closed or files.active is not None or vault_locked():
             return
         lease = _reserve_files_locked(job, read_source=False)
     try:
