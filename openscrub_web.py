@@ -359,6 +359,8 @@ def _thumbnail_resolve_admission(lease, path):
                 records.append(by_path)
             if by_inode is not None and by_inode is not by_path:
                 records.append(by_inode)
+            for record in records:
+                _thumbnail_settle_abandoned_claim_locked(record)
             if any(record['claimed'] for record in records):
                 raise _ThumbnailArtifactPending()
             for record in records:
@@ -389,6 +391,7 @@ def _thumbnail_register_stage(job, sequence, path, fd):
     record = dict(path=canonical, identity=identity, job=job,
                   protected=True, claimed=False)
     with VAULT_LOCK:
+        record['authority'] = FILES.thumbnail_authority
         protected = (FILES.thumbnail_admission != sequence
                      or bool(FILES.thumbnail_resolving))
         FILES.thumbnail_paths[canonical] = record
@@ -405,7 +408,20 @@ def _thumbnail_forget_artifact_locked(record):
         del FILES.thumbnail_inodes[record['identity']]
 
 
-def _thumbnail_unlink_owned(path):
+def _thumbnail_settle_abandoned_claim_locked(record):
+    claim = record['claimed']
+    if not isinstance(claim, dict):
+        return
+    batch = claim['batch']
+    if batch.retirement.claimed is batch:
+        return  # Its worker is still active or its batch is not yet unwound.
+    if claim['disposition'] != 'failed':
+        # Successful or ambiguous removal cannot authorize a later unlink.
+        _thumbnail_forget_artifact_locked(record)
+    record['claimed'] = False
+
+
+def _thumbnail_unlink_owned(path, batch):
     # Do not follow a replacement at the owned leaf while finding its receipt.
     canonical = os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
     if not VAULT_LOCK.acquire(blocking=False):
@@ -414,12 +430,17 @@ def _thumbnail_unlink_owned(path):
         record = FILES.thumbnail_paths.get(canonical)
         if record is None:
             return  # Unknown/replaced ownership is preserved, never removed.
+        _thumbnail_settle_abandoned_claim_locked(record)
+        if FILES.thumbnail_paths.get(canonical) is not record:
+            return
         if record['claimed']:
             raise OSError('thumbnail cleanup already claimed')
-        if record['protected'] or FILES.thumbnail_resolving:
+        if (record.get('authority') is not FILES.thumbnail_authority
+                or record['protected'] or FILES.thumbnail_resolving):
             _thumbnail_forget_artifact_locked(record)
             return
-        record['claimed'] = True
+        claim = {'batch': batch, 'disposition': 'uncertain'}
+        record['claimed'] = claim
     finally:
         VAULT_LOCK.release()
     settled = False
@@ -428,18 +449,24 @@ def _thumbnail_unlink_owned(path):
             observed = os.stat(path, follow_symlinks=False)
         except FileNotFoundError:
             settled = True
+            claim['disposition'] = 'settled'
             return
         if ((observed.st_dev, observed.st_ino) != record['identity']
                 or not stat.S_ISREG(observed.st_mode)):
             settled = True  # Replaced/indeterminate: relinquish, do not unlink.
+            claim['disposition'] = 'settled'
             return
         os.unlink(path)
         settled = True
+        claim['disposition'] = 'settled'
+    except OSError:
+        claim['disposition'] = 'failed'
+        raise
     finally:
         with VAULT_LOCK:
-            record['claimed'] = False
             if settled:
                 _thumbnail_forget_artifact_locked(record)
+            record['claimed'] = False
 
 
 def _validate_files_locked(job=None):
@@ -605,10 +632,13 @@ def _own_files(job=None, work=False):
             _thumbnail_resolve_admission(lease, lease.source)
         return lease
     except BaseException:
-        try:
-            lease.release()
-        except BaseException:
-            pass
+        if job is not None:
+            _thumbnail_release_lease(job, lease, primary_pending=True)
+        else:
+            try:
+                lease.release()
+            except BaseException:
+                pass
         raise
 
 
@@ -1334,6 +1364,11 @@ def enforce_vault_lock():
                 return _thumbnail_error_response(_ThumbnailError(
                     'thumbnail_pending', 409, 'Thumbnail cleanup is in progress'))
             abort(409, 'source cleanup is in progress')
+        except OSError:
+            if request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
+                return _thumbnail_error_response(_ThumbnailError(
+                    'thumbnail_source_conflict', 409, 'Source requires rescan'))
+            raise
 
 
 @app.after_request
@@ -1537,7 +1572,7 @@ def _delete_job(job):
                 for _ in range(32):
                     if not state.thumbnail_artifacts:
                         break
-                    path = next(iter(state.thumbnail_artifacts))
+                    path = state.thumbnail_artifacts.pop()
                     record = FILES.thumbnail_paths.get(path)
                     if record is not None and record['job'] is job:
                         discarded.append(record)
@@ -2321,7 +2356,7 @@ def _thumbnail_cleanup(job, *, target=None):
             break
         succeeded = set()
         try:
-            succeeded = thumbs.cleanup(batch, unlink=_thumbnail_unlink_owned)
+            succeeded = thumbs.cleanup(batch, unlink=lambda path: _thumbnail_unlink_owned(path, batch))
         finally:
             with files.report_lock:
                 thumbs.complete_cleanup_locked(files.thumbnail, batch, succeeded)
@@ -5596,6 +5631,7 @@ def _vault_lock_locked(blocking_jobs=True):
         return 0
     owners, discarded, _ = _vault_live_owners() if blocking_jobs else ([], [], [])
     _evict_thumbnails_for_store_transition(blocking=blocking_jobs)
+    FILES.thumbnail_authority = object()
     VAULT["closed"] = True
     affected = []
     try:
@@ -5702,6 +5738,7 @@ def vault_unlock():
             abort(409, "job files are still in use")
         owners, discarded, sealed = _vault_live_owners()
         VAULT["closed"] = True
+        FILES.thumbnail_authority = object()
         affected = sealed + discarded
         try:
             _vault_discard_markers(discarded, affected)

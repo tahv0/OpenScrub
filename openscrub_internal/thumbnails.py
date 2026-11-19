@@ -120,6 +120,7 @@ class FillTicket:
     stage_path: object = None
     stage_closed: bool = True
     stage_writer: object = None
+    stage_identity: object = None
     prospective_destination: object = None
 
 
@@ -283,6 +284,8 @@ def stage_jpeg(job_dir, ticket, jpeg):
     ticket.stage_closed = False
     ticket.stage_writer = raw
     try:
+        observed = os.fstat(fd)
+        ticket.stage_identity = (observed.st_dev, observed.st_ino)
         register = getattr(ticket, 'register_stage', None)
         if register is not None:
             register(path, fd)
@@ -355,6 +358,7 @@ def accept_jpeg_locked(state, ticket, staged):
     if ticket not in state.fills or ticket.obsolete or state.current is not ticket.generation or state.retirement is not None: raise ThumbnailObsolete()
     key = ticket.kind, ticket.index
     if not ticket.stage_closed or staged.path != ticket.stage_path or staged.destination != staged.path: raise ValueError('stage does not belong to ticket')
+    if staged.stamp[:2] != ticket.stage_identity: raise ThumbnailObsolete()
     if key in state.entries: raise ThumbnailObsolete()
     entry = JPEGEntry(ticket.kind, ticket.index, staged.path, staged.stamp, staged.size, staged.etag)
     state.entries[key] = entry

@@ -2416,3 +2416,319 @@ def test_deletion_drains_owned_receipts_in_bounded_batches_outside_guard(exact):
     assert response.status_code == 200 and response.json['ok']
     assert not files.thumbnail_artifacts
     assert len(released) == 65 and not any(released)
+
+
+@pytest.mark.parametrize('transition', ['vault', 'delete'])
+def test_fix3_lookup_failure_with_interrupted_release_recovers_via_lifecycle(exact, monkeypatch, transition):
+    if transition == 'vault': exact.enable()
+    primary = PermissionError('identity lookup denied')
+    related = web.new_job('', {}, 'lookup related owner')
+    related['phase'] = 'review'
+    related_files = web.FILES.initialize(related)
+    real_reserve = web._reserve_files_locked
+    captured = []
+    def reserve(*args, **kwargs):
+        lease = real_reserve(*args, **kwargs)
+        if not lease.work:
+            return lease
+        lease.related.append(web.FILES.reserve(related, work=True))
+        original, calls = lease.release, []
+        def interrupted():
+            calls.append(True)
+            if len(calls) == 1: raise KeyboardInterrupt('release interrupted')
+            return original()
+        lease.release = interrupted
+        captured.append((lease, original, calls))
+        return lease
+    def denied(*args): raise primary
+    monkeypatch.setattr(web, '_reserve_files_locked', reserve)
+    monkeypatch.setattr(web, '_thumbnail_resolve_admission', denied)
+    files = web.FILES.initialize(exact.job)
+    try:
+        with pytest.raises(PermissionError) as caught: web._own_files(exact.job, work=True)
+        assert caught.value is primary
+        lease, _, calls = captured[0]
+        assert not lease.released and len(calls) == 1 and web.FILES.count == 2
+        assert files.count == files.work == related_files.count == related_files.work == 1
+        assert any(getattr(ticket, '_deferred_lease', None) is lease for ticket in files.thumbnail.deferred)
+        response = (request('post', '/api/vault/lock') if transition == 'vault'
+                    else request('delete', exact.url))
+        assert response.status_code == 200
+        assert lease.released and lease.related[0].released and web.FILES.count == 0
+        assert files.count == files.work == related_files.count == related_files.work == 0
+        assert not files.thumbnail.deferred and not files.thumbnail.deferred_by_owner
+    finally:
+        for lease, original, _ in captured:
+            if not lease.released: original()
+
+
+def test_fix3_interrupted_claim_finalization_clears_without_reunlink(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries['crop', 0].path
+    real_guard, real_unlink = web.VAULT_LOCK, os.unlink
+    armed, calls = [False], []
+    class InterruptFinalGuard:
+        def acquire(self, *args, **kwargs): return real_guard.acquire(*args, **kwargs)
+        def release(self): return real_guard.release()
+        def __enter__(self):
+            if armed[0]:
+                armed[0] = False
+                raise KeyboardInterrupt('claim finalization interrupted')
+            return real_guard.__enter__()
+        def __exit__(self, *args): return real_guard.__exit__(*args)
+    def unlink(name, *args, **kwargs):
+        result = real_unlink(name, *args, **kwargs)
+        if str(name) == path:
+            calls.append(path)
+            armed[0] = True
+        return result
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'claim interruption')
+    monkeypatch.setattr(web, 'VAULT_LOCK', InterruptFinalGuard())
+    monkeypatch.setattr(os, 'unlink', unlink)
+    try:
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job)
+        with open(path, 'wb') as file: file.write(b'unowned replacement')
+        web._thumbnail_cleanup(exact.job)
+        assert open(path, 'rb').read() == b'unowned replacement'
+        assert calls == [path] and files.thumbnail.retirement is None
+        assert path not in web.FILES.thumbnail_paths
+    finally:
+        armed[0] = False
+        record = web.FILES.thumbnail_paths.get(path)
+        if record is not None:
+            record['claimed'] = False
+            record['protected'] = True
+            web._thumbnail_cleanup(exact.job)
+
+
+def test_fix3_private_stage_replacement_before_stamp_is_not_published(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    real_stamp, replaced, held = web.thumbs._stamp, [], []
+    def replace_before_stamp(path):
+        fd = os.open(path, os.O_RDONLY)
+        held.append(fd)
+        data = os.read(fd, 1048576)
+        old = os.fstat(fd)
+        os.unlink(path)
+        with open(path, 'wb') as file: file.write(data)
+        assert (os.stat(path).st_dev, os.stat(path).st_ino) != (old.st_dev, old.st_ino)
+        replaced.append((path, data))
+        return real_stamp(path)
+    monkeypatch.setattr(web.thumbs, '_stamp', replace_before_stamp)
+    try:
+        response = request('get', exact.url + '/thumb/0?v=' + version)
+        assert response.status_code in (409, 500) and response.is_json
+        assert replaced and open(replaced[0][0], 'rb').read() == replaced[0][1]
+        assert ('crop', 0) not in web.FILES.initialize(exact.job).thumbnail.entries
+    finally:
+        for fd in held: os.close(fd)
+
+
+def test_fix3_old_vault_receipt_cannot_delete_reused_identity(exact):
+    exact.enable()
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    source_ref = files.current_source['source_ref']
+    path = files.thumbnail.entries['crop', 0].path
+    record = web.FILES.thumbnail_paths[path]
+    assert request('post', '/api/vault/lock').status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password': 'synthetic-password'}).status_code == 200
+    restored = os.stat(path)
+    with web.VAULT_LOCK:
+        web.FILES.thumbnail_inodes.pop(record['identity'], None)
+        record['identity'] = (restored.st_dev, restored.st_ino)
+        web.FILES.thumbnail_inodes[record['identity']] = record
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.isfile(path) and files.thumbnail.retirement is None
+    assert request('get', exact.url + '/detections').status_code == 200
+    assert files.current_source['source_ref'] == source_ref
+
+
+@pytest.mark.parametrize('endpoint', ['detections', 'thumb/0', 'detframe/0'])
+@pytest.mark.parametrize('failure', [PermissionError('denied'), NotADirectoryError('bad directory')])
+def test_fix3_source_admission_io_error_is_private_json(exact, monkeypatch, endpoint, failure):
+    source = os.path.realpath(exact.job['video'])
+    real_stat = os.stat
+    def denied(path, *args, **kwargs):
+        if str(path) == source: raise failure
+        return real_stat(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'stat', denied)
+    response = request('get', exact.url + '/' + endpoint)
+    assert response.status_code == 409 and response.is_json
+    assert response.json['error'] == 'thumbnail_source_conflict'
+    assert response.headers['Cache-Control'] == 'private, no-store'
+    assert web.FILES.count == 0 and not web.FILES.thumbnail_resolving
+
+
+def test_fix3_sparse_deletion_receipt_set_never_restarts_iteration(exact):
+    files = web.FILES.initialize(exact.job)
+    class NoIteration(set):
+        def __iter__(self): raise AssertionError('artifact set iterated')
+    with web.VAULT_LOCK:
+        for number in range(200):
+            path = str(exact.path.parent / ('sparse-%d' % number))
+            record = dict(path=path, identity=(-80113, number), job=exact.job, protected=False, claimed=False)
+            files.thumbnail_artifacts.add(path)
+            web.FILES.thumbnail_paths[path] = record
+            web.FILES.thumbnail_inodes[record['identity']] = record
+        for number in range(120):
+            path = str(exact.path.parent / ('sparse-%d' % number))
+            record = web.FILES.thumbnail_paths[path]
+            web._thumbnail_forget_artifact_locked(record)
+        files.thumbnail_artifacts = NoIteration(files.thumbnail_artifacts)
+    assert request('delete', exact.url).status_code == 200
+    assert not files.thumbnail_artifacts
+
+
+def test_fix3_repeated_interrupt_cannot_reuse_prior_guard_intent(monkeypatch):
+    from openscrub_internal.lifetimes import FileOwners, _Lease
+    owners = FileOwners(threading.Lock())
+    job = {}
+    lease = owners.reserve(job, work=True)
+    original = _Lease.__setattr__
+    interruptions = []
+    def fail_assign(self, name, value):
+        if self is lease and name == '_work_done' and value is True and len(interruptions) < 2:
+            interruptions.append(name)
+            raise KeyboardInterrupt('progress marker interrupted')
+        if self is lease and name == '_decrement_uncertain' and value is True and len(interruptions) == 2:
+            interruptions.append(name)
+            raise KeyboardInterrupt('uncertainty handoff interrupted')
+        return original(self, name, value)
+    monkeypatch.setattr(_Lease, '__setattr__', fail_assign)
+    with pytest.raises(KeyboardInterrupt): lease.release()
+    assert len(interruptions) == 3
+    other = owners.reserve(job, work=True)
+    try:
+        try: lease.release()
+        except (RuntimeError, KeyboardInterrupt): pass
+        assert not lease.released
+        assert job['_files'].work == 1
+        assert owners.count == job['_files'].count == 2
+    finally:
+        other.release()
+
+
+def test_fix3_failed_unlink_claim_retries_after_finalization_interrupt(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries['crop', 0].path
+    real_guard, real_unlink = web.VAULT_LOCK, os.unlink
+    armed, attempts = [False], []
+    class InterruptedGuard:
+        def acquire(self, *args, **kwargs): return real_guard.acquire(*args, **kwargs)
+        def release(self): return real_guard.release()
+        def __enter__(self):
+            if armed[0]:
+                armed[0] = False
+                raise KeyboardInterrupt('finalization interrupted')
+            return real_guard.__enter__()
+        def __exit__(self, *args): return real_guard.__exit__(*args)
+    def unlink(name, *args, **kwargs):
+        if str(name) == path:
+            attempts.append(path)
+            if len(attempts) == 1:
+                armed[0] = True
+                raise PermissionError('owned unlink failed')
+        return real_unlink(name, *args, **kwargs)
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'retry failed unlink')
+    monkeypatch.setattr(web, 'VAULT_LOCK', InterruptedGuard())
+    monkeypatch.setattr(os, 'unlink', unlink)
+    try:
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job)
+        assert os.path.exists(path) and files.thumbnail.retirement is not None
+        web._thumbnail_cleanup(exact.job)
+        assert len(attempts) == 2 and not os.path.exists(path)
+        assert files.thumbnail.retirement is None and path not in web.FILES.thumbnail_paths
+    finally:
+        armed[0] = False
+        record = web.FILES.thumbnail_paths.get(path)
+        if record is not None:
+            record['claimed'] = False
+            record['protected'] = True
+            web._thumbnail_cleanup(exact.job)
+
+
+def test_fix3_new_admission_settles_abandoned_completed_claim(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries['crop', 0].path
+    real_guard, real_unlink = web.VAULT_LOCK, os.unlink
+    armed = [False]
+    class InterruptedGuard:
+        def acquire(self, *args, **kwargs): return real_guard.acquire(*args, **kwargs)
+        def release(self): return real_guard.release()
+        def __enter__(self):
+            if armed[0]:
+                armed[0] = False
+                raise KeyboardInterrupt('finalization interrupted')
+            return real_guard.__enter__()
+        def __exit__(self, *args): return real_guard.__exit__(*args)
+    def unlink(name, *args, **kwargs):
+        result = real_unlink(name, *args, **kwargs)
+        if str(name) == path: armed[0] = True
+        return result
+    with files.report_lock: web.thumbs.invalidate_locked(files.thumbnail, 'admission after unlink')
+    monkeypatch.setattr(web, 'VAULT_LOCK', InterruptedGuard())
+    monkeypatch.setattr(os, 'unlink', unlink)
+    try:
+        with pytest.raises(KeyboardInterrupt): web._thumbnail_cleanup(exact.job)
+        with open(path, 'wb') as file: file.write(b'new authoritative source')
+        other = web.new_job(path, {}, 'new source after completed claim')
+        assert other['video'] == path and path not in web.FILES.thumbnail_paths
+        web._thumbnail_cleanup(exact.job)
+        assert files.thumbnail.retirement is None
+        assert open(path, 'rb').read() == b'new authoritative source'
+    finally:
+        armed[0] = False
+        record = web.FILES.thumbnail_paths.get(path)
+        if record is not None:
+            record['claimed'] = False
+            record['protected'] = True
+            web._thumbnail_cleanup(exact.job)
+
+
+def test_fix3_failed_vault_transition_invalidates_old_cleanup_authority(exact, monkeypatch):
+    exact.enable()
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    path = files.thumbnail.entries['crop', 0].path
+    previous = web.FILES.thumbnail_authority
+    def fail(*args, **kwargs): raise OSError('interrupted vault operation')
+    monkeypatch.setattr(web.vault, 'encrypt_tree', fail)
+    response = request('post', '/api/vault/lock')
+    assert response.status_code == 500 and web.FILES.thumbnail_authority is not previous
+    web._thumbnail_cleanup(exact.job)
+    assert os.path.exists(path) and files.thumbnail.retirement is None
+
+
+def test_fix3_replacement_after_stage_stamp_never_serves_or_deletes(exact, monkeypatch):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    real_stage, replacement, held = web.thumbs.stage_jpeg, [], []
+    def replace_after_stamp(job_dir, ticket, jpeg):
+        staged = real_stage(job_dir, ticket, jpeg)
+        fd = os.open(staged.path, os.O_RDONLY)
+        held.append(fd)
+        original = os.fstat(fd)
+        os.unlink(staged.path)
+        with open(staged.path, 'wb') as file: file.write(jpeg)
+        observed = os.stat(staged.path)
+        assert (observed.st_dev, observed.st_ino) != (original.st_dev, original.st_ino)
+        replacement.append((staged.path, jpeg))
+        return staged
+    monkeypatch.setattr(web.thumbs, 'stage_jpeg', replace_after_stamp)
+    try:
+        response = request('get', exact.url + '/thumb/0?v=' + version,
+                           headers={'If-None-Match': '*'})
+        assert response.status_code == 409 and response.is_json
+        assert response.json['error'] == 'thumbnail_obsolete'
+        web._thumbnail_cleanup(exact.job)
+        assert open(replacement[0][0], 'rb').read() == replacement[0][1]
+    finally:
+        for fd in held: os.close(fd)

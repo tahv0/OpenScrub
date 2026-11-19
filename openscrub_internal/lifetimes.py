@@ -46,6 +46,7 @@ class FileOwners:
         self.thumbnail_inodes = {}
         self.thumbnail_resolving = set()
         self.thumbnail_admission = 0
+        self.thumbnail_authority = object()
 
     @staticmethod
     def initialize(job):
@@ -75,7 +76,7 @@ class _Lease:
         self.report_input = False
         self.operation = None
 
-    def _decrement_locked(self, obj, name, marker):
+    def _decrement_locked(self, obj, name, marker, invocation):
         if self._decrement_uncertain:
             raise RuntimeError('interrupted lease decrement needs same-guard reconciliation')
         if getattr(self, marker):
@@ -85,9 +86,10 @@ class _Lease:
         intent = self._decrement_intent
         if intent is None:
             before = getattr(obj, name)
-            self._decrement_intent = (obj, name, before, marker)
+            self._decrement_intent = (obj, name, before, marker, invocation)
         else:
-            if intent[0] is not obj or intent[1] != name or intent[3] != marker:
+            if (intent[0] is not obj or intent[1] != name or intent[3] != marker
+                    or intent[4] is not invocation):
                 raise RuntimeError('unfinished lease decrement')
             before = intent[2]
         try:
@@ -103,6 +105,7 @@ class _Lease:
     def release_locked(self):
         if self.released:
             return
+        invocation = object()
         self.release_started = True
         self.owners.thumbnail_resolving.discard(self)
         for lease in self.related:
@@ -110,16 +113,16 @@ class _Lease:
         try:
             try:
                 if self.state is not None:
-                    self._decrement_locked(self.state, 'work', '_work_done')
-                    self._decrement_locked(self.state, 'count', '_job_done')
-                self._decrement_locked(self.owners, 'count', '_global_done')
+                    self._decrement_locked(self.state, 'work', '_work_done', invocation)
+                    self._decrement_locked(self.state, 'count', '_job_done', invocation)
+                self._decrement_locked(self.owners, 'count', '_global_done', invocation)
             finally:
                 # Reconcile the saved before-value only while this guard is
                 # continuously held: other owners may change counts later.
                 if self.state is not None:
-                    self._decrement_locked(self.state, 'work', '_work_done')
-                    self._decrement_locked(self.state, 'count', '_job_done')
-                self._decrement_locked(self.owners, 'count', '_global_done')
+                    self._decrement_locked(self.state, 'work', '_work_done', invocation)
+                    self._decrement_locked(self.state, 'count', '_job_done', invocation)
+                self._decrement_locked(self.owners, 'count', '_global_done', invocation)
                 self.released = self._work_done and self._job_done and self._global_done
         finally:
             intent = self._decrement_intent
