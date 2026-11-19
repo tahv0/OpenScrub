@@ -9,7 +9,12 @@ import openscrub_web as web
 
 
 @pytest.fixture(autouse=True)
-def restore_threads():
+def restore_threads(monkeypatch):
+    # main() assigns these before the test stops startup; restore even when
+    # the embedding process had already configured either value.
+    monkeypatch.setattr(web, "TOKEN", web.TOKEN)
+    monkeypatch.setitem(web.app.config, "MAX_CONTENT_LENGTH",
+                        web.app.config["MAX_CONTENT_LENGTH"])
     previous = web.app.config.pop("PREVIEW_DECODE_THREADS", None)
     yield
     if previous is None:
@@ -57,12 +62,22 @@ def configure(monkeypatch, candidate=None, failure=None):
     return calls, legacy
 
 
-def test_default_uses_only_original_constructor_without_probe(monkeypatch):
+@pytest.mark.parametrize("configured", [False, True], ids=["absent", "zero"])
+def test_default_uses_only_original_constructor_without_probe(monkeypatch, configured):
     sentinel = object()
     constructor = Mock(return_value=sentinel)
-    monkeypatch.setattr(web.cv2, "VideoCapture", constructor)
-    monkeypatch.delattr(web.cv2, "CAP_PROP_N_THREADS", raising=False)
-    monkeypatch.delattr(web.cv2, "CAP_FFMPEG", raising=False)
+
+    class NoCapabilityProbes:
+        VideoCapture = constructor
+
+        def __getattr__(self, name):
+            if name in ("CAP_PROP_N_THREADS", "CAP_FFMPEG"):
+                raise AssertionError("unexpected capability lookup: " + name)
+            raise AttributeError(name)
+
+    monkeypatch.setattr(web, "cv2", NoCapabilityProbes())
+    if configured:
+        web.app.config["PREVIEW_DECODE_THREADS"] = 0
     assert web._open_preview_capture("movie.mp4") is sentinel
     constructor.assert_called_once_with("movie.mp4")
 
@@ -126,6 +141,8 @@ def test_legacy_failure_propagates(monkeypatch):
 def test_cli_assigns_threads_before_startup(monkeypatch, value):
     args = ["openscrub-web"] if value is None else ["openscrub-web", "--preview-decode-threads", value]
     monkeypatch.setattr(sys, "argv", args)
+    monkeypatch.setattr(web, "TOKEN", "preconfigured-token")
+    monkeypatch.setitem(web.app.config, "MAX_CONTENT_LENGTH", 1234)
     def stop(*args, **kwargs):
         raise RuntimeError("startup stopped")
     monkeypatch.setattr(web.os, "makedirs", stop)
@@ -172,23 +189,41 @@ def test_real_consumers_keep_pixels_metadata_and_jpegs(tmp_path, monkeypatch):
         def start(self):
             self.target()
     monkeypatch.setattr(web.threading, "Thread", InlineThread)
+    real_open = web._open_preview_capture
+    calls = []
+
+    def recording_open(path):
+        calls.append((path, web.app.config["PREVIEW_DECODE_THREADS"]))
+        return real_open(path)
+
+    monkeypatch.setattr(web, "_open_preview_capture", recording_open)
     results = []
     for mode in (0, 1, 2, 4):
         web.app.config["PREVIEW_DECODE_THREADS"] = mode
         frames = [web._frame_at(job, t, doc["render_state"]) for t in (0, 1, 1.75)]
+        assert calls == [(video, mode)] * 3
+        calls.clear()
         assert all(frame is not None for frame in frames)
         pixels = [(hashlib.sha256(frame.tobytes()).hexdigest(),
                    hashlib.sha256(frame[3:44, 5:62].tobytes()).hexdigest()) for frame in frames]
         with web.app.test_client() as client:
             info = client.get('/api/jobs/decoder-test/mediainfo')
-            previews = [client.get('/api/jobs/decoder-test/frame_at', query_string={"t": t, "src": "output"})
-                        for t in (0, 1, 1.75, 2.1)]
+            assert calls == [(video, mode)]
+            calls.clear()
+            previews = []
+            for t in (0, 1, 1.75, 2.1):
+                previews.append(client.get('/api/jobs/decoder-test/frame_at',
+                                           query_string={"t": t, "src": "output"}))
+                assert calls == [(video, mode)]
+                calls.clear()
         assert info.status_code == 200
         assert all(response.status_code == 200 for response in previews)
         thumb = tmp_path / 'thumb2_0.jpg'
         if thumb.exists():
             thumb.unlink()
         web._run_job(job, 'scan')
+        assert calls == [(video, mode)]
+        calls.clear()
         assert thumb.exists(), job['log']
         results.append((pixels, info.get_json(), [p.data for p in previews], thumb.read_bytes()))
     assert all(result == results[0] for result in results[1:])
