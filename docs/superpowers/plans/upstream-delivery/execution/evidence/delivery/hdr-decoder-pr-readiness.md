@@ -39,7 +39,7 @@ With project dependencies, FFmpeg/ffprobe with libx265 and the POSIX child-obser
 
 Run on both supported interpreter environments. These observations require real children; missing prerequisites can skip the optional controls, which does not establish readiness.
 
-This is the first privately prepared submission candidate. Keep the next candidate private while Austin reviews it; wait for initial feedback or an invitation before adding another. Publication and the shared prerequisite's submission disposition remain separate. No remaining optional feature or final combined application gate is needed to prepare this independent contribution.
+The reviewed topic is now pushed to the user’s fork under explicit authorization; [submission status](../../submissions/hdr-decoder-cleanup.md) records the upstream PR access error. It is the first submission candidate. Keep the next candidate private while Austin reviews it; wait for initial feedback or an invitation before adding another. The shared test-only prerequisite remains explicitly included as its own commit; no intermediate PR into the fork is needed. No remaining optional feature or final combined application gate is needed to prepare this independent contribution.
 
 The evidence covers Linux CPU and POSIX/libx265. It establishes no Windows/GPU encoder, arbitrary native-interruption, cancellation-speed, permanent-leak or broader lifecycle/geometry/output-policy guarantee. Defaults and output handling remain preserved.
 
