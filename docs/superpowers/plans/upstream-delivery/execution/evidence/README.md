@@ -4,6 +4,8 @@ These local planning records preserve synthetic research, completed-task reports
 
 | Evidence | What it establishes |
 | --- | --- |
+| [Thumbnail coherence acceptance](delivery/p08a-thumbnail-coherence-acceptance.md) | Reviewed 1948644, final 353/353 and fresh installed/package checks; earlier page, broader-test and video results retain their actual source pins. |
+| [Vault/source continuity acceptance](delivery/vault-source-continuity-acceptance.md) | Reviewed 0788899 and verified managed round-trip source identity, final 215/215 and installed strict-save evidence. |
 | [Report baseline](research/report-baseline-research/README.md) / [transaction inventory](research/report-transaction-research.md) | Actual-route interrupted writes, lost sparse edits, replay and roundtrip loss; proposed ownership boundaries remain distinct from passing implementation evidence. |
 | [No-op save scope](research/report-noop-scope-research.md) | Actual transaction-head work counts and normalization/metadata semantics; separate unchanged-publication and conditional serializer candidates, without latency claims. |
 | [Unchanged report saves](delivery/task-631-report.md) / [review](delivery/task-631-review.md) | Actual-route no-op preservation, full/floor/browser/render/reopen checks and pinned alternating HTTP savings with changed-save/RSS/retention costs. |

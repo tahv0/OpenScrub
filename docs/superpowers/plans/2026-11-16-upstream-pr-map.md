@@ -20,7 +20,7 @@ This is the contribution breakdown for [the extraction plan](2026-11-16-upstream
 
 Every candidate receives one disposition: **proposed PR**, **already upstream**, **downstream option**, **removed-system-only**, or **needs investigation**. Mixed commits are split by behavior, not discarded wholesale because they touch training/review code. Removal of the workbench is not a reason to lose a generic reliability improvement.
 
-This ledger covers all 28 commit references in issue #22 plus additional identified history. It is not a claim that all 500 integration-only commits have received a fresh line-by-line audit. Before cutover, the baseline task must reconcile the remaining history and changed-file inventory against this ledger; unresolved candidates stay visible as needs investigation.
+Source accounting is complete for all 28 issue #22 references and the additional integration history: 500 integration-only commits, 177 net changed paths, 438 core hunks and 42 other production/build paths have recorded dispositions. The [preserved audit](upstream-delivery/execution/preservation/README.md) retains the exact partition, merge handling and selected support-test coverage limits for large mixed introductions. Source accounting is distinct from extraction and runtime acceptance; every remaining candidate still needs its owning validation before cutover.
 
 For each candidate, record donor SHA and follow-ups, affected upstream path, reproduction/feature scenario, disposition and reason, proposed PR ID, dependencies, exact upstream SHA tested, validation results and any platform limitations. Track the behavior separately from whether the named donor SHA is an ancestor: early features were sometimes integrated through different commits.
 
@@ -107,7 +107,7 @@ Commit IDs locate evidence, not instructions to cherry-pick a whole change. Merg
 | `2900930f` | P01 | Streaming Save As. |
 | `39b4ed83` | P02 | Explicit idempotent output choices. |
 | `617c9ac7` | P17; early donor not an integration ancestor | Manual quad renderer behavior; examine integrated equivalent and later source-frame fixes. |
-| `a3520d7e` | Optional later minimal human-label proposal | Early donor not an integration ancestor; output Keep must not imply a negative training label. Training/example collection is excluded. Not a prerequisite for P02 or P17. |
+| a3520d7e | EXCLUDE from clean contributions | Human-label/training/example collection is excluded. Ordinary Keep controls redaction. The early donor is not an integration ancestor and remains provenance only; it is not a prerequisite for P02 or P17. |
 | `64afc3cc` | P15 | Detection-type and output filters that only change the view. |
 | `c3a8c7a5` | P15 subset | Preserve drafts/lazy cards; only expose statuses supported by the clean app. |
 | `72efeb02` | P18; early donor not an integration ancestor | Atomic checkpoint and review-preserving suffix merge, without training. |
