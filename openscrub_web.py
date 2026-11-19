@@ -4767,7 +4767,11 @@ function beHook(){
 }
 // Thumbnail ownership is separate from the review draft and box editor.
 let REVIEW_IMAGES=null, REVIEW_REQUEST=null;
-function retireThumbnailReview(){REVIEW_IMAGES=null;REVIEW_REQUEST=null;}
+function retireThumbnailReview(){
+ const owner=REVIEW_IMAGES,light=owner&&owner.lightbox;
+ REVIEW_IMAGES=null;REVIEW_REQUEST=null;
+ if(light&&light.overlay)light.overlay.remove();
+}
 function thumbnailUrl(jobId,kind,index,version){
  const u=new URL(`api/jobs/${encodeURIComponent(jobId)}/${kind}/${index}`,window.location.href);
  if(version)u.searchParams.set("v",version);
@@ -5061,7 +5065,7 @@ async function loadReview(){
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
  if(!ownsView(id,gen)||REVIEW_REQUEST!==token)return;
- showPanel("review");DUR=d.duration;Object.assign(EN,nextEN);TRKMEM=nextTRKMEM;
+ showPanel("review");retireThumbnailReview();DUR=d.duration;Object.assign(EN,nextEN);TRKMEM=nextTRKMEM;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
  owner.root=document.getElementById("review");owner.version=version;REVIEW_IMAGES=owner;

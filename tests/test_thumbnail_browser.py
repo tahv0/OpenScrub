@@ -22,7 +22,7 @@ const vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map();
 function element(id='') {return {id, textContent:'', innerHTML:'', style:{},dataset:{},
  disabled:false,isConnected:true, classList:{toggle(){},remove(){}},
- remove(){this.isConnected=false; if(elements.get(this.id)===this)elements.delete(this.id)},
+ remove(){this.isConnected=false;if(this.child)this.child.isConnected=false; if(elements.get(this.id)===this)elements.delete(this.id)},
  addEventListener(){},querySelector(selector){if(selector==='img'&&this.id==='lb'){if(!this.child){this.child=element();this.child.root=this;}return this.child;}return null},querySelectorAll(){return []},
  contains(node){return node.isConnected && node.root===this},setAttribute(k,v){this[k]=String(v)},
  removeAttribute(k){delete this[k]}};}
@@ -294,7 +294,7 @@ def test_fix1_failed_reopen_keeps_group_owner_and_allows_retry(failure):
     const owner=REVIEW_IMAGES,root=elements.get('review'),editor=BE,draft=EDITS,manual=MAN,audio=BE.audio,groups=TRKMEM;
     BE.ov[0]=[1,2,3,4];MAN.push({manual_id:'pending'});EDITS.audioInFlight=true;BE.audioSaved=null;
     const p=loadReview();if(FAIL==='network')queue.shift().reject(Error('offline'));else await reply({error:'pending'},+FAIL);
-    await p.catch(()=>{});assert.equal(REVIEW_IMAGES,owner,'failed reopen must keep owner');
+    await p;assert.equal(REVIEW_IMAGES,owner,'failed reopen must keep owner');
     assert.equal(elements.get('review'),root);assert.equal(TRKMEM,groups);toggleDet(0);
     assert.equal(EN[0],false);assert.equal(EN[1],false,'group toggle keeps every member');
     assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(BE.audio,audio);
@@ -345,3 +345,27 @@ def test_fix1_competing_review_mounts_only_publish_latest():
     assert.equal(REVIEW_IMAGES,owner);assert.equal(elements.get('review'),root);
     assert.match(elements.get('img1').src,/cccccccccccccccccccccccccccccccc$/);
     """)
+
+
+def test_fix2_failed_reopen_keeps_exact_loaded_lightbox():
+    run_js("""await mount([row(0)]);zoomDet(0);const owner=REVIEW_IMAGES,light=owner.lightbox,root=elements.get('review');
+    const editor=BE,draft=EDITS,p=loadReview();await reply({error:'pending'},409);await p;
+    assert.equal(REVIEW_IMAGES,owner);assert.equal(elements.get('review'),root);assert.equal(elements.get('lb'),light.overlay);
+    assert.equal(light.overlay.isConnected,true);assert.equal(light.node.isConnected,true);assert.equal(BE,editor);assert.equal(EDITS,draft);
+    """)
+
+
+@pytest.mark.parametrize('exit_kind',['job','panel','replacement'])
+def test_fix2_retirement_disconnects_only_owned_lightbox(exit_kind):
+    run_js("""await mount([row(0)]);zoomDet(0);const owner=REVIEW_IMAGES,light=owner.lightbox;
+    const oldError=light.node.onerror,oldLoad=light.node.onload;light.node.currentSrc=light.node.src;light.node.complete=true;light.node.naturalWidth=20;oldLoad();
+    if(KIND==='job'){openJob('B');assert.equal(light.overlay.isConnected,false);openJob('A');}
+    if(KIND==='panel'){showPanel('compare');assert.equal(light.overlay.isConnected,false);}
+    if(KIND==='replacement'){const p=loadReview();await reply(metadata([row(0)],'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));await p;}
+    else {const p=loadReview();await reply(metadata([row(0)]));await p;}
+    assert.equal(light.overlay.isConnected,false,'retired owned overlay must be removed');
+    assert.equal(light.node.isConnected,false);zoomDet(0);const current=REVIEW_IMAGES.lightbox,src=current.node.src;
+    MAN.push({manual_id:'current'});const editor=BE,draft=EDITS,manual=MAN;oldError();oldLoad();await tick();
+    assert.notEqual(current.overlay,light.overlay);assert.equal(current.overlay.isConnected,true);assert.equal(current.node.src,src);
+    assert.equal(BE,editor);assert.equal(EDITS,draft);assert.equal(MAN,manual);assert.equal(MAN[0].manual_id,'current');
+    """.replace('KIND',json.dumps(exit_kind)))

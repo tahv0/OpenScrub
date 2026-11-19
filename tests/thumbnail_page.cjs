@@ -161,6 +161,50 @@ async function reviewFixScenario(context){
   return {reopenFailures:['network',409,503],staleCallbacks:true,closedLightboxLatch:true,teardown:['panel','job'],consoleMessages};
  }finally{await page.close();}
 }
+async function lightboxTeardownScenario(context,kind){
+ const page=await context.newPage(),errors=[],consoleMessages=[],requests=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ page.on('console',m=>{if(['error','warning'].includes(m.type()))consoleMessages.push(m.text());});
+ page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
+ try{
+  await page.goto(base);assert.equal(await page.title(),'OpenScrub');
+  await page.evaluate(id=>openJob(id),job);await page.waitForSelector('#thumb2');
+  await page.waitForFunction(()=>document.getElementById('thumb2')?.naturalWidth>0);
+  await page.evaluate(()=>zoomDet(2));await page.waitForFunction(()=>document.querySelector('#lb img')?.naturalWidth>0);
+  await page.evaluate(()=>{BE.ov[2]=[2,3,14,15];BE.audio=[{t0:.1,t1:.2,mode:'mute'}];
+   EDITS.audioInFlight=true;MAN.push({manual_id:'fix2-draft'});
+   const light=REVIEW_IMAGES.lightbox;window.retireProof={owner:REVIEW_IMAGES,root:document.getElementById('review'),
+    overlay:light.overlay,node:light.node,error:light.node.onerror,load:light.node.onload,
+    editor:BE,draft:EDITS,manual:MAN,audio:BE.audio,attempted:REVIEW_IMAGES.attempted};});
+  if(kind==='replacement'){
+   const failed=route=>route.fulfill({status:409,contentType:'application/json',body:'{"error":"pending"}'});
+   await page.route('**/api/jobs/'+job+'/detections',failed);
+   await page.evaluate(()=>loadReview());await page.unroute('**/api/jobs/'+job+'/detections',failed);
+   assert.equal(await page.evaluate(()=>REVIEW_IMAGES===retireProof.owner&&document.getElementById('review')===retireProof.root&&
+    retireProof.overlay.isConnected&&retireProof.node.isConnected&&REVIEW_IMAGES.attempted===retireProof.attempted&&
+    BE===retireProof.editor&&EDITS===retireProof.draft&&MAN===retireProof.manual&&BE.audio===retireProof.audio),true);
+   await page.evaluate(()=>loadReview());
+  }else if(kind==='panel')await page.evaluate(()=>showPanel('compare'));
+  else await page.evaluate(id=>{refresh=()=>{};openJob(id);},jobB);
+  assert.equal(await page.evaluate(()=>!retireProof.overlay.isConnected&&!retireProof.node.isConnected&&
+   (!REVIEW_IMAGES||REVIEW_IMAGES!==retireProof.owner)),true);
+  assert.equal(await page.locator('#lb').count(),0);
+  if(kind!=='replacement')await page.evaluate(async id=>{refresh=()=>{};openJob(id);await loadReview();},job);
+  await page.waitForSelector('#thumb2');await page.waitForFunction(()=>document.getElementById('thumb2')?.naturalWidth>0);
+  await page.evaluate(()=>zoomDet(2));await page.waitForFunction(()=>document.querySelector('#lb img')?.naturalWidth>0);
+  await page.evaluate(()=>{BE.ov[2]=[4,5,16,17];MAN.push({manual_id:'new-owner'});
+   const l=REVIEW_IMAGES.lightbox;window.newProof={owner:REVIEW_IMAGES,overlay:l.overlay,node:l.node,src:l.node.src,
+    editor:BE,draft:EDITS,manual:MAN};retireProof.error();retireProof.load();});
+  assert.equal(await page.evaluate(()=>REVIEW_IMAGES===newProof.owner&&newProof.overlay.isConnected&&newProof.node.isConnected&&
+   newProof.node.src===newProof.src&&getComputedStyle(newProof.node).visibility==='visible'&&BE===newProof.editor&&
+   EDITS===newProof.draft&&MAN===newProof.manual&&MAN.some(x=>x.manual_id==='new-owner')&&BE.ov[2][0]===4),true);
+  assert.equal(await page.locator('#lb').count(),1);
+  assert.equal(requests.filter(r=>r.method==='POST'||r.url.includes('/render')||r.url.includes('/edit_sample')).length,0);
+  assert.deepEqual(errors,[]);
+  assert.deepEqual(consoleMessages.filter(m=>!/Failed to load resource: (the server responded with a status of (409|503)|net::ERR_FAILED)/.test(m)),[]);
+  return {kind,loadedLightbox:true,oldDisconnected:true,oldCallbacksFenced:true,consoleMessages};
+ }finally{await page.close();}
+}
 (async()=>{
  const browser=await chromium.launch({executablePath:process.env.OPENSCRUB_CHROMIUM,args:['--no-sandbox']});
  try{
@@ -255,7 +299,7 @@ async function reviewFixScenario(context){
   await page.evaluate(()=>{window.revisitedRoot=document.getElementById('review');window.revisitedSrc=document.getElementById('thumb2').src;});
   releaseMeta();await page.evaluate(()=>window.delayedRefresh);await page.unroute('**/api/jobs/'+job+'/detections',holdMetadata);
   assert.equal(await page.evaluate(()=>document.getElementById('review')===revisitedRoot&&document.getElementById('thumb2').src===revisitedSrc),true);
-  if(await page.locator('#lb').count())await page.locator('#lb').click();
+  assert.equal(await page.locator('#lb').count(),0);
   await page.waitForFunction(()=>{const n=document.getElementById('thumb2');return n&&n.complete&&n.naturalWidth>0&&getComputedStyle(n).visibility==='visible';});
   // Persistent metadata failure spends exactly one attempt; a deliberate
   // reopen is the only operation that creates a new budget.
@@ -276,8 +320,9 @@ async function reviewFixScenario(context){
   const persisted=await context.request.get(base+'api/jobs/'+job+'/detections');assert.equal(persisted.status(),200);
   const pendingDom=[await pendingDomScenario(context,'before'),await pendingDomScenario(context,'after')];
   const fix1=await reviewFixScenario(context);
+  const fix2=[];for(const kind of ['panel','job','replacement'])fix2.push(await lightboxTeardownScenario(context,kind));
   console.log(JSON.stringify({url:page.url(),title:await page.title(),pendingDom,fix1,screenshots:['review-desktop.png','review-unavailable.png','review-small.png'],
-   oldStatus:obsolete.status(),pixelChanged:true,recovery:true,pageErrors:errors,consoleMessages,rawRows:(await persisted.json()).detections.length,heldLostAckAndReopen:true,lateABA:true,persistentFailure:true}));
+   fix2,oldStatus:obsolete.status(),pixelChanged:true,recovery:true,pageErrors:errors,consoleMessages,rawRows:(await persisted.json()).detections.length,heldLostAckAndReopen:true,lateABA:true,persistentFailure:true}));
   await context.close();
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
