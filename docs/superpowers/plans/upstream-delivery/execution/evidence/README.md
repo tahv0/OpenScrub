@@ -4,6 +4,7 @@ These local planning records preserve synthetic research, completed-task reports
 
 | Evidence | What it establishes |
 | --- | --- |
+| [Current report-read baseline](delivery/p08b-report-read-baseline.md) | Accepted 1k/10k/100k native HTTP timing, separate parse/validation counts and fresh-process RSS, actual source/report replacement and decoded-pixel controls; setup corrections and sampling limits explicit. P08B implementation remains conditional. |
 | [HDR PR readiness](delivery/hdr-decoder-pr-readiness.md) | Unchanged ded411cb, four current cases on each interpreter, separated shared test prerequisite and retained archive member audit; historical full/build checks remain attributed. |
 | [Thumbnail coherence acceptance](delivery/p08a-thumbnail-coherence-acceptance.md) | Reviewed 1948644, final 353/353 and fresh installed/package checks; earlier page, broader-test and video results retain their actual source pins. |
 | [Vault/source continuity acceptance](delivery/vault-source-continuity-acceptance.md) | Reviewed 0788899 and verified managed round-trip source identity, final 215/215 and installed strict-save evidence. |
