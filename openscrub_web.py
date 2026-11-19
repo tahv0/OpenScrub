@@ -469,8 +469,13 @@ def _files_busy_locked(blocking=True):
     if not JOBS_LOCK.acquire(blocking=blocking):
         return True  # shutdown cannot safely inspect the registry now
     try:
-        return bool(FILES.count or any(j.get("phase") in _ACTIVE_PHASES
-                                       for j in JOBS.values()))
+        # Cleanup releases its lease before clearing the active operation.
+        # Inspect only existing owners while admission is held, without waiting
+        # for a report transaction or constructing a new owner.
+        return bool(FILES.count or any(
+            j.get("phase") in _ACTIVE_PHASES
+            or (j.get("_files") is not None and j["_files"].active is not None)
+            for j in JOBS.values()))
     finally:
         JOBS_LOCK.release()
 

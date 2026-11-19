@@ -817,3 +817,85 @@ def test_wrapper_failure_does_not_close_an_unrelated_open_file(tmp_path, monkeyp
                 real_close(reopened[0])
             except OSError:
                 pass
+
+
+@pytest.mark.parametrize('lock_path', ['manual', 'nonblocking'])
+def test_vault_stays_busy_until_operation_cleanup_finishes(exact, lock_path):
+    import threading
+    import time
+    from pathlib import Path
+    key = exact.enable()
+    pc = precondition(sample(exact))
+    files = web.FILES.initialize(exact.job)
+    selected, epoch = files.current_source, files.source_epoch
+    source = Path(exact.job['video'])
+    before = source.read_bytes()
+    stamp = selected['stamp']
+    report = exact.path.read_bytes()
+    owner = web._prepare_work(exact.job, 'scan')
+    with files.report_lock:
+        web._begin_operation(exact.job, owner)
+    exact.job['phase'] = 'review'
+    real_lock = files.report_lock
+    entered, resume = threading.Event(), threading.Event()
+    errors, admission_report_locks = [], []
+    class FinishGate:
+        def __enter__(self):
+            if threading.current_thread() is worker:
+                entered.set()
+                assert resume.wait(8)
+                return real_lock.__enter__()
+            admission_report_locks.append(True)
+            return real_lock.__enter__()
+        def __exit__(self, *args):
+            return real_lock.__exit__(*args)
+    def finish():
+        try:
+            web._finish_operation(exact.job, owner)
+        except BaseException as error:
+            errors.append(error)
+    worker = threading.Thread(target=finish, name='held-operation-finish')
+    files.report_lock = FinishGate()
+    worker.start()
+    try:
+        assert entered.wait(5)
+        assert web.FILES.count == 0 and files.active is owner
+        assert owner.released and exact.job['phase'] == 'review'
+        if lock_path == 'manual':
+            assert request('post', '/api/vault/lock').status_code == 409
+            assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 409
+        else:
+            start = time.monotonic()
+            with pytest.raises(web.FilesBusy):
+                web._vault_lock_now(blocking=False)
+            assert time.monotonic() - start < 2
+        assert not admission_report_locks
+        assert source.read_bytes() == before and exact.path.read_bytes() == report
+        assert web.VAULT['key'] == key and not web.vault_locked()
+        assert files.current_source is selected and selected['stamp'] == stamp
+        assert files.source_epoch == epoch and files.vault_transition is None
+    finally:
+        resume.set()
+        worker.join(8)
+        files.report_lock = real_lock
+        assert not worker.is_alive() and not errors
+    assert files.active is None and web.FILES.count == 0
+    assert request('post', '/api/vault/lock').status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert files.current_source is selected and files.source_epoch == epoch
+    assert precondition(sample(exact)) == pc
+    assert post(exact, geometry_preconditions={'0':pc}, box_overrides={'0':[3,4,10,11]}).status_code == 200
+    assert raw(exact)['detections'][0]['cbox'] == [3,4,10,11]
+
+
+def test_vault_busy_check_does_not_create_missing_owner(store):
+    orphan = {'phase': 'review'}
+    with web.JOBS_LOCK:
+        web.JOBS['uninitialized-test-job'] = orphan
+    try:
+        with web.VAULT_LOCK:
+            assert not web._files_busy_locked()
+        assert '_files' not in orphan
+    finally:
+        with web.JOBS_LOCK:
+            del web.JOBS['uninitialized-test-job']
