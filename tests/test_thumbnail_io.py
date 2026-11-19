@@ -2732,3 +2732,78 @@ def test_fix3_replacement_after_stage_stamp_never_serves_or_deletes(exact, monke
         assert open(replacement[0][0], 'rb').read() == replacement[0][1]
     finally:
         for fd in held: os.close(fd)
+
+
+def _retired_crop(exact):
+    version = request('get', exact.url + '/detections').json['thumbnail_version']
+    assert request('get', exact.url + '/thumb/0?v=' + version).status_code == 200
+    files = web.FILES.initialize(exact.job)
+    with files.report_lock:
+        path = files.thumbnail.entries['crop', 0].path
+        web.thumbs.invalidate_locked(files.thumbnail, 'retire owned crop')
+    return files, path
+
+
+def test_interrupted_unlink_relinquishes_receipt_before_inode_reuse(exact, monkeypatch):
+    files, path = _retired_crop(exact)
+    original = os.stat(path)
+    identity = (original.st_dev, original.st_ino)
+    interrupt = KeyboardInterrupt('unlink consumed the crop')
+    real_unlink = os.unlink
+    calls = []
+
+    def interrupt_after_remove(name, *args, **kwargs):
+        if name == path:
+            calls.append(name)
+            assert len(calls) == 1
+            real_unlink(name, *args, **kwargs)
+            raise interrupt
+        return real_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(os, 'unlink', interrupt_after_remove)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        web._thumbnail_cleanup(exact.job)
+    assert caught.value is interrupt
+    assert not os.path.exists(path)
+    assert path not in web.FILES.thumbnail_paths
+    assert identity not in web.FILES.thumbnail_inodes
+    assert path not in files.thumbnail_artifacts
+    assert files.thumbnail.retirement is not None
+
+    with open(path, 'xb') as replacement:
+        replacement.write(b'unowned replacement')
+    real_stat = os.stat
+
+    def reused_identity(name, *args, **kwargs):
+        if name == path and kwargs.get('follow_symlinks') is False:
+            return original
+        return real_stat(name, *args, **kwargs)
+
+    monkeypatch.setattr(os, 'stat', reused_identity)
+    web._thumbnail_cleanup(exact.job)
+    with open(path, 'rb') as replacement:
+        assert replacement.read() == b'unowned replacement'
+    assert calls == [path] and files.thumbnail.retirement is None
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='requires POSIX directory write permissions')
+def test_permission_denied_unlink_keeps_receipt_for_retry(exact):
+    files, path = _retired_crop(exact)
+    record = web.FILES.thumbnail_paths[path]
+    identity = record['identity']
+    directory = os.path.dirname(path)
+    mode = os.stat(directory).st_mode
+    try:
+        os.chmod(directory, mode & ~0o222)
+        if os.access(directory, os.W_OK):
+            pytest.skip('current user can bypass directory write permissions')
+        web._thumbnail_cleanup(exact.job)
+        assert os.path.isfile(path) and files.thumbnail.retirement is not None
+        assert web.FILES.thumbnail_paths[path] is web.FILES.thumbnail_inodes[identity] is record
+        assert path in files.thumbnail_artifacts and not record['claimed']
+    finally:
+        os.chmod(directory, mode)
+    web._thumbnail_cleanup(exact.job)
+    assert not os.path.exists(path) and files.thumbnail.retirement is None
+    assert path not in web.FILES.thumbnail_paths and identity not in web.FILES.thumbnail_inodes
+    assert path not in files.thumbnail_artifacts

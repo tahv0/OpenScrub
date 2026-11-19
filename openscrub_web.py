@@ -415,7 +415,11 @@ def _thumbnail_settle_abandoned_claim_locked(record):
     batch = claim['batch']
     if batch.retirement.claimed is batch:
         return  # Its worker is still active or its batch is not yet unwound.
-    if claim['disposition'] != 'failed':
+    _thumbnail_finish_claim_locked(record)
+
+
+def _thumbnail_finish_claim_locked(record):
+    if record['claimed']['disposition'] != 'failed':
         # Successful or ambiguous removal cannot authorize a later unlink.
         _thumbnail_forget_artifact_locked(record)
     record['claimed'] = False
@@ -443,30 +447,24 @@ def _thumbnail_unlink_owned(path, batch):
         record['claimed'] = claim
     finally:
         VAULT_LOCK.release()
-    settled = False
     try:
         try:
             observed = os.stat(path, follow_symlinks=False)
         except FileNotFoundError:
-            settled = True
             claim['disposition'] = 'settled'
             return
         if ((observed.st_dev, observed.st_ino) != record['identity']
                 or not stat.S_ISREG(observed.st_mode)):
-            settled = True  # Replaced/indeterminate: relinquish, do not unlink.
             claim['disposition'] = 'settled'
             return
         os.unlink(path)
-        settled = True
         claim['disposition'] = 'settled'
     except OSError:
         claim['disposition'] = 'failed'
         raise
     finally:
         with VAULT_LOCK:
-            if settled:
-                _thumbnail_forget_artifact_locked(record)
-            record['claimed'] = False
+            _thumbnail_finish_claim_locked(record)
 
 
 def _validate_files_locked(job=None):
