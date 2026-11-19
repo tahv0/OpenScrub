@@ -14,4 +14,4 @@ Validation:
 
 OS-native picker interaction, Windows permissions, other browser engines, multi-GB exports, physical disk durability and OpenCV 5 compatibility remain unverified. No new runtime dependency or version change is included.
 
-Private delivery status: reviewed ca0f2ce on Austin5d3a15a; [current readiness](../evidence/delivery/save-as-pr-readiness.md). Wait for Austin’s feedback or invitation on HDR#23 before another submission.
+Private delivery status: reviewedca0f2ce on Austin5d3a15a; [readiness and next-baseline plan](../evidence/delivery/save-as-pr-readiness.md). HDR#23 is now merged and Austin's feedback has arrived. Refresh privately on50c5a9e/v1.0.97 and replace old-base verification with actual new results before submission; no refresh or second publication is claimed yet.

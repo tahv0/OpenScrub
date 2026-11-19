@@ -1,6 +1,6 @@
 # Save As progress: private PR readiness
 
-The unchanged candidate pr/save-as-progress at ca0f2ce7458347afd2e6156a97df580b6623767a is independently approved for private readiness. Its direct Austin parent is 5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f. Read-only upstream checks on 2026-11-19 still identified that main revision and [HDR PR #23](https://github.com/austinmabry/OpenScrub/pull/23) open without comments or reviews. Keep this candidate private pending Austin's feedback or invitation.
+The unchanged candidate pr/save-as-progress atca0f2ce7458347afd2e6156a97df580b6623767a is independently approved for private readiness on its original Austin parent5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f. [HDR PR#23 has now merged](../../submissions/hdr-decoder-cleanup.md); Austin's feedback supports focused PRs and main has advanced to50c5a9e/v1.0.97. The checks below retain their old source attribution. Refresh Save As privately against the actual accepted baseline before submission.
 
 The existing Save As donor displayed a static Saving message. This contribution adds feedback for the redacted video and audit report: bytes count after each destination write completes, a valid response length enables a total and approximate remaining time, unknown totals stay indeterminate, stalls show waiting, and Saved follows successful close. Direct Download remains available. It preserves output generation, redaction behavior, existing streaming routes and upstream defaults.
 
@@ -24,3 +24,9 @@ With project dependencies and Node 18+ available, reproduce the owning suite fro
 Retained archive SHA-256 values: sdist 45629ac9dc852131b4655e50512a459e2c4241af8d2aace4c2830314c2db5cc9; wheel 513e3ae0efc3f9fd14aee7a1ffde1d4097b8de9c996353ecee0183de9dee4daf.
 
 [Prepared PR description](../../pr-drafts/save-as-progress.md). C01 composition and working-version adoption remain separate.
+
+## Next private refresh
+
+Preserveca0f2ce and create a separate candidate from50c5a9e. Keep upstream's1.0.97 version, full-discovery contributor command, HDR regressions, tracker geometry assertion and sdist-only tests/contributor files. Reconcile only CONTRIBUTING.md and pyproject.toml overlap; the upstream web implementation and zones_ui.py are unchanged. Verify Save As web/tests/README bytes againstca0f2ce.
+
+Run one fresh full native discovery (expected161: upstream137 plus24 Save As cases; verify the actual result and no HDR skips), the24 owning cases on actual Python3.9, evaluated joined PAGE, and fresh offline sdist-to-wheel/installed checks. Matching UI and route bytes can justify retaining the historical256MiB browser scenario at its original pin and limits. The old tracker-log failure is historical; do not carry it forward as an accepted failure after its upstream correction. No refresh execution or second submission is claimed here.

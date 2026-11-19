@@ -1,5 +1,7 @@
 Title: Test size-jump handoff rejection through track geometry
 
+Delivery status: merged as the separate test-only commit in [HDR PR#23](https://github.com/austinmabry/OpenScrub/pull/23). This historical draft is retained for attribution; do not submit it again.
+
 The existing engulfing-look-alike regression expects a `size jump` log that the tracker intentionally suppresses when already held. Assert that post-occlusion samples exist, then retain the existing area checks to verify the larger look-alike cannot steal the target.
 
 Only two test assertion lines change; the synthetic fixture and production tracker are unchanged.

@@ -2,7 +2,7 @@
 
 Candidate: pr/hdr-decoder-cleanup at ded411cbec308333d1416ae3d58b4f6e918d7849.
 
-On 2026-11-19 at 09:11:26 UTC, the [upstream main API](https://api.github.com/repos/austinmabry/OpenScrub/branches/main) still identified 5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f. The unchanged reviewed topic is now open as [Austin PR#23](https://github.com/austinmabry/OpenScrub/pull/23); this date records the preparation check, not a new source test. The candidate code is unchanged from its [independent source approval](task-109-review.md); the current readiness evidence and PR description also pass independent specification/quality review.
+On 2026-11-19 at09:11:26UTC, the preparation check identified Austin main5d3a15a. The unchanged reviewed topic was subsequently submitted as [PR#23](https://github.com/austinmabry/OpenScrub/pull/23) and merged at18:22:38UTC. These dates record delivery checks, not new source tests. The candidate code remains the independently approved source; its readiness and prepared description passed separate specification/quality review.
 
 ## What and why
 
@@ -39,7 +39,7 @@ With project dependencies, FFmpeg/ffprobe with libx265 and the POSIX child-obser
 
 Run on both supported interpreter environments. These observations require real children; missing prerequisites can skip the optional controls, which does not establish readiness.
 
-The unchanged reviewed topic is now [open as Austin upstream PR #23](https://github.com/austinmabry/OpenScrub/pull/23), submitted manually by the user after the initial connection error. [Submission status](../../submissions/hdr-decoder-cleanup.md) records the verified head/base and working GitHub CLI access. Prepare the next candidate privately while Austin reviews it and wait for feedback or an invitation before another submission. The shared test-only prerequisite remains included as its own commit; no intermediate fork PR is needed. C01 and application adoption remain separate.
+The unchanged topic was [merged as Austin PR#23](https://github.com/austinmabry/OpenScrub/pull/23). [Submission status and feedback](../../submissions/hdr-decoder-cleanup.md) record the actual merge, Austin's independent checks and current main50c5a9e/v1.0.97. The shared test-only prerequisite merged as its own commit and needs no duplicate PR. Save As is next for private baseline refresh; another publication action, C01 and application adoption remain separate.
 
 The evidence covers Linux CPU and POSIX/libx265. It establishes no Windows/GPU encoder, arbitrary native-interruption, cancellation-speed, permanent-leak or broader lifecycle/geometry/output-policy guarantee. Defaults and output handling remain preserved.
 
