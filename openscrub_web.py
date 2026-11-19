@@ -2466,7 +2466,9 @@ def _thumbnail_validate_snapshot(job, fresh_snapshot, *, operation_owner=None, e
         generation = files.thumbnail.current
         if expected_generation is not None and generation is not expected_generation:
             raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
-        if (type(fresh_snapshot) is _FreshThumbnailSnapshot
+        # Windows ctime is creation time, so a restored mtime can hide an edit.
+        # Unknown platform semantics likewise cannot establish content continuity.
+        if (os.name == 'posix' and type(fresh_snapshot) is _FreshThumbnailSnapshot
                 and _thumbnail_generation_matches_locked(files, job, generation, doc, selected, fence)):
             return doc['detections'], doc['render_state'], generation
     rows, rs = _thumbnail_validate_report(doc)
