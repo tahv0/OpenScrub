@@ -757,6 +757,64 @@ class Detection:
                                # category); empty = plain box redaction
 
 
+@dataclass
+class NarrowPlateDetection(Detection):
+    # Present only on opt-in plate rows; ordinary report rows stay unchanged.
+    narrow_plate: dict = None
+
+
+def _frame_sha256(frame):
+    # The decoder normally returns a contiguous buffer; avoid a full-frame
+    # bytes copy. Unusual strided inputs are made contiguous before hashing.
+    pixels = frame if frame.flags.c_contiguous else np.ascontiguousarray(frame)
+    return hashlib.sha256(memoryview(pixels)).hexdigest()
+
+
+def _narrow_evidence_digest(d, evidence):
+    payload = [d.category, d.cbox, d.aoff, d.poly, evidence.get("frame_index"),
+               evidence.get("frame_sha256"), evidence.get("margin")]
+    encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("ascii")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _record_narrow_plate(d, frame_index, frame_digest, poly, margin, reason):
+    row = NarrowPlateDetection(**asdict(d), narrow_plate={})
+    row.poly = poly
+    evidence = {"frame_index": frame_index,
+                "frame_sha256": frame_digest,
+                "margin": float(margin), "fallback": reason}
+    evidence["geometry_sha256"] = _narrow_evidence_digest(row, evidence)
+    row.narrow_plate = evidence
+    return row
+
+
+def _narrow_plate_eligible(d, frame_index, frame):
+    """Use a plate polygon only on its inspected pixels and original geometry."""
+    if not isinstance(d, NarrowPlateDetection) or d.category != "plate" or not d.poly:
+        return False
+    try:
+        evidence = d.narrow_plate
+        margin = evidence["margin"]
+        if (type(evidence["frame_index"]) is not int
+                or evidence["frame_index"] != frame_index
+                or isinstance(margin, bool) or not math.isfinite(margin) or margin < 0
+                or evidence.get("fallback")):
+            return False
+        for polygon in d.poly:
+            if len(polygon) < 3:
+                return False
+            for point in polygon:
+                if (len(point) != 2 or any(isinstance(v, bool) or not math.isfinite(v)
+                                            or v < 0 or v > 1 for v in point)):
+                    return False
+        digest = (frame if isinstance(frame, str)
+                  else _frame_sha256(frame))
+        return (evidence["frame_sha256"] == digest
+                and evidence["geometry_sha256"] == _narrow_evidence_digest(d, evidence))
+    except (KeyError, TypeError, ValueError, OverflowError, AttributeError):
+        return False
+
+
 class PhiMemory:
     """Remembers every string ever confirmed as PII in this video. At each
     scan, all OCR'd words are checked against memory, so a name identified
@@ -1441,7 +1499,8 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                          (int(sbox[0] - o[0]), int(sbox[1] - o[1]),
                           int(sbox[2] - o[0]), int(sbox[3] - o[1])),
                          ref.category, ref.text, ref.confidence, o,
-                         last_seen=t0, dense=True, track=tid, poly=ref.poly)
+                         last_seen=t0, dense=True, track=tid,
+                         poly=() if isinstance(ref, NarrowPlateDetection) else ref.poly)
 
     capture = cv2.VideoCapture(video) if video else None
     try:
@@ -4055,7 +4114,7 @@ def apply_coverage(dets, coverage, cb=None):
     return out
 
 
-def _dedupe_dense(act):
+def _dedupe_dense(act, frame_index=None, frame_digest=None):
     """Dense track samples are POSITION SNAPSHOTS whose spans carry a
     small grace overlap; a frame covered by TWO snapshots of the same
     object would get blurred twice at slightly offset positions — the
@@ -4065,7 +4124,13 @@ def _dedupe_dense(act):
     for d in act:
         if d.dense and d.track >= 0:
             p = latest.get(d.track)
-            if p is None or d.t_start > p.t_start:
+            # A synthetic overlap must not displace an exact inspected plate
+            # sample on that frame; other tracks keep the existing ordering.
+            d_exact = (frame_index is not None and frame_digest is not None
+                       and _narrow_plate_eligible(d, frame_index, frame_digest))
+            p_exact = (p is not None and frame_index is not None and frame_digest is not None
+                       and _narrow_plate_eligible(p, frame_index, frame_digest))
+            if p is None or (d_exact and not p_exact) or (d_exact == p_exact and d.t_start > p.t_start):
                 latest[d.track] = d
     if not latest:
         return act
@@ -4322,7 +4387,7 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
-                if d.poly:
+                if d.poly and d.category != "plate":
                     _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
                                            d.poly, pbox, pad_px=px)
                 else:
@@ -4525,6 +4590,7 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 buckets.setdefault(s, []).append(d)
 
         idx = 0
+        plate_mismatch_logged = False
         if clip and clip[0] > 0.5:
             tgt = int(clip[0] * fps)
             if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
@@ -4552,15 +4618,32 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
             # 1. tracked PII boxes, translated by scroll offset
             act = [d for d in buckets.get(int(t), [])
                    if d.t_start - 0.01 <= t <= d.t_end + 0.01]
-            for d in _dedupe_dense(act):
-                # drift allowance: residual tracking error grows (slowly) with
-                # distance scrolled since detection — expand the box to cover it
-                (x1, y1, x2, y2), pbox, px = _geometry_box(
-                    d, ox, oy, pad, f"SDR detection {ordinals[id(d)]} frame {idx}")
+            # Hash raw decoded pixels once, before any redaction changes them.
+            frame_digest = (_frame_sha256(frame)
+                            if any(d.category == "plate" and d.poly for d in act)
+                            else None)
+            for d in _dedupe_dense(act, idx, frame_digest):
+                narrow = (d.category == "plate" and frame_digest is not None
+                          and _narrow_plate_eligible(d, idx, frame_digest))
+                poly = d.poly if d.category != "plate" or narrow else ()
+                if d.category == "plate" and d.poly and not narrow and not plate_mismatch_logged:
+                    cb.log("      narrow plates: frame or geometry evidence unavailable; "
+                           "using full plate coverage where the box is available")
+                    plate_mismatch_logged = True
+                if narrow:
+                    margin = min(math.ceil(d.narrow_plate["margin"]), max(w, h))
+                    # At the inspected frame the source-space anchor is exact;
+                    # rounded report offsets must not shift the polygon.
+                    (x1, y1, x2, y2), pbox, px = _geometry_box(
+                        d, d.aoff[0], d.aoff[1], margin,
+                        f"SDR detection {ordinals[id(d)]} frame {idx}")
+                else:
+                    (x1, y1, x2, y2), pbox, px = _geometry_box(
+                        d, ox, oy, pad, f"SDR detection {ordinals[id(d)]} frame {idx}")
                 if preview:
                     cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
                                   (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
-                    for pts in (d.poly or ()):
+                    for pts in (poly or ()):
                         arr = np.array(
                             [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
                               int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
@@ -4572,11 +4655,11 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                         label = f"face {d.confidence:.2f}"
                     cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-                elif d.poly:
+                elif poly:
                     # segmentation silhouette: mask only the body, not the box —
                     # px (pad+drift) becomes an outward mask dilation
                     blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
-                                    d.poly, pbox, pad_px=px)
+                                    poly, pbox, pad_px=px)
                 else:
                     blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
                                 shape=("ellipse" if d.category == "face"
@@ -5806,7 +5889,7 @@ class TextRegionDetector:
         except (TypeError, ValueError, OverflowError):
             return [], "invalid_crop"
         h, w = frame.shape[:2]
-        if x1 < 0 or y1 < 0 or x2 > w or y2 > h or x2-x1 < 8 or y2-y1 < 8:
+        if x1 <= 0 or y1 <= 0 or x2 >= w or y2 >= h or x2-x1 < 8 or y2-y1 < 8:
             return [], "invalid_crop"
         if self.sess is None:
             return [], "model_unavailable"
@@ -6569,10 +6652,13 @@ def sha256_file(path, chunk=1 << 20):
 
 def _settings_dict(args):
     skip = {"video", "output", "report", "from_report", "batch", "config",
-            "_report_input"}
+            "_report_input", "_plate_coverage_explicit"}
     out = {k: v for k, v in vars(args).items()
            if k not in skip and isinstance(v, (str, int, float, bool, list,
                                                tuple, type(None)))}
+    if getattr(args, "plate_coverage", "full") != "narrow":
+        out.pop("plate_coverage", None)
+        out.pop("plate_narrow_margin", None)
     mm = getattr(args, "mode_map", None)
     if isinstance(mm, dict) and mm:
         out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
@@ -6829,6 +6915,9 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
         doc = dict(source)
         previous = dict(source.get("provenance", {}))
         settings = dict(previous.get("settings", {}))
+        if getattr(args, "plate_coverage", "full") == "full":
+            settings.pop("plate_coverage", None)
+            settings.pop("plate_narrow_margin", None)
         settings.update(prov["settings"])
         prov["settings"] = settings
         # Output hashes/paths must describe this render, never an older one.
@@ -6849,10 +6938,22 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
                            + [dict(asdict(d), enabled=False, zone_dropped=True)
                               for d in state.get("zdropped", [])]),
         }
+        if getattr(args, "plate_coverage", "full") == "narrow":
+            fallbacks = {}
+            for row in state["detections"]:
+                if isinstance(row, NarrowPlateDetection) and isinstance(row.narrow_plate, dict):
+                    reason = row.narrow_plate.get("fallback")
+                    if reason:
+                        fallbacks[reason] = fallbacks.get(reason, 0) + 1
+            doc["plate_fallbacks"] = fallbacks
+            if state.get("plate_coverage_limitation"):
+                doc["plate_coverage_limitation"] = state["plate_coverage_limitation"]
         if state.get("audio_suggestions"):
             doc["audio_suggestions"] = state["audio_suggestions"]
         if state.get("audio_transcript"):
             doc["audio_transcript"] = state["audio_transcript"]
+    if getattr(args, "plate_coverage", "full") == "narrow" and state.get("plate_coverage_limitation"):
+        doc["plate_coverage_limitation"] = state["plate_coverage_limitation"]
     aspans = getattr(args, "audio_spans", None)
     if ((source is None and aspans)
             or (source is not None and state.get("audio_redactions_overridden"))):
@@ -6889,7 +6990,9 @@ def _decode_report(doc):
     for r in rows:
         if not r.get("enabled", True):
             continue
-        dets.append(Detection(
+        cls = NarrowPlateDetection if "narrow_plate" in r else Detection
+        extra = {"narrow_plate": copy.deepcopy(r["narrow_plate"])} if cls is NarrowPlateDetection else {}
+        dets.append(cls(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
             confidence=float(r.get("confidence", 1.0)),
@@ -6899,7 +7002,7 @@ def _decode_report(doc):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+            poly=tuple(copy.deepcopy(r.get("poly") or ())), **extra))
     return dets, state, prov
 
 
@@ -7298,6 +7401,10 @@ def build_parser():
                          "faces — close-ups only). Never slower than "
                          "explicit --dense-face-stride/--detect-scale. "
                          "Always review the output.")
+    ap.add_argument("--plate-coverage", choices=["full", "narrow"], default=None,
+                    help="plate coverage: full (default) or opt-in lettering-only")
+    ap.add_argument("--plate-narrow-margin", type=float, default=0,
+                    help="nonnegative source-pixel margin around lettering (default 0)")
     ap.add_argument("--plate-model", default=None,
                     help="path to a YOLOv8 license-plate ONNX model. If omitted, "
                          "OpenScrub looks for models/plate_yolov8.onnx or the "
@@ -7539,6 +7646,16 @@ def _apply_scan_speed(args):
 
 def _prep_args(args, parser):
     args = apply_config(args, parser)
+    args._plate_coverage_explicit = getattr(args, "plate_coverage", None) is not None
+    args.plate_coverage = getattr(args, "plate_coverage", None) or "full"
+    if args.plate_coverage not in ("full", "narrow"):
+        parser.error("--plate-coverage must be full or narrow")
+    try:
+        args.plate_narrow_margin = float(getattr(args, "plate_narrow_margin", 0))
+        if not math.isfinite(args.plate_narrow_margin) or args.plate_narrow_margin < 0:
+            raise ValueError()
+    except (ValueError, TypeError, OverflowError):
+        parser.error("--plate-narrow-margin must be finite and nonnegative")
     args = _apply_scan_speed(args)
     regions = []
     for r in (args.ignore_region or []):
@@ -7730,6 +7847,41 @@ def text_scan_stride(small, scan_small, step):
     return step * 2
 
 
+
+def _narrow_source_policy(args, cap, fps, count, width, height):
+    """Qualify the bounded native SDR/CFR subset; otherwise use full boxes."""
+    if getattr(args, "hdr_source", None):
+        return None, "HDR output is unsupported"
+    if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
+        return None, "VFR normalization was bypassed"
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries",
+             "stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames:stream_tags=rotate:stream_side_data",
+             "-of", "json", args.video], capture_output=True, timeout=15, check=True)
+        if len(probe.stdout) > 65536:
+            raise ValueError("metadata response too large")
+        facts = exact.metadata_facts(json.loads(probe.stdout))
+        tolerance = exact.precision_bound(facts, fps, count)
+        if (not cap.isOpened() or cap.getBackendName() != "FFMPEG"
+                or (facts["width"], facts["height"]) != (width, height)):
+            raise ValueError("decoder or dimensions differ")
+        return tolerance, ""
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError,
+            OverflowError, AttributeError, cv2.error) as error:
+        return None, "unverified SDR/CFR source (%s)" % error
+
+
+def _narrow_frame_matches(cap, frame, index, fps, width, height, tolerance):
+    try:
+        observed = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        return (tolerance is not None and frame.dtype == np.uint8
+                and frame.shape == (height, width, 3)
+                and math.isfinite(observed) and abs(observed - index / fps) <= tolerance)
+    except (TypeError, ValueError, OverflowError, AttributeError, cv2.error):
+        return False
+
+
 def run_scan(args, cb=None):
     """Scan pass only: OCR + face detection + tracking. Returns a state dict
     consumed by run_render (and serialized into --report files)."""
@@ -7829,7 +7981,11 @@ def run_scan(args, cb=None):
                     or (getattr(args, "face_heads", False)
                         and "face" in cats)) else None)
     qrer = QRDetector(cb) if "qrcode" in cats else None
-    texter = TextRegionDetector(cb) if "anytext" in cats else None
+    narrow_plate = getattr(args, "plate_coverage", "full") == "narrow" and "plate" in cats
+    texter = (TextRegionDetector(cb, verify_hash=True) if narrow_plate
+              else TextRegionDetector(cb) if "anytext" in cats else None)
+    if narrow_plate:
+        cb.log("      narrow plates: locating plates and lettering on every frame at full resolution; review fallbacks")
     detect_scale = float(getattr(args, "detect_scale", 1.0) or 1.0)
     if args.ignore_regions:
         cb.log(f"      ignore regions: {len(args.ignore_regions)}")
@@ -7906,6 +8062,11 @@ def run_scan(args, cb=None):
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    narrow_tolerance, narrow_limitation = (None, "")
+    if narrow_plate:
+        narrow_tolerance, narrow_limitation = _narrow_source_policy(args, cap, fps, total, vw, vh)
+        if narrow_limitation:
+            cb.log("      narrow plates unavailable: %s; using full plate coverage" % narrow_limitation)
     step = max(1, int(round(fps * args.sample_interval)))
     # ignore zones ride in the zones file under the "ignore" class:
     # normalized rects where NOTHING is ever detected or blurred. They are
@@ -8250,16 +8411,17 @@ def run_scan(args, cb=None):
                     dense=True))
                 dense_now.append((fx1, fy1, fx2, fy2))
                 face_now.append((fx1, fy1, fx2, fy2))
+        narrow_frame_digest = None
         # per-frame license-plate detection: plates on dashcam/CCTV footage move
         # fast, so (like dense faces) we re-detect every frame at the true
         # position rather than tracking. Only runs if a plate model is loaded.
         if (plater is not None and plater.available() and "plate" in cats
-                and idx % max(1, dense_stride) == 0):
-            phold = 0.3 * max(1, dense_stride) / fps
+                and (narrow_plate or idx % max(1, dense_stride) == 0)):
+            phold = 0.3 * (1 if narrow_plate else max(1, dense_stride)) / fps
             _psc = _scope_at(t_now)
             _pzr = _psc.get("plate")
             for (px1, py1, px2, py2, pconf) in (
-                    _maybe_tiled(lambda f: plater.find(f, detect_scale),
+                    _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate else detect_scale),
                                  frame, plater.INPUT, tile_mode)
                     if "plate" in _psc else []):
                 if _pzr and not in_any_zone((px1, py1, px2, py2), _pzr):
@@ -8267,12 +8429,41 @@ def run_scan(args, cb=None):
                 if in_ignore_region((px1, py1, px2, py2),
                                     args.ignore_regions):
                     continue
-                raw.append(Detection(
+                row = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),
                      int(px2 - cx), int(py2 - cy)),
                     "plate", "plate", round(pconf, 3), (cx, cy),
-                    dense=True))
+                    dense=True)
+                if narrow_plate:
+                    polygons, reason = [], ""
+                    if narrow_limitation:
+                        reason = "unsupported_source"
+                    elif not _narrow_frame_matches(cap, frame, idx, fps, vw, vh, narrow_tolerance):
+                        reason = "unverified_frame"
+                    else:
+                        try:
+                            polygons, reason = texter.find_plate(frame, (px1, py1, px2, py2))
+                        except Exception:
+                            reason = "inference_error"
+                    normalized = ()
+                    if polygons and not reason:
+                        bx1, by1 = row.cbox[0] + cx, row.cbox[1] + cy
+                        bw, bh = row.cbox[2] - row.cbox[0], row.cbox[3] - row.cbox[1]
+                        try:
+                            normalized = tuple(tuple(((float(x)-bx1)/bw, (float(y)-by1)/bh)
+                                                     for x, y in p) for p in polygons)
+                            if not all(0 <= v <= 1 and math.isfinite(v)
+                                       for p in normalized for point in p for v in point):
+                                raise ValueError("outside plate box")
+                        except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+                            normalized, reason = (), "invalid_geometry"
+                    if normalized and narrow_frame_digest is None:
+                        narrow_frame_digest = _frame_sha256(frame)
+                    row = _record_narrow_plate(row, idx,
+                                               narrow_frame_digest if normalized else None,
+                                               normalized, getattr(args, "plate_narrow_margin", 0), reason)
+                raw.append(row)
                 dense_now.append((px1, py1, px2, py2))
         # per-frame full-body person detection: bodies move like faces do, so
         # (like dense faces/plates) re-detect every frame at the true
@@ -9001,7 +9192,18 @@ def run_scan(args, cb=None):
             nlp=getattr(namer, "nlp", None) if namer else None,
             custom_res=custom_res, phrases=phrases)
 
+    if narrow_plate:
+        reasons = {}
+        for row in raw:
+            if isinstance(row, NarrowPlateDetection):
+                reason = row.narrow_plate.get("fallback")
+                if reason:
+                    reasons[reason] = reasons.get(reason, 0) + 1
+        if reasons:
+            cb.log("      narrow plate full-box fallbacks: "
+                   + ", ".join("%s=%s" % item for item in sorted(reasons.items())))
     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+            **({"plate_coverage_limitation": narrow_limitation} if narrow_plate and narrow_limitation else {}),
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
             "input_sha256": sha256_file(args.video),
@@ -9052,6 +9254,30 @@ def run_render(args, state, cb=None):
         clip = None
     dets_r = apply_coverage(state["detections"],
                             getattr(args, "coverage", "tight"), cb)
+    narrow_render = getattr(args, "plate_coverage", "full") == "narrow"
+    if narrow_render:
+        cap = cv2.VideoCapture(args.video)
+        try:
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            _, limitation = _narrow_source_policy(args, cap, state["fps"],
+                                                   len(state["cum"]), width, height)
+        except (ValueError, TypeError, OverflowError, cv2.error):
+            limitation = "render source is unavailable or unverified"
+        finally:
+            cap.release()
+        if limitation:
+            cb.log("      narrow plates unavailable: %s; using full plate coverage" % limitation)
+            state["plate_coverage_limitation"] = limitation
+            narrow_render = False
+    if not narrow_render:
+        full = []
+        for d in dets_r:
+            if d.category == "plate" and d.poly:
+                d = copy.copy(d)
+                d.poly = ()
+            full.append(d)
+        dets_r = full
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
@@ -9110,6 +9336,12 @@ def run_pipeline(args, cb=None):
         with open(args.from_report, encoding="utf-8") as f:
             source = json.load(f)
         dets, rstate, prov = _decode_report(source)
+        if not getattr(args, "_plate_coverage_explicit", False):
+            settings = prov.get("settings") or {}
+            saved_coverage = settings.get("plate_coverage", "full")
+            if saved_coverage not in ("full", "narrow"):
+                saved_coverage = "full"
+            args.plate_coverage = saved_coverage
         audio_overridden = getattr(args, "audio_spans", None) is not None
         if not audio_overridden and isinstance(source, dict):
             try:

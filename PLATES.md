@@ -95,3 +95,39 @@ the frame stays covered.
 - OpenScrub blurs the plate; it does **not** read it. That's deliberate — for
   redaction you only need to cover it, and not reading avoids a whole class of
   OCR-accuracy problems.
+
+## Optional lettering-only coverage (CLI)
+
+Full-plate coverage remains the default. `--plate-coverage narrow` asks the
+stock, pretrained PP-OCRv5 text-region detector to localize lettering inside
+each plate; it detects regions and does not recognize or save characters.
+`--plate-narrow-margin N` adds a finite, nonnegative margin in source pixels
+(default `0`; fractional values round outward at render). Narrow mode locates
+plates and text on every frame at full resolution, even when a faster scan
+preset is selected. This may substantially increase scan time.
+
+Narrow masks are an experimental downstream option. A localization guard
+can miss lettering, particularly with low contrast, clipping, occlusion,
+unusual layouts or motion. Extra margin is no guarantee. A plate missed by
+the plate detector is not rescued by this stage. Inspect the actual output.
+
+**Privacy tradeoff:** lettering-only masks leave plate background, character
+positions and potentially recoverable character geometry visible. Localization
+fallback does not settle this concern. Select full-plate coverage where this
+information must be concealed; the redaction mode also matters because blur
+and mosaic may be reversible.
+
+This first implementation supports native SDR rendering from a qualified
+zero-origin CFR scan source using OpenCV's FFmpeg backend and ffprobe metadata.
+VFR input must first pass the existing normalization; bypassing that step and
+HDR output use ordinary full-plate boxes. A missing or corrupt text model,
+uncertain geometry, or a mismatch between the rendered frame and the
+inspected frame also uses the ordinary full box where a box is available.
+Logs describe mode limitations and summarize detected-frame fallbacks; narrow
+reports record fallback reasons. A polygon is tied to the decoded frame and
+its geometry; interpolated, changed or adjacent frames never inherit it.
+Frame hashes and polygons in the report belong to the job and should follow
+its existing retention and deletion practices.
+
+The web and desktop interfaces do not expose this option. An ordinary report
+without narrow mode retains the existing full-coverage settings and row shape.
