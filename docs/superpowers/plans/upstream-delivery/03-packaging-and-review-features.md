@@ -254,6 +254,8 @@ Preserve useful disclosure from mixed donor `eedef89`: a saved plate quad/group 
 
 ### P18A — portable checkpoint and raw-document merge
 
+The portable validation and merge helper is [locally reviewed](execution/evidence/delivery/portable-scan-checkpoint-acceptance.md) at `4661b8a`. The engine still supplies verified source and settings identity, frame activity and completion evidence.
+
 - [ ] **S/I:** Add `openscrub_internal/checkpoints.py` with `with_checkpoint(doc, frame, total, options)`, `validate_resume(doc, source_sha256=None)` and `join_reports(previous, continuation, next_frame, total_frames, completed=False)`. Use strict schema/type/identity validation and useful errors; reuse atomic reports. Unsupported incomplete donor schema requires an explicit fresh-scan/migration disposition, not guessed compatibility.
 - [ ] **I:** The first unprocessed frame b defines committed `[0,b)`. Partial cum/bands arrays have exactly b finite entries; full arrays have N. Capture exact scanned/original/render source participants and normalization identity, FPS/dimensions/count provenance, plus immutable effective scan settings and file-backed/model content identities. Paths/mtime/default config strings alone do not establish resume compatibility.
 - [ ] **I:** Begin merge from a deep copy of the full previous raw document. Preserve all old row dictionaries/order, disabled/zone/manual/geometry/time/grouping fields, immutable replay data, audio redactions and unknown row/top/provenance fields. Append only authorized suffix output with fresh track/person IDs; change only declared scan-owned fields and invalidate stale output identity. No cross-boundary remerge or inferred inheritance of Keep.
