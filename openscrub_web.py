@@ -960,6 +960,9 @@ def build_args(job, for_render=False):
         argv.append("--audio-pii")
     if o.get("draw_scores"):
         argv.append("--draw-scores")
+    # A render is governed by the saved report, not a later job option.
+    if not for_render and o.get("plate_coverage") == "narrow":
+        argv += ["--plate-coverage", "narrow"]
     # unified Scan Setup jobs: stacked detection windows (fractions of
     # duration, resolved server-side by the engine) with per-window
     # categories + zones travel as a windows.json inside the job dir
