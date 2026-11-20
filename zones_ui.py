@@ -176,6 +176,8 @@ details .inner .full{grid-column:1/-1}
   <div><label>Face threshold <span class="qm" data-tip="How sure the face detector must be before it blurs something (0-1, default 0.6). Lower it to catch small, distant, turned or partly hidden faces - you may get a few false faces, which you can reject in review. Raise it only if many non-faces are being flagged; a missed face is never blurred.">?</span></label><input type="number" id="fthr" value="0.6" step="0.05" min="0" max="1"></div>
   <div><label>Face expand <span class="qm" data-tip="Grow each detected face box by this fraction before blurring (0.15 = 15% larger). Default 0.15. Close-up faces (filling roughly 15-30% or more of the frame) automatically get more, up to 0.45, so the neck and collar under the face are covered too - those can still identify someone. Raise it if hairlines, ears or chins show around the edge of face blurs.">?</span></label><input type="number" id="fex" value="0.15" step="0.05"></div>
   <div><label>Plate threshold <span class="qm" data-tip="How sure the plate detector must be before it blurs something (0.05-0.95, default 0.35). Raise it if hands, labels or signs keep getting flagged as plates; lower it if real plates are missed. Higher values mean more missed plates - a false plate can be rejected in review, but a missed plate is never blurred, so raise it in small steps and check the output.">?</span></label><input type="number" id="pthr" value="0.35" step="0.05" min="0.05" max="0.95"></div>
+  <div class="full"><label style="display:inline"><input type="checkbox" id="plateletters"> Plate lettering only (experimental)</label>
+   <div id="platelettersNote" class="mutd">For the plate category. Text detection can miss letters; the plate background and character positions remain visible and may identify someone. Checks every frame and can be slow. Unsupported sources or uncertain text use the full detected plate box when available; review the output.</div></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
    <option>rect</option></select></div>
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
@@ -1210,6 +1212,7 @@ async function startScan(){
     track:w.track||[]})),
   ignore_zones:S.ignore,
  };
+ if($("plateletters").checked)o.plate_coverage="narrow";
  const fd=new FormData();
  if(S.file)fd.append("video",S.file);
  fd.append("server_path",$("spath").value.trim());

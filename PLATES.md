@@ -96,9 +96,14 @@ the frame stays covered.
   redaction you only need to cover it, and not reading avoids a whole class of
   OCR-accuracy problems.
 
-## Optional lettering-only coverage (CLI)
+## Optional lettering-only coverage
 
-Full-plate coverage remains the default. `--plate-coverage narrow` asks the
+Full-plate coverage remains the default. In Scan Setup, enable the plate
+category and select **Plate lettering only (experimental)** under Advanced
+settings. The selection is saved in the report and reused when rendering or
+reopening the job. The web option uses zero extra lettering margin.
+
+The CLI option `--plate-coverage narrow` asks the
 stock, pretrained PP-OCRv5 text-region detector to localize lettering inside
 each plate; it detects regions and does not recognize or save characters.
 `--plate-narrow-margin N` adds a finite, nonnegative margin in source pixels
@@ -129,5 +134,5 @@ its geometry; interpolated, changed or adjacent frames never inherit it.
 Frame hashes and polygons in the report belong to the job and should follow
 its existing retention and deletion practices.
 
-The web and desktop interfaces do not expose this option. An ordinary report
-without narrow mode retains the existing full-coverage settings and row shape.
+The desktop interface does not expose this option. An ordinary report without
+narrow mode retains the existing full-coverage settings and row shape.
