@@ -3284,6 +3284,13 @@ def _report_frame_authorities(doc):
     return bounds
 
 
+def _has_checkpoint_identity(doc):
+    if not isinstance(doc, dict):
+        return False
+    provenance = doc.get("provenance")
+    return isinstance(provenance, dict) and "checkpoint_identity" in provenance
+
+
 def _validate_bounded_report_identity(doc, input_sha256, render_state):
     """Check the existing source hash and verified frame domain for replay."""
     provenance = doc.get("provenance")
@@ -8266,11 +8273,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     while True:
         if monitor_stop:
             if _stop_now():
-                # Once the final selected window is behind us, a stop is not
-                # a paused scan. Count/EOF remain unverified in this slice.
-                scan_exit_reason = ("scope_fast_stop" if total > 0 and not track_on and
-                                    idx / fps > win_end else "stop_requested")
-                break
+                # A stop at the reported final index still needs the next
+                # decoder read to prove clean EOF and reject any extra frame.
+                if checkpoint_stream is None or idx < total:
+                    scan_exit_reason = ("scope_fast_stop" if total > 0 and not track_on and
+                                        idx / fps > win_end else "stop_requested")
+                    break
         elif idx % 30 == 0 and cb.cancelled():
             _release_scan_capture()
             raise PipelineCancelled()
@@ -9207,11 +9215,12 @@ def run_render(args, state, cb=None):
                      if source_report is not None else [])
     has_report_bounds = any(bound is not None for bound in report_bounds)
     has_detection_bounds = any(_frame_authority(d) is not None for d in state["detections"])
-    if has_report_bounds:
+    has_frame_domain = has_report_bounds or _has_checkpoint_identity(source_report)
+    if has_frame_domain:
         _validate_bounded_report_identity(source_report, state.get("input_sha256"), state)
     elif has_detection_bounds:
         raise ValueError("bounded detections require a completed source report identity")
-    if ((has_report_bounds or has_detection_bounds) and
+    if ((has_frame_domain or has_detection_bounds) and
             getattr(args, "hdr_source", None) and not args.preview):
         try:
             same_source = os.path.samefile(args.video, args.hdr_source)
@@ -9265,7 +9274,7 @@ def run_render(args, state, cb=None):
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     summary = dict(state["stats"], output=dst)
-    frame_domain_args = {"frame_domain": len(state["cum"])} if has_report_bounds else {}
+    frame_domain_args = {"frame_domain": len(state["cum"])} if has_frame_domain else {}
     with _RenderDelivery(dst, args.report) as delivery:
         if getattr(args, "hdr_source", None) and not args.preview:
             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
@@ -9351,7 +9360,8 @@ def run_pipeline(args, cb=None):
         in_sha = sha256_file(args.video)
         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
             rows = source if isinstance(source, list) else source.get("detections", [])
-            if any(_frame_authority(row) is not None for row in rows):
+            if (_has_checkpoint_identity(source) or
+                    any(_frame_authority(row) is not None for row in rows)):
                 raise ValueError("bounded report input source SHA-256 mismatch")
             cb.log("      WARNING: input file differs from the one this report "
                    "was made from (sha256 mismatch) — blur positions may be wrong")

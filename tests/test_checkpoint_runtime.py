@@ -265,3 +265,171 @@ def test_cancel_interrupts_a_stalled_decoder_and_preserves_report(tmp_path, monk
     assert report.read_bytes() == before
     assert len(children) == 1 and children[0].poll() is not None
     assert children[0].stdout.closed and children[0].stderr.closed
+
+
+def test_initial_clean_eof_publishes_verified_completed_report(tmp_path):
+    rt = runtime()
+    video = movie(tmp_path)
+    path = tmp_path / 'review.json'
+    result = owned_scan(rt, args_for(video), str(path), cb=Quiet(),
+                        stop_requested=lambda: False)
+    assert result == json.loads(path.read_text())
+    assert 'stop_review' not in result
+    assert result['provenance']['checkpoint_identity']['timeline']['count_verified'] is True
+    assert len(result['render_state']['cum']) == len(result['render_state']['bands']) == 24
+    assert result['detections']
+    assert all((row['scan_frame_start'], row['scan_frame_end']) == (0, 24)
+               for row in result['detections'])
+    # The completed producer's output must be accepted by the actual bounded
+    # renderer, with all source-frame indices intact.
+    out = tmp_path / 'completed.mp4'
+    parser = core.build_parser()
+    render_args = core._prep_args(parser.parse_args([
+        str(video), '--from-report', str(path), '--output', str(out),
+        '--encoder', 'x264', '--mode', 'box', '--pad', '0', '--no-vfr-fix']), parser)
+    core.run_pipeline(render_args, Quiet())
+    capture = cv2.VideoCapture(str(out))
+    frames = []
+    try:
+        while True:
+            ok, frame = capture.read()
+            if not ok:
+                break
+            frames.append(frame)
+    finally:
+        capture.release()
+    assert len(frames) == 24
+    assert frames[0][0, 0].mean() > 230
+    assert frames[0][128, 128].mean() < 30
+
+
+def test_stop_after_last_frame_checks_eof_and_completes(tmp_path):
+    rt = runtime()
+    video = movie(tmp_path)
+    path = tmp_path / 'review.json'
+    result = owned_scan(rt, args_for(video), str(path), cb=Quiet(),
+                        stop_requested=stop_after(24))
+    assert 'stop_review' not in result
+    assert result['provenance']['checkpoint_identity']['timeline']['count_verified'] is True
+    assert len(result['render_state']['cum']) == 24
+
+
+def test_last_frame_stop_cannot_certify_without_decoder_eof(tmp_path, monkeypatch):
+    rt = runtime()
+    video = movie(tmp_path)
+    path = tmp_path / 'review.json'
+    actual_read = rt.checkpoint_media.FrameStream.read
+    def fail_at_terminal_read(stream):
+        if stream.next_frame == stream.source.total_frames:
+            raise rt.checkpoint_media.FrameEvidenceError('terminal EOF unavailable')
+        return actual_read(stream)
+    monkeypatch.setattr(rt.checkpoint_media.FrameStream, 'read', fail_at_terminal_read)
+    with pytest.raises(rt.checkpoint_media.FrameEvidenceError, match='terminal EOF unavailable'):
+        owned_scan(rt, args_for(video), str(path), cb=Quiet(),
+                   stop_requested=stop_after(24))
+    assert not path.exists()
+
+
+def test_cancel_at_final_frame_preserves_paused_report_bytes(tmp_path):
+    rt = runtime()
+    video = movie(tmp_path)
+    path = tmp_path / 'review.json'
+    owned_scan(rt, args_for(video), str(path), cb=Quiet(), stop_requested=stop_after(9))
+    before = path.read_bytes()
+    cancelled = threading.Event()
+    class Cancelled(Quiet):
+        def cancelled(self):
+            return cancelled.is_set()
+    calls = [0]
+    def stop_and_cancel_at_end():
+        calls[0] += 1
+        # Resume starts at frame 3 and observes 21 frames through frame 23.
+        if calls[0] > 21:
+            cancelled.set()
+            return True
+        return False
+    with pytest.raises(core.PipelineCancelled):
+        owned_scan(rt, args_for(video), str(path), cb=Cancelled(),
+                   stop_requested=stop_and_cancel_at_end, resume=True)
+    assert path.read_bytes() == before
+
+
+def test_zero_detection_completed_checkpoint_rejects_another_source(tmp_path):
+    rt = runtime()
+    video = movie(tmp_path)
+    args = args_for(video)
+    args.categories = 'none'
+    source = rt.checkpoint_media.inspect_source(str(video))
+    identity = rt._identity(args, source)
+    identity['timeline']['count_verified'] = True
+    state = {'fps': 6.0, 'cum': [(0.0, 0.0)] * 24,
+             'bands': [(0.0, 0.0)] * 24, 'detections': [],
+             'input_sha256': source.sha256, 'stats': {}}
+    report = core._report_document(args, state)
+    report['provenance']['checkpoint_identity'] = identity
+    report_path = tmp_path / 'complete.json'
+    atomic_report(str(report_path), report)
+    other = tmp_path / 'other.mp4'
+    # Appending an inert byte keeps a decodable video while changing the
+    # selected file's content identity.
+    other.write_bytes(video.read_bytes() + b'\x00')
+    out = tmp_path / 'must-not-render.mp4'
+    parser = core.build_parser()
+    render_args = core._prep_args(parser.parse_args([
+        str(other), '--from-report', str(report_path), '--output', str(out),
+        '--encoder', 'x264', '--no-vfr-fix']), parser)
+    with pytest.raises(ValueError, match='source|SHA-256'):
+        core.run_pipeline(render_args, Quiet())
+    assert not out.exists()
+
+
+def test_initial_checkpoint_retains_configured_audio_redactions(tmp_path):
+    rt = runtime()
+    video = movie(tmp_path)
+    args = args_for(video)
+    args.audio_redact = '0.25-0.75'
+    args.audio_redact_mode = 'mute'
+    path = tmp_path / 'review.json'
+    result = owned_scan(rt, args, str(path), cb=Quiet(), stop_requested=stop_after(9))
+    assert result['audio_redactions'] == [{'t0': .25, 't1': .75, 'mode': 'mute'}]
+
+
+def test_zero_detection_checkpoint_rejects_early_render_decode(tmp_path, monkeypatch):
+    rt = runtime()
+    video = movie(tmp_path)
+    args = args_for(video)
+    args.categories = 'none'
+    source = rt.checkpoint_media.inspect_source(str(video))
+    identity = rt._identity(args, source)
+    identity['timeline']['count_verified'] = True
+    state = {'fps': 6.0, 'cum': [(0.0, 0.0)] * 24,
+             'bands': [(0.0, 0.0)] * 24, 'detections': [],
+             'input_sha256': source.sha256, 'stats': {}}
+    document = core._report_document(args, state)
+    document['provenance']['checkpoint_identity'] = identity
+    report = tmp_path / 'complete.json'
+    atomic_report(str(report), document)
+    out = tmp_path / 'previous.mp4'
+    out.write_bytes(b'previous video remains')
+    actual_capture = core.cv2.VideoCapture
+    class EarlyCapture:
+        def __init__(self, *a, **kw):
+            self.capture = actual_capture(*a, **kw)
+            self.reads = 0
+        def read(self):
+            if self.reads == 8:
+                return False, None
+            ok, frame = self.capture.read()
+            if ok:
+                self.reads += 1
+            return ok, frame
+        def __getattr__(self, name):
+            return getattr(self.capture, name)
+    monkeypatch.setattr(core.cv2, 'VideoCapture', EarlyCapture)
+    parser = core.build_parser()
+    render_args = core._prep_args(parser.parse_args([
+        str(video), '--from-report', str(report), '--output', str(out),
+        '--encoder', 'x264', '--no-vfr-fix']), parser)
+    with pytest.raises(ValueError, match='frame|decoder'):
+        core.run_pipeline(render_args, Quiet())
+    assert out.read_bytes() == b'previous video remains'

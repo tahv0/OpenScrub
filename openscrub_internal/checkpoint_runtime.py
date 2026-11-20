@@ -129,6 +129,11 @@ def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock, r
                 previous, boundary = None, 0
         start = (max(0, boundary - max(1, math.ceil(source.fps))) if resume else 0)
         scan_args = copy.deepcopy(args)
+        # run_pipeline normally parses these before scanning. Checkpoint
+        # attempts call run_scan directly, so retain the same explicit choices.
+        if getattr(scan_args, 'audio_redact', ''):
+            scan_args.audio_spans = core.parse_audio_spans(
+                scan_args.audio_redact, scan_args.audio_redact_mode)
         def check_cancelled():
             if cb.cancelled():
                 raise core.PipelineCancelled()
@@ -159,8 +164,19 @@ def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock, r
                                     allow_nan=False))
         if previous is None:
             if completed:
-                raise CheckpointRuntimeError('scan completed without a pause; use an ordinary scan')
-            initial = checkpoints.with_checkpoint(doc, end, source.total_frames, identity)
+                # This is a fresh generated document, so every row has the
+                # complete source range. The existing render owner checks the
+                # attested identity and extent even when there are no rows.
+                initial = doc
+                completed_identity = copy.deepcopy(identity)
+                completed_identity['timeline']['count_verified'] = True
+                initial['provenance']['checkpoint_identity'] = completed_identity
+                for row in initial['detections']:
+                    row['scan_frame_start'], row['scan_frame_end'] = 0, source.total_frames
+                core._report_frame_authorities(initial)
+                core._validate_bounded_report_identity(initial, source.sha256, state)
+            else:
+                initial = checkpoints.with_checkpoint(doc, end, source.total_frames, identity)
         else:
             anchor = boundary - 1
             if doc['render_state']['cum'][anchor] != previous['render_state']['cum'][anchor]:
