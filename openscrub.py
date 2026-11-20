@@ -4387,7 +4387,7 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
-                if d.poly and d.category != "plate":
+                if d.poly and not isinstance(d, NarrowPlateDetection):
                     _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
                                            d.poly, pbox, pad_px=px)
                 else:
@@ -4482,7 +4482,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
-           mute_tracks=(), out_quality="archival", audio_lanes=None):
+           mute_tracks=(), out_quality="archival", audio_lanes=None, *,
+           narrow_plates=True):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -4620,13 +4621,15 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                    if d.t_start - 0.01 <= t <= d.t_end + 0.01]
             # Hash raw decoded pixels once, before any redaction changes them.
             frame_digest = (_frame_sha256(frame)
-                            if any(d.category == "plate" and d.poly for d in act)
+                            if narrow_plates and any(
+                                d.poly and isinstance(d, NarrowPlateDetection) for d in act)
                             else None)
             for d in _dedupe_dense(act, idx, frame_digest):
-                narrow = (d.category == "plate" and frame_digest is not None
+                lettering = isinstance(d, NarrowPlateDetection)
+                narrow = (lettering and frame_digest is not None
                           and _narrow_plate_eligible(d, idx, frame_digest))
-                poly = d.poly if d.category != "plate" or narrow else ()
-                if d.category == "plate" and d.poly and not narrow and not plate_mismatch_logged:
+                poly = d.poly if not lettering or narrow else ()
+                if narrow_plates and lettering and d.poly and not narrow and not plate_mismatch_logged:
                     cb.log("      narrow plates: frame or geometry evidence unavailable; "
                            "using full plate coverage where the box is available")
                     plate_mismatch_logged = True
@@ -6990,7 +6993,7 @@ def _decode_report(doc):
     for r in rows:
         if not r.get("enabled", True):
             continue
-        cls = NarrowPlateDetection if "narrow_plate" in r else Detection
+        cls = NarrowPlateDetection if r["category"] == "plate" and "narrow_plate" in r else Detection
         extra = {"narrow_plate": copy.deepcopy(r["narrow_plate"])} if cls is NarrowPlateDetection else {}
         dets.append(cls(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
@@ -9270,14 +9273,6 @@ def run_render(args, state, cb=None):
             cb.log("      narrow plates unavailable: %s; using full plate coverage" % limitation)
             state["plate_coverage_limitation"] = limitation
             narrow_render = False
-    if not narrow_render:
-        full = []
-        for d in dets_r:
-            if d.category == "plate" and d.poly:
-                d = copy.copy(d)
-                d.poly = ()
-            full.append(d)
-        dets_r = full
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
@@ -9304,7 +9299,8 @@ def run_render(args, state, cb=None):
                    face_shape=getattr(args, "face_shape", "ellipse"),
                    encoder=args.encoder, audio_spans=aspans, clip=clip,
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-                   audio_lanes=getattr(args, "audio_lane_count", None))
+                   audio_lanes=getattr(args, "audio_lane_count", None),
+                   narrow_plates=narrow_render)
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)

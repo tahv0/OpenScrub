@@ -382,3 +382,38 @@ def test_real_stock_detector_and_encoded_video(tmp_path, monkeypatch):
     cap.release()
     print('synthetic 3-frame wall time: full scan %.3fs; narrow scan %.3fs; narrow encode %.3fs; fallbacks %d/3' %
           (full_seconds, narrow_seconds, render_seconds, fallback_count))
+
+
+def test_default_render_preserves_existing_plate_polygon(tmp_path, monkeypatch):
+    source = str(tmp_path / "original.mp4")
+    output = str(tmp_path / "rendered.mp4")
+    writer = cv2.VideoWriter(source, cv2.VideoWriter_fourcc(*"mp4v"), 10, (96, 64))
+    assert writer.isOpened()
+    writer.write(np.full((64, 96, 3), 220, np.uint8))
+    writer.release()
+
+    def unexpected_hash(frame):
+        raise AssertionError("an existing plate polygon does not require a pixel hash")
+
+    monkeypatch.setattr(openscrub, "_frame_sha256", unexpected_hash)
+    row = openscrub.Detection(
+        0, .1, (10, 10, 80, 50), "plate", "plate", 1,
+        poly=(((.25, .25), (.75, .25), (.75, .75), (.25, .75)),),
+    )
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(
+        parser.parse_args([source, "--mode", "box", "--pad", "0",
+                           "--encoder", "x264", "-o", output]),
+        parser,
+    )
+    state = {"fps": 10, "cum": [(0, 0)], "bands": [(0, 0)],
+             "detections": [row], "stats": {}}
+    openscrub.run_render(args, state)
+    reader = cv2.VideoCapture(output)
+    try:
+        ok, rendered = reader.read()
+        assert ok
+        assert rendered[20, 20].mean() > 150
+        assert rendered[30, 45].mean() < 50
+    finally:
+        reader.release()
