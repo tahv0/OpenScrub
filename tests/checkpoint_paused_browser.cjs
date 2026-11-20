@@ -23,11 +23,11 @@ const [url,root]=process.argv.slice(2);
     Object.assign(body,{phase:'paused',checkpoint_unfinished:true,has_output:false});
     await route.fulfill({response,json:body});
    });
-   let releasedBounds=false;
+   let releasedBounds=false,badBounds=false;
    await page.route('**/api/jobs/resize/edit_sample?*',async route=>{
     const response=await route.fetch(),body=await response.json();
     if(response.ok())for(const row of body.boxes){
-     row.scan_frame_bounds=row.i===0&&!releasedBounds?[0,8]:null;
+     row.scan_frame_bounds=row.i===0&&!releasedBounds?(badBounds?[0,1]:[0,8]):null;
      if(row.i===0&&releasedBounds)row.row_context_eq='b'.repeat(64);
     }
     await route.fulfill({response,json:body});
@@ -69,6 +69,10 @@ const [url,root]=process.argv.slice(2);
    assert((await page.locator('#beslot').innerText()).includes('Automatic audio scanning is incomplete'));
    await page.evaluate(()=>{beTogglePlay();beTrackMode()});assert.deepEqual(unsupported,[]);
    assert.equal(await page.locator('#beT').getAttribute('max'),'7');
+   badBounds=true;
+   await page.locator('#beT').fill('7');await page.locator('#beT').dispatchEvent('input');
+   await page.waitForFunction(()=>document.getElementById('beL')?.textContent.includes('Invalid checkpoint row bounds'),null,{timeout:4000});
+   assert.equal(await page.evaluate(()=>beReady()),false);badBounds=false;
    await page.locator('#beT').fill('7');await page.locator('#beT').dispatchEvent('input');
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===7);
    assert(samples.every(t=>t>=0&&t<.8),JSON.stringify(samples));
