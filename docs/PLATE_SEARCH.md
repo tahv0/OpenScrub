@@ -13,16 +13,20 @@ In review, open **Preview video & edit boxes**, pause and inspect the frame you
 want, then expand **Find plate text in this frame**. Enter 3–16 letters or
 digits, choose **Full text** or **Text fragment**, and select **Search this
 frame**. Select a result to highlight its approximate region in cyan. It is not
-a plate outline and the matching text may be unrelated to a plate. Inspect the
-image and explicitly use **Add box** or **Track object** to draw a region that
-covers the whole number or plate if you want to redact it. Search and selection
-alone make no Blur or Keep decision. Ordinary review and export remain available
-when no result is chosen.
+a plate outline and the matching text may be unrelated to a plate. To track a
+suggestion, select **Adjust for tracking** and inspect the proposed region. Drag
+its corners to expand it or drag inside to move it until it covers the whole
+number or plate. Set the timeline window and then select **Track this region**
+to request tracked blur. Review the resulting positions. **Cancel region**
+discards the proposed region. Search, selection and adjustment alone do not
+start tracking or make a Blur or Keep decision. You can also use the ordinary
+**Add box** or **Track object** tools to draw a region yourself.
 
 Only the selected frame is searched; a negative result does not establish
 absence elsewhere or even on that frame. Seek to another frame and search again
 as needed. Seeking, playback, closing the editor, or changing the query retires
-the old suggestions and requests cancellation of an in-flight search. A
+the old suggestions and any unconfirmed region, and requests cancellation of an
+in-flight search. A
 timeout, cancellation, unavailable recognizer, or changed source is shown as a
 separate outcome instead of a negative match. **Cancel search** discards its
 result; cleanup can take a moment. The query remains in the editor field until
