@@ -221,31 +221,53 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
         def start(self):
             deferred.append(self.target)
     monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+    start_owned_thread = web._start_owned_thread
+    leased_sources = []
+    def start_owned(target, lease):
+        leased_sources.append(lease.source)
+        return start_owned_thread(target, lease)
+    monkeypatch.setattr(web, '_start_owned_thread', start_owned)
     monkeypatch.setattr(web, 'build_args', lambda *_: object())
     monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
     published = []
     def write_report(path, args, state, *, publisher):
         assert callable(publisher)
-        publisher(path, {'provenance': {'input': str(source)}, 'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        publisher(path, {'provenance': {'input': str(source)},
+                         'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': [[0, 0]]},
+                         'detections': []})
         published.append(Path(path).is_file())
     monkeypatch.setattr(web.openscrub, 'write_report', write_report)
-    monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
     class Capture:
         def release(self):
             pass
     sources = []
     monkeypatch.setattr(web.cv2, 'VideoCapture', lambda source: (sources.append(source), Capture())[1])
     web._run_job(old, 'scan')
-    replacement = web.new_job('', {}, 'replacement')
-    web.JOBS[old['id']] = replacement
-    selected = old['video']
-    old['video'] = 'late source must not replace lease'
+    selected = web.FILES.initialize(old).current_source
+    assert selected['path'] == str(source.resolve())
+    assert old['video'] == selected['path']
     deferred.pop(0)()
-    assert sources == [str(source.resolve())]
+    assert leased_sources == [selected['path']]
+    assert sources == leased_sources
     assert published == [True]
-    assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
-    assert replacement['log'].snapshot()['lines'] == []
+    assert any('thumbnails ready (0)' in s for s in old['log'].snapshot()['lines'])
+
+    # A second pre-generation owner becomes stale when this job is replaced.
+    web._run_job(old, 'scan')
+    assert published == [True, True]
+    assert leased_sources == [selected['path'], selected['path']]
+    before_old = old['log'].snapshot()
+    replacement = web.new_job('', {}, 'replacement')
+    before_replacement = replacement['log'].snapshot()
+    web.JOBS[old['id']] = replacement
+    deferred.pop(0)()
+    assert sources == [selected['path']]
+    assert old['log'].snapshot() == before_old
+    assert replacement['log'].snapshot() == before_replacement
+    assert web.FILES.count == 0
     replacement['phase'] = 'review'
+    (Path(replacement['dir']) / 'report.json').write_bytes(
+        (Path(old['dir']) / 'report.json').read_bytes())
     # Actual manual-tracking route creates its ordinary engine callback.
     def detector(cb, **kwargs):
         cb.log('tracking detector')
