@@ -61,10 +61,11 @@ source hashes and metadata must be measured, not inferred from a saved path.
 The marker has schema 2, `state: "paused"`, `next_frame`, `total_frames`,
 `fps`, `input_sha256`, and `options`. The same options are saved under
 `provenance.checkpoint_identity` so the identity survives completion. The scan
-hash must match both provenance and the scan participant. All integers are
-strict integers in the interoperable range through 2^53−1, values/arrays must
-be finite and JSON-compatible, and render
-state FPS must equal the scan/timeline/marker FPS exactly. FPS/count provenance
+hash must match both provenance and the scan participant. Frame counts,
+dimensions, bounds and track/person IDs are strict integers in the
+interoperable range through 2^53−1. Values/arrays must be finite and
+JSON-compatible, and render state FPS must equal the scan/timeline/marker FPS
+exactly. FPS/count provenance
 is descriptive; recording a reported count does not make it verified.
 
 `validate_resume(doc)` checks saved structure and internal identity.
