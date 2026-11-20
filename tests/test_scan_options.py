@@ -24,6 +24,7 @@ INVALID_OPTIONS = [
     pytest.param('""', id="empty-string"),
     pytest.param("7", id="integer"),
     pytest.param("1" * 4301, id="integer-over-runtime-limit"),
+    pytest.param("[" * 10000 + "0" + "]" * 10000, id="nesting-over-runtime-limit"),
     pytest.param("0", id="zero"),
     pytest.param("1.5", id="decimal"),
     pytest.param("true", id="true"),
