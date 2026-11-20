@@ -28,11 +28,13 @@ indices, including the first and last frame, and lists the number of suggestions
 at each sampled frame. For videos with fewer than four frames it checks each
 frame once. Frames between the listed indices are not searched. Select a listed
 frame to inspect it, then search that frame to see and adjust its suggestions.
-The editor checks the newly inspected frame against the sampled source and
-timeline; it does not transfer a sampled box directly into a blur.
+The list remains available while you inspect and search another listed frame.
+The editor checks each newly inspected frame against the sampled source and
+timeline; it does not transfer a sampled box directly into a blur. Starting a
+tracking request retires the list.
 
 A negative result does not establish absence elsewhere or even on a searched
-frame. Seek to another frame and search again as needed. Seeking, playback,
+frame. Seek to another frame and search again as needed. Other seeks, playback,
 closing the editor, or changing the query retires the old suggestions and any
 unconfirmed region, and requests cancellation of an in-flight search. A timeout,
 cancellation, unavailable recognizer, or changed source is shown as a
