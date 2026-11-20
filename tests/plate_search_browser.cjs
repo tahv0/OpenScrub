@@ -38,6 +38,7 @@ const [url,root]=process.argv.slice(2);
    await page.locator('#beAdd').click();assert.equal(await page.evaluate(()=>BE.add),false);
    assert.deepEqual(writes,[]);
    await page.screenshot({path:root+'/plate-search-positive.png',fullPage:true});
+   await page.locator('#bePlate').screenshot({path:root+'/plate-search-controls.png'});
    // A held genuine response belongs to the old inspected frame after a seek.
    let release,started,finished;const gate=new Promise(r=>release=r),start=new Promise(r=>started=r),done=new Promise(r=>finished=r);
    await page.route('**/api/jobs/resize/plate_search',async route=>{
@@ -56,7 +57,16 @@ const [url,root]=process.argv.slice(2);
    await page.waitForFunction(()=>document.querySelectorAll('#bePlateResults button').length>0);
    assert.equal(await page.evaluate(()=>BE.adds.length),0);
    await page.setViewportSize({width:390,height:844});
+   for(const id of ['bePlateQuery','bePlateMode']){
+    const fields=await page.locator(`label[for="${id}"]`).evaluate(label=>{
+     const control=label.control, text=label.getBoundingClientRect(), target=control.getBoundingClientRect();
+     return {together:label.parentElement.contains(control),aligned:Math.abs(text.left-target.left)<2,
+             stacked:text.bottom<=target.top};
+    });
+    assert.deepEqual(fields,{together:true,aligned:true,stacked:true});
+   }
    await page.screenshot({path:root+'/plate-search-mobile.png',fullPage:true});
+   await page.locator('#bePlate').screenshot({path:root+'/plate-search-mobile-controls.png'});
    const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
    assert(size.scroll<=size.client+2,JSON.stringify(size));
    await page.setViewportSize({width:1100,height:900});

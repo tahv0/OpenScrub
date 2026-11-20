@@ -5691,7 +5691,7 @@ async function bePlateGo(){
    return;
   }
   p.rows=bePlateValidate(result,req.sample.sample,mode);p.selected=-1;
-  p.message=p.rows.length?`Found ${p.rows.length} suggestion(s) on this frame. Select one to inspect; draw a box around the whole number or plate to redact it.`:
+  p.message=p.rows.length?`Found ${p.rows.length} ${p.rows.length===1?'suggestion':'suggestions'} on this frame. Select one to inspect, then draw a box around the whole number or plate to redact it.`:
    'No matching text found in this frame. OCR can miss text.';
   if(result.truncated)p.message+=' Results were truncated.';
  }catch(_){
@@ -5817,13 +5817,18 @@ async function loadBoxEdit(fromReview){
   <details id="bePlate" style="margin-top:8px" ontoggle="bePlateToggle()">
    <summary onclick="bePlateSummary()">Find plate text in this frame</summary>
    <p style="font-size:12px;color:#94a3b8;margin:5px 0">Searches only this inspected frame with local OCR. Results are approximate suggestions, not redactions.</p>
-   <div class="row" style="gap:6px;align-items:center">
-    <label for="bePlateQuery">Plate text</label>
-    <input id="bePlateQuery" type="text" maxlength="128" autocomplete="off" spellcheck="false"
-     style="flex:1;min-width:150px" oninput="bePlateChanged()">
-    <label for="bePlateMode">Match</label>
-    <select id="bePlateMode" onchange="bePlateChanged()"><option value="full">Full text</option>
-     <option value="fragment">Text fragment</option></select>
+   <div class="row" style="gap:6px;align-items:end">
+    <div style="flex:1 1 145px;min-width:0">
+     <label for="bePlateQuery" style="display:block">Plate text</label>
+     <input id="bePlateQuery" type="text" maxlength="128" autocomplete="off" spellcheck="false"
+      style="width:100%;box-sizing:border-box" oninput="bePlateChanged()">
+    </div>
+    <div style="flex:0 1 135px;min-width:0">
+     <label for="bePlateMode" style="display:block">Match</label>
+     <select id="bePlateMode" style="width:100%;box-sizing:border-box" onchange="bePlateChanged()">
+      <option value="full">Full text</option><option value="fragment">Text fragment</option>
+     </select>
+    </div>
     <button class="sec" id="bePlateRun" type="button" onclick="bePlateGo()" disabled>Search this frame</button>
     <button class="sec" id="bePlateCancel" type="button" onclick="bePlateCancel()" hidden>Cancel search</button>
    </div>
