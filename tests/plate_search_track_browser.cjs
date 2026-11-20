@@ -113,6 +113,33 @@ const [url,root]=process.argv.slice(2);
    assert.equal(actual.index,6);assert.equal(actual.t_ref,.6);assert.deepEqual(actual.box,readyBox);
    const report=await (await page.request.get(url+'/api/jobs/resize/report')).text();
    assert.notEqual(report,initial);assert.deepEqual(errors,[],JSON.stringify(errors));
+   // A selected suggestion must take over from a live corner editor without
+   // turning its approximate OCR region into a saved change or a track.
+   const writesBefore=writes.length;
+   await page.goto(url);
+   await page.getByRole('link',{name:'synthetic-plate.mp4',exact:true}).click();
+   await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
+   await page.waitForFunction(()=>beReady());await page.evaluate(()=>stopPolling());
+   await page.locator('#beCv').scrollIntoViewIfNeeded();
+   const platePoint=await page.evaluate(()=>{const r=BE_VIEW.cv.getBoundingClientRect(),tr=BE_VIEW.transform;
+    return {x:r.left+220*tr.sx,y:r.top+150*tr.sy};});
+   await page.mouse.click(platePoint.x,platePoint.y);
+   await page.getByRole('button',{name:'Edit plate corners',exact:true}).click();
+   assert(await page.evaluate(()=>!!BE_VIEW.quadEdit));
+   await page.locator('#bePlate summary').click();await page.locator('#bePlateQuery').fill('F57');
+   await page.locator('#bePlateMode').selectOption('fragment');await searchAndSelect();
+   await page.getByRole('button',{name:'Adjust for tracking'}).click();
+   assert.equal(await page.evaluate(()=>BE_VIEW.quadEdit),null);
+   const cornerBefore=await page.evaluate(()=>[...BE_VIEW.plate.region.box]);
+   await page.locator('#beCv').scrollIntoViewIfNeeded();
+   const cornerPoint=await page.evaluate(()=>{const r=BE_VIEW.cv.getBoundingClientRect(),tr=BE_VIEW.transform,b=BE_VIEW.plate.region.box;
+    return {x:r.left+b[0]*tr.sx,y:r.top+b[1]*tr.sy,sx:tr.sx,sy:tr.sy};});
+   await page.mouse.move(cornerPoint.x,cornerPoint.y);await page.mouse.down();
+   await page.mouse.move(cornerPoint.x-12*cornerPoint.sx,cornerPoint.y-8*cornerPoint.sy,{steps:3});await page.mouse.up();
+   const cornerAfter=await page.evaluate(()=>[...BE_VIEW.plate.region.box]);
+   assert(cornerAfter[0]<cornerBefore[0]-8&&cornerAfter[1]<cornerBefore[1]-5,
+    JSON.stringify({cornerBefore,cornerAfter,cornerPoint}));
+   assert.equal(writes.length,writesBefore);assert.deepEqual(errors,[],JSON.stringify(errors));
    fs.writeFileSync(root+'/plate-track-result.json',JSON.stringify({before,edited,tracks,actual,viewport}));
    console.log('PLATE_TRACK_REAL_PAGE_OK');
   }finally{await context.close()}
