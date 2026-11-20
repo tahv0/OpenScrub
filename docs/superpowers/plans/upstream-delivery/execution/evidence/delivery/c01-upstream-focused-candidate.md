@@ -13,7 +13,7 @@ The local integration `integration/upstream-focused-candidate` at `9db95db294f59
 | Exact-frame editor and Track | Use the displayed indexed sample for edits and as the initial Track seed. Keep tracking status with the job, so a later result can be opened explicitly after a user chooses another editor. | Review the indexed sample, strict seed and browser owners in that order. Use an encoded clip for the selected pixels and held responses for the browser races. |
 | Optional tighter masks and stopping mid-scan | Deliver a verified four-corner plate edit and partial-scan checkpoint in their own stacks. Each has a narrower ownership and compatibility surface for review. | Follow the exact editor for plate geometry. Follow raw report preservation with the checkpoint contract, bounded engine progress and then restart and controls. |
 
-The source-tree audit records Austin’s ancestry, 11 checked product modules, 52 route literals and the existing OpenCV compatibility pin. The selected tree uses stock inference and ordinary review. The audit excludes custom training, Findings, learning, journal and section implementation files, imports, routes and training dependencies.
+The source-tree audit records Austin’s ancestry, 11 checked product modules, 52 route literals and the existing OpenCV compatibility pin. The selected tree uses stock inference and ordinary review. The audit excludes custom training, Findings, learning, journal and section implementation files, imports, routes and training dependencies. The declared model choice, mode, coverage, padding, detection categories, sampling interval and face, person and plate thresholds match Austin on both the clean and manual-corner builds.
 
 ## Synthetic scale and package evidence
 

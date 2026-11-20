@@ -1,0 +1,19 @@
+# Exact frame bounds in completed checkpoint renders
+
+The local `pr/completed-checkpoint-frame-bounds` topic at `6ab185ea5b7e4df8c88f4af1db228e861c5790f7` follows the [portable checkpoint data contract](portable-scan-checkpoint-acceptance.md) and [whole-frame scanner boundary](whole-frame-scan-stop-acceptance.md). It adds the render behavior needed for a video whose report already contains a verified complete frame timeline.
+
+| What | Why | When to deliver |
+| --- | --- | --- |
+| Honor a paired inclusive start and exclusive end frame before choosing or deduplicating active detections. Preserve the values through report roundtrips and coverage. | At 120 fps, ordinary ±0.01-second time slack can activate a suffix detection on a prefix frame. Coverage also needs to keep geometry from neighboring authority ranges out of the current box. | Review as the next renderer topic after the scanner boundary. Use the synthetic boundary clips and before-and-after pixels as the reproduction. |
+| Check the supplied complete timeline and source identity before applying the bounds. Reuse the current source digest. | Matching array lengths or a similar filename alone can describe a different frame domain. Applying a suffix mask against such a file risks moving it to the wrong frame. | Keep this validation in the renderer topic. An actual resume producer still needs source, settings and lifecycle evidence. |
+| Preserve source-frame indices through trimmed SDR rendering. Use the same underlying source for this HDR branch of the contract. | Trimming and an alternate HDR render file affect which pixels correspond to a recorded index. | Verify a trim beyond the fast-seek threshold and actual 10-bit same-source HDR. Treat distinct normalized/original mapping as a later renderer compatibility task. |
+
+The attached frame authority intersects the existing time interval. Ordinary reports without frame bounds keep their legacy behavior. The completed-report path verifies aligned cumulative-offset and band arrays, frame count, FPS and matching source SHA. It refuses paused markers and known incompatible alternate render sources. Bounded SDR trims decode from the beginning to maintain the original frame index. Existing ordinary trim can still use its fast seek.
+
+The render itself checks its observed frame extent in the same decoder pass. An extra frame or an early stop inside the required output range fails before video and report publication, even when all bounded detections are disabled. Partial HDR frames and unsuccessful HDR decoding also fail. A valid trim checks its required range and any frames it actually observes. An OpenCV false read exactly at the expected count remains insufficient to certify normal EOF for a future scan producer.
+
+The actual SDR and 10-bit HDR 120 fps examples reproduced suffix coverage one frame early before the patch. The completed-report renderer now covers the authorized frames exactly in those fixtures. Additional tests cover concealed coverage, malformed pairs, failed source checks, report roundtrips and ordinary controls. Declared completion must still come from the future verified resume producer. Partial export and ordinary UI overlays inherit their own later acceptance checks.
+
+## Verification
+
+Independent review approved the final extent repair after reproducing rejection of an extra decoded frame and an unexpected mid-video decoder stop. The regression tests check that both failures preserve any previous video and report. The final source passed 518 supervisor-selected tests on each of Python 3.12 and 3.9, including loopback routes and actual encoded SDR and HDR. The offline package passed 173 checks on each interpreter from the isolated wheel installation. An additional implementer selection passed 820 on each version with three local-socket cases excluded in that run. Package contents, source origins and exact test selections are recorded in the local execution evidence.
