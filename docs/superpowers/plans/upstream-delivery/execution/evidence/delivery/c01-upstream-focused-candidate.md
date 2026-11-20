@@ -1,6 +1,6 @@
 # Clean OpenScrub v1.0.97 integration
 
-The local integration `integration/upstream-focused-candidate` at `d80cf9c6936d1658c6087eef5c93e4a3acb8d4c8` uses Austin’s v1.0.97 main at `50c5a9e03564983ea0bc2a7841824b1fffaf35e0`. It brings the reviewed OpenScrub fixes together as a build to exercise locally. The individual topics remain the units for upstream review. [Austin’s base commit](https://github.com/austinmabry/OpenScrub/commit/50c5a9e03564983ea0bc2a7841824b1fffaf35e0)
+The local integration `integration/upstream-focused-candidate` at `9db95db294f591736e31f01fcb6005ec16475c29` uses Austin’s v1.0.97 main at `50c5a9e03564983ea0bc2a7841824b1fffaf35e0`. It brings the reviewed OpenScrub fixes together as a build to exercise locally. The individual topics remain the units for upstream review. [Austin’s base commit](https://github.com/austinmabry/OpenScrub/commit/50c5a9e03564983ea0bc2a7841824b1fffaf35e0)
 
 ## What, why and delivery order
 
@@ -18,6 +18,7 @@ The source-tree audit records Austin’s ancestry, 11 checked product modules, 5
 ## Synthetic scale and package evidence
 
 - Full discovery on `d80cf9c` passed 2,720 tests on Python 3.12.16. Python 3.9.25 passed the same 2,720 tests on `af7dbaf`, which has identical runtime source and differs only in one browser test's allowed thumbnail response codes. The eight Python 3.9 checks covering that browser area also passed on `d80cf9c`. These runs used Linux/WSL, OpenCV 4.14.0, stock FFmpeg and Tesseract, and local Chromium with synthetic inputs.
+- A later Python 3.9 discovery on `d80cf9c` recorded 2,719 passes and a timing-dependent browser failure. The fixture checked canvas size at DOM creation while serving an invalid placeholder for the indexed sample. At `9db95db` it serves a synthetic JPEG with a valid sample and waits for the app’s ready state. The exact browser scenario passed on both Python versions, and the runtime source is identical across the revisions.
 - The 610-second, 6,100-frame long-GOP clip returned the same encoded review JPEG at frame 6,000 as an independent sequential decode. The separately tested 15-frame 3840×2160 clip returned the matching JPEG at frame 12. Its actual web render redacted the chosen area and its export matched the rendered file bytes. These are two separate workload checks.
 - The 69,956,372-byte, 100,000-row report check on `e818807` retained identical bytes and file identity on unchanged saves, with one parse and zero report encodes, staging writes, fsyncs or replacements. The paired test also compared sparse and bulk outputs to the previous reviewed source. The no-op median was 961.4 ms on `d31939a` and 958.8 ms on `e818807`. The timing varies by workload and host.
 - The offline build produced an sdist and a wheel from the extracted sdist, verified source bytes for 114 sdist members, checked 24 wheel `RECORD` digests and compared installed file bytes. The package declares Python ≥3.9.
