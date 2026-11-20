@@ -20,6 +20,10 @@ The initial integrated wheel passed the package byte audit and 77 installed test
 
 The integrated app at `474b625` passed 117 checkpoint, plate and ordinary-job regressions on each of Python 3.12 and 3.9. Each installed wheel run passed seven cases across Chromium and actual local HTTP. The native checkpoint test stops a generated 24-frame clip after seven frames, restarts the job registry, saves a manual region and mute span, resumes, inspects a later exact frame, and renders all 24 frames. The separately launched preview also completed a normal synthetic job and counted 12 exported frames.
 
+The runtime at `3325092601f1285528069d1ace39a7acb0005276` adds durable original settings and restart recovery based on the recorded report bytes. It passed 47 targeted source tests and 20 installed-wheel tests on each of Python 3.12 and 3.9, including actual process exits around report replacement and the native editor and render workflow.
+
+The branch tip `9453832e98f09e9d5c17d5be48fbec0f2531cd0d` updates the packaged checkpoint contract. Git verified the change is confined to that Markdown file. Its offline source distribution and wheel passed the package byte audit. The audited wheel SHA-256 is `2bea4be920a18c8c64facdf2f1eb505112fabe75fc68b222e968948a8b2c2c9d`.
+
 An earlier full run at `6651913` passed 3,338 tests on Python 3.12. Python 3.9 passed 3,337 with one intermittent response-ownership assertion. All 23 tests in that file passed when rerun at the same commit. The 117-case gate targets the later checkpoint and plate integration.
 
 The preview is available at [http://127.0.0.1:8391/](http://127.0.0.1:8391/), with an isolated job store. The combined branch is for local testing. [Submission of the separate scan-options fix](../../submissions/scan-options-validation.md)
