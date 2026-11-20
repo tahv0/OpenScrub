@@ -480,15 +480,13 @@ that the browser download started. Without picker support, enable **Ask where
 to save each file** in browser download settings. The destination is on the
 device running the browser, including when OpenScrub runs in Docker.
 
-Review thumbnails refresh once when an outdated image is requested. If a
-report changes a detection (including its blur choice or a member of a
-collapsed group), its image may instead show “Review changed; reopen review
-to refresh.” Reopen the review to see current images and recheck any pending
-edits. Already displayed images do not update until requested again. Image
-identity detects ordinary file replacement; external changes that preserve all
-observed file attributes, and filesystems with weak file identity, may not be
-detected. Old private thumbnail files may remain after a restart; they are
-not used as current images and are removed with their job data.
+An outdated thumbnail request triggers at most one automatic refresh while
+the review is open. If a detection or a member of its group has changed, the
+card can show an unavailable preview and offer **Re-open review**. Reopen to
+see current images and check pending edits. Image identity detects ordinary
+file replacement. A filesystem with weak file identity or an external change
+that preserves all observed file attributes can bypass that check. A restart
+can leave old thumbnail cache files, which are removed with their job data.
 
 **Settings** (gear icon): detection model pickers for **Face**,
 **License-plate**, and **Person (full-body blur)** — optional models are
