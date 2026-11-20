@@ -4434,7 +4434,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
-           mute_tracks=(), out_quality="archival", audio_lanes=None):
+           mute_tracks=(), out_quality="archival", audio_lanes=None,
+           exact_frames=False):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -4542,7 +4543,7 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 buckets.setdefault(s, []).append(d)
 
         idx = 0
-        if clip and clip[0] > 0.5:
+        if clip and clip[0] > 0.5 and not exact_frames:
             tgt = int(clip[0] * fps)
             if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
                 idx = tgt                    # shift the whole trimmed render
@@ -8090,7 +8091,7 @@ def run_scan(args, cb=None):
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on:
+    if win_start > 1.0 and not track_on and not optional_policy:
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -8125,7 +8126,7 @@ def run_scan(args, cb=None):
                            f"{win_end:.1f}s — the rest of the video is "
                            "not decoded")
                     break
-                if nxt - t_now > 1.5:
+                if nxt - t_now > 1.5 and not optional_policy:
                     # gap between windows: seek instead of decoding it
                     # (verified — a lying seek would mislabel every
                     # detection after the jump; unseekable → keep
@@ -8958,6 +8959,14 @@ def run_scan(args, cb=None):
 
 def run_render(args, state, cb=None):
     cb = cb or Callbacks()
+    if state.get("plate_policy"):
+        expected = state.get("input_sha256")
+        if (not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected)
+                or sha256_file(args.video) != expected):
+            raise ValueError("optional plate source differs from the scanned source")
+        hdr = getattr(args, "hdr_source", None)
+        if hdr and not args.preview and os.path.realpath(hdr) != os.path.realpath(args.video):
+            raise ValueError("optional plate output requires the scanned source; HDR frame mapping is unavailable")
     detections = state["detections"]
     if state.get("plate_policy"):
         choices = plate_policy.evaluate(detections, *state["plate_policy"], capable_off=True)
@@ -9027,7 +9036,8 @@ def run_render(args, state, cb=None):
                    face_shape=getattr(args, "face_shape", "ellipse"),
                    encoder=args.encoder, audio_spans=aspans, clip=clip,
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-                   audio_lanes=getattr(args, "audio_lane_count", None))
+                   audio_lanes=getattr(args, "audio_lane_count", None),
+                   **({"exact_frames": True} if state.get("plate_policy") else {}))
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)
@@ -9064,6 +9074,9 @@ def run_pipeline(args, cb=None):
         capable = isinstance(source, dict) and source.get("plate_policy_evidence_version") == 1
         optional = None
         if capable:
+            expected = source.get("provenance", {}).get("input_sha256")
+            if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                raise ValueError("optional plate report has no valid scanned source hash")
             settings = source.get("provenance", {}).get("settings", {})
             optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
                         settings.get("plate_auto_cutoff"))
@@ -9084,7 +9097,7 @@ def run_pipeline(args, cb=None):
             args.video = selected_input
         else:
             orig = prov.get("original_input")
-            if orig and os.path.exists(orig) \
+            if not capable and orig and os.path.exists(orig) \
                     and os.path.abspath(orig) != os.path.abspath(args.video):
                 # re-renders must start from the TRUE original so intake can
                 # re-derive the HDR/CFR context (cached intermediates are
@@ -9097,15 +9110,11 @@ def run_pipeline(args, cb=None):
                                "with --report using openscrub v4+")
         cb.log(f"      {len(dets)} enabled detections")
         in_sha = sha256_file(args.video)
+        if capable and expected != in_sha:
+            raise ValueError("optional plate source differs from the scanned source")
         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
             cb.log("      WARNING: input file differs from the one this report "
                    "was made from (sha256 mismatch) — blur positions may be wrong")
-            if capable:
-                for d in dets:
-                    if d.category == "plate":
-                        d._plate_policy_evidence = MappingProxyType({
-                            "origin": "source_mismatch", "frame": None,
-                            "geometry_valid": False})
         state = {"fps": rstate["fps"],
                  "cum": [tuple(v) for v in rstate["cum"]],
                  "bands": [tuple(v) for v in rstate["bands"]],

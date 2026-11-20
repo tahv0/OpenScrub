@@ -87,6 +87,48 @@ restrict where it looks), and they honor **per-category redaction mode**
 OpenScrub re-detects them **every frame** (like dense faces), so a plate crossing
 the frame stays covered.
 
+## Experimental confidence policies
+
+The default remains the existing plate detector and smoothing behavior. Two
+optional policies retain detections at `--plate-threshold` and require an
+explicit `--plate-auto-cutoff`:
+
+    openscrub dashcam.mp4 --categories plate --report audit.json \
+      --uncertain-policy manual_review --plate-threshold 0.35 --plate-auto-cutoff 0.80
+
+The values above only illustrate the interface; they are not calibrated
+recommendations. The values must be finite and satisfy
+`0.05 <= plate-threshold <= plate-auto-cutoff <= 0.95`.
+
+`manual_review` automatically masks a supported frame only after two
+associated direct detector observations meet the cutoff. Earlier or lower-score
+hits remain visible for review. `blur_candidates` masks a supported retained
+candidate after one observation, accepting extra short masks and flashes. It
+still requires the explicit cutoff, even though its candidate output uses the
+lower floor. The association is a spatial/temporal heuristic, not proof of
+identity.
+
+These experimental policies currently support only the actual source frames
+with valid direct detections. Interpolation, grace padding, held positions and
+unscanned frames are not supported locations and can leave gaps requiring manual
+work. Selecting a lower candidate floor requires a new scan. A capable report
+preserves explicit Blur and Keep decisions across policy changes; ordinary and
+legacy reports retain their existing choices and are not converted. Unhandled
+suggestions do not prevent export.
+
+The options are available through the CLI and job API; the existing web setup
+and review screens do not yet label all optional suggestions or provide policy
+controls. An API client can submit `uncertain_policy`, `plate_threshold` and
+`plate_auto_cutoff` in the scan options. On a capable report, a
+`POST /api/jobs/<id>/detections` request may include, for example,
+`{"plate_policy":{"uncertain_policy":"blur_candidates"}}`; `manual_review`
+and `off` are also accepted. The report remains authoritative after scanning.
+
+Optional reports can be rendered only against the same hashed scan source.
+Distinct original/HDR render sources need a frame mapping that is not available
+in this experimental path. Optional skipped windows and trimmed renders decode
+forward to preserve source-frame identity, which can take longer on long clips.
+
 ## Honest limitations
 
 - Detection quality is entirely the model's. A model trained on EU plates will

@@ -91,6 +91,22 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
 
     results = [None] * len(rows)
     previous = {}
+    uncertain_tracks = set()
+    for row in rows:
+        if _get(row, "category") != "plate":
+            continue
+        track = _get(row, "track")
+        if type(track) is not int or track < 0:
+            continue
+        evidence = _get(row, "policy_evidence")
+        origin = evidence.get("origin") if isinstance(evidence, Mapping) else None
+        frame = evidence.get("frame") if isinstance(evidence, Mapping) else None
+        if (origin not in ("detection", "interpolation", "visual_continuation",
+                           "grace", "held", "weak", "manual_seed")
+                or (origin == "detection" and (type(frame) is not int or frame < 0))):
+            # With no origin/frame we cannot place this row relative to the
+            # direct observations; it might be an intervening failed hit.
+            uncertain_tracks.add(track)
     def order(item):
         evidence = _get(item[1], "policy_evidence")
         frame = evidence.get("frame") if isinstance(evidence, Mapping) else None
@@ -111,7 +127,7 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
                     and candidate_floor <= score <= 1.0)
         cutoff_eligible = eligible and score >= auto_cutoff
         prior = previous.get(track) if associated else None
-        supported = bool(cutoff_eligible and prior and prior[1]
+        supported = bool(track not in uncertain_tracks and cutoff_eligible and prior and prior[1]
                          and type(frame) is int and frame > prior[0])
         # Synthetic rows do not become, or reset, direct-observation evidence.
         # A repeated same-frame hit cannot replace the first observation.

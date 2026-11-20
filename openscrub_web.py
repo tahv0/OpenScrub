@@ -882,9 +882,28 @@ class WebCallbacks(openscrub.Callbacks):
         return self.cancel_event.is_set()
 
 
+def _optional_plate_settings(options):
+    """Validate explicit scan policy without clamping its candidate floor."""
+    policy = options.get('uncertain_policy')
+    if policy is None or policy == 'off':
+        return None
+    if not isinstance(policy, str) or policy not in ('manual_review', 'blur_candidates'):
+        raise ValueError('invalid optional plate settings')
+    values = (options.get('plate_threshold', .35), options.get('plate_auto_cutoff'))
+    if any(isinstance(v, bool) or not isinstance(v, (str, int, float)) for v in values):
+        raise ValueError('invalid optional plate settings')
+    try:
+        floor, cutoff = (float(v) for v in values)
+        openscrub.plate_policy.validate_settings(policy, floor, cutoff)
+    except (ValueError, OverflowError):
+        raise ValueError('invalid optional plate settings') from None
+    return policy, floor, cutoff
+
+
 def build_args(job, for_render=False):
     o = job["options"]
     jdir = job["dir"]
+    optional = None if for_render else _optional_plate_settings(o)
     argv = [job["video"],
             "--engine", o.get("engine", "auto"),
             "--device", o.get("device", "auto"),
@@ -931,6 +950,9 @@ def build_args(job, for_render=False):
                                   if o.get("out_format") in ("mp4", "mov", "mkv")
                                   else "mp4")),
             "--report", os.path.join(jdir, "report.json")]
+    if optional:
+        policy, _, cutoff = optional
+        argv += ["--uncertain-policy", policy, "--plate-auto-cutoff", str(cutoff)]
     # user-defined regex categories ride along on every job; the engine only
     # activates the ones whose id is in --categories
     for c in load_custom_cats():
@@ -1639,6 +1661,10 @@ def create_job():
         return jsonify({"error": "Scan options must be a JSON object."}), 400
     if not isinstance(options, dict):
         return jsonify({"error": "Scan options must be a JSON object."}), 400
+    try:
+        _optional_plate_settings(options)
+    except ValueError:
+        return jsonify({"error": "Invalid optional plate policy settings."}), 400
     jobs = []
     files = request.files.getlist("video")
     if files and files[0].filename:

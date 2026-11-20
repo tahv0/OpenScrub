@@ -99,3 +99,15 @@ def test_oversized_json_integers_are_invalid_evidence_and_settings():
         validate_settings("manual_review", .1, huge)
     assert decisions([row(box=(1, 2, huge, 8)), row(score=huge)],
                      "blur_candidates") == [(False, "gap"), (False, "suggestion")]
+
+
+def test_unknown_origin_in_track_cannot_bridge_manual_review_support():
+    unknown = row(2, .9)
+    unknown.pop('policy_evidence')
+    rows = [row(1, .9), unknown, row(3, .9)]
+    assert decisions(rows, 'manual_review') == [(False, 'suggestion'),
+                                                (False, 'gap'),
+                                                (False, 'suggestion')]
+    assert decisions(rows, 'blur_candidates') == [(True, 'automatic'),
+                                                   (False, 'gap'),
+                                                   (True, 'automatic')]
