@@ -35,11 +35,13 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, asdict
+from types import MappingProxyType
 
 import cv2
 import numpy as np
 
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_policy
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
@@ -1435,13 +1437,17 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
         return (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
                 d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
 
-    def _mk(t0, t1, sbox, ref, tid):
+    def _mk(t0, t1, sbox, ref, tid, origin):
         o = _off(t0)
-        return Detection(t0, t1,
+        result = Detection(t0, t1,
                          (int(sbox[0] - o[0]), int(sbox[1] - o[1]),
                           int(sbox[2] - o[0]), int(sbox[3] - o[1])),
                          ref.category, ref.text, ref.confidence, o,
                          last_seen=t0, dense=True, track=tid, poly=ref.poly)
+        if hasattr(ref, "_plate_policy_evidence"):
+            result._plate_policy_evidence = MappingProxyType(
+                {"origin": origin, "frame": None, "geometry_valid": False})
+        return result
 
     capture = cv2.VideoCapture(video) if video else None
     try:
@@ -1566,7 +1572,7 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                     u = tuple(min(pos[i][k], pos[i + 1][k]) if k < 2 else
                               max(pos[i][k], pos[i + 1][k]) for k in range(4))
                     t0 = ts[i] if i else a.t_start + 0.5 * frame_period
-                    added.append(_mk(t0, ts[i + 1], u, a, tid))
+                    added.append(_mk(t0, ts[i + 1], u, a, tid, "interpolation"))
                 n_gaps += 1
 
             # 2. onset: template-match the first sample backwards to the
@@ -1607,7 +1613,8 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                         nx = (rx1 + loc[0]) / SCALE
                         ny = (ry1 + loc[1]) / SCALE
                         box = [nx, ny, nx + (sb[2] - sb[0]), ny + (sb[3] - sb[1])]
-                        walked = _mk(t, t + step, tuple(box), first, tid)
+                        walked = _mk(t, t + step, tuple(box), first, tid,
+                                     "visual_continuation")
                         added.append(walked)
                         n_lead += 1
                         lead_s += step
@@ -4073,6 +4080,16 @@ def _dedupe_dense(act):
             if not (d.dense and d.track >= 0 and latest[d.track] is not d)]
 
 
+def _active_on_frame(d, t, index):
+    # Optional plate evidence supports only the actual decoded source frame.
+    # Dense smoothing's spans and 10ms render tolerance are not observations.
+    if hasattr(d, "_plate_policy_evidence"):
+        evidence = d._plate_policy_evidence
+        return (plate_policy._valid_geometry(d) and evidence.get("frame") == index
+                and d.t_start - 0.01 <= t <= d.t_end + 0.01)
+    return d.t_start - 0.01 <= t <= d.t_end + 0.01
+
+
 def _suppress_textless_bands(bands, n_raw_hits):
     """-> (bands, suppressed). Safety bands exist to cover unscanned TEXT
     scrolling into view. A scan whose OCR found ZERO text in any sampled
@@ -4318,7 +4335,7 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             _geometry_finite((ox, oy), 2, f"frame {idx}", "cum")
 
             act = [d for d in buckets.get(int(t), [])
-                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+                   if _active_on_frame(d, t, idx)]
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
@@ -4551,7 +4568,7 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
 
             # 1. tracked PII boxes, translated by scroll offset
             act = [d for d in buckets.get(int(t), [])
-                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+                   if _active_on_frame(d, t, idx)]
             for d in _dedupe_dense(act):
                 # drift allowance: residual tracking error grows (slowly) with
                 # distance scrolled since detection — expand the box to cover it
@@ -6432,6 +6449,8 @@ def sha256_file(path, chunk=1 << 20):
 def _settings_dict(args):
     skip = {"video", "output", "report", "from_report", "batch", "config",
             "_report_input"}
+    if getattr(args, "uncertain_policy", None) in (None, "off"):
+        skip.update(("uncertain_policy", "plate_auto_cutoff"))
     out = {k: v for k, v in vars(args).items()
            if k not in skip and isinstance(v, (str, int, float, bool, list,
                                                tuple, type(None)))}
@@ -6692,6 +6711,12 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
         previous = dict(source.get("provenance", {}))
         settings = dict(previous.get("settings", {}))
         settings.update(prov["settings"])
+        if source.get("plate_policy_evidence_version") == 1:
+            # Once a capable report exists, its retained floor and optional
+            # policy settings, not fresh CLI defaults, are authoritative.
+            for key in ("uncertain_policy", "plate_auto_cutoff", "plate_threshold"):
+                if key in previous.get("settings", {}):
+                    settings[key] = previous["settings"][key]
         prov["settings"] = settings
         # Output hashes/paths must describe this render, never an older one.
         previous.pop("output", None)
@@ -6699,6 +6724,19 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
         previous.update(prov)
         doc["provenance"] = previous
     else:
+        optional = state.get("plate_policy")
+        if optional:
+            decisions = plate_policy.evaluate(state["detections"], *optional)
+            rows = []
+            for d, decision in zip(state["detections"], decisions):
+                row = dict(asdict(d), enabled=decision.enabled)
+                if hasattr(d, "_plate_policy_evidence"):
+                    row["policy_evidence"] = dict(d._plate_policy_evidence)
+                if getattr(d, "_plate_output_choice", None) is not None:
+                    row["output_choice"] = d._plate_output_choice
+                rows.append(row)
+        else:
+            rows = [dict(asdict(d), enabled=True) for d in state["detections"]]
         doc = {
             "provenance": prov,
             "render_state": {
@@ -6706,11 +6744,11 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
             },
-            "detections": ([dict(asdict(d), enabled=True)
-                            for d in state["detections"]]
-                           + [dict(asdict(d), enabled=False, zone_dropped=True)
-                              for d in state.get("zdropped", [])]),
+            "detections": (rows + [dict(asdict(d), enabled=False, zone_dropped=True)
+                                   for d in state.get("zdropped", [])]),
         }
+        if optional:
+            doc["plate_policy_evidence_version"] = 1
         if state.get("audio_suggestions"):
             doc["audio_suggestions"] = state["audio_suggestions"]
         if state.get("audio_transcript"):
@@ -6740,28 +6778,46 @@ def load_report(path):
     return _decode_report(doc)
 
 
-def _decode_report(doc):
-    """Decode the enabled render subset of one already-read report snapshot."""
+def _decode_report(doc, optional_full=False):
+    """Decode a snapshot; optionally retain all capable rows for reevaluation."""
     if isinstance(doc, list):
         rows, state, prov = doc, None, {}
     else:
         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
             doc.get("provenance", {})
+    capable = isinstance(doc, dict) and doc.get("plate_policy_evidence_version") == 1
     dets = []
     for r in rows:
-        if not r.get("enabled", True):
+        if (not capable and not r.get("enabled", True)) or (capable and r.get("zone_dropped")):
             continue
-        dets.append(Detection(
+        score = r.get("confidence", None if capable and r.get("category") == "plate" else 1.0)
+        if capable and r.get("category") == "plate" and not plate_policy._finite_number(score):
+            score = float("nan")
+        d = Detection(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
-            confidence=float(r.get("confidence", 1.0)),
+            confidence=float(score),
             aoff=tuple(r.get("aoff", (0.0, 0.0))),
             last_seen=float(r.get("last_seen", r["t_start"])),
             # Preserve grouping in the enabled subset used by the renderer.
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+            poly=tuple(copy.deepcopy(r.get("poly") or ())))
+        if capable:
+            d._plate_saved_enabled = bool(r.get("enabled", True))
+            if d.category == "plate":
+                evidence = r.get("policy_evidence")
+                d._plate_policy_evidence = MappingProxyType(
+                    dict(evidence) if isinstance(evidence, dict) else {})
+                d._plate_output_choice = r.get("output_choice")
+        dets.append(d)
+    if capable and not optional_full:
+        settings = prov.get("settings", {})
+        decisions = plate_policy.evaluate(
+            dets, settings.get("uncertain_policy"), settings.get("plate_threshold"),
+            settings.get("plate_auto_cutoff"), capable_off=True)
+        dets = [d for d, decision in zip(dets, decisions) if decision.enabled]
     return dets, state, prov
 
 
@@ -7179,6 +7235,14 @@ def build_parser():
     ap.add_argument("--plate-threshold", type=float, default=0.35,
                     help="license-plate detector confidence cutoff (0-1). "
                          "Default 0.35.")
+    ap.add_argument("--uncertain-policy", choices=["manual_review", "blur_candidates"],
+                    default=None,
+                    help="opt in to a plate evidence policy; manual_review leaves "
+                         "uncertain hits for review, blur_candidates may mask "
+                         "single-frame hits. Requires --plate-auto-cutoff.")
+    ap.add_argument("--plate-auto-cutoff", type=float, default=None,
+                    help="explicit automatic plate confidence cutoff for an "
+                         "optional policy; at least the candidate floor")
     ap.add_argument("--person-model", default=None,
                     help="path to a YOLO person-detection ONNX model (see "
                          "person_models.json). If omitted, OpenScrub looks "
@@ -7401,6 +7465,9 @@ def _apply_scan_speed(args):
 
 def _prep_args(args, parser):
     args = apply_config(args, parser)
+    plate_policy.validate_settings(getattr(args, "uncertain_policy", None),
+                                   getattr(args, "plate_threshold", .35),
+                                   getattr(args, "plate_auto_cutoff", None))
     args = _apply_scan_speed(args)
     regions = []
     for r in (args.ignore_region or []):
@@ -7596,6 +7663,12 @@ def run_scan(args, cb=None):
     """Scan pass only: OCR + face detection + tracking. Returns a state dict
     consumed by run_render (and serialized into --report files)."""
     cb = cb or Callbacks()
+    optional_policy = getattr(args, "uncertain_policy", None)
+    if optional_policy == "off":
+        optional_policy = None
+    plate_policy.validate_settings(optional_policy,
+                                   getattr(args, "plate_threshold", .35),
+                                   getattr(args, "plate_auto_cutoff", None))
     if not args.video or not os.path.exists(args.video):
         raise RuntimeError(f"input not found: {args.video}")
     # normalize attributes that may be absent when args come from an older
@@ -8129,12 +8202,18 @@ def run_scan(args, cb=None):
                 if in_ignore_region((px1, py1, px2, py2),
                                     args.ignore_regions):
                     continue
-                raw.append(Detection(
+                plate = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),
                      int(px2 - cx), int(py2 - cy)),
                     "plate", "plate", round(pconf, 3), (cx, cy),
-                    dense=True))
+                    dense=True)
+                if optional_policy:
+                    plate._plate_policy_evidence = MappingProxyType({
+                        "origin": "detection", "frame": idx,
+                        "geometry_valid": (plate.cbox[0] < plate.cbox[2]
+                                           and plate.cbox[1] < plate.cbox[3])})
+                raw.append(plate)
                 dense_now.append((px1, py1, px2, py2))
         # per-frame full-body person detection: bodies move like faces do, so
         # (like dense faces/plates) re-detect every frame at the true
@@ -8863,7 +8942,7 @@ def run_scan(args, cb=None):
             nlp=getattr(namer, "nlp", None) if namer else None,
             custom_res=custom_res, phrases=phrases)
 
-    return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+    state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
             "input_sha256": sha256_file(args.video),
@@ -8871,11 +8950,19 @@ def run_scan(args, cb=None):
                       "regions": len(detections), "recalls": n_recalled,
                       "remembered": len(memory.items) if memory else 0,
                       "zone_dropped": zone_dropped}}
+    if optional_policy:
+        state["plate_policy"] = (optional_policy, args.plate_threshold,
+                                 args.plate_auto_cutoff)
+    return state
 
 
 def run_render(args, state, cb=None):
     cb = cb or Callbacks()
-    _geometry_preflight(state["detections"], state["cum"], state["bands"],
+    detections = state["detections"]
+    if state.get("plate_policy"):
+        choices = plate_policy.evaluate(detections, *state["plate_policy"], capable_off=True)
+        detections = [d for d, choice in zip(detections, choices) if choice.enabled]
+    _geometry_preflight(detections, state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")
     dst = args.output or os.path.splitext(args.video)[0] + (
         "_preview.mp4" if args.preview else "_redacted.mp4")
@@ -8912,7 +8999,7 @@ def run_render(args, state, cb=None):
         cb.log("      NOTE: output trim is not yet supported on HDR output — "
                "rendering full length. Use --hdr-output sdr to trim.")
         clip = None
-    dets_r = apply_coverage(state["detections"],
+    dets_r = apply_coverage(detections,
                             getattr(args, "coverage", "tight"), cb)
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
@@ -8971,7 +9058,17 @@ def run_pipeline(args, cb=None):
         # same snapshot. The raw document stays separate from render objects.
         with open(args.from_report, encoding="utf-8") as f:
             source = json.load(f)
-        dets, rstate, prov = _decode_report(source)
+        if getattr(args, "uncertain_policy", None) is not None:
+            raise ValueError("optional plate policy on a saved report must be "
+                             "changed in its report transaction")
+        capable = isinstance(source, dict) and source.get("plate_policy_evidence_version") == 1
+        optional = None
+        if capable:
+            settings = source.get("provenance", {}).get("settings", {})
+            optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
+                        settings.get("plate_auto_cutoff"))
+            plate_policy.validate_settings(*optional)
+        dets, rstate, prov = _decode_report(source, optional_full=capable)
         audio_overridden = getattr(args, "audio_spans", None) is not None
         if not audio_overridden and isinstance(source, dict):
             try:
@@ -9003,6 +9100,12 @@ def run_pipeline(args, cb=None):
         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
             cb.log("      WARNING: input file differs from the one this report "
                    "was made from (sha256 mismatch) — blur positions may be wrong")
+            if capable:
+                for d in dets:
+                    if d.category == "plate":
+                        d._plate_policy_evidence = MappingProxyType({
+                            "origin": "source_mismatch", "frame": None,
+                            "geometry_valid": False})
         state = {"fps": rstate["fps"],
                  "cum": [tuple(v) for v in rstate["cum"]],
                  "bands": [tuple(v) for v in rstate["bands"]],
@@ -9012,6 +9115,8 @@ def run_pipeline(args, cb=None):
                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                            "recalls": 0, "remembered": 0}}
+        if optional:
+            state["plate_policy"] = optional
         return run_render(args, state, cb)
     state = run_scan(args, cb)
     return run_render(args, state, cb)

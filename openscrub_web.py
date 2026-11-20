@@ -3380,9 +3380,14 @@ def job_boxes_at(jid):
     ox, oy = rs["cum"][fidx]
     boxes = []
     want_all = request.args.get("all") == "1"
+    capable = doc.get('plate_policy_evidence_version') == 1
     for i, d in enumerate(doc["detections"]):
         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
             continue
+        if capable and d.get('category') == 'plate':
+            if (not openscrub.plate_policy._valid_geometry(d)
+                    or d['policy_evidence']['frame'] != fidx):
+                continue
         if not want_all and not d.get("enabled", True):
             continue
         if True:
@@ -3646,6 +3651,8 @@ def _manual_candidates(doc, edits):
                 raise exact.ExactError(message, 409, 'geometry_conflict' if pc is not None else message)
             continue
         row = dict(creation,category='manual',text='user-drawn',confidence=1.,last_seen=t0,enabled=True)
+        if doc.get('plate_policy_evidence_version') == 1:
+            row['output_choice'] = 'blur'
         if has_id:
             row.update(manual_id=identity,manual_creation={**creation,'cbox':list(creation['cbox']),'aoff':list(creation['aoff'])})
             identified[identity] = [row]
@@ -3746,10 +3753,33 @@ def job_save_edits(jid):
                             touched[destination] = (target, key, target.get(key, missing))
                         target[key] = value
                     original_count = len(doc['detections'])
+                    capable = doc.get('plate_policy_evidence_version') == 1
+                    switch = edits.get('plate_policy')
+                    settings = doc.get('provenance', {}).get('settings', {})
+                    if 'plate_policy' in edits:
+                        if not capable:
+                            abort(409, 'optional plate evidence requires a fresh optional scan')
+                        if (not isinstance(switch, dict) or not switch
+                                or set(switch) - {'uncertain_policy', 'plate_auto_cutoff'}):
+                            abort(400, 'invalid plate policy request; changing the candidate floor requires a rescan')
+                        policy = switch.get('uncertain_policy', settings.get('uncertain_policy'))
+                        cutoff = switch.get('plate_auto_cutoff', settings.get('plate_auto_cutoff'))
+                        if policy not in ('manual_review', 'blur_candidates', 'off'):
+                            abort(400, 'invalid plate policy')
+                        try:
+                            # Preserve a valid cutoff even while switched off.
+                            openscrub.plate_policy.validate_settings(
+                                'manual_review', settings.get('plate_threshold'), cutoff)
+                        except ValueError as error:
+                            abort(400, str(error))
+                        assign(settings, 'uncertain_policy', policy)
+                        assign(settings, 'plate_auto_cutoff', cutoff)
                     enabled = edits.get('enabled',{})
                     for i,row in enumerate(doc['detections']):
                         if str(i) in enabled:
                             assign(row, 'enabled', bool(enabled[str(i)]))
+                            if capable:
+                                assign(row, 'output_choice', 'blur' if enabled[str(i)] else 'keep')
                     for key,box in (edits.get('box_overrides') or {}).items():
                         i = int(key)
                         if key in preconditions:
@@ -3771,6 +3801,18 @@ def job_save_edits(jid):
                                 assign(row, 't_start', t0); assign(row, 't_end', t1)
                                 assign(row, 'last_seen', min(max(row.get('last_seen',t0),t0),t1))
                     doc['detections'].extend(additions)
+                    if capable:
+                        policy = settings.get('uncertain_policy')
+                        floor = settings.get('plate_threshold')
+                        cutoff = settings.get('plate_auto_cutoff')
+                        try:
+                            decisions = openscrub.plate_policy.evaluate(
+                                doc['detections'], policy, floor, cutoff, capable_off=True)
+                        except ValueError as error:
+                            abort(400, str(error))
+                        for row, decision in zip(doc['detections'], decisions):
+                            if row.get('category') == 'plate' and not row.get('zone_dropped'):
+                                assign(row, 'enabled', decision.enabled)
                     if 'audio' in edits:
                         assign(doc, 'audio_redactions', [
                             dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
@@ -4012,6 +4054,8 @@ def job_track_object(jid):
                         "dense": True, "track": tid, "enabled": True,
                         "poly": [[[float(x), float(y)] for x, y in c]
                                  for c in poly]})
+                    if doc.get('plate_policy_evidence_version') == 1:
+                        new[-1]['output_choice'] = 'blur'
                 # grace pads: cover the sub-sample sliver at both ends
                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
                 new[-1]["t_end"] += 0.25
