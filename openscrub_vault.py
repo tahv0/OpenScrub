@@ -28,9 +28,13 @@ permanently unrecoverable — that is the entire point of the feature.
 from openscrub_internal.render_delivery import _is_discardable_render_stage
 
 import base64
+from contextlib import contextmanager
 import json
 import os
 import struct
+import stat
+import tempfile
+from typing import NamedTuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
@@ -108,50 +112,164 @@ def is_encrypted(path):
     return path.endswith(SUFFIX)
 
 
-def encrypt_file(key, path):
+
+
+def _encrypt_stream(aes, src, dst, nonce):
+    dst.write(MAGIC + nonce)
+    count = counter = 0
+    while True:
+        chunk = src.read(CHUNK)
+        if not chunk:
+            break
+        count += len(chunk)
+        sealed = aes.encrypt(_chunk_nonce(nonce, counter), chunk, None)
+        dst.write(struct.pack('>I', len(sealed)) + sealed)
+        counter += 1
+    return count
+
+
+def _decrypt_stream(aes, src, dst, path, witnessed=False):
+    head = src.read(len(MAGIC) + 12)
+    if not head.startswith(MAGIC) or (witnessed and len(head) != len(MAGIC) + 12):
+        raise ValueError("not an OpenScrub vault file: %s" % path)
+    nonce = head[len(MAGIC):]
+    count = counter = 0
+    while True:
+        ln = src.read(4)
+        if not ln:
+            break
+        sealed = src.read(struct.unpack('>I', ln)[0])
+        plain = aes.decrypt(_chunk_nonce(nonce, counter), sealed, None)
+        dst.write(plain)
+        count += len(plain)
+        counter += 1
+    return nonce, count
+
+
+class _Receipt(NamedTuple):
+    direction: str
+    input_stamp: tuple
+    output_stamp: tuple
+    nonce: bytes
+    plaintext_bytes: int
+
+
+def _regular_stamp(info):
+    if not stat.S_ISREG(info.st_mode) or not info.st_dev or not info.st_ino:
+        raise OSError("vault continuity requires a regular file with stable identity")
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _entry_stamp(path):
+    return _regular_stamp(os.stat(path, follow_symlinks=False))
+
+
+@contextmanager
+def _fdopen_owned(fd, mode):
+    """Own the raw descriptor independently of the buffered file wrapper."""
+    try:
+        with os.fdopen(fd, mode, closefd=False) as stream:
+            yield stream
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass  # Preserve the original construction, I/O, or close failure.
+        raise
+    else:
+        os.close(fd)
+
+
+def _witnessed_file(key, path, direction, finish):
+    """Transform one tracked entry; emit evidence only after publication/removal."""
+    encrypting = direction == 'encrypt'
+    out = path + SUFFIX if encrypting else path[:-len(SUFFIX)]
+    stage = None
+    stage_identity = None
+    try:
+        before_open = _entry_stamp(path)
+        flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0)
+        fd = os.open(path, flags)
+        with _fdopen_owned(fd, 'rb') as src:
+            original = _regular_stamp(os.fstat(src.fileno()))
+            if original != before_open or _entry_stamp(path) != original:
+                raise OSError("vault input changed while opening")
+            fd, stage = tempfile.mkstemp(prefix='.vault-', suffix='.tmp', dir=os.path.dirname(out) or '.')
+            with _fdopen_owned(fd, 'wb') as dst:
+                stage_identity = _regular_stamp(os.fstat(dst.fileno()))[:2]
+                aes = AESGCM(key)
+                if encrypting:
+                    nonce = os.urandom(12)
+                    count = _encrypt_stream(aes, src, dst, nonce)
+                else:
+                    nonce, count = _decrypt_stream(aes, src, dst, path, witnessed=True)
+                if _regular_stamp(os.fstat(src.fileno())) != original or _entry_stamp(path) != original:
+                    raise OSError("vault input changed during streaming")
+                dst.flush()
+                written = _regular_stamp(os.fstat(dst.fileno()))
+                expected = getattr(finish, 'expected_plaintext_size', count)
+                if not encrypting and (written[2] != count or count != expected):
+                    raise OSError("vault plaintext size changed during writing")
+                if _entry_stamp(stage) != written:
+                    raise OSError("vault stage changed during streaming")
+            if _entry_stamp(stage) != written:
+                raise OSError("vault stage changed before publication")
+            if not encrypting and os.path.lexists(out):
+                raise OSError("vault plaintext appeared before publication")
+            os.replace(stage, out)
+            stage = None
+            published = _entry_stamp(out)
+            if published[:4] != written[:4]:
+                raise OSError("vault published output changed")
+            if _regular_stamp(os.fstat(src.fileno())) != original or _entry_stamp(path) != original:
+                raise OSError("vault input changed before removal")
+        if _entry_stamp(path) != original:
+            raise OSError("vault input changed before removal")
+        os.remove(path)
+        if _entry_stamp(out) != published:
+            raise OSError("vault output changed after removal")
+        finish(_Receipt(direction, original, published, nonce, count))
+        return out
+    finally:
+        if stage is not None and stage_identity is not None:
+            try:
+                if _entry_stamp(stage)[:2] == stage_identity:
+                    os.remove(stage)
+            except OSError:
+                pass
+
+
+def encrypt_file(key, path, observe=None):
     """path -> path+SUFFIX (atomic; original removed only on success)."""
     if is_encrypted(path):
         return path
+    finish = observe("encrypt", path) if observe is not None else None
+    if finish is not None:
+        return _witnessed_file(key, path, "encrypt", finish)
     aes = AESGCM(key)
     base = os.urandom(12)
     out = path + SUFFIX
     tmp = out + ".tmp"
     with open(path, "rb") as src, open(tmp, "wb") as dst:
-        dst.write(MAGIC + base)
-        counter = 0
-        while True:
-            chunk = src.read(CHUNK)
-            if not chunk:
-                break
-            sealed = aes.encrypt(_chunk_nonce(base, counter), chunk, None)
-            dst.write(struct.pack(">I", len(sealed)) + sealed)
-            counter += 1
+        _encrypt_stream(aes, src, dst, base)
     os.replace(tmp, out)
     os.remove(path)
     return out
 
 
-def decrypt_file(key, path):
+def decrypt_file(key, path, observe=None):
     """path+SUFFIX -> path (atomic; ciphertext removed only on success).
     Raises on tampering (GCM auth) or wrong key."""
     if not is_encrypted(path):
         return path
+    finish = observe("decrypt", path[:-len(SUFFIX)]) if observe is not None else None
+    if finish is not None:
+        return _witnessed_file(key, path, "decrypt", finish)
     aes = AESGCM(key)
     out = path[:-len(SUFFIX)]
     tmp = out + ".tmp"
     with open(path, "rb") as src, open(tmp, "wb") as dst:
-        head = src.read(len(MAGIC) + 12)
-        if not head.startswith(MAGIC):
-            raise ValueError("not an OpenScrub vault file: %s" % path)
-        base = head[len(MAGIC):]
-        counter = 0
-        while True:
-            ln = src.read(4)
-            if not ln:
-                break
-            sealed = src.read(struct.unpack(">I", ln)[0])
-            dst.write(aes.decrypt(_chunk_nonce(base, counter), sealed, None))
-            counter += 1
+        _decrypt_stream(aes, src, dst, path)
     os.replace(tmp, out)
     os.remove(path)
     return out
@@ -163,7 +281,7 @@ def _walk_files(root):
             yield os.path.join(dirpath, f)
 
 
-def encrypt_tree(key, root):
+def encrypt_tree(key, root, observe=None):
     """Encrypt every not-yet-encrypted file under root. Returns count."""
     n = 0
     for p in list(_walk_files(root)):
@@ -173,12 +291,15 @@ def encrypt_tree(key, root):
             except FileNotFoundError:
                 pass                           # published since enumeration
         elif not is_encrypted(p):
-            encrypt_file(key, p)
+            if observe is None:
+                encrypt_file(key, p)
+            else:
+                encrypt_file(key, p, observe)
             n += 1
     return n
 
 
-def decrypt_tree(key, root):
+def decrypt_tree(key, root, observe=None):
     """Decrypt every encrypted file under root. Returns count."""
     n = 0
     for p in list(_walk_files(root)):
@@ -188,7 +309,10 @@ def decrypt_tree(key, root):
             except FileNotFoundError:
                 pass                           # published since enumeration
         elif is_encrypted(p):
-            decrypt_file(key, p)
+            if observe is None:
+                decrypt_file(key, p)
+            else:
+                decrypt_file(key, p, observe)
             n += 1
     return n
 
