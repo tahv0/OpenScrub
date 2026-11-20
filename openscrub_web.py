@@ -2151,10 +2151,10 @@ def _adopt_scan_source(job, owner, hdr_proof=None, scan_digest=None):
                 raise exact.ExactError('committed scan report changed during adoption', 409, 'sample_conflict')
             selected = _select_observed_locked(job, prepared, authoritative=True)
             selected.pop('hdr_quad_proof', None)
-            doc = _load_job_report(job)
-            if (hdr_proof is not None and hdr_proof.get('scan_sha256') == scan_digest
-                    and openscrub.hdr_quad_pairs.usable(hdr_proof, doc, selected)):
-                selected['hdr_quad_proof'] = hdr_proof
+            if isinstance(hdr_proof, dict) and hdr_proof.get('scan_sha256') == scan_digest:
+                doc = _load_job_report(job)
+                if openscrub.hdr_quad_pairs.usable(hdr_proof, doc, selected):
+                    selected['hdr_quad_proof'] = hdr_proof
             job['video'] = selected['path']
             return True
     except Exception as error:

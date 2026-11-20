@@ -141,3 +141,18 @@ def test_observed_old_source_failed_normalized_adoption_recovers_only_committed_
     assert request('get',exact.url+'/edit_sample?t=0.2').status_code==422
     assert request('get',exact.url+'/edit_sample?t=0.2').status_code==422
     assert files.source_pair is None and files.source_retired
+
+
+def test_ordinary_scan_adoption_does_not_reread_report_for_hdr_evidence(scan, monkeypatch):
+    import sys
+    exact, threads = scan
+    original = web._load_job_report
+    adoption_reads = []
+    def observe(job):
+        if sys._getframe(1).f_code is web._adopt_scan_source.__code__:
+            adoption_reads.append(job['id'])
+        return original(job)
+    monkeypatch.setattr(web, '_load_job_report', observe)
+    web._run_job(exact.job, 'scan')
+    assert web.FILES.initialize(exact.job).source_status == 'coherent'
+    assert adoption_reads == []
