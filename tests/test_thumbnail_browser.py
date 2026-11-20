@@ -166,3 +166,24 @@ def test_lightbox_failure_clears_only_after_current_image_decodes():
     const replacement=s.lightbox;await headers(tasks[3]);await body(tasks[3]);eq(a.reopen.hidden,false);
     replacement.img.onload();eq(a.reopen.hidden,true);
     """)
+
+
+def test_stale_loaded_image_callbacks_cannot_hide_replacement_generation():
+    run(NETWORK + GENERATION + LIGHTBOX + """
+    const s=scheduler(),rows=[hashed(0)];versioned(s,rows);const b=card(s,0);eligible(s,[0]);
+    await headers(tasks[0]);await body(tasks[0]);const oldLoad=b.img.onload,oldError=b.img.onerror;
+    s.recoverThumbnails();tasks[1].resolve({ok:true,json:async()=>({duration:10,detections:rows,thumbnail_version:'b'.repeat(32)})});await tick();
+    await headers(tasks[2]);await body(tasks[2]);const url=b.url;b.img.onload();
+    oldError();oldLoad();await tick();
+    if(b.url!==url||s.retries.get(0).failures!==0||!b.reopen.hidden)throw Error('stale callbacks mutated current image');
+    eq(revoked,['blob:1']);
+    """)
+
+
+def test_new_successful_review_has_fresh_recovery_budget():
+    run_js("""openJob('A');const row={i:0,enabled:true,category:'name',t_start:0,t_end:1,thumbnail_row:'0'.repeat(64)};
+    const old=loadReview();await reply({duration:10,detections:[row],thumbnail_version:'a'.repeat(32)});await old;
+    const first=REVIEW_SCHED;first.meta.thumbnails.attempted=true;
+    const reopen=loadReview();await reply({duration:10,detections:[row],thumbnail_version:'b'.repeat(32)});await reopen;
+    if(REVIEW_SCHED===first||REVIEW_META.thumbnails.attempted||REVIEW_META.thumbnails.version!=='b'.repeat(32))throw Error('new review did not acquire a fresh budget');
+    """)
