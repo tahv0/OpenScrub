@@ -49,7 +49,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
 from werkzeug.exceptions import Conflict
 
 import openscrub
-from openscrub_internal.reports import _staged_report
+from openscrub_internal.reports import _staged_report, atomic_report
 from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
@@ -699,16 +699,59 @@ def _start_owned_thread(target, lease):
         raise
 
 
-def new_job(video_path, options, name):
+def new_job(video_path, options, name, *, _defer_registration=False):
     with _own_files() as owner:
         _thumbnail_admit_path(video_path, owner)
-        return _new_job(video_path, options, name)
+        return _new_job(video_path, options, name, _defer_registration=_defer_registration)
 
 
-def _new_job(video_path, options, name):
+class _CheckpointOptionsError(OSError):
+    """Original checkpoint settings could not be made durable."""
+
+
+def _persist_checkpoint_options(jdir, options):
+    """Persist one private options generation before admitting a checkpoint."""
+    flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_CLOEXEC', 0)
+    with contextlib.ExitStack() as stack:
+        directory = os.open(jdir, flags)
+        stack.callback(os.close, directory)
+        parent = os.open(JOBS_DIR, flags)
+        stack.callback(os.close, parent)
+        atomic_report(os.path.join(jdir, OPTIONS_FILE), options)
+        os.fsync(directory)
+        os.fsync(parent)
+
+
+def _discard_unregistered_checkpoint(job):
+    """Remove an unadmitted private directory, or leave the existing reaper marker."""
+    if not _reap_job_dir(job['dir'], job['id'], retries=1, delay=0):
+        try:
+            with open(os.path.join(job['dir'], DELETE_MARKER), 'w') as marker:
+                marker.write(str(time.time()))
+        except OSError:
+            pass
+
+
+def _register_new_jobs(jobs):
+    with VAULT_LOCK:
+        with JOBS_LOCK:
+            for job in jobs:
+                JOBS[job['id']] = job
+        if has_request_context() and g.get("file_owner") is not None:
+            g.setdefault("file_children", []).extend(FILES.reserve(job, work=True) for job in jobs)
+
+
+def _new_job(video_path, options, name, *, _defer_registration=False):
     jid = uuid.uuid4().hex[:12]
     jdir = os.path.join(JOBS_DIR, jid)
-    os.makedirs(jdir, exist_ok=True)
+    checkpoint = options.get('checkpoint_review') is True
+    if checkpoint:
+        try:
+            os.mkdir(jdir, 0o700)
+        except OSError as error:
+            raise _CheckpointOptionsError('checkpoint settings could not be saved') from error
+    else:
+        os.makedirs(jdir, exist_ok=True)
     job = {
         "id": jid, "dir": jdir, "video": video_path, "name": name,
         "options": options, "phase": "queued", "progress": 0.0,
@@ -720,17 +763,23 @@ def _new_job(video_path, options, name):
     # keep the job's settings beside its upload: a scan that never finished
     # has no report to recover them from, and a Retry after a restart then
     # ran with DEFAULT settings (all categories) instead of the user's own
-    try:
-        with open(os.path.join(jdir, OPTIONS_FILE), "w",
-                  encoding="utf-8") as f:
-            json.dump(options, f)
-    except (OSError, TypeError, ValueError):
-        pass
-    with VAULT_LOCK:
-        with JOBS_LOCK:
-            JOBS[jid] = job
-        if has_request_context() and g.get("file_owner") is not None:
-            g.setdefault("file_children", []).append(FILES.reserve(job, work=True))
+    if checkpoint:
+        try:
+            _persist_checkpoint_options(jdir, options)
+        except BaseException as error:
+            _discard_unregistered_checkpoint(job)
+            if isinstance(error, (OSError, TypeError, ValueError, RecursionError)):
+                raise _CheckpointOptionsError('checkpoint settings could not be saved') from error
+            raise
+    else:
+        try:
+            with open(os.path.join(jdir, OPTIONS_FILE), "w",
+                      encoding="utf-8") as f:
+                json.dump(options, f)
+        except (OSError, TypeError, ValueError):
+            pass
+    if not _defer_registration:
+        _register_new_jobs([job])
     return job
 
 
@@ -2031,23 +2080,53 @@ def create_job():
     jobs = []
     files = request.files.getlist("video")
     if files and files[0].filename:
-        for f in files:
-            name = os.path.basename(f.filename.replace("\\", "/"))
-            # extension comes from the client: keep it only if it's a plain
-            # known media suffix, never splice arbitrary text into the path
-            ext = os.path.splitext(name)[1].lower()
-            if ext not in MEDIA_EXTS:
-                ext = ".mp4"
-            job = new_job("", options, name)
-            path = os.path.join(job["dir"], "input" + ext)
-            f.save(path)
-            job["video"] = path
+        if checkpoint:
+            # Stage all options and uploads before registering any job. A
+            # failure cannot strand unreported queued work or partial copies.
+            allocated = []
             try:
-                job["size"] = os.path.getsize(path)
-            except OSError:
-                pass
-            enqueue(job, "scan")
-            jobs.append(job["id"])
+                for f in files:
+                    name = os.path.basename(f.filename.replace("\\", "/"))
+                    allocated.append(new_job("", options, name, _defer_registration=True))
+                for f, job in zip(files, allocated):
+                    name = os.path.basename(f.filename.replace("\\", "/"))
+                    ext = os.path.splitext(name)[1].lower()
+                    if ext not in MEDIA_EXTS:
+                        ext = ".mp4"
+                    path = os.path.join(job["dir"], "input" + ext)
+                    f.save(path)
+                    job["video"] = path
+                    job["size"] = os.path.getsize(path)
+            except BaseException as error:
+                for job in allocated:
+                    _discard_unregistered_checkpoint(job)
+                if isinstance(error, _CheckpointOptionsError):
+                    return jsonify({"error": "Could not save checkpoint settings; no scan was queued."}), 507
+                if isinstance(error, OSError):
+                    return jsonify({"error": "Could not save checkpoint upload; no scan was queued."}), 507
+                raise
+            _register_new_jobs(allocated)
+            for job in allocated:
+                enqueue(job, "scan")
+                jobs.append(job["id"])
+        else:
+            for f in files:
+                name = os.path.basename(f.filename.replace("\\", "/"))
+                # extension comes from the client: keep it only if it's a plain
+                # known media suffix, never splice arbitrary text into the path
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in MEDIA_EXTS:
+                    ext = ".mp4"
+                job = new_job("", options, name)
+                path = os.path.join(job["dir"], "input" + ext)
+                f.save(path)
+                job["video"] = path
+                try:
+                    job["size"] = os.path.getsize(path)
+                except OSError:
+                    pass
+                enqueue(job, "scan")
+                jobs.append(job["id"])
     elif request.form.get("server_path"):
         p = _request_source_path(request.form["server_path"].strip())
         err = server_path_error(p)
@@ -2064,7 +2143,10 @@ def create_job():
         if not p.startswith(r.rstrip(os.sep) + os.sep):
             return jsonify({"error": "server path is outside "
                                      "OPENSCRUB_MEDIA_ROOT"}), 400
-        job = new_job(p, options, os.path.basename(p))
+        try:
+            job = new_job(p, options, os.path.basename(p))
+        except _CheckpointOptionsError:
+            return jsonify({"error": "Could not save checkpoint settings; no scan was queued."}), 507
         try:
             job["size"] = os.path.getsize(p)
         except OSError:
