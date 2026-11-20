@@ -175,7 +175,23 @@ details .inner .full{grid-column:1/-1}
   <div><label>Bridge gap (s) <span class="qm" data-tip="If the same text disappears for a moment (the reader missed it for a frame or two) and comes back in the same place, keep the blur on across the gap - up to this many seconds. Default 4. Raise it for flickery or low-quality video; lower it if blurs linger after text has really gone.">?</span></label><input type="number" id="bgap" value="4" step="0.5"></div>
   <div><label>Face threshold <span class="qm" data-tip="How sure the face detector must be before it blurs something (0-1, default 0.6). Lower it to catch small, distant, turned or partly hidden faces - you may get a few false faces, which you can reject in review. Raise it only if many non-faces are being flagged; a missed face is never blurred.">?</span></label><input type="number" id="fthr" value="0.6" step="0.05" min="0" max="1"></div>
   <div><label>Face expand <span class="qm" data-tip="Grow each detected face box by this fraction before blurring (0.15 = 15% larger). Default 0.15. Close-up faces (filling roughly 15-30% or more of the frame) automatically get more, up to 0.45, so the neck and collar under the face are covered too - those can still identify someone. Raise it if hairlines, ears or chins show around the edge of face blurs.">?</span></label><input type="number" id="fex" value="0.15" step="0.05"></div>
-  <div><label>Plate threshold <span class="qm" data-tip="How sure the plate detector must be before it blurs something (0.05-0.95, default 0.35). Raise it if hands, labels or signs keep getting flagged as plates; lower it if real plates are missed. Higher values mean more missed plates - a false plate can be rejected in review, but a missed plate is never blurred, so raise it in small steps and check the output.">?</span></label><input type="number" id="pthr" value="0.35" step="0.05" min="0.05" max="0.95"></div>
+  <div><label for="pthr">Plate threshold <span class="qm" data-tip="The lowest detector score retained for plates (0.05-0.95, default 0.35). A higher threshold can miss plates. With an optional confidence policy, retained candidates may stay visible for review; lowering this threshold later requires a new scan.">?</span></label><input type="number" id="pthr" value="0.35" step="0.05" min="0.05" max="0.95" oninput="clearPlatePolicyError()"></div>
+  <div class="full"><label for="plate-policy">Plate confidence policy</label>
+   <select id="plate-policy" onchange="platePolicyChanged()">
+    <option value="">Standard (current behavior)</option>
+    <option value="manual_review">Review uncertain</option>
+    <option value="blur_candidates">Blur candidates</option>
+   </select>
+   <div id="plate-policy-help" class="mutd" aria-live="polite"></div>
+  </div>
+  <div class="full" id="plate-auto-cutoff-wrap" hidden>
+   <label for="plate-auto-cutoff">Automatic plate cutoff</label>
+   <input type="number" id="plate-auto-cutoff" min="0.05" max="0.95" step="any"
+    inputmode="decimal" disabled oninput="clearPlatePolicyError()"
+    aria-describedby="plate-policy-help plate-policy-error">
+   <div class="mutd">Choose a cutoff at least as high as the plate threshold. No cutoff is preset.</div>
+  </div>
+  <div class="full" id="plate-policy-error" role="alert" hidden style="color:#fca5a5"></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
    <option>rect</option></select></div>
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
@@ -1107,6 +1123,33 @@ function speedHint(){
  h.textContent=SPEED_HINT[v]||"";
  h.style.color=(v==="fast"||v==="fastest")?"#fbbf24":"";
 }
+function clearPlatePolicyError(){
+ const error=$("plate-policy-error");error.textContent="";error.hidden=true;
+}
+function platePolicyChanged(){
+ const policy=$("plate-policy").value,cutoff=$("plate-auto-cutoff");
+ $("plate-auto-cutoff-wrap").hidden=!policy;cutoff.disabled=!policy;
+ $("plate-policy-help").textContent=policy==="manual_review"
+  ?"Uncertain observations remain visible for manual review. Automatic blur starts after two associated high-score observations. Unsupported frames can remain visible."
+  :policy==="blur_candidates"
+   ?"Blur retained candidates at the plate threshold, including single observations. Extra short masks can appear; unsupported frames can remain visible. The automatic cutoff is saved for Review uncertain."
+   :"";
+ clearPlatePolicyError();
+}
+function platePolicyRequest(){
+ const policy=$("plate-policy").value;if(!policy)return null;
+ const floorText=$("pthr").value.trim(),cutoffText=$("plate-auto-cutoff").value.trim();
+ const floor=Number(floorText),cutoff=Number(cutoffText);
+ const error=$("plate-policy-error");
+ if(!floorText||!Number.isFinite(floor)||floor<0.05||floor>0.95){
+  error.textContent="Enter a plate threshold from 0.05 to 0.95.";error.hidden=false;$("pthr").focus();return false;
+ }
+ if(!cutoffText||!Number.isFinite(cutoff)||cutoff<floor||cutoff>0.95){
+  error.textContent="Enter an automatic plate cutoff from the plate threshold up to 0.95.";
+  error.hidden=false;$("plate-auto-cutoff").focus();return false;
+ }
+ clearPlatePolicyError();return {policy,cutoff};
+}
 const MAXUP=+"%%MAXUP%%"||0;  // server upload cap in bytes (0 = unlimited),
                               // injected at serve time like %%VERSION%%
 const FREEDISK=+"%%FREEDISK%%"||0; // server free disk at page load (bytes,
@@ -1119,6 +1162,7 @@ fetch("/api/model_status").then(r=>r.json())
 async function startScan(){
  if(!S.dur){alert("Load a video first.");return;}
  if(!S.file&&!$("spath").value.trim()){alert("Choose a file or server path.");return;}
+ const platePolicy=platePolicyRequest();if(platePolicy===false)return;
  if(S.file&&MAXUP>0&&S.file.size>MAXUP){
   alert("This file is "+(S.file.size/1073741824).toFixed(1)+" GB — over the "
    +"server's "+(MAXUP/1073741824).toFixed(0)+" GB upload limit, so the "
@@ -1210,6 +1254,7 @@ async function startScan(){
     track:w.track||[]})),
   ignore_zones:S.ignore,
  };
+ if(platePolicy){o.uncertain_policy=platePolicy.policy;o.plate_auto_cutoff=platePolicy.cutoff;}
  const fd=new FormData();
  if(S.file)fd.append("video",S.file);
  fd.append("server_path",$("spath").value.trim());
