@@ -85,12 +85,15 @@ const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE);
 (async()=>{const browser=await chromium.launch({executablePath:process.env.OPENSCRUB_CHROMIUM,headless:true,args:['--no-sandbox']});
 try{const page=await browser.newPage();await page.goto(process.env.OPENSCRUB_PAGE_URL);
  await page.evaluate(id=>openJob(id),process.env.OPENSCRUB_PAGE_JOB);
- await page.waitForSelector('#thumb0');
+ await page.locator('#detwrap').scrollIntoViewIfNeeded();
+ await page.waitForSelector('#det0 img');
+ await page.locator('#reviewZones summary').click();
+ await page.waitForSelector('#det2');
  const state=await page.evaluate(()=>{const root=document.getElementById('review');
   const card=document.getElementById('det0'),zone=document.getElementById('det2');
   return {category:card.dataset.cat,card:card.textContent,zone:zone.textContent,
    markup:card.querySelector('b')!==null||zone.querySelector('i')!==null,
-   binding:REVIEW_IMAGES.bindings.get(0).node===card.querySelector('img'),
+   binding:REVIEW_SCHED.bindings.get(0).img===card.querySelector('img'),
    group:TRKMEM[0],heading:[...root.querySelectorAll('h3')].find(n=>n.textContent.includes('name'))?.textContent};});
  assert.equal(state.category,'name " <tag> & literal');
  assert.ok(state.card.includes('Label <b>literal</b> & "quote"'));
@@ -131,9 +134,13 @@ try{const page=await browser.newPage(),job=process.env.OPENSCRUB_PAGE_JOB;let ca
   return route.fulfill({status:409,contentType:'application/json',body:'{}'});};
  await page.route(pattern,fail);await page.goto(process.env.OPENSCRUB_PAGE_URL);await page.evaluate(id=>openJob(id),job);
  await page.waitForSelector('[data-review-retry]',{timeout:2500});assert.equal(calls,1);
- await page.evaluate(()=>refresh());assert.equal(calls,1);
+ // P03 independently retries on a later polling cycle. Pause that cycle here
+ // to exercise the visible manual retry before it can replace the error UI.
+ await page.waitForFunction(()=>!POLL_CYCLE && AUTO_REVIEW?.state!=='loading');
+ await page.evaluate(()=>stopPolling());assert.equal(calls,1);
  await page.unroute(pattern,fail);await page.locator('[data-review-retry]').click();
- await page.waitForSelector('#thumb0');assert.equal(await page.locator('[data-review-retry]').count(),0);
+ await page.locator('#detwrap').scrollIntoViewIfNeeded();
+ await page.waitForSelector('#det0 img');assert.equal(await page.locator('[data-review-retry]').count(),0);
  await page.close();}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
 """
     try:
