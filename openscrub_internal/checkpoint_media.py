@@ -12,6 +12,7 @@ import queue
 import re
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from fractions import Fraction
 
@@ -95,6 +96,7 @@ _SHOWINFO = re.compile(
 _TIME_BASE = re.compile(
     r'^\[Parsed_showinfo_\d+ @ 0x[0-9a-fA-F]+\] config in time_base: (\d+)/(\d+)')
 _END = object()
+_METADATA_TIMEOUT = 5.0
 
 
 class FrameStream:
@@ -114,7 +116,6 @@ class FrameStream:
         self._proc = None
         self._thread = None
         self._info = queue.Queue()
-        self._lines = []
         self._last_index = None
         self._showinfo_number = 0
         self._time_base = None
@@ -147,9 +148,6 @@ class FrameStream:
         try:
             for raw in self._proc.stderr:
                 line = raw.decode('utf-8', 'replace').strip()
-                self._lines.append(line)
-                if len(self._lines) > 8:
-                    del self._lines[0]
                 match = _TIME_BASE.match(line)
                 if match:
                     self._info.put(('base', match.groups()))
@@ -161,8 +159,15 @@ class FrameStream:
             self._info.put((_END, ()))
 
     def _frame_info(self):
+        # showinfo runs before FFmpeg writes the corresponding raw frame.  A
+        # missing/unrecognized line must not wait for EOF: FFmpeg may itself
+        # be blocked writing the next frame while we wait for its metadata.
+        deadline = time.monotonic() + _METADATA_TIMEOUT
         while True:
-            kind, values = self._info.get()
+            try:
+                kind, values = self._info.get(timeout=max(0, deadline - time.monotonic()))
+            except queue.Empty:
+                raise FrameEvidenceError('decoder did not provide a timestamp for a decoded frame') from None
             if kind is _END:
                 raise FrameEvidenceError('decoder did not provide a timestamp for a decoded frame')
             if kind == 'base':

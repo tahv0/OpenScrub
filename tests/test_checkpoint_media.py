@@ -105,3 +105,28 @@ def test_fractional_cfr_seek_does_not_round_away_anchor(tmp_path):
         assert stream.read()[0] == 19
         assert not stream.completed
 
+
+
+def test_missing_frame_timestamp_does_not_hang_while_decoder_is_writing(tmp_path, monkeypatch):
+    import sys
+    import time
+    media = media_module()
+    source = clip(tmp_path)
+    identity = media.inspect_source(str(source))
+    fake_bin = tmp_path / 'fake-bin'
+    fake_bin.mkdir()
+    decoder = fake_bin / 'ffmpeg'
+    decoder.write_text(
+        '#!' + sys.executable + '\n'
+        'import sys, time\n'
+        'sys.stdout.buffer.write(b"\\x00" * (96 * 64 * 3))\n'
+        'sys.stdout.buffer.flush()\n'
+        'time.sleep(2)\n')
+    decoder.chmod(0o755)
+    monkeypatch.setenv('PATH', str(fake_bin) + os.pathsep + os.environ.get('PATH', ''))
+    monkeypatch.setattr(media, '_METADATA_TIMEOUT', 0.2, raising=False)
+    started = time.monotonic()
+    with pytest.raises(media.FrameEvidenceError, match='timestamp'):
+        with media.FrameStream(identity) as reader:
+            reader.read()
+    assert time.monotonic() - started < 1.0
