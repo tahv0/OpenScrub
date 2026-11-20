@@ -365,3 +365,64 @@ def test_foreign_recovery_before_optional_pregen_keeps_scan_in_review(exact, mon
         assert not deferred
     finally:
         owner.recovery_required = False
+
+
+@pytest.mark.parametrize('failure', [PermissionError('admission denied'), web._ThumbnailArtifactPending()])
+@pytest.mark.parametrize('skip_review', [False, True])
+def test_optional_pregen_admission_refusal_preserves_scan_handoff(exact, monkeypatch, failure, skip_review):
+    exact.job['options']['skip_review'] = skip_review
+    queued = []
+    monkeypatch.setattr(web, 'enqueue', lambda job, action, ticket: queued.append(ticket))
+    monkeypatch.setattr(web.openscrub, 'run_scan', lambda args, cb: dict(
+        fps=5, cum=[[0, 0]]*10, bands=[[0, 0]]*10, detections=[], stats={}))
+    original_adopt = web._adopt_scan_source
+    original_resolve = web._thumbnail_resolve_admission
+    adopted = False
+    def adopt(job, operation):
+        nonlocal adopted
+        coherent = original_adopt(job, operation)
+        adopted = True
+        return coherent
+    def resolve(lease, path):
+        nonlocal failure
+        if adopted and failure is not None:
+            refusal, failure = failure, None
+            raise refusal
+        return original_resolve(lease, path)
+    monkeypatch.setattr(web, '_adopt_scan_source', adopt)
+    monkeypatch.setattr(web, '_thumbnail_resolve_admission', resolve)
+    web._run_job(exact.job, 'scan')
+    assert adopted
+    assert exact.job['phase'] == ('queued_render' if skip_review else 'review')
+    assert exact.path.exists()
+    if skip_review:
+        assert len(queued) == 1
+        ticket = queued.pop()
+        web.FILES.initialize(exact.job).queued.pop(ticket[2])
+        web._finish_operation(exact.job, ticket[3])
+    else:
+        assert not queued
+    assert web.FILES.count == 0
+
+
+def test_unexpected_optional_pregen_admission_error_is_not_hidden(exact, monkeypatch):
+    monkeypatch.setattr(web.openscrub, 'run_scan', lambda args, cb: dict(
+        fps=5, cum=[[0, 0]]*10, bands=[[0, 0]]*10, detections=[], stats={}))
+    original_adopt = web._adopt_scan_source
+    original_resolve = web._thumbnail_resolve_admission
+    adopted = False
+    def adopt(job, operation):
+        nonlocal adopted
+        coherent = original_adopt(job, operation)
+        adopted = True
+        return coherent
+    def resolve(lease, path):
+        if adopted:
+            raise RuntimeError('unexpected admission failure')
+        return original_resolve(lease, path)
+    monkeypatch.setattr(web, '_adopt_scan_source', adopt)
+    monkeypatch.setattr(web, '_thumbnail_resolve_admission', resolve)
+    web._run_job(exact.job, 'scan')
+    assert exact.job['phase'] == 'error'
+    assert exact.job['error'] == 'unexpected admission failure'
+    assert web.FILES.count == 0

@@ -486,7 +486,7 @@ def _validate_files_locked(job=None):
             abort(409, "job is being deleted")
 
 
-def _source_job_locked(canonical, missing_ok=False):
+def _source_job_locked(canonical, missing_ok=False, *, thumbnail_job=None):
     root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
     if not canonical.startswith(root):
         return None
@@ -498,14 +498,20 @@ def _source_job_locked(canonical, missing_ok=False):
             return None
         abort(404, "source job is no longer available")
     _validate_files_locked(source_job)
-    _recovery_gate(source_job)
+    try:
+        _recovery_gate(source_job)
+    except Conflict as error:
+        if (thumbnail_job is not None and source_job is not thumbnail_job
+                and error.description == 'render delivery requires recovery'):
+            raise _ThumbnailError('thumbnail_obsolete', 409, 'Containing source changed') from None
+        raise
     return source_job
 
 
-def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+def _reserve_files_locked(job=None, work=False, read_source=True, source=None, *, thumbnail_recovery=False):
     source = (os.path.realpath(source if source is not None else job["video"])
               if read_source and job and (source is not None or job.get("video")) else None)
-    source_job = _source_job_locked(source) if source else None
+    source_job = _source_job_locked(source, thumbnail_job=job if thumbnail_recovery else None) if source else None
     lease = FILES.reserve(job, work)
     try:
         lease.source = source
@@ -1338,6 +1344,10 @@ def _run_job(job, action, owner=None):
                     if error.description != "render delivery requires recovery":
                         raise
                     coherent = False
+                except (OSError, _ThumbnailArtifactPending):
+                    # Thumbnail generation is optional after a committed scan.
+                    # _own_files releases any provisional ownership on failure.
+                    coherent = False
             if coherent:
                 pregen_source = files.current_source
                 def _pregen(jb=job, video=thumbnail_owner.source):
@@ -1347,12 +1357,12 @@ def _run_job(job, action, owner=None):
                         if selected is not pregen_source or selected['path'] != video:
                             return
                         rows, rs = _thumbnail_validate_report(doc)
-                        _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
+                        generation = _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
                         cap = cv2.VideoCapture(video)
                         generated = 0
                         for index in range(len(rows)):
                             try:
-                                _thumbnail_image(jb, index, 'crop', operation_owner=owner,
+                                _thumbnail_image(jb, index, 'crop', generation.version, operation_owner=owner,
                                                  capture=cap, snapshot=(doc, selected, fence, rows, rs))
                                 generated += 1
                             except _ThumbnailError as error:
@@ -1521,7 +1531,14 @@ def enforce_vault_lock():
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
                 "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
-            g.file_owner = _reserve_files_locked(job, read_source=read_source)
+            version = request.args.get('v')
+            versioned_image = (request.endpoint in {'job_thumb', 'job_detframe'}
+                               and version is not None and re.fullmatch(r'[0-9a-f]{32}', version))
+            try:
+                g.file_owner = _reserve_files_locked(job, read_source=read_source,
+                                                     thumbnail_recovery=bool(versioned_image))
+            except _ThumbnailError as error:
+                return _thumbnail_error_response(error)
         try:
             if g.file_owner.source:
                 _thumbnail_resolve_admission(g.file_owner, g.file_owner.source)
