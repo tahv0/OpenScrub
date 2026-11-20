@@ -349,3 +349,101 @@ def test_suffix_drops_a_time_span_between_discrete_frames():
     joined = join_reports(old, c, 7, 10)
     assert len(joined['detections']) == len(old['detections']) + 1
     assert joined['detections'][-1]['t_start'] == 5.005
+
+
+def unverified_previous():
+    options = identity()
+    options['timeline']['count_verified'] = False
+    return with_checkpoint(raw(), 4, 10, options)
+
+
+def test_verified_count_can_be_promoted_on_partial_resume_without_losing_rows():
+    old = unverified_previous()
+    old['detections'].append(row(.04, .08, enabled=False, manual_id='saved'))
+    before = copy.deepcopy(old)
+    current = identity()
+    # Validation accepts the same identity with stronger count evidence and
+    # does not silently modify the saved document before a successful commit.
+    assert not validate_resume(old, current)['options']['timeline']['count_verified']
+    assert old == before
+    c = continuation()
+    result = join_reports(old, c, 7, 10)
+    assert old == before
+    assert result['detections'][:len(old['detections'])] == old['detections']
+    assert result['audio_redactions'] == old['audio_redactions']
+    assert result['stop_review']['options'] == current
+    assert result['provenance']['checkpoint_identity'] == current
+    assert result['stop_review']['next_frame'] == 7
+    validate_resume(result, current)
+    second = join_reports(result, continuation(9, []), 9, 10)
+    assert second['stop_review']['options']['timeline']['count_verified'] is True
+    assert second['provenance']['checkpoint_identity']['timeline']['count_verified'] is True
+    assert second['detections'] == result['detections']
+
+
+def test_verified_count_can_complete_same_previously_unverified_timeline():
+    old = unverified_previous()
+    before = copy.deepcopy(old)
+    result = join_reports(old, complete_doc(), 10, 10, completed=True)
+    assert old == before
+    assert 'stop_review' not in result
+    assert result['provenance']['checkpoint_identity'] == identity()
+    assert result['detections'] == old['detections']
+    assert result['audio_redactions'] == old['audio_redactions']
+
+
+def test_count_evidence_cannot_be_downgraded():
+    old = previous()
+    unverified = identity()
+    unverified['timeline']['count_verified'] = False
+    with pytest.raises(CheckpointError):
+        validate_resume(old, unverified)
+    c = continuation()
+    c['provenance']['checkpoint_identity'] = unverified
+    with pytest.raises(CheckpointError):
+        join_reports(old, c, 7, 10)
+
+
+@pytest.mark.parametrize('change', [
+    lambda i: i['sources']['scan'].update(sha256='0' * 64),
+    lambda i: i['sources']['original'].update(sha256='0' * 64),
+    lambda i: i['sources']['render'].update(sha256='0' * 64),
+    lambda i: i['sources']['scan'].update(width=641),
+    lambda i: i['timeline'].update(total_frames=11),
+    lambda i: i['timeline'].update(fps=121.0),
+    lambda i: i['timeline'].update(fps_source='different origin'),
+    lambda i: i['timeline'].update(count_source='different origin'),
+    lambda i: i['normalization'].update(target='other'),
+    lambda i: i['effective_settings'].update(categories=['person']),
+    lambda i: i['file_identities'].update(face_model='0' * 64),
+])
+def test_promotion_cannot_change_other_identity_fields(change):
+    old = unverified_previous()
+    promoted = identity()
+    change(promoted)
+    with pytest.raises(CheckpointError):
+        validate_resume(old, promoted)
+    c = continuation()
+    c['provenance']['checkpoint_identity'] = promoted
+    with pytest.raises(CheckpointError):
+        join_reports(old, c, 7, 10)
+
+
+def test_unverified_partial_resume_remains_unverified_until_producer_verifies_count():
+    old = unverified_previous()
+    c = continuation()
+    c['provenance']['checkpoint_identity']['timeline']['count_verified'] = False
+    result = join_reports(old, c, 7, 10)
+    assert result['stop_review']['options']['timeline']['count_verified'] is False
+    assert result['provenance']['checkpoint_identity']['timeline']['count_verified'] is False
+    assert result['detections'][:len(old['detections'])] == old['detections']
+    validate_resume(result, c['provenance']['checkpoint_identity'])
+
+
+def test_promoting_count_does_not_replace_completion_proof():
+    old = unverified_previous()
+    before = copy.deepcopy(old)
+    candidate = continuation(10, [])  # same count verified, but no completion proof
+    with pytest.raises(CheckpointError, match='scan_completion'):
+        join_reports(old, candidate, 10, 10, completed=True)
+    assert old == before
