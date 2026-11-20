@@ -26,7 +26,8 @@ target is Windows 10 + NVIDIA RTX 3060.
 | `THIRD_PARTY_NOTICES.md` | License + copyright notice + full license text for every third-party MODEL FILE OpenScrub uses — required because the Docker images REDISTRIBUTE the prefetched models (MIT/Apache-2.0 both require shipping the notice). Copyright lines are VERIFIED from upstream license files (2026-11-05); where an upstream names no holder (SFace, VitTrack) it says so instead of inventing one, and the plate model's training data is stated as unpublished (an earlier, untraceable "Roboflow CC BY 4.0" registry claim was removed). Ships in all three images (/src), the sdist, the wheel (as `openscrub_THIRD_PARTY_NOTICES.md`) and the Windows spec. test_third_party_notices_cover_every_baked_model ties each prefetch entry to a notice by filename + sha256 — adding a model to docker/prefetch_models.py REQUIRES a notice. Per-user registry copies refresh descriptive fields (`_REGISTRY_DOC_FIELDS`) from the shipped registry, never pins/URLs/recommended. |
 | `openscrub_update.py` | `openscrub-update` command + web self-update backend: PyPI version check, sha256-verified sdist download, data-preserving folder update (PRESERVE set), TOFU pin carry-forward. Ships in the wheel. |
 | `openscrub_vault.py` | At-rest encryption for the job store: scrypt keystore, chunked AES-256-GCM files (`.osvault`), lock/unlock tree walkers. NO password reset by design. Ships in the wheel. Lock-on-shutdown lives in openscrub_web: a SIGTERM handler (docker stop; locks then os._exit — sys.exit is swallowed by cheroot) + an atexit hook (Ctrl+C; uses the import-time `_HERE` constant because `__file__` is gone during interpreter teardown — both failure modes were real and verified). Encryption must finish inside the container stop grace period (`docker stop -t 120`). |
-| `test_openscrub.py` | pytest suite (134 tests). Must stay green. |
+| `test_openscrub.py` | Main pytest suite (134 tests). Must stay green. |
+| `tests/` | Additional pytest files, including `test_hdr_decoder_cleanup.py` (real FFmpeg on a synthetic 64x64 10-bit PQ clip, skips without ffmpeg/libx265). Run the whole suite with `python -m pytest -q` — `pytest test_openscrub.py` alone skips this folder. Shipped in the sdist only, never the wheel. |
 | `deploy/` | App-store submission kit: winget/CasaOS/Runtipi/TrueNAS/Umbrel/Portainer/CapRover/Coolify manifests + a novice-friendly submission guide (deploy/README.md). Platforms with their own reverse proxy get `--http` in the command; direct-port platforms keep default TLS. Bump pinned versions at submission time. |
 | `tools/make_icons.py` | Regenerates every icon/logo asset from `assets/badge_master.png`. |
 | `tools/make_wordmark.py` | Regenerates the typeset Poppins wordmarks (navy + white). |
@@ -945,6 +946,18 @@ defined — there was a real UnboundLocalError from ordering once.
   in v1.0.93 (a no-op: faces are always per-frame when selected);
   build_args still honours `dense_faces` in old saved job options and
   the CLI keeps `--dense-faces`.
+- HDR render cleanup (PR #23 by Tuomas Aho, v1.0.97): on cancel or an
+  encoder failure `_render_hdr_into` uses `_stop_render_children` to stop
+  and reap the children and close BOTH pipes (decoder stdout and encoder
+  stdin). The decoder pipe previously stayed open while the exception
+  traceback held it, leaking a pipe per cancelled/failed HDR render.
+  NOTE tests/test_hdr_decoder_cleanup.py's success test locates the
+  `enc.stdin.write` line by parsing `_render_hdr_into`'s source: restructuring
+  that call means updating the test.
+- test_track_person_size_jump_handoff asserts GEOMETRY (post-occlusion
+  samples exist and never adopt the 2.7x look-alike box), not the
+  "refused a … size jump" log line — that line is only emitted when the
+  track is not `held`, so it is frame-timing dependent (PR #23).
 - Progress ETA is computed SERVER-side per STAGE
   (`WebCallbacks.progress`): whole-stage average rate + a light EMA on
   the published seconds (`eta` in the job JSON; cleared on stage change,

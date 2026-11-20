@@ -43,7 +43,7 @@ from openscrub_internal import exact_samples as exact
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
-VERSION = "1.0.96"
+VERSION = "1.0.97"
 
 # ----------------------------------------------------------------------------
 # OCR backends
