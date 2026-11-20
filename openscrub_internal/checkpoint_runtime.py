@@ -102,20 +102,25 @@ def _validate_previous(previous, identity, source):
     return boundary
 
 
-def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock, resume=False):
+def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock,
+                   resume=False, _commit_staged=None):
     """Run one synchronous attempt with caller-owned source and report locks.
 
     The caller must exclude source writers throughout the call, use the same
     report lock for all report writers and cancellation acknowledgement, and
     retain operation ownership through cleanup. This is not connected to
     web or CLI actions. Staging is outside the report lock; publication checks
-    the latest raw bytes and cancellation under that lock.
+    the latest raw bytes and cancellation under that lock. An owning service
+    can supply a private staged-commit callback; it runs synchronously while
+    that same lock is held and must consume the stage or raise.
     """
     import openscrub as core
     if not callable(stop_requested):
         raise TypeError('stop_requested must be a no-argument callback')
     if publication_lock is None:
         raise CheckpointRuntimeError('checkpoint scan requires the owning report lock')
+    if _commit_staged is not None and not callable(_commit_staged):
+        raise TypeError('_commit_staged must be callable')
     source = checkpoint_media.inspect_source(args.video)
     identity = _identity(args, source)
     with checkpoint_media.SourceLease(source) as lease:
@@ -222,6 +227,9 @@ def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock, r
                     if changed:
                         continue
                     lease.check()
-                    os.replace(staged, os.path.abspath(report_path))
+                    if _commit_staged is None:
+                        os.replace(staged, os.path.abspath(report_path))
+                    else:
+                        _commit_staged(staged, os.path.abspath(report_path), result)
                     return result
         raise CheckpointRuntimeError('checkpoint changed repeatedly during publication; retry')
