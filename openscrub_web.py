@@ -6184,7 +6184,7 @@ class ReviewScheduler{
   overlay.onclick=()=>{if(this.lightbox===b){this.closeLightbox();this.updateQueue();}};
   overlay.querySelector('[data-thumb-reopen]').onclick=event=>{
    event.stopPropagation();
-   if(this.valid(b)){this.closeLightbox();loadReview();}
+   if(this.valid(b))loadReview();
   };
   this.updateQueue();
  }
@@ -6244,7 +6244,7 @@ class ReviewScheduler{
    for(const r of this.retries.values())this.clearRetryTimer(r);
    this.retries.clear();
    for(const b of this.bindings.values()){
-    this.cancel(b);this.clearURL(b);b.lightFailed=false;
+    this.cancel(b);this.clearURL(b);
     this.previewStatus(b,state.incompatible.has(b.id));
    }
    if(this.lightbox){
@@ -6308,8 +6308,8 @@ class ReviewScheduler{
    if(!current())return;
    const urlValue=URL.createObjectURL(blob);
    if(!current()){URL.revokeObjectURL(urlValue);return;}
-   b.url=urlValue;this.previewStatus(b,false);
-   b.img.onload=()=>{if(!current()||b.url!==urlValue)return;};
+   b.url=urlValue;
+   b.img.onload=()=>{if(current()&&b.url===urlValue)this.previewStatus(b,false);};
    b.img.onerror=()=>{if(current()&&b.url===urlValue)this.fail(b);};
    b.img.src=urlValue;
   }catch(error){if(current())this.fail(b);}

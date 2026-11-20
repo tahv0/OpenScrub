@@ -70,7 +70,9 @@ def combined_http(monkeypatch, tmp_path):
         options = {} if jid == 'default' else {'mode': 'box', 'pad': 0, 'encoder': 'x264'}
         job = web.new_job(str(video), options, names[jid])
         web.JOBS.pop(job['id'])
-        job.update(id=jid, phase='review', progress=1.)
+        directory = Path(web.JOBS_DIR) / jid
+        Path(job['dir']).rename(directory)
+        job.update(id=jid, dir=str(directory), phase='review', progress=1.)
         web.JOBS[jid] = job
         web.WebCallbacks(job).log('log-' + jid)
         count = 1 if jid == 'default' else 102

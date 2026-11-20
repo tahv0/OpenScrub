@@ -25,7 +25,7 @@ const vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map();
 function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:false,
  classList:{toggle(){},remove(){}},remove(){this.removed=true},
- addEventListener(){},querySelector(selector){
+ addEventListener(){},appendChild(){},setAttribute(){},querySelector(selector){
   if(selector.startsWith('[data-review-heading='))return {querySelector:()=>el(),querySelectorAll:()=>[el(),el()]};
   if(selector.startsWith('[data-review-card='))return {dataset:{},querySelector:()=>el()};
   return null;

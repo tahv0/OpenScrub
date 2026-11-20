@@ -3,7 +3,8 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const [url,root]=process.argv.slice(2);
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.OPENSCRUB_CHROMIUM});
 try{for(const dpr of [1,2]){const context=await browser.newContext({viewport:{width:1365,height:1000},deviceScaleFactor:dpr});
-try{const page=await context.newPage(),errors=[],requests=[],warnings=[];
+try{const page=await context.newPage(),errors=[],requests=[],warnings=[],responses=[];
+page.on('response',r=>{if(r.status()===409)responses.push((async()=>{let body={};try{body=await r.json()}catch{};return {url:r.url(),body}})())});
 await page.addInitScript(()=>{
  const Native=ResizeObserver;window.resizeObservers=[];
  window.ResizeObserver=class extends Native{
@@ -135,7 +136,8 @@ assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,add
 const final=await measure('mobile-edited');assert(Math.max(...final.paint.edgeDelta.map(Math.abs))<=2);
 // Ordinary enlarged review preview and embedded editor help survive.
 assert((await page.locator('body').innerText()).includes('drag inside to move'));
-await page.evaluate(()=>zoomDet(0));await page.locator('#lb img').waitFor();await page.locator('#lb').click();assert.equal(await page.locator('#lb').count(),0);
+await page.evaluate(()=>loadReview());await page.locator('#det0 img').click();await page.locator('#lb img').waitFor();await page.locator('#lb').click();assert.equal(await page.locator('#lb').count(),0);
+await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
 if(dpr===2){
  // Save via the actual endpoint. Intercept only to retain the submitted bytes.
  let sent;await page.route('**/api/jobs/resize/detections',async route=>{if(route.request().method()==='POST')sent=route.request().postDataJSON();await route.continue()});
@@ -156,7 +158,11 @@ if(dpr===2){
 }
 result.errors=errors;result.warnings=warnings;result.requests=requests;
 fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
-assert.deepEqual(errors,[]);assert(warnings.every(w=>w.includes('willReadFrequently')),warnings.join('\n'));
+assert.deepEqual(errors,[]);
+const conflicts=await Promise.all(responses);const obsolete=conflicts.filter(r=>/\/(thumb|detframe)\/\d+\?v=/.test(r.url)&&r.body.error==='thumbnail_obsolete');
+const resourceWarnings=warnings.filter(w=>w.includes('Failed to load resource: the server responded with a status of 409'));
+assert(resourceWarnings.length<=obsolete.length&&warnings.every(w=>w.includes('willReadFrequently')||resourceWarnings.includes(w)),JSON.stringify({warnings,conflicts}));
+result.obsoleteThumbnailResponses=obsolete;
 console.log(JSON.stringify({dpr,edgeError:result.edgeError,hit:result.liveHit,states:result.states.map(s=>s.name),persistence:result.persistence,errors,warnings}));
 
 }finally{await context.close()}}}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

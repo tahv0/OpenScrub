@@ -94,10 +94,10 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   assert.equal(metadata.length,before+1,'a later generation cannot replenish recovery');
   failMetadata=true;
   await page.locator('#lb [data-thumb-reopen]').click();
-  await page.locator('[data-review-retry]').waitFor();
-  assert(await page.evaluate(()=>document.getElementById('review')===firstReview&&EDITS===firstDraft));
+  await page.locator('[data-review-retry]').waitFor({state:'attached'});
+  assert(await page.evaluate(()=>document.getElementById('review')===firstReview&&EDITS===firstDraft&&!!document.getElementById('lb')));
   failMetadata=false;
-  await page.locator('#review-load-error [data-review-retry]').click();
+  await page.locator('#lb [data-thumb-reopen]').click();
   await page.waitForFunction(()=>document.getElementById('review')!==firstReview&&!!document.getElementById('review'));
   assert(await page.evaluate(()=>EDITS===firstDraft&&MAN===firstManual&&BE===firstEditor&&EDITS.enabled[0]===false));
   assert.deepEqual(errors,[]);

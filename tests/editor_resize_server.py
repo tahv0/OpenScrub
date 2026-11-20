@@ -42,7 +42,7 @@ encoded=runtime/'source.mp4'
 subprocess.run(['ffmpeg','-nostdin','-y','-loglevel','error','-i',str(video),'-c:v','libx264','-pix_fmt','yuv420p',str(encoded)],check=True)
 video=encoded
 job=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-resize.mp4')
-web.JOBS.pop(job['id']);job['id']='resize';web.JOBS['resize']=job
+web.JOBS.pop(job['id']);new_dir=Path(web.JOBS_DIR)/'resize';os.rename(job['dir'],new_dir);job['dir']=str(new_dir);job['id']='resize';web.JOBS['resize']=job
 report={'provenance':{'input':str(video),'settings':{'pad':0,'mode':'box'}},
  'render_state':{'fps':10,'cum':[[20,12]]*20,'bands':[[0,0]]*20},
  'detections':[{'t_start':0,'t_end':2,'last_seen':0,'cbox':[120,80,320,220],
@@ -51,7 +51,7 @@ report={'provenance':{'input':str(video),'settings':{'pad':0,'mode':'box'}},
 Path(job['dir'],'report.json').write_text(json.dumps(report))
 job['phase']='review'
 other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
-web.JOBS.pop(other['id']);other['id']='other';web.JOBS['other']=other
+web.JOBS.pop(other['id']);new_dir=Path(web.JOBS_DIR)/'other';os.rename(other['dir'],new_dir);other['dir']=str(new_dir);other['id']='other';web.JOBS['other']=other
 Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
 # Read-only network-independent replacement only for unrelated update metadata.
 web.app.view_functions['update_check']=lambda:web.jsonify({'current':web.openscrub.VERSION,'update_available':False})

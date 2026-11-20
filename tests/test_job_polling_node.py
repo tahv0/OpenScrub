@@ -66,7 +66,7 @@ def run_js(scenario):
     if not node:
         pytest.skip("Node needed for emitted polling JavaScript")
     script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
-    result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([node], input=script, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
