@@ -91,3 +91,11 @@ def test_optional_settings_reject_invalid_requests(policy, floor, cutoff):
     assert validate_settings is not None, "plate policy settings validator has not been implemented"
     with pytest.raises(ValueError):
         validate_settings(policy, floor, cutoff)
+
+
+def test_oversized_json_integers_are_invalid_evidence_and_settings():
+    huge = 10 ** 1000
+    with pytest.raises(ValueError):
+        validate_settings("manual_review", .1, huge)
+    assert decisions([row(box=(1, 2, huge, 8)), row(score=huge)],
+                     "blur_candidates") == [(False, "gap"), (False, "suggestion")]

@@ -16,6 +16,15 @@ class Decision:
     status: str
 
 
+def _finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def validate_settings(policy, candidate_floor, auto_cutoff):
     """Validate explicit optional settings; absent policy retains upstream output."""
     if policy is None or policy == "off":
@@ -23,8 +32,7 @@ def validate_settings(policy, candidate_floor, auto_cutoff):
     if policy not in ("manual_review", "blur_candidates"):
         raise ValueError("invalid uncertain plate policy")
     values = (candidate_floor, auto_cutoff)
-    if any(isinstance(v, bool) or not isinstance(v, (int, float))
-           or not math.isfinite(v) for v in values):
+    if not all(_finite_number(v) for v in values):
         raise ValueError("plate floor and automatic cutoff must be finite numbers")
     if not .05 <= candidate_floor <= auto_cutoff <= .95:
         raise ValueError("require 0.05 <= plate floor <= automatic cutoff <= 0.95")
@@ -40,8 +48,7 @@ def _valid_geometry(row):
     box = row.get("cbox")
     if not isinstance(box, (list, tuple)) or len(box) != 4:
         return False
-    if any(isinstance(v, bool) or not isinstance(v, (int, float))
-           or not math.isfinite(v) for v in box):
+    if not all(_finite_number(v) for v in box):
         return False
     return box[0] < box[2] and box[1] < box[3]
 
@@ -76,8 +83,7 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff):
         track = row.get("track")
         associated = type(track) is int and track >= 0
         score = row.get("confidence")
-        eligible = (valid and not isinstance(score, bool)
-                    and isinstance(score, (int, float)) and math.isfinite(score)
+        eligible = (valid and _finite_number(score)
                     and candidate_floor <= score <= 1.0)
         cutoff_eligible = eligible and score >= auto_cutoff
         prior = previous.get(track) if associated else None
