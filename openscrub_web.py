@@ -1137,6 +1137,93 @@ def _publish_job_report_locked(job, path, doc):
         os.replace(staged, os.path.abspath(path))
 
 
+_CHECKPOINT_FD_PUBLICATION = os.name == 'posix'
+
+
+class _CheckpointPublicationCommittedError(RuntimeError):
+    """Report bytes were replaced, but the source notification needs recovery."""
+    committed = True
+
+
+def _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc):
+    """Commit a checkpoint stage under the existing per-job report lock.
+
+    The owning worker remains responsible for its phase transition, source
+    adoption and lifetime cleanup. Cross-job source publication needs its
+    ordered foreign-owner guard and is deliberately not admitted here. This
+    prerequisite is POSIX-only: it retains the staged descriptor across
+    rename, and a post-replace failure explicitly marks committed recovery.
+    """
+    files = FILES.initialize(job)
+    _report_current(job)
+    _recovery_gate(job)
+    if (not _operation_valid(job, owner) or files.active is not owner or
+            owner.release_started or owner.operation is not operation or
+            operation is None or operation.is_set()):
+        raise openscrub.PipelineCancelled()
+    with JOBS_LOCK:
+        if type(generation) is not int or job.get('qgen') != generation:
+            raise openscrub.PipelineCancelled()
+    if owner.source_state is not None and owner.source_state is not files:
+        raise ValueError('checkpoint source owned by another job is not supported')
+    if not _CHECKPOINT_FD_PUBLICATION:
+        raise ValueError('checkpoint publication currently requires POSIX stage descriptors')
+    target = os.path.abspath(os.path.join(job['dir'], 'report.json'))
+    if (os.path.abspath(path) != target or
+            os.path.dirname(os.path.abspath(staged)) != os.path.dirname(target)):
+        raise ValueError('checkpoint stage does not belong to this report')
+    provenance = doc.get('provenance') if isinstance(doc, dict) else None
+    selected = provenance.get('input') if isinstance(provenance, dict) else None
+    original = provenance.get('original_input') if isinstance(provenance, dict) else None
+    if (not isinstance(selected, str) or not owner.source or
+            os.path.realpath(selected) != owner.source or
+            (original is not None and
+             (not isinstance(original, str) or not original or
+              os.path.realpath(original) != owner.source)) or
+            provenance.get('output') is not None):
+        raise ValueError('checkpoint report source differs from the owned scan source')
+    # POSIX rename retains the opened inode; this supplies the actual
+    # post-rename stamp without a second path lookup or a Windows share-delete
+    # assumption. The stage must still be the owned regular file we opened.
+    flags = (os.O_RDONLY | getattr(os, 'O_CLOEXEC', 0) |
+             getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
+    descriptor = os.open(staged, flags)
+    try:
+        opened_stage = os.fdopen(descriptor, 'rb')
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+    with opened_stage as opened:
+        held, named = os.fstat(opened.fileno()), os.stat(staged, follow_symlinks=False)
+        if (not stat.S_ISREG(held.st_mode) or not stat.S_ISREG(named.st_mode) or
+                (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)):
+            raise ValueError('checkpoint stage changed before publication')
+        # A failing preparation or replacement leaves the old report and
+        # committed epochs intact. Generation retirement is conservative.
+        thumbs.invalidate_locked(files.thumbnail, 'checkpoint report preparing')
+        os.replace(staged, target)
+        files.output_epoch += 1
+        try:
+            report_stat = os.fstat(opened.fileno())
+            _report_committed_locked(job, doc, owner, _thumbnail_ready=True,
+                                     _report_stat=report_stat)
+        except BaseException as error:
+            # No UI invokes this prerequisite. A later owner must persist and
+            # resolve this state across restart before exposing controls.
+            files.recovery_required = True
+            files.recovery_diagnostics = ('checkpoint report replaced; source notification unverified',)
+            files.current_source = None
+            files.source_pair = None
+            files.source_status = 'unavailable'
+            files.source_retired = True
+            files.source_reason = 'checkpoint report committed but requires recovery'
+            job.update(phase='error', error=files.source_reason, eta=None)
+            raise _CheckpointPublicationCommittedError(files.source_reason) from error
+
+
 def _edit_gate(job):
     _recovery_gate(job)
     _report_current(job)
@@ -2042,15 +2129,19 @@ def _file_stamp(stat):
     return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
-def _report_committed_locked(job, doc=None, scan_owner=None):
+def _report_committed_locked(job, doc=None, scan_owner=None, *, _thumbnail_ready=False,
+                             _report_stat=None):
     """Success-only notification; caller owns report/lifetime transaction."""
     files = FILES.initialize(job)
     files.committed_report_epoch += 1
-    thumbs.invalidate_locked(files.thumbnail, 'report committed')
+    if not _thumbnail_ready:
+        thumbs.invalidate_locked(files.thumbnail, 'report committed')
     if scan_owner is not None:
         expected = doc.get('provenance', {}).get('input')
+        report_stat = (_report_stat if _report_stat is not None else
+                       os.stat(os.path.join(job['dir'], 'report.json')))
         files.source_pair = (scan_owner.operation, files.committed_report_epoch, expected,
-                             _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))))
+                             _file_stamp(report_stat))
         files.source_status, files.source_reason = 'pending', None
     elif files.source_pair is not None and files.source_status == 'unavailable':
         operation, _, expected, _ = files.source_pair

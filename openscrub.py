@@ -820,6 +820,20 @@ def _narrow_plate_eligible(d, frame_index, frame):
         return False
 
 
+@dataclass
+class FrameBoundedDetection(Detection):
+    """A detection whose original source-frame authority is half-open."""
+    scan_frame_start: int = None
+    scan_frame_end: int = None
+
+
+@dataclass
+class FrameBoundedNarrowPlateDetection(NarrowPlateDetection):
+    """A lettering observation also limited to a verified frame interval."""
+    scan_frame_start: int = None
+    scan_frame_end: int = None
+
+
 class PhiMemory:
     """Remembers every string ever confirmed as PII in this video. At each
     scan, all OCR'd words are checked against memory, so a name identified
@@ -1455,7 +1469,8 @@ def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
     return next_id
 
 
-def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
+def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
+                        _checkpoint_capture=None, _checkpoint_start=0):
     """Make each dense track leak-free from true first appearance to exit.
 
     Dense samples are instantaneous per-frame boxes; three gaps remain
@@ -1511,7 +1526,8 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                 {"origin": origin, "frame": None, "geometry_valid": False})
         return result
 
-    capture = cv2.VideoCapture(video) if video else None
+    capture = (_checkpoint_capture if _checkpoint_capture is not None
+               else (cv2.VideoCapture(video) if video else None))
     try:
         cap = capture
         if cap is not None and not cap.isOpened():
@@ -1531,13 +1547,13 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
         # onset-sorted processing order. Memory stays bounded by one span
         # (~LEAD_MAX seconds of half-scale grays), not the file.
         gray_cache = {}
-        _seq = {"pos": 0}
+        _seq = {"pos": _checkpoint_start}
         _span_lo = {}                # frame index -> lowest span start needing it
         if cap is not None and tracks:
             for samples in tracks.values():
                 t0 = min(d.t_start for d in samples)
                 lo_t = max(0.0, t0 - LEAD_MAX - 0.2, win_start - 0.01)
-                lo = max(0, int(lo_t * _fps_g) - 2)
+                lo = max(_checkpoint_start, int(lo_t * _fps_g) - 2)
                 hi = int(round(t0 * _fps_g)) + 2
                 for k in range(lo, hi + 1):
                     _span_lo[k] = min(_span_lo.get(k, lo), lo)
@@ -3296,9 +3312,118 @@ def _geometry_finite(values, size, stage, field):
         raise ValueError(f"render geometry {stage}: invalid {field}") from None
 
 
+_NO_FRAME_BOUND = object()
+
+
+def _frame_authority(value, total=None, where="detection"):
+    """Validate paired strict source-frame bounds from a raw row or object."""
+    if isinstance(value, dict):
+        start = value.get("scan_frame_start", _NO_FRAME_BOUND)
+        end = value.get("scan_frame_end", _NO_FRAME_BOUND)
+    else:
+        start = getattr(value, "scan_frame_start", _NO_FRAME_BOUND)
+        end = getattr(value, "scan_frame_end", _NO_FRAME_BOUND)
+    if start is _NO_FRAME_BOUND and end is _NO_FRAME_BOUND:
+        return None
+    if (type(start) is not int or type(end) is not int or
+            start < 0 or start >= end or end > (1 << 53) - 1 or
+            (total is not None and end > total)):
+        raise ValueError(f"invalid scan frame authority for {where}")
+    return start, end
+
+
+def _report_frame_authorities(doc):
+    """Validate every raw row, including disabled rows, before render use."""
+    if isinstance(doc, list):
+        rows, state = doc, None
+    else:
+        if "stop_review" in doc:
+            raise ValueError("paused checkpoint rendering is not supported")
+        rows, state = doc.get("detections", []), doc.get("render_state")
+    bounds = [_frame_authority(row, where=f"report detection {i}")
+              for i, row in enumerate(rows, 1)]
+    if any(bound is not None for bound in bounds):
+        if not isinstance(state, dict):
+            raise ValueError("scan frame authority requires a complete render timeline")
+        try:
+            cum, bands = state["cum"], state["bands"]
+            total = len(cum)
+            valid = (isinstance(cum, (list, tuple)) and
+                     isinstance(bands, (list, tuple)) and
+                     total > 0 and total == len(bands))
+        except (TypeError, KeyError):
+            valid = False
+        if not valid:
+            raise ValueError("scan frame authority requires aligned complete render timelines")
+        for i, row in enumerate(rows, 1):
+            _frame_authority(row, total=total, where=f"report detection {i}")
+    return bounds
+
+
+def _has_checkpoint_identity(doc):
+    if not isinstance(doc, dict):
+        return False
+    provenance = doc.get("provenance")
+    return isinstance(provenance, dict) and "checkpoint_identity" in provenance
+
+
+def _validate_bounded_report_identity(doc, input_sha256, render_state):
+    """Check the existing source hash and verified frame domain for replay."""
+    provenance = doc.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("bounded report is missing source provenance")
+    expected = provenance.get("input_sha256")
+    if (type(expected) is not str or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+            or expected != input_sha256):
+        raise ValueError("bounded report input source SHA-256 is missing or mismatched")
+    identity = provenance.get("checkpoint_identity")
+    if not isinstance(identity, dict):
+        raise ValueError("bounded report requires verified source timeline identity")
+    timeline, sources = identity.get("timeline"), identity.get("sources")
+    if not isinstance(timeline, dict) or not isinstance(sources, dict):
+        raise ValueError("bounded report requires verified source timeline identity")
+    scan = sources.get("scan")
+    if not isinstance(scan, dict) or scan.get("sha256") != expected:
+        raise ValueError("bounded report scan source identity mismatch")
+    state = doc["render_state"]
+    fps = timeline.get("fps")
+    source_fps, render_fps = scan.get("fps"), state.get("fps")
+    frame_count = timeline.get("total_frames")
+    try:
+        valid = (timeline.get("count_verified") is True and
+                 type(frame_count) is int and frame_count == len(state["cum"]) and
+                 type(fps) in (int, float) and math.isfinite(fps) and fps > 0 and
+                 type(source_fps) in (int, float) and source_fps == fps and
+                 type(render_fps) in (int, float) and render_fps == fps and
+                 type(scan.get("width")) is int and 0 < scan["width"] <= (1 << 53) - 1 and
+                 type(scan.get("height")) is int and 0 < scan["height"] <= (1 << 53) - 1)
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        raise ValueError("bounded report requires a verified matching frame timeline")
+    try:
+        same = render_state["fps"] == fps
+        for field in ("cum", "bands"):
+            actual, saved = render_state[field], state[field]
+            same = (same and len(actual) == len(saved) and
+                    all(len(a) == len(b) == 2 and a[0] == b[0] and a[1] == b[1]
+                        for a, b in zip(actual, saved)))
+    except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+        same = False
+    if not same:
+        raise ValueError("bounded render state differs from the report timeline")
+
+
+def _frame_authorized(d, index):
+    """Use after preflight; legacy detections have no frame restriction."""
+    start = getattr(d, "scan_frame_start", _NO_FRAME_BOUND)
+    return start is _NO_FRAME_BOUND or start <= index < d.scan_frame_end
+
+
 def _geometry_detections(detections, stage):
     for ordinal, d in enumerate(detections, 1):
         where = f"{stage} detection {ordinal}"
+        _frame_authority(d, where=where)
         _geometry_finite(d.cbox, 4, where, "cbox")
         if d.cbox[2] <= d.cbox[0] or d.cbox[3] <= d.cbox[1]:
             raise ValueError(f"render geometry {where}: invalid cbox extents")
@@ -3325,6 +3450,11 @@ def _geometry_preflight(detections, cum, bands, fps, pad, band_margin, stage):
             raise ValueError(f"render geometry {stage}: invalid {field}")
         for i in range(length):
             _geometry_finite(trajectory[i], 2, stage, f"{field} entry {i}")
+    for ordinal, detection in enumerate(detections, 1):
+        authority = _frame_authority(detection, total=len(cum),
+                                     where=f"{stage} detection {ordinal}")
+        if authority is not None and len(cum) != len(bands):
+            raise ValueError("scan frame authority requires aligned complete render timelines")
 
 
 def _geometry_box(d, ox, oy, pad, stage):
@@ -3747,6 +3877,17 @@ class PipelineCancelled(Exception):
     """Raised internally when a Callbacks.cancelled() returns True."""
 
 
+class ScanDecodeError(RuntimeError):
+    """A monitored scan failed to read its next unaccounted frame."""
+    def __init__(self, next_frame, reported_total_frames):
+        super().__init__(f"decoder exception at frame {next_frame}")
+        self.reason = "decoder_exception"
+        self.next_frame = next_frame
+        self.reported_total_frames = reported_total_frames
+        self.count_verified = False
+        self.checkpoint_available = False
+
+
 class Callbacks:
     """Hooks for embedding the pipeline (GUI, batch runner, tests).
     The default implementation reproduces the CLI's print behavior."""
@@ -4082,7 +4223,10 @@ def apply_coverage(dets, coverage, cb=None):
             c.poly = ()
             out.append(c)
             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
-                per_track.setdefault(c.track, []).append((ordinal, c))
+                # A sample outside a frame-authority segment must not expand
+                # the active segment's box through concealed coverage.
+                key = (c.track, _frame_authority(c, where=f"coverage detection {ordinal}"))
+                per_track.setdefault(key, []).append((ordinal, c))
         else:
             out.append(d)
     for entries in per_track.values():
@@ -4298,7 +4442,8 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
 def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
-               mute_tracks=(), out_quality="archival", audio_lanes=None, quad_context=None):
+               mute_tracks=(), out_quality="archival", audio_lanes=None,
+               quad_context=None, frame_domain=None):
     """render(), but 10-bit end to end: decode the HDR source to raw
     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
@@ -4385,6 +4530,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
 
         ysz, csz = w * h, (w // 2) * (h // 2)
         fbytes = (ysz + 2 * csz) * 2
+        if frame_domain is None and any(_frame_authority(d) is not None for d in detections):
+            frame_domain = len(cum)
 
         idx = 0
         while True:
@@ -4393,7 +4540,15 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 raise PipelineCancelled()
             raw = dec.stdout.read(fbytes)
             if len(raw) < fbytes:
+                if frame_domain is not None:
+                    if raw:
+                        raise ValueError(f"HDR decoder produced a partial frame at index {idx}")
+                    if idx != frame_domain:
+                        raise ValueError(f"HDR decoder stopped at frame {idx}; "
+                                         f"expected {frame_domain} frames")
                 break
+            if frame_domain is not None and idx >= frame_domain:
+                raise ValueError(f"HDR decoder produced frame {idx} beyond the verified timeline")
             buf = np.frombuffer(raw, dtype=np.uint16).copy()
             y = buf[:ysz].reshape(h, w)
             u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
@@ -4404,7 +4559,7 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             _geometry_finite((ox, oy), 2, f"frame {idx}", "cum")
 
             act = [d for d in buckets.get(int(t), [])
-                   if _active_on_frame(d, t, idx)]
+                   if _active_on_frame(d, t, idx) and _frame_authorized(d, idx)]
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
@@ -4444,9 +4599,11 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 cb.log(f"  rendering… {idx}/{max(total, idx)}")
 
         dec.stdout.close()
-        decoder_status = dec.wait()
-        if quad_context and (decoder_status != 0 or idx != quad_context['count']):
-            raise RuntimeError('verified HDR frame decoding did not complete')
+        decoder_rc = dec.wait()
+        if quad_context and (decoder_rc != 0 or idx != quad_context["count"]):
+            raise RuntimeError("verified HDR frame decoding did not complete")
+        if frame_domain is not None and decoder_rc != 0:
+            raise ValueError(f"HDR decoder failed after frame {idx} (exit {decoder_rc})")
         cb.progress("render", max(total, idx), max(total, idx))
         try:
             enc.stdin.close()
@@ -4688,12 +4845,24 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
            mute_tracks=(), out_quality="archival", audio_lanes=None,
-           exact_frames=False, quad_context=None, *, narrow_plates=True):
+           exact_frames=False, quad_context=None, frame_domain=None, *, narrow_plates=True):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
     # Public entry checks source extents before the single delivery stage.
     # Coverage may legally round a positive source box to an empty integer box.
+    if frame_domain is None and any(_frame_authority(d) is not None for d in detections):
+        frame_domain = len(cum)
+    has_frame_authority = frame_domain is not None
+    if has_frame_authority and clip is not None:
+        try:
+            if len(clip) != 2:
+                raise ValueError()
+            _geometry_finite((clip[0],), 1, "SDR", "clip start")
+            if clip[1] is not None:
+                _geometry_finite((clip[1],), 1, "SDR", "clip end")
+        except (TypeError, ValueError, IndexError):
+            raise ValueError("invalid bounded clip interval") from None
     mode_map = mode_map or {}
     def _mode_for(cat):
         return mode_map.get(cat, mode)
@@ -4797,7 +4966,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
 
         idx = 0
         plate_mismatch_logged = False
-        if clip and clip[0] > 0.5 and not exact_frames:
+        # Source-bound rows require decoding through the exact prefix.
+        if clip and clip[0] > 0.5 and not (exact_frames or has_frame_authority):
             tgt = int(clip[0] * fps)
             if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
                 idx = tgt                    # shift the whole trimmed render
@@ -4809,7 +4979,14 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 raise PipelineCancelled()
             ok, frame = cap.read()
             if not ok:
+                if (frame_domain is not None and idx < frame_domain and
+                        (not clip or clip[1] is None or idx / fps <= clip[1] + 1e-6)):
+                    raise ValueError(f"SDR decoder stopped before required frame {idx}")
                 break
+            if frame_domain is not None and frame is None:
+                raise ValueError(f"SDR decoder produced an invalid frame at index {idx}")
+            if frame_domain is not None and idx >= frame_domain:
+                raise ValueError(f"SDR decoder produced frame {idx} beyond the verified timeline")
             t = idx / fps
             _geometry_finite((t,), 1, f"frame {idx}", "time")
             if clip:
@@ -4823,7 +5000,7 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
 
             # 1. tracked PII boxes, translated by scroll offset
             act = [d for d in buckets.get(int(t), [])
-                   if _active_on_frame(d, t, idx)]
+                   if _active_on_frame(d, t, idx) and _frame_authorized(d, idx)]
             # Hash raw decoded pixels once, before any redaction changes them.
             frame_digest = (_frame_sha256(frame)
                             if narrow_plates and any(
@@ -7110,6 +7287,8 @@ def _fresh_detection_row(detection, **extra):
 
 
 def _report_document(args, state, output_path=None, output_bytes_path=None):
+    if "scan_boundary" in state:
+        raise RuntimeError("unverified scan boundary cannot be serialized as a report")
     prov = {
         "tool": "openscrub", "version": VERSION,
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
@@ -7204,6 +7383,7 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
     # Construction and output hashing precede an optional caller-owned final
     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+    _report_frame_authorities(doc)
     return doc
 
 
@@ -7228,15 +7408,22 @@ def _decode_report(doc, optional_full=False):
         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
             doc.get("provenance", {})
     capable = isinstance(doc, dict) and doc.get("plate_policy_evidence_version") == 1
+    authorities = _report_frame_authorities(doc)
     dets = []
-    for r in rows:
+    for r, authority in zip(rows, authorities):
         if (not capable and not r.get("enabled", True)) or (capable and r.get("zone_dropped")):
             continue
         score = r.get("confidence", None if capable and r.get("category") == "plate" else 1.0)
         if capable and r.get("category") == "plate" and not plate_policy._finite_number(score):
             score = float("nan")
-        cls = NarrowPlateDetection if r["category"] == "plate" and "narrow_plate" in r else Detection
-        extra = {"narrow_plate": copy.deepcopy(r["narrow_plate"])} if cls is NarrowPlateDetection else {}
+        narrow = r["category"] == "plate" and "narrow_plate" in r
+        if authority is not None:
+            cls = FrameBoundedNarrowPlateDetection if narrow else FrameBoundedDetection
+        else:
+            cls = NarrowPlateDetection if narrow else Detection
+        extra = {"narrow_plate": copy.deepcopy(r["narrow_plate"])} if narrow else {}
+        if authority is not None:
+            extra.update(scan_frame_start=authority[0], scan_frame_end=authority[1])
         d = cls(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
@@ -8190,10 +8377,28 @@ def _quad_scan_digest(args):
     return sha256_file(args.video)
 
 
-def run_scan(args, cb=None):
-    """Scan pass only: OCR + face detection + tracking. Returns a state dict
-    consumed by run_render (and serialized into --report files)."""
+def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None):
+    """Scan pass only. A stop callback requests a whole-frame boundary.
+
+    The opt-in boundary result is an unverified engine candidate, not a saved
+    checkpoint or permission to render. Ordinary callers retain their existing
+    return shape. See CHECKPOINT_CONTRACT.md for later producer obligations.
+    """
+    main_capture = [None]
+    try:
+        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream)
+    finally:
+        if main_capture[0] is not None:
+            main_capture[0].release()
+
+
+def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     cb = cb or Callbacks()
+    if stop_requested is not None and not callable(stop_requested):
+        raise TypeError("stop_requested must be a no-argument callback")
+    monitor_stop = stop_requested is not None
+    if checkpoint_stream is not None and not monitor_stop:
+        raise ValueError("checkpoint stream requires a monitored scan")
     optional_policy = getattr(args, "uncertain_policy", None)
     if optional_policy == "off":
         optional_policy = None
@@ -8371,9 +8576,35 @@ def run_scan(args, cb=None):
     cb.log(f"[3/4] Scanning (every {args.sample_interval}s or {args.scan_trigger}px of scroll"
            + (", self-tuning to screen activity and scroll speed)"
               if getattr(args, "adaptive", "on") != "off" else ")"))
-    cap = cv2.VideoCapture(args.video)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if checkpoint_stream is None:
+        cap = cv2.VideoCapture(args.video)
+    else:
+        from openscrub_internal.checkpoint_media import ScanCapture
+        cap = ScanCapture(checkpoint_stream)
+    main_capture[0] = cap
+
+    def _release_scan_capture():
+        held, main_capture[0] = main_capture[0], None
+        if held is not None:
+            held.release()
+
+    reported_fps = cap.get(cv2.CAP_PROP_FPS)
+    if monitor_stop:
+        try:
+            fps_is_reported = math.isfinite(reported_fps) and reported_fps > 0
+        except (TypeError, ValueError, OverflowError):
+            fps_is_reported = False
+        fps = reported_fps if fps_is_reported else 30.0
+        reported_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        try:
+            total = (int(reported_count) if math.isfinite(reported_count)
+                     and reported_count > 0 and reported_count == int(reported_count)
+                     else 0)
+        except (TypeError, ValueError, OverflowError):
+            total = 0
+    else:
+        fps = reported_fps or 30.0
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     narrow_tolerance, narrow_limitation = (None, "")
@@ -8558,8 +8789,9 @@ def run_scan(args, cb=None):
     tracker = ScrollTracker()
     memory = None if (args.no_memory or not text_cats) else PhiMemory(
         threshold=78 if getattr(args, "paranoid", False) else 82)
-    cum = []
-    bands = []
+    checkpoint_start = checkpoint_stream.start_frame if checkpoint_stream is not None else 0
+    cum = [(0.0, 0.0)] * checkpoint_start
+    bands = [(0.0, 0.0)] * checkpoint_start
     raw = []
     scans = []
     cx = cy = 0.0
@@ -8622,7 +8854,7 @@ def run_scan(args, cb=None):
                + (". Brief or fast-moving subjects can be missed — "
                   "review the output carefully." if dense_stride > 2
                   or detect_scale < 1.0 else "."))
-    idx = 0
+    idx = checkpoint_start
     dense_now = []
     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
     # manual jobs — exactly the "one person 16 minutes in" case), frames
@@ -8630,7 +8862,7 @@ def run_scan(args, cb=None):
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on and not optional_policy:
+    if win_start > 1.0 and not track_on and not optional_policy and not monitor_stop:
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -8639,17 +8871,63 @@ def run_scan(args, cb=None):
             cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
                    f"{skip_n} frame(s) before the window are not decoded")
         else:
-            cap.release()
+            _release_scan_capture()
             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+            main_capture[0] = cap
             cb.log("      fast-skip unavailable on this file — decoding "
                    "from the start")
+    scan_exit_reason = None
+    dimensions_match = True
+
+    def _stop_now():
+        # A Cancel captured for this operation wins over a pending stop.
+        try:
+            if cb.cancelled():
+                raise PipelineCancelled()
+            return bool(stop_requested())
+        except BaseException:
+            _release_scan_capture()
+            raise
+
     while True:
-        if idx % 30 == 0 and cb.cancelled():
-            cap.release()
+        if monitor_stop:
+            if _stop_now():
+                # A stop at the reported final index still needs the next
+                # decoder read to prove clean EOF and reject any extra frame.
+                if checkpoint_stream is None or idx < total:
+                    scan_exit_reason = ("scope_fast_stop" if total > 0 and not track_on and
+                                        idx / fps > win_end else "stop_requested")
+                    break
+        elif idx % 30 == 0 and cb.cancelled():
+            _release_scan_capture()
             raise PipelineCancelled()
-        ok, frame = cap.read()
-        if not ok:
+        try:
+            ok, frame = cap.read()
+        except Exception as error:
+            _release_scan_capture()
+            if (monitor_stop and checkpoint_stream is None and
+                    not isinstance(error, PipelineCancelled)):
+                raise ScanDecodeError(idx, total) from error
+            raise
+        except BaseException:
+            _release_scan_capture()
+            raise
+        if not ok or frame is None:
+            if checkpoint_stream is not None and checkpoint_stream.completed:
+                scan_exit_reason = "decoder_clean_verified_range"
+            elif ok:
+                scan_exit_reason = "decoder_invalid_frame"
+            elif not total:
+                scan_exit_reason = "decoder_read_stopped_unknown_count"
+            elif idx < total:
+                scan_exit_reason = "decoder_read_stopped_before_reported_count"
+            elif idx == total:
+                scan_exit_reason = "decoder_read_stopped_at_reported_count"
+            else:
+                scan_exit_reason = "decoder_read_stopped_after_reported_count"
             break
+        if monitor_stop and frame.shape[:2] != (vh, vw):
+            dimensions_match = False
         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
         cum.append((cx, cy))
 
@@ -8664,8 +8942,14 @@ def run_scan(args, cb=None):
                     cb.log(f"      fast-stop: last window ended at "
                            f"{win_end:.1f}s — the rest of the video is "
                            "not decoded")
+                    if monitor_stop:
+                        bands.append((0.0, 0.0))
+                        idx += 1
+                        if cb.cancelled():
+                            raise PipelineCancelled()
+                        scan_exit_reason = "scope_fast_stop"
                     break
-                if nxt - t_now > 1.5 and not optional_policy:
+                if nxt - t_now > 1.5 and not optional_policy and not monitor_stop:
                     # gap between windows: seek instead of decoding it
                     # (verified — a lying seek would mislabel every
                     # detection after the jump; unseekable → keep
@@ -8682,8 +8966,9 @@ def run_scan(args, cb=None):
                         continue
                     # jump failed and may have consumed frames: reopen at
                     # a KNOWN position and keep decoding sequentially
-                    cap.release()
+                    _release_scan_capture()
                     cap = cv2.VideoCapture(args.video)
+                    main_capture[0] = cap
                     if not _seek_cap(cap, idx + 1, fps):
                         break
             scan_cx, scan_cy = cx, cy
@@ -9205,7 +9490,18 @@ def run_scan(args, cb=None):
         if bt_on:
             bt_buf.append((idx, cx, cy, small))
         idx += 1
-    cap.release()
+    _release_scan_capture()
+
+    if monitor_stop and cb.cancelled():
+        raise PipelineCancelled()
+    if monitor_stop and track_jobs:
+        # A seed or requested tracking interval beyond the committed prefix
+        # cannot be followed safely with only the prefix's scroll coordinates.
+        boundary_time = idx / fps
+        if any(t1 >= boundary_time or tref >= boundary_time
+               for _, t1, _, tref in track_jobs):
+            raise RuntimeError("cannot finalize this boundary: a setup tracked "
+                               "object extends beyond the processed prefix")
 
     if memory is not None:
         extra = reverse_pass(scans, memory, cats, namer,
@@ -9247,64 +9543,66 @@ def run_scan(args, cb=None):
         # is found. No knobs to raise — it goes as far back as it needs to.
         cap2 = cv2.VideoCapture(args.video)
         deep_n, deep_gain = 0, 0.0
-        for d, dcx, dcy, tmpl in bt_deep:
-            if float(tmpl.std()) < 4:
-                continue
-            th_, tw_ = tmpl.shape
-            M = 10
+        try:
+            for d, dcx, dcy, tmpl in bt_deep:
+                if float(tmpl.std()) < 4:
+                    continue
+                th_, tw_ = tmpl.shape
+                M = 10
 
-            def _visible(t, d=d, dcx=dcx, dcy=dcy, tmpl=tmpl,
-                         th_=th_, tw_=tw_):
-                fr = _grab_frame(cap2, t,
-                                 cap2.get(cv2.CAP_PROP_FPS) or 30.0)
-                if fr is None:
-                    return False
-                sm = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
-                                fx=BT_SCALE, fy=BT_SCALE)
-                sh, sw = sm.shape[:2]
-                bx1 = int((d.cbox[0] + dcx) * BT_SCALE) - M
-                by1 = int((d.cbox[1] + dcy) * BT_SCALE) - M
-                bx2, by2 = bx1 + tw_ + 2 * M, by1 + th_ + 2 * M
-                bx1, by1 = max(0, bx1), max(0, by1)
-                bx2, by2 = min(sw, bx2), min(sh, by2)
-                if bx2 - bx1 < tw_ or by2 - by1 < th_:
-                    return False
-                reg = sm[by1:by2, bx1:bx2]
-                if float(reg.std()) < max(3.0, 0.30 * float(tmpl.std())):
-                    return False
-                return float(cv2.matchTemplate(
-                    reg, tmpl, cv2.TM_CCOEFF_NORMED).max()) >= 0.6
+                def _visible(t, d=d, dcx=dcx, dcy=dcy, tmpl=tmpl,
+                             th_=th_, tw_=tw_):
+                    fr = _grab_frame(cap2, t,
+                                     cap2.get(cv2.CAP_PROP_FPS) or 30.0)
+                    if fr is None:
+                        return False
+                    sm = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                                    fx=BT_SCALE, fy=BT_SCALE)
+                    sh, sw = sm.shape[:2]
+                    bx1 = int((d.cbox[0] + dcx) * BT_SCALE) - M
+                    by1 = int((d.cbox[1] + dcy) * BT_SCALE) - M
+                    bx2, by2 = bx1 + tw_ + 2 * M, by1 + th_ + 2 * M
+                    bx1, by1 = max(0, bx1), max(0, by1)
+                    bx2, by2 = min(sw, bx2), min(sh, by2)
+                    if bx2 - bx1 < tw_ or by2 - by1 < th_:
+                        return False
+                    reg = sm[by1:by2, bx1:bx2]
+                    if float(reg.std()) < max(3.0, 0.30 * float(tmpl.std())):
+                        return False
+                    return float(cv2.matchTemplate(
+                        reg, tmpl, cv2.TM_CCOEFF_NORMED).max()) >= 0.6
 
-            hi, step, lo, at_start = d.t_start, 1.0, None, False
-            for _ in range(11):          # doubling covers ~34 min of video
-                t = hi - step
-                if t <= win_start + 0.01:
-                    at_start = _visible(win_start)
-                    lo = win_start
-                    break
-                if _visible(t):
-                    hi, step = t, step * 2
-                else:
-                    lo = t
-                    break
-            if lo is None:
-                lo = max(win_start, hi - step)
-            if not at_start:
-                for _ in range(6):       # binary search to ~0.15s
-                    if hi - lo <= 0.15:
+                hi, step, lo, at_start = d.t_start, 1.0, None, False
+                for _ in range(11):          # doubling covers ~34 min of video
+                    t = hi - step
+                    if t <= win_start + 0.01:
+                        at_start = _visible(win_start)
+                        lo = win_start
                         break
-                    mid = (lo + hi) / 2
-                    if _visible(mid):
-                        hi = mid
+                    if _visible(t):
+                        hi, step = t, step * 2
                     else:
-                        lo = mid
-            new_start = max(win_start,
-                            (win_start if at_start else hi) - 0.12)
-            if new_start < d.t_start - 0.05:
-                deep_n += 1
-                deep_gain += d.t_start - new_start
-                d.t_start = new_start
-        cap2.release()
+                        lo = t
+                        break
+                if lo is None:
+                    lo = max(win_start, hi - step)
+                if not at_start:
+                    for _ in range(6):       # binary search to ~0.15s
+                        if hi - lo <= 0.15:
+                            break
+                        mid = (lo + hi) / 2
+                        if _visible(mid):
+                            hi = mid
+                        else:
+                            lo = mid
+                new_start = max(win_start,
+                                (win_start if at_start else hi) - 0.12)
+                if new_start < d.t_start - 0.05:
+                    deep_n += 1
+                    deep_gain += d.t_start - new_start
+                    d.t_start = new_start
+        finally:
+            cap2.release()
         if deep_n:
             cb.log(f"      deep backtrack: found the true onset of {deep_n} "
                    f"region(s) beyond the buffer, closing another "
@@ -9366,14 +9664,16 @@ def run_scan(args, cb=None):
         _gap_stats["bridged"] += 1
         return True
 
-    detections = merge_detections(raw, hold=hold, scans=scans,
-                                  bridge_gap=args.bridge_gap, fuzz=_fuzz,
-                                  gap_check=_gap_check)
-    zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
-                                bridge_gap=args.bridge_gap, fuzz=_fuzz,
-                                gap_check=_gap_check) if zdrop_raw else []
-    if _gap_cap["cap"] is not None:
-        _gap_cap["cap"].release()
+    try:
+        detections = merge_detections(raw, hold=hold, scans=scans,
+                                      bridge_gap=args.bridge_gap, fuzz=_fuzz,
+                                      gap_check=_gap_check)
+        zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
+                                    bridge_gap=args.bridge_gap, fuzz=_fuzz,
+                                    gap_check=_gap_check) if zdrop_raw else []
+    finally:
+        if _gap_cap["cap"] is not None:
+            _gap_cap["cap"].release()
     n_tracks = assign_dense_tracks(detections)
     if n_tracks:
         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
@@ -9382,9 +9682,21 @@ def run_scan(args, cb=None):
         cb.log(f"      dense continuity: smoothing {n_tracks} track(s) — "
                "interpolating flicker gaps and walking each onset back "
                "through the video (the slow part of a dense scan)…")
-        n_gaps, n_lead, lead_s = smooth_dense_tracks(
-            detections, fps, args.video, cum=cum, win_start=win_start,
-            cb=cb)
+        if checkpoint_stream is None:
+            n_gaps, n_lead, lead_s = smooth_dense_tracks(
+                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb)
+        else:
+            from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+            secondary = ScanCapture(FrameStream(
+                checkpoint_stream.source, start_frame=checkpoint_start,
+                check_cancelled=checkpoint_stream.check_cancelled).__enter__())
+            try:
+                n_gaps, n_lead, lead_s = smooth_dense_tracks(
+                    detections, fps, args.video, cum=cum,
+                    win_start=max(win_start, checkpoint_start / fps), cb=cb,
+                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start)
+            finally:
+                secondary.release()
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "
@@ -9396,6 +9708,8 @@ def run_scan(args, cb=None):
                        f"identity-matched into {n_people} person(s) — "
                        "review shows one card per person")
         except Exception as e:
+            if monitor_stop and isinstance(e, PipelineCancelled):
+                raise
             cb.log(f"      person grouping unavailable ({e}) — review "
                    "shows per-track cards instead")
     if track_jobs:
@@ -9502,7 +9816,9 @@ def run_scan(args, cb=None):
                "text) could only be camera-motion artifacts")
 
     audio_sugg, audio_tx = [], []
-    if getattr(args, "audio_pii", False):
+    defer_audio = (monitor_stop and scan_exit_reason == "stop_requested"
+                   and bool(getattr(args, "audio_pii", False)))
+    if getattr(args, "audio_pii", False) and not defer_audio:
         # spoken names/numbers/addresses leak PII no matter how good the
         # visual blur is — transcribe locally and suggest mute spans
         audio_sugg, audio_tx = transcribe_audio_pii(
@@ -9521,11 +9837,14 @@ def run_scan(args, cb=None):
         if reasons:
             cb.log("      narrow plate full-box fallbacks: "
                    + ", ".join("%s=%s" % item for item in sorted(reasons.items())))
+    if monitor_stop and cb.cancelled():
+        raise PipelineCancelled()
     state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
             **({"plate_coverage_limitation": narrow_limitation} if narrow_plate and narrow_limitation else {}),
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
-            "input_sha256": _quad_scan_digest(args),
+            "input_sha256": (checkpoint_stream.source.sha256 if checkpoint_stream is not None
+                             else _quad_scan_digest(args)),
             "stats": {"scans": n_scans, "raw_hits": len(raw),
                       "regions": len(detections), "recalls": n_recalled,
                       "remembered": len(memory.items) if memory else 0,
@@ -9533,10 +9852,51 @@ def run_scan(args, cb=None):
     if optional_policy:
         state["plate_policy"] = (optional_policy, args.plate_threshold,
                                  args.plate_auto_cutoff)
+    if monitor_stop:
+        if cb.cancelled():
+            raise PipelineCancelled()
+        aligned = (len(cum) == len(bands) == idx and
+                   all(len(pair) == 2 and all(math.isfinite(v) for v in pair)
+                       for trajectory in (cum, bands) for pair in trajectory))
+        state["scan_boundary"] = {
+            "reason": scan_exit_reason, "next_frame": idx,
+            "reported_total_frames": total, "count_verified": False,
+            "count_source": "opencv_reported" if total else "unavailable",
+            "fps_source": "opencv_reported" if fps_is_reported else "fallback_30",
+            "dimensions": [vw, vh], "dimensions_match": dimensions_match,
+            "audio_incomplete": defer_audio,
+            "prefix_candidate": bool(scan_exit_reason == "stop_requested" and
+                                     0 < idx < total and fps_is_reported and
+                                     vw > 0 and vh > 0 and dimensions_match and aligned),
+            # A cursor and post-scan hash alone do not establish the original,
+            # render, normalization or effective-settings identities.
+            "checkpoint_available": False,
+        }
     return state
 
 
 def run_render(args, state, cb=None):
+    if "scan_boundary" in state:
+        raise RuntimeError("unverified scan boundary cannot be rendered")
+    source_report = state.get("source_report")
+    report_bounds = (_report_frame_authorities(source_report)
+                     if source_report is not None else [])
+    has_report_bounds = any(bound is not None for bound in report_bounds)
+    has_detection_bounds = any(_frame_authority(d) is not None for d in state["detections"])
+    has_frame_domain = has_report_bounds or _has_checkpoint_identity(source_report)
+    if has_frame_domain:
+        _validate_bounded_report_identity(source_report, state.get("input_sha256"), state)
+    elif has_detection_bounds:
+        raise ValueError("bounded detections require a completed source report identity")
+    if ((has_frame_domain or has_detection_bounds) and
+            getattr(args, "hdr_source", None) and not args.preview):
+        try:
+            same_source = os.path.samefile(args.video, args.hdr_source)
+        except (OSError, TypeError, ValueError):
+            same_source = False
+        if not same_source:
+            raise ValueError("bounded HDR render source differs from scan source; "
+                             "frame mapping is not verified")
     cb = cb or Callbacks()
     if state.get("plate_policy"):
         expected = state.get("input_sha256")
@@ -9636,6 +9996,7 @@ def run_render(args, state, cb=None):
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     summary = dict(state["stats"], output=dst)
+    frame_domain_args = {"frame_domain": len(state["cum"])} if has_frame_domain else {}
     with _RenderDelivery(dst, args.report) as delivery:
         if quad_guard is not None:
             delivery.validate_before_publication = require_quad_sources
@@ -9649,7 +10010,7 @@ def run_render(args, state, cb=None):
                        audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
                        out_quality=out_q,
                        audio_lanes=getattr(args, "audio_lane_count", None),
-                       quad_context=quad_context)
+                       quad_context=quad_context, **frame_domain_args)
         else:
             _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
                    state["bands"],
@@ -9662,7 +10023,8 @@ def run_render(args, state, cb=None):
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None),
                    narrow_plates=narrow_render, quad_context=quad_context,
-                   **({"exact_frames": True} if state.get("plate_policy") else {}))
+                   **({"exact_frames": True} if state.get("plate_policy") else {}),
+                   **frame_domain_args)
         require_quad_sources()
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
@@ -9769,6 +10131,10 @@ def run_pipeline(args, cb=None):
             if capable and expected != in_sha:
                 raise ValueError("optional plate source differs from the scanned source")
             if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+                rows = source if isinstance(source, list) else source.get("detections", [])
+                if (_has_checkpoint_identity(source) or
+                        any(_frame_authority(row) is not None for row in rows)):
+                    raise ValueError("bounded report input source SHA-256 mismatch")
                 cb.log("      WARNING: input file differs from the one this report "
                        "was made from (sha256 mismatch) — blur positions may be wrong")
             state = {"fps": rstate["fps"],
