@@ -212,7 +212,8 @@ class FrameStream:
         preceding = max(0, self.start_frame - 1)
         us = (preceding * 1000000 * self.source.fps.denominator
               // self.source.fps.numerator)
-        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'info', '-nostdin',
+        # Progress records use carriage returns and can prefix a showinfo line.
+        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'info', '-nostats', '-nostdin',
                '-xerror', '-err_detect', 'explode', '-copyts']
         if us:
             cmd += ['-ss', '%d.%06d' % (us // 1000000, us % 1000000)]
