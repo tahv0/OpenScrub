@@ -3678,6 +3678,17 @@ class PipelineCancelled(Exception):
     """Raised internally when a Callbacks.cancelled() returns True."""
 
 
+class ScanDecodeError(RuntimeError):
+    """A monitored scan failed to read its next unaccounted frame."""
+    def __init__(self, next_frame, reported_total_frames):
+        super().__init__(f"decoder exception at frame {next_frame}")
+        self.reason = "decoder_exception"
+        self.next_frame = next_frame
+        self.reported_total_frames = reported_total_frames
+        self.count_verified = False
+        self.checkpoint_available = False
+
+
 class Callbacks:
     """Hooks for embedding the pipeline (GUI, batch runner, tests).
     The default implementation reproduces the CLI's print behavior."""
@@ -6664,6 +6675,8 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
 
 
 def _report_document(args, state, output_path=None, output_bytes_path=None):
+    if "scan_boundary" in state:
+        raise RuntimeError("unverified scan boundary cannot be serialized as a report")
     prov = {
         "tool": "openscrub", "version": VERSION,
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
@@ -7592,10 +7605,26 @@ def text_scan_stride(small, scan_small, step):
     return step * 2
 
 
-def run_scan(args, cb=None):
-    """Scan pass only: OCR + face detection + tracking. Returns a state dict
-    consumed by run_render (and serialized into --report files)."""
+def run_scan(args, cb=None, *, stop_requested=None):
+    """Scan pass only. A stop callback requests a whole-frame boundary.
+
+    The opt-in boundary result is an unverified engine candidate, not a saved
+    checkpoint or permission to render. Ordinary callers retain their existing
+    return shape. See CHECKPOINT_CONTRACT.md for later producer obligations.
+    """
+    main_capture = [None]
+    try:
+        return _run_scan_impl(args, cb, stop_requested, main_capture)
+    finally:
+        if main_capture[0] is not None:
+            main_capture[0].release()
+
+
+def _run_scan_impl(args, cb, stop_requested, main_capture):
     cb = cb or Callbacks()
+    if stop_requested is not None and not callable(stop_requested):
+        raise TypeError("stop_requested must be a no-argument callback")
+    monitor_stop = stop_requested is not None
     if not args.video or not os.path.exists(args.video):
         raise RuntimeError(f"input not found: {args.video}")
     # normalize attributes that may be absent when args come from an older
@@ -7764,8 +7793,30 @@ def run_scan(args, cb=None):
            + (", self-tuning to screen activity and scroll speed)"
               if getattr(args, "adaptive", "on") != "off" else ")"))
     cap = cv2.VideoCapture(args.video)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    main_capture[0] = cap
+
+    def _release_scan_capture():
+        held, main_capture[0] = main_capture[0], None
+        if held is not None:
+            held.release()
+
+    reported_fps = cap.get(cv2.CAP_PROP_FPS)
+    if monitor_stop:
+        try:
+            fps_is_reported = math.isfinite(reported_fps) and reported_fps > 0
+        except (TypeError, ValueError, OverflowError):
+            fps_is_reported = False
+        fps = reported_fps if fps_is_reported else 30.0
+        reported_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        try:
+            total = (int(reported_count) if math.isfinite(reported_count)
+                     and reported_count > 0 and reported_count == int(reported_count)
+                     else 0)
+        except (TypeError, ValueError, OverflowError):
+            total = 0
+    else:
+        fps = reported_fps or 30.0
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     step = max(1, int(round(fps * args.sample_interval)))
@@ -8017,7 +8068,7 @@ def run_scan(args, cb=None):
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on:
+    if win_start > 1.0 and not track_on and not monitor_stop:
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -8026,17 +8077,59 @@ def run_scan(args, cb=None):
             cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
                    f"{skip_n} frame(s) before the window are not decoded")
         else:
-            cap.release()
+            _release_scan_capture()
             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+            main_capture[0] = cap
             cb.log("      fast-skip unavailable on this file — decoding "
                    "from the start")
+    scan_exit_reason = None
+    dimensions_match = True
+
+    def _stop_now():
+        # A Cancel captured for this operation wins over a pending stop.
+        try:
+            if cb.cancelled():
+                raise PipelineCancelled()
+            return bool(stop_requested())
+        except BaseException:
+            _release_scan_capture()
+            raise
+
     while True:
-        if idx % 30 == 0 and cb.cancelled():
-            cap.release()
+        if monitor_stop:
+            if _stop_now():
+                # Once the final selected window is behind us, a stop is not
+                # a paused scan. Count/EOF remain unverified in this slice.
+                scan_exit_reason = ("scope_fast_stop" if total > 0 and not track_on and
+                                    idx / fps > win_end else "stop_requested")
+                break
+        elif idx % 30 == 0 and cb.cancelled():
+            _release_scan_capture()
             raise PipelineCancelled()
-        ok, frame = cap.read()
-        if not ok:
+        try:
+            ok, frame = cap.read()
+        except Exception as error:
+            _release_scan_capture()
+            if monitor_stop and not isinstance(error, PipelineCancelled):
+                raise ScanDecodeError(idx, total) from error
+            raise
+        except BaseException:
+            _release_scan_capture()
+            raise
+        if not ok or frame is None:
+            if ok:
+                scan_exit_reason = "decoder_invalid_frame"
+            elif not total:
+                scan_exit_reason = "decoder_read_stopped_unknown_count"
+            elif idx < total:
+                scan_exit_reason = "decoder_read_stopped_before_reported_count"
+            elif idx == total:
+                scan_exit_reason = "decoder_read_stopped_at_reported_count"
+            else:
+                scan_exit_reason = "decoder_read_stopped_after_reported_count"
             break
+        if monitor_stop and frame.shape[:2] != (vh, vw):
+            dimensions_match = False
         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
         cum.append((cx, cy))
 
@@ -8051,8 +8144,14 @@ def run_scan(args, cb=None):
                     cb.log(f"      fast-stop: last window ended at "
                            f"{win_end:.1f}s — the rest of the video is "
                            "not decoded")
+                    if monitor_stop:
+                        bands.append((0.0, 0.0))
+                        idx += 1
+                        if cb.cancelled():
+                            raise PipelineCancelled()
+                        scan_exit_reason = "scope_fast_stop"
                     break
-                if nxt - t_now > 1.5:
+                if nxt - t_now > 1.5 and not monitor_stop:
                     # gap between windows: seek instead of decoding it
                     # (verified — a lying seek would mislabel every
                     # detection after the jump; unseekable → keep
@@ -8069,8 +8168,9 @@ def run_scan(args, cb=None):
                         continue
                     # jump failed and may have consumed frames: reopen at
                     # a KNOWN position and keep decoding sequentially
-                    cap.release()
+                    _release_scan_capture()
                     cap = cv2.VideoCapture(args.video)
+                    main_capture[0] = cap
                     if not _seek_cap(cap, idx + 1, fps):
                         break
             scan_cx, scan_cy = cx, cy
@@ -8557,7 +8657,18 @@ def run_scan(args, cb=None):
         if bt_on:
             bt_buf.append((idx, cx, cy, small))
         idx += 1
-    cap.release()
+    _release_scan_capture()
+
+    if monitor_stop and cb.cancelled():
+        raise PipelineCancelled()
+    if monitor_stop and track_jobs:
+        # A seed or requested tracking interval beyond the committed prefix
+        # cannot be followed safely with only the prefix's scroll coordinates.
+        boundary_time = idx / fps
+        if any(t1 >= boundary_time or tref >= boundary_time
+               for _, t1, _, tref in track_jobs):
+            raise RuntimeError("cannot finalize this boundary: a setup tracked "
+                               "object extends beyond the processed prefix")
 
     if memory is not None:
         extra = reverse_pass(scans, memory, cats, namer,
@@ -8748,6 +8859,8 @@ def run_scan(args, cb=None):
                        f"identity-matched into {n_people} person(s) — "
                        "review shows one card per person")
         except Exception as e:
+            if monitor_stop and isinstance(e, PipelineCancelled):
+                raise
             cb.log(f"      person grouping unavailable ({e}) — review "
                    "shows per-track cards instead")
     if track_jobs:
@@ -8854,7 +8967,9 @@ def run_scan(args, cb=None):
                "text) could only be camera-motion artifacts")
 
     audio_sugg, audio_tx = [], []
-    if getattr(args, "audio_pii", False):
+    defer_audio = (monitor_stop and scan_exit_reason == "stop_requested"
+                   and bool(getattr(args, "audio_pii", False)))
+    if getattr(args, "audio_pii", False) and not defer_audio:
         # spoken names/numbers/addresses leak PII no matter how good the
         # visual blur is — transcribe locally and suggest mute spans
         audio_sugg, audio_tx = transcribe_audio_pii(
@@ -8863,17 +8978,42 @@ def run_scan(args, cb=None):
             nlp=getattr(namer, "nlp", None) if namer else None,
             custom_res=custom_res, phrases=phrases)
 
-    return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
-            "zdropped": zdropped, "audio_suggestions": audio_sugg,
-            "audio_transcript": audio_tx,
-            "input_sha256": sha256_file(args.video),
-            "stats": {"scans": n_scans, "raw_hits": len(raw),
-                      "regions": len(detections), "recalls": n_recalled,
-                      "remembered": len(memory.items) if memory else 0,
-                      "zone_dropped": zone_dropped}}
+    if monitor_stop and cb.cancelled():
+        raise PipelineCancelled()
+    state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+             "zdropped": zdropped, "audio_suggestions": audio_sugg,
+             "audio_transcript": audio_tx,
+             "input_sha256": sha256_file(args.video),
+             "stats": {"scans": n_scans, "raw_hits": len(raw),
+                       "regions": len(detections), "recalls": n_recalled,
+                       "remembered": len(memory.items) if memory else 0,
+                       "zone_dropped": zone_dropped}}
+    if monitor_stop:
+        if cb.cancelled():
+            raise PipelineCancelled()
+        aligned = (len(cum) == len(bands) == idx and
+                   all(len(pair) == 2 and all(math.isfinite(v) for v in pair)
+                       for trajectory in (cum, bands) for pair in trajectory))
+        state["scan_boundary"] = {
+            "reason": scan_exit_reason, "next_frame": idx,
+            "reported_total_frames": total, "count_verified": False,
+            "count_source": "opencv_reported" if total else "unavailable",
+            "fps_source": "opencv_reported" if fps_is_reported else "fallback_30",
+            "dimensions": [vw, vh], "dimensions_match": dimensions_match,
+            "audio_incomplete": defer_audio,
+            "prefix_candidate": bool(scan_exit_reason == "stop_requested" and
+                                     0 < idx < total and fps_is_reported and
+                                     vw > 0 and vh > 0 and dimensions_match and aligned),
+            # A cursor and post-scan hash alone do not establish the original,
+            # render, normalization or effective-settings identities.
+            "checkpoint_available": False,
+        }
+    return state
 
 
 def run_render(args, state, cb=None):
+    if "scan_boundary" in state:
+        raise RuntimeError("unverified scan boundary cannot be rendered")
     cb = cb or Callbacks()
     _geometry_preflight(state["detections"], state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")

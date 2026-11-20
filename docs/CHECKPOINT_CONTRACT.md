@@ -141,5 +141,56 @@ accounted for and normal finalization has succeeded. An early read failure,
 unknown/reported-only count without later successful verification, missing end
 frame, stop request or `completed=True` alone is not proof. The engine must
 reject contradictory observed frames and retain the previous checkpoint if it
-cannot establish count/termination confidence. No decoder, EOF, concurrency, crash durability, or actual rendering
-is tested or promised by this data contract.
+cannot establish count/termination confidence. No decoder, EOF, concurrency,
+crash durability, or actual rendering is tested or promised by this data contract.
+
+## Engine boundary candidate
+
+`run_scan(args, cb, stop_requested=callback)` is an opt-in engine-only boundary
+probe. The callback belongs to one scan attempt and takes no arguments; a
+caller using an event can pass `event.is_set`. It is distinct from
+`cb.cancelled()`. The scanner checks for a stop between frames, after the
+previous frame and its detection/skip accounting have finished. It closes the
+primary decoder, runs the ordinary detection finalization, and checks Cancel
+again before returning. Cancel still raises `PipelineCancelled`; an operation
+owner must fence concurrent cancellation and publication separately.
+
+The monitored path decodes sequentially through excluded windows instead of
+using the existing seek shortcut, whose fallback can accept an unverified
+position when PTS is unavailable. Excluded frames receive zero bands and, with
+scroll tracking disabled, zero cumulative offsets. A monitored fast-stop after
+the last selected window accounts for its last decoded excluded frame but does
+not invent timeline rows for the unprocessed tail.
+
+Only an opt-in result has `state["scan_boundary"]`. `next_frame` is its first
+unaccounted exclusive index; `reported_total_frames`, `count_source` and
+`fps_source` describe OpenCV metadata, not proof of canonical source length or timing. The `reason`
+is `stop_requested`, `scope_fast_stop`, `decoder_invalid_frame`, or a
+`decoder_read_stopped_*_reported_count`/`decoder_read_stopped_unknown_count`
+status. A false decoder read is not distinguished from clean EOF. A decoder
+exception raises `ScanDecodeError` after cleanup, carrying `next_frame`, the
+reported count, and false verification/checkpoint flags; its original exception
+is retained as the cause. Other exceptions propagate after decoder cleanup. A stopped zero-frame result, a missing or
+contradictory reported count, invalid or mismatched reported/decoded dimensions,
+invalid source FPS, or nonfinite or misaligned arrays cannot be a `prefix_candidate`.
+
+`prefix_candidate` means only that a requested stop produced a plausible,
+frame-aligned prefix with ordinary visual finalization. `checkpoint_available`
+is **always false** in this engine slice. A post-scan hash does not prove the
+input remained unchanged during scanning, identify the original or render
+participant, establish normalization identity, or capture complete immutable
+effective settings before the scanner mutates them. Those measurements and
+revalidation, plus compatible frame-bound render handling, belong to later
+integration work. `count_verified` is always false here, even when the decoder
+stops exactly at the metadata count. An unverified engine state cannot be
+rendered or serialized through the ordinary report builder. This guard does not
+reject a valid, separately constructed partial report; a future compatible
+renderer must honor its bounds and the partial-render policy above.
+
+For a requested stop, whole-file audio transcription is deferred and
+`audio_incomplete` records whether configured audio analysis was deferred. A
+setup object track that extends beyond any monitored processed boundary is
+refused rather than followed into unknown future frames with a fabricated
+offset. This slice does not add context overlap, scroll-origin reconciliation,
+checkpoint publication,
+resume, a CLI or web action, or a verified completion proof.
