@@ -53,6 +53,7 @@ from openscrub_internal.reports import _staged_report
 from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
+from openscrub_internal import checkpoints
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal import diagnostics
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
@@ -760,6 +761,7 @@ def job_public(job):
         "log_truncated": logs["truncated"],
         "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
         "recovery_required": FILES.initialize(job).recovery_required,
+        "checkpoint_unfinished": bool(job.get("_checkpoint_unfinished")),
         "download_name": video_name,
         "report_name": report_name,
     }
@@ -1237,6 +1239,33 @@ def _edit_gate(job):
         abort(409, "job work is queued, running or still cleaning up")
 
 
+def _unfinished_checkpoint_locked(job):
+    """Recognize even invalid checkpoint markers before destructive admission."""
+    if job.get('_checkpoint_unfinished'):
+        return True
+    path = os.path.join(job['dir'], 'report.json')
+    try:
+        named = os.stat(path)
+        if not stat.S_ISREG(named.st_mode):
+            return True
+        stamp = _file_stamp(named)
+        cached = job.get('_checkpoint_observation')
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+        with open(path, encoding='utf-8', opener=_thumbnail_nonblocking_opener) as stream:
+            opened = os.fstat(stream.fileno())
+            if not stat.S_ISREG(opened.st_mode) or _file_stamp(opened) != stamp:
+                return True
+            doc = json.load(stream)
+            if _file_stamp(os.fstat(stream.fileno())) != stamp or _file_stamp(os.stat(path)) != stamp:
+                return True
+    except (OSError, ValueError):
+        return False
+    result = isinstance(doc, dict) and 'stop_review' in doc
+    job['_checkpoint_observation'] = (stamp, result)
+    return result
+
+
 def _operation_valid(job, owner):
     files = FILES.initialize(job)
     with JOBS_LOCK:
@@ -1697,6 +1726,11 @@ def enforce_vault_lock():
             _validate_files_locked(job)
             if job is not None and request.endpoint not in {"job_status", "job_log", "job_cancel"}:
                 _recovery_gate(job)
+            if (job is not None and job.get('_checkpoint_unfinished') and
+                    request.endpoint in {'job_detections', 'job_detframe', 'job_thumb',
+                        'job_frame_at', 'job_video_stream', 'job_boxes_at',
+                        'job_edit_sample', 'job_save_edits', 'job_track_object'}):
+                abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
                 "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
@@ -2000,6 +2034,8 @@ def job_retry(jid):
         exists = bool(video and os.path.exists(video))
         with FILES.initialize(job).report_lock:
             _report_current(job)
+            if _unfinished_checkpoint_locked(job):
+                return jsonify({"error": "unfinished checkpoint cannot be retried as a new scan"}), 409
             if (FILES.initialize(job).active is not None
                     or FILES.initialize(job).work > 1):
                 return jsonify({"error": "job work is still cleaning up"}), 409
@@ -2113,6 +2149,8 @@ def _capture_frame_source(job, output=False):
     with state.report_lock:
         _report_current(job)
         _recovery_gate(job)
+        if output and _unfinished_checkpoint_locked(job):
+            abort(409, "unfinished checkpoint has no completed output")
         selected_output = job.get("output") if output else None
         path = selected_output or _job_video(job)
         epoch = state.output_epoch
@@ -2136,6 +2174,8 @@ def _frame_source_current(snapshot):
     with state.report_lock:
         _report_current(job)
         _recovery_gate(job)
+        if snapshot["output"] and _unfinished_checkpoint_locked(job):
+            abort(409, "unfinished checkpoint has no completed output")
         selected = job.get("output") if snapshot["output"] else None
         if (FILES.initialize(job) is not state or state.output_epoch != snapshot["epoch"]
                 or selected != snapshot["selection"]
@@ -4946,6 +4986,8 @@ def job_render(jid):
     files = FILES.initialize(job)
     def refusal(prepared_work=0):
         _report_current(job)
+        if _unfinished_checkpoint_locked(job):
+            return jsonify({"error": "unfinished checkpoint cannot be rendered"}), 409
         if job["phase"] in ("rendering", "queued_render"):
             return jsonify({"ok": True, "note": "render already in progress"})
         if files.active is not None or files.work > prepared_work:
@@ -4986,6 +5028,8 @@ def job_download(jid):
     with FILES.initialize(job).report_lock:
         _report_current(job)
         _recovery_gate(job)
+        if _unfinished_checkpoint_locked(job):
+            abort(409, "unfinished checkpoint has no completed output")
         if not job["output"]:
             abort(404)
         return _send_open_file(job["output"], as_attachment=True,
@@ -5516,7 +5560,7 @@ async function loadJobs(){
   `<div class="row" style="justify-content:space-between;padding:4px 0">
    <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
-   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+   ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
 }
 
@@ -5931,12 +5975,14 @@ async function refreshCycle(cycle){
   let a="";
   if(j.phase=="scanning"||j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
-  if(j.phase=="error"||j.phase=="cancelled")
+  if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
+  if(j.phase=="paused")
+   a=`<div>Partial scan saved. Resume is not available in this version; the source and report are retained.</div>`;
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
@@ -9419,23 +9465,55 @@ def _rehydrate_jobs():
             continue
         try:
             with open(rep, encoding="utf-8") as f:
-                prov = json.load(f).get("provenance", {})
+                doc = json.load(f)
+            if not isinstance(doc, dict):
+                continue
+            checkpoint = 'stop_review' in doc
+            prov = doc.get("provenance", {})
+            if not isinstance(prov, dict):
+                if not checkpoint:
+                    continue
+                prov = {}
             video = prov.get("input")
-            if not video or not os.path.exists(video):
+            if not isinstance(video, str):
+                video = None
+            source_available = isinstance(video, str) and bool(video) and os.path.exists(video)
+            if not source_available and not checkpoint:
                 continue
             out = os.path.join(jdir, "output.mp4")
             has_out = os.path.exists(out)
+            # Completion invalidates the previous render's provenance. A
+            # leftover file beside the report is not the completed output.
+            if 'checkpoint_identity' in prov:
+                recorded_output = prov.get('output')
+                has_out = (has_out and isinstance(recorded_output, str) and
+                           os.path.realpath(recorded_output) == os.path.realpath(out))
+            checkpoint_error = None if source_available else "checkpoint source is unavailable"
+            opts = prov.get("settings", {}) or {}
+            if checkpoint:
+                try:
+                    with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
+                        saved_opts = json.load(f)
+                    if not isinstance(saved_opts, dict):
+                        raise ValueError('original job options are invalid')
+                    opts = saved_opts
+                    checkpoints.validate_resume(doc)
+                except (OSError, ValueError, TypeError):
+                    checkpoint_error = "unfinished checkpoint or its original job options are invalid"
+            original = prov.get("original_input")
+            display_source = (original if isinstance(original, str) and original else
+                              video if isinstance(video, str) and video else jid)
             job = {
                 "id": jid, "dir": jdir, "video": video,
-                "name": os.path.basename(prov.get("original_input")
-                                          or video),
-                "options": prov.get("settings", {}) or {},
-                "phase": "done" if has_out else "review",
-                "progress": 1.0 if has_out else 0.5,
+                "name": os.path.basename(display_source),
+                "options": opts,
+                "phase": ("error" if checkpoint_error else "paused") if checkpoint else ("done" if has_out else "review"),
+                "progress": 0.5 if checkpoint else (1.0 if has_out else 0.5),
                 "log": JobLog(["(recovered after server restart)"]),
-                "error": None, "output": out if has_out else None,
+                "error": checkpoint_error, "output": out if has_out and not checkpoint else None,
                 "created": os.path.getmtime(jdir),
                 "cancel": threading.Event(), "stats": {},
+                "_checkpoint_unfinished": checkpoint,
             }
             try:
                 # original upload size, for the editor's duplicate-upload
@@ -9445,7 +9523,7 @@ def _rehydrate_jobs():
                              if os.path.exists(
                                  os.path.join(jdir, "input" + e))), video)
                 job["size"] = os.path.getsize(orig)
-            except OSError:
+            except (OSError, TypeError):
                 pass
             files = FILES.initialize(job)
             with JOBS_LOCK:
