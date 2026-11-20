@@ -487,6 +487,8 @@ def test_stdin_close_error_before_eof_uses_bounded_abort(
         kind, wait_fails, source, tmp_path, monkeypatch):
     """A still-open owned endpoint must not lead to an unbounded status wait."""
     close_error = OSError('stdin still open sentinel')
+    output = tmp_path / 'out.mp4'
+    output.write_bytes(b'previous untouched output')
     injected, wait_injections = [], []
     held = []
     with owners(monkeypatch) as observed:
@@ -514,13 +516,18 @@ def test_stdin_close_error_before_eof_uses_bounded_abort(
                 monkeypatch.setattr(enc, 'wait', wait)
 
         try:
-            render(kind, source, tmp_path / 'out.mp4', Callbacks())
+            render(kind, source, output, Callbacks())
         except BaseException as error:
             held.append(error)
         assert len(held) == 1 and held[0] is close_error
         assert close_error.__traceback__ is not None and injected == [True]
         enc, = [p for p in observed[2] if 'pipe:0' in p.args]
-        assert enc.returncode != 0
+        # The stop/reap path can observe a zero exit status; reaping and pipe
+        # closure are the ownership guarantees. The primary close error still
+        # prevents publication.
+        assert enc.returncode is not None
+        assert output.read_bytes() == b'previous untouched output'
+        assert not list(tmp_path.glob('.render-*.tmp*'))
         if wait_fails:
             assert 'status wait sentinel' in ' '.join(close_error.render_cleanup_errors)
         print('STDIN_ABORT_STATE ' + json.dumps(dict(
