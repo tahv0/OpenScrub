@@ -9026,7 +9026,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         else:
             from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
             secondary = ScanCapture(FrameStream(
-                checkpoint_stream.source, start_frame=checkpoint_start).__enter__())
+                checkpoint_stream.source, start_frame=checkpoint_start,
+                check_cancelled=checkpoint_stream.check_cancelled).__enter__())
             try:
                 n_gaps, n_lead, lead_s = smooth_dense_tracks(
                     detections, fps, args.video, cum=cum,

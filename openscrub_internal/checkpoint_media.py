@@ -168,6 +168,9 @@ _TIME_BASE = re.compile(
     r'^\[Parsed_showinfo_\d+ @ 0x[0-9a-fA-F]+\] config in time_base: (\d+)/(\d+)')
 _END = object()
 _METADATA_TIMEOUT = 5.0
+_FRAME_TIMEOUT = 30.0
+_PIPE_POLL = 0.1
+_MAX_LOG_LINE = 65536
 
 
 class FrameStream:
@@ -175,20 +178,27 @@ class FrameStream:
 
     Only EOF plus a successful FFmpeg exit and the exact reported count set
     ``completed``. A caller stopping after the last expected frame has not
-    observed termination and must not promote the count. Raw pipe reads are
-    synchronous: a decoder that stalls mid-frame can block cancellation until
-    that read returns. This primitive is not ready for interactive controls.
+    observed termination and must not promote the count. Owned pipe workers use
+    bounded queues so an incomplete raw frame has a finite wait and cleanup.
     """
-    def __init__(self, source, start_frame=0):
+    def __init__(self, source, start_frame=0, *, check_cancelled=None):
+        if check_cancelled is not None and not callable(check_cancelled):
+            raise TypeError('check_cancelled must be callable')
         if (type(start_frame) is not int or not 0 <= start_frame < source.total_frames):
             raise FrameEvidenceError('start frame must be inside the reported timeline')
         self.source = source
+        self.check_cancelled = check_cancelled or (lambda: None)
         self.start_frame = start_frame
         self.next_frame = start_frame
         self.completed = False
         self._proc = None
         self._thread = None
-        self._info = queue.Queue()
+        self._raw_thread = None
+        self._stop_workers = threading.Event()
+        # At most one raw frame waits in the queue; the raw worker can hold
+        # one additional frame while it waits to hand it over.
+        self._frames = queue.Queue(maxsize=1)
+        self._info = queue.Queue(maxsize=8)
         self._last_index = None
         self._showinfo_number = 0
         self._time_base = None
@@ -214,23 +224,91 @@ class FrameStream:
                                           stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
         except OSError as exc:
             raise FrameEvidenceError('cannot start FFmpeg frame decoder: %s' % exc) from exc
-        self._thread = threading.Thread(target=self._read_info, daemon=True)
-        self._thread.start()
+        self._thread = threading.Thread(target=self._read_info, daemon=True,
+                                        name='checkpoint-ffmpeg-metadata')
+        self._raw_thread = threading.Thread(target=self._read_raw, daemon=True,
+                                            name='checkpoint-ffmpeg-frames')
+        try:
+            self._thread.start()
+            self._raw_thread.start()
+        except BaseException:
+            self.close()
+            raise
         return self
+
+    def _offer(self, destination, item):
+        while not self._stop_workers.is_set():
+            try:
+                destination.put(item, timeout=_PIPE_POLL)
+                return True
+            except queue.Full:
+                pass
+        return False
+
+    def _read_raw(self):
+        frame_size = self.source.width * self.source.height * 3
+        try:
+            while not self._stop_workers.is_set():
+                frame = self._proc.stdout.read(frame_size)
+                if not self._offer(self._frames, ('data', frame)):
+                    return
+                if len(frame) != frame_size:
+                    return
+        except Exception as exc:
+            self._offer(self._frames, ('error', exc))
 
     def _read_info(self):
         try:
-            for raw in self._proc.stderr:
+            while not self._stop_workers.is_set():
+                raw = self._proc.stderr.readline(_MAX_LOG_LINE + 1)
+                if not raw:
+                    break
+                if len(raw) > _MAX_LOG_LINE:
+                    self._offer(self._info, ('error', 'decoder metadata line is too long'))
+                    break
                 line = raw.decode('utf-8', 'replace').strip()
                 match = _TIME_BASE.match(line)
                 if match:
-                    self._info.put(('base', match.groups()))
+                    if not self._offer(self._info, ('base', match.groups())):
+                        return
                     continue
                 match = _SHOWINFO.match(line)
-                if match:
-                    self._info.put(('frame', match.groups()))
+                if match and not self._offer(self._info, ('frame', match.groups())):
+                    return
         finally:
-            self._info.put((_END, ()))
+            self._offer(self._info, (_END, ()))
+
+    def _take(self, values, deadline, message):
+        while True:
+            self.check_cancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise FrameEvidenceError(message)
+            try:
+                return values.get(timeout=min(_PIPE_POLL, remaining))
+            except queue.Empty:
+                pass
+
+    def _wait_child(self):
+        deadline = time.monotonic() + _FRAME_TIMEOUT
+        while True:
+            self.check_cancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise FrameEvidenceError('FFmpeg decoder stalled before termination')
+            try:
+                return self._proc.wait(timeout=min(_PIPE_POLL, remaining))
+            except subprocess.TimeoutExpired:
+                pass
+
+    def _wait_metadata_reader(self):
+        deadline = time.monotonic() + _METADATA_TIMEOUT
+        while self._thread.is_alive():
+            self.check_cancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise FrameEvidenceError('FFmpeg metadata reader did not terminate')
+            self._thread.join(timeout=min(_PIPE_POLL, remaining))
 
     def _frame_info(self):
         # showinfo runs before FFmpeg writes the corresponding raw frame.  A
@@ -238,12 +316,13 @@ class FrameStream:
         # be blocked writing the next frame while we wait for its metadata.
         deadline = time.monotonic() + _METADATA_TIMEOUT
         while True:
-            try:
-                kind, values = self._info.get(timeout=max(0, deadline - time.monotonic()))
-            except queue.Empty:
-                raise FrameEvidenceError('decoder did not provide a timestamp for a decoded frame') from None
+            kind, values = self._take(
+                self._info, deadline,
+                'decoder did not provide a timestamp for a decoded frame')
             if kind is _END:
                 raise FrameEvidenceError('decoder did not provide a timestamp for a decoded frame')
+            if kind == 'error':
+                raise FrameEvidenceError(values)
             if kind == 'base':
                 try:
                     base = Fraction(int(values[0]), int(values[1]))
@@ -274,10 +353,14 @@ class FrameStream:
             return None
         frame_size = self.source.width * self.source.height * 3
         while True:
-            data = self._proc.stdout.read(frame_size)
+            kind, data = self._take(
+                self._frames, time.monotonic() + _FRAME_TIMEOUT,
+                'FFmpeg decoder stalled while reading a raw frame')
+            if kind == 'error':
+                raise FrameEvidenceError('cannot read FFmpeg raw frame') from data
             if not data:
-                rc = self._proc.wait()
-                self._thread.join()
+                rc = self._wait_child()
+                self._wait_metadata_reader()
                 if rc != 0:
                     raise FrameEvidenceError('FFmpeg decoding failed before clean completion')
                 if self.next_frame != self.source.total_frames:
@@ -306,6 +389,7 @@ class FrameStream:
         if self._closed:
             return
         self._closed = True
+        self._stop_workers.set()
         if self._proc is None:
             return
         if self._proc.poll() is None:
@@ -314,11 +398,14 @@ class FrameStream:
                 self._proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 self._proc.kill()
-                self._proc.wait()
+                self._proc.wait(timeout=3)
+        for worker in (self._raw_thread, self._thread):
+            if worker is not None and worker.ident is not None:
+                worker.join(timeout=3)
+                if worker.is_alive():
+                    raise FrameEvidenceError('FFmpeg pipe reader did not terminate')
         if self._proc.stdout:
             self._proc.stdout.close()
-        if self._thread is not None:
-            self._thread.join()
         if self._proc.stderr:
             self._proc.stderr.close()
 

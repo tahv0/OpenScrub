@@ -227,3 +227,41 @@ def test_source_mutation_during_resume_preserves_checkpoint(tmp_path):
         owned_scan(rt, args_for(video), str(path), cb=Quiet(),
                    stop_requested=alter_source, resume=True)
     assert path.read_bytes() == before
+
+
+def test_cancel_interrupts_a_stalled_decoder_and_preserves_report(tmp_path, monkeypatch):
+    import sys
+    import time
+    rt = runtime()
+    video = movie(tmp_path)
+    report = tmp_path / 'review.json'
+    owned_scan(rt, args_for(video), str(report), cb=Quiet(), stop_requested=stop_after(9))
+    before = report.read_bytes()
+    decoder = tmp_path / 'stall_decoder.py'
+    decoder.write_text('import sys, time\n'
+                       'sys.stdout.buffer.write(b"x" * 100)\n'
+                       'sys.stdout.buffer.flush()\n'
+                       'time.sleep(2)\n')
+    original = subprocess.Popen
+    children = []
+    def launch(command, *args, **kwargs):
+        if command[0] == 'ffmpeg':
+            process = original([sys.executable, '-u', str(decoder)], *args, **kwargs)
+            children.append(process)
+            return process
+        return original(command, *args, **kwargs)
+    monkeypatch.setattr(rt.checkpoint_media.subprocess, 'Popen', launch)
+    class CancelDuringRead(Quiet):
+        started = None
+        def cancelled(self):
+            if self.started is None:
+                self.started = time.monotonic()
+            return time.monotonic() - self.started > .2
+    callback = CancelDuringRead()
+    with pytest.raises(core.PipelineCancelled):
+        owned_scan(rt, args_for(video), str(report), cb=callback,
+                   stop_requested=lambda: False, resume=True)
+    assert time.monotonic() - callback.started < 1
+    assert report.read_bytes() == before
+    assert len(children) == 1 and children[0].poll() is not None
+    assert children[0].stdout.closed and children[0].stderr.closed

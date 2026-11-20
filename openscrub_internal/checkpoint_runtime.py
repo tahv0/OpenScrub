@@ -129,7 +129,11 @@ def scan_to_report(args, report_path, *, cb, stop_requested, publication_lock, r
                 previous, boundary = None, 0
         start = (max(0, boundary - max(1, math.ceil(source.fps))) if resume else 0)
         scan_args = copy.deepcopy(args)
-        with checkpoint_media.FrameStream(source, start_frame=start) as stream:
+        def check_cancelled():
+            if cb.cancelled():
+                raise core.PipelineCancelled()
+        with checkpoint_media.FrameStream(source, start_frame=start,
+                                          check_cancelled=check_cancelled) as stream:
             state = core.run_scan(scan_args, cb, stop_requested=stop_requested,
                                   _checkpoint_stream=stream)
         status = state['scan_boundary']
