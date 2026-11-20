@@ -1,13 +1,12 @@
 # Portable checkpoint data contract
 
-The checkpoint helper is a data contract, not a complete Stop & Review feature.
-This branch also has a monitored scanner boundary, completed-report frame
-authority, and an opt-in web scan worker. A supported native progressive
-8-bit H.264 MP4 scan with QR codes or no detection categories can stop at a
-verified frame boundary. The worker fences report publication to its job and
-persists a recovery marker before replacing the report. The Resume API requires
-the exact current report-generation token. Partial rendering and editing are
-not available in this slice; they require a separate bounded-review owner.
+The opt-in Stop & Review workflow supports native progressive 8-bit H.264 MP4
+at a constant frame rate with QR codes or no detection categories. It stops at
+a verified frame boundary. The web editor can inspect the processed frames and
+save changes to their geometry, manual regions, audio spans and output choices.
+The worker fences publication to its job and persists a recovery marker before
+replacing the report. Resume requires the report-generation token acknowledged
+by Save. Rendering becomes available after the scan reaches verified EOF.
 Older OpenScrub renderers do not honor checkpoint frame authority and must not
 render bounded reports as if they did.
 
@@ -219,8 +218,8 @@ optional **paired** strict integers satisfying `0 <= start < end <= N`, where N
 is the length of the aligned full render timelines. Missing both fields keeps
 legacy time-only behavior; missing one, nulls, booleans, nonintegers, reversed
 or out-of-range bounds fail validation. This includes disabled raw rows. A
-report carrying any `stop_review` marker is refused before rendering because
-partial timeline, source identity, and geometry handling are not yet integrated.
+report carrying any `stop_review` marker must reach verified completion before
+being rendered.
 This does not change the separate unverified engine-state guard.
 
 The report decoder uses `FrameBoundedDetection`, a `Detection` subclass, only
