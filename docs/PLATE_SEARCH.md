@@ -1,11 +1,35 @@
-# Experimental plate-text search core
+# Optional plate-text search
 
-This optional Python core and exact-frame HTTP route search explicitly requested
-ASCII text using an installed local Tesseract. The route has no editor control
-yet. Search does not change a report, select or blur anything, and does not
-require a vehicle or plate detector. A result is a suggestion for human inspection, not evidence
+This optional feature searches explicitly requested ASCII text in the currently
+inspected exact frame using an installed local Tesseract. Search does not change
+a report, select or blur anything, and does not require a vehicle or plate
+detector. A result is a suggestion for human inspection, not evidence
 that an identifier has been redacted or that its physical plate boundary is
 known. No model is trained or downloaded by this code.
+
+## Using the editor
+
+In review, open **Preview video & edit boxes**, pause and inspect the frame you
+want, then expand **Find plate text in this frame**. Enter 3–16 letters or
+digits, choose **Full text** or **Text fragment**, and select **Search this
+frame**. Select a result to highlight its approximate region in cyan. It is not
+a plate outline and the matching text may be unrelated to a plate. Inspect the
+image and explicitly use **Add box** or **Track object** to draw a region that
+covers the whole number or plate if you want to redact it. Search and selection
+alone make no Blur or Keep decision. Ordinary review and export remain available
+when no result is chosen.
+
+Only the selected frame is searched; a negative result does not establish
+absence elsewhere or even on that frame. Seek to another frame and search again
+as needed. Seeking, playback, closing the editor, or changing the query retires
+the old suggestions and requests cancellation of an in-flight search. A
+timeout, cancellation, unavailable recognizer, or changed source is shown as a
+separate outcome instead of a negative match. **Cancel search** discards its
+result; cleanup can take a moment. The query remains in the editor field until
+the panel is closed or the editor is removed.
+
+The source distribution includes this guide at `docs/PLATE_SEARCH.md`; the
+wheel includes it as `openscrub_internal/plate_search/PLATE_SEARCH.md`.
 
 `PlateQuery(text, "full")` requires equality after the literal normalizer
 removes spaces, tabs, dots and hyphens; `PlateQuery(text, "fragment")` requires
@@ -70,7 +94,7 @@ files on normal completion and handled timeout. Abrupt process termination may
 leave files behind. The HTTP wrapper supplies the job-owned directory described
 below.
 
-The HTTP route searches one current exact sample in an isolated POSIX process
+The editor's HTTP route searches one current exact sample in an isolated POSIX process
 (non-frozen Python with `waitid`/`WNOWAIT` support only), with at most one search
 process per app instance. It has a 15-second admission-and-worker budget, kills
 its process group on timeout, cancellation, or abnormal worker completion, and

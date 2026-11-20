@@ -5484,6 +5484,7 @@ function beSampleCurrent(view,serial){return !!view&&view.current()&&view.serial
 function beInvalidateSample(view,message){
  if(!view)return;
  view.serial++;view.readySample=null;view.loading=true;view.transform=null;
+ bePlateRetire(view,'Frame changed. Search again after inspecting this frame.');
  beEndGesture(view.editor,view.cv);view.editor.sel=-1;
  for(const id of ['beRm','beTimes']){const e=document.getElementById(id);if(e)e.style.display='none';}
  if(view.current()){
@@ -5533,7 +5534,7 @@ async function beApplySample(view,serial,data){
   const b=view.editor;b.raw=data.rows;b.ox=data.sample.offset[0];b.oy=data.sample.offset[1];b.t=data.sample.canonical_s;
   view.readySample={serial,...data,imageURL:url};
   const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
-  beFilter();beDraw();beTLDraw();
+  beFilter();beDraw();beTLDraw();bePlateRender(view);
  }finally{if(url&&!installed)URL.revokeObjectURL(url);}
 }
 function beRequestSample(view,t){
@@ -5594,6 +5595,116 @@ function beNewBox(view,box,t0,t1){
  [t0,t1].every(Number.isFinite)&&t0>=0&&t1>t0&&t1<=view.editor.dur&&t0<=s.canonical_s&&s.canonical_s<=t1;
 }
 
+function bePlateRender(view){
+ if(!view?.current())return;
+ const p=view.plate,run=document.getElementById('bePlateRun'),cancel=document.getElementById('bePlateCancel');
+ const status=document.getElementById('bePlateStatus'),list=document.getElementById('bePlateResults');
+ if(!run||!cancel||!status||!list)return;
+ run.disabled=!!p.request||!beReady(view);
+ cancel.hidden=!p.request||p.request.cancelRequested;
+ status.textContent=p.message;list.replaceChildren();
+ p.rows.forEach((row,i)=>{
+  const button=document.createElement('button');button.type='button';button.className='sec';
+  button.textContent=`Suggestion ${i+1} · ${row.match==='full_equal'?'full text':'fragment'} match`;
+  button.setAttribute('aria-pressed',String(p.selected===i));
+  if(p.selected===i)button.style.outline='2px solid #22d3ee';
+  button.onclick=()=>{
+   if(!view.current()||!beReady(view))return;
+   p.selected=i;bePlateRender(view);beDraw();
+  };
+  list.appendChild(button);
+ });
+}
+function bePlateRetire(view,message){
+ const p=view?.plate;if(!p)return;
+ if(p.request){
+  const request=p.request;request.retired=true;
+  if(!request.cancelRequested){
+   request.cancelRequested=true;
+   // The token also lets the server remember cancellation before admission.
+   fetch(`api/jobs/${view.id}/plate_search/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({request_id:request.id})}).catch(()=>{});
+  }
+ }
+ p.rows=[];p.selected=-1;if(message)p.message=message;
+ if(view.current()){bePlateRender(view);beDraw();}
+}
+function bePlateChanged(){
+ const view=BE_VIEW;if(!view)return;
+ bePlateRetire(view,'Text or match mode changed. Search again.');
+ view.plate.message='Text or match mode changed. Search again.';bePlateRender(view);
+}
+function bePlateClose(view){
+ bePlateRetire(view,'Search only the current frame. Suggestions do not blur anything.');
+ const query=document.getElementById('bePlateQuery');if(query)query.value='';
+ view.plate.message='Search only the current frame. Suggestions do not blur anything.';bePlateRender(view);
+}
+function bePlateSummary(){
+ const view=BE_VIEW,details=document.getElementById('bePlate');
+ if(view&&details?.open)bePlateClose(view);
+}
+function bePlateToggle(){
+ const view=BE_VIEW,details=document.getElementById('bePlate');
+ if(view&&details&&!details.open)bePlateClose(view);
+}
+function bePlateCancel(){
+ const view=BE_VIEW,request=view?.plate?.request;if(!request)return;
+ request.userCancelled=true;
+ bePlateRetire(view,'Cancellation requested. No suggestions will be applied.');
+}
+function bePlateValidate(value,sample,mode){
+ if(value?.state!=='complete'||value.index!==sample.index||typeof value.truncated!=='boolean'||
+  !Array.isArray(value.suggestions)||value.suggestions.length>128)throw Error('invalid search response');
+ const kind=mode==='full'?'full_equal':'fragment';
+ for(const row of value.suggestions){
+  if(!row||row.boundary!=='unknown'||row.match!==kind||!Array.isArray(row.box)||row.box.length!==4||
+   !row.box.every(Number.isSafeInteger)||row.box[0]<0||row.box[1]<0||row.box[2]>sample.width||
+   row.box[3]>sample.height||row.box[0]>=row.box[2]||row.box[1]>=row.box[3])throw Error('invalid search geometry');
+ }
+ return value.suggestions.map(row=>({box:[...row.box],match:row.match}));
+}
+async function bePlateGo(){
+ const view=BE_VIEW;if(!view||!view.current()||view.plate.request)return;
+ const p=view.plate,query=document.getElementById('bePlateQuery')?.value||'',
+       mode=document.getElementById('bePlateMode')?.value;
+ if(!beReady(view)){p.message='Pause and inspect a frame before searching.';bePlateRender(view);return;}
+ const normalized=query.replace(/[ .\t-]/g,'');
+ if(!/^[A-Za-z0-9 .\t-]+$/.test(query)||normalized.length<3||normalized.length>16||!['full','fragment'].includes(mode)){
+  p.message='Enter 3–16 letters or digits; spaces, dots and hyphens are allowed.';bePlateRender(view);return;
+ }
+ let identity;
+ try{identity=manualId().replace(/-/g,'');}
+ catch(_){p.message='A secure request identifier is unavailable in this browser.';bePlateRender(view);return;}
+ const req={id:identity,serial:view.serial,sample:view.readySample,retired:false,cancelRequested:false,userCancelled:false};
+ p.request=req;p.rows=[];p.selected=-1;p.message='Searching this frame…';bePlateRender(view);beDraw();
+ try{
+  const response=await fetch(`api/jobs/${view.id}/plate_search`,{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({request_id:req.id,seed:copyEdit(req.sample.precondition),query,mode})});
+  let result;try{result=await response.json();}catch(_){throw Error('invalid search response');}
+  if(!view.current()||p.request!==req||req.retired||!beSampleCurrent(view,req.serial)||view.readySample!==req.sample)return;
+  if(!response.ok){
+   if(result?.state==='timeout')p.message='Search timed out; this frame was not fully searched.';
+   else if(result?.state==='cancelled')p.message='Search cancelled; no suggestions were applied.';
+   else if(result?.error==='search_busy')p.message='Another search is running. Try again when it finishes.';
+   else if(response.status===409)p.message='The inspected frame changed. Inspect it again and retry.';
+   else p.message='Search unavailable. Check the local Tesseract installation and supported runtime.';
+   return;
+  }
+  p.rows=bePlateValidate(result,req.sample.sample,mode);p.selected=-1;
+  p.message=p.rows.length?`Found ${p.rows.length} suggestion(s) on this frame. Select one to inspect; draw a box around the whole number or plate to redact it.`:
+   'No matching text found in this frame. OCR can miss text.';
+  if(result.truncated)p.message+=' Results were truncated.';
+ }catch(_){
+  if(view.current()&&p.request===req&&!req.retired)p.message='Search failed. Try again.';
+ }finally{
+  if(p.request===req){
+   p.request=null;
+   if(req.userCancelled&&view.current()&&view.serial===req.serial)p.message='Search stopped. No suggestions were applied.';
+   if(view.current()){bePlateRender(view);beDraw();}
+  }
+ }
+}
+
 function beEndGesture(editor,cv){
  editor.drag=null;editor.addAnchor=null;editor.addFloat=null;
  if(editor.pointerId!=null){
@@ -5603,6 +5714,7 @@ function beEndGesture(editor,cv){
 }
 function beUnmount(){
  const view=BE_VIEW;if(!view)return;
+ bePlateRetire(view,'');
  beRetireTrack(view);BE_VIEW=null;view.serial++;view.playbackSerial++;
  const gesture=view.tlGesture;
  if(gesture){
@@ -5623,7 +5735,8 @@ function beUnmountIn(root){
 }
 function beMount(img,vid,cv,id,gen,editor){
  beUnmount();
- const view={img,vid,cv,id,gen,editor,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false};
+ const view={img,vid,cv,id,gen,editor,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false,
+  plate:{request:null,rows:[],selected:-1,message:'Search only the current frame. Suggestions do not blur anything.'}};
  view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
   document.getElementById("beCv")===cv;
  view.sync=()=>{
@@ -5701,6 +5814,22 @@ async function loadBoxEdit(fromReview){
    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
+  <details id="bePlate" style="margin-top:8px" ontoggle="bePlateToggle()">
+   <summary onclick="bePlateSummary()">Find plate text in this frame</summary>
+   <p style="font-size:12px;color:#94a3b8;margin:5px 0">Searches only this inspected frame with local OCR. Results are approximate suggestions, not redactions.</p>
+   <div class="row" style="gap:6px;align-items:center">
+    <label for="bePlateQuery">Plate text</label>
+    <input id="bePlateQuery" type="text" maxlength="128" autocomplete="off" spellcheck="false"
+     style="flex:1;min-width:150px" oninput="bePlateChanged()">
+    <label for="bePlateMode">Match</label>
+    <select id="bePlateMode" onchange="bePlateChanged()"><option value="full">Full text</option>
+     <option value="fragment">Text fragment</option></select>
+    <button class="sec" id="bePlateRun" type="button" onclick="bePlateGo()" disabled>Search this frame</button>
+    <button class="sec" id="bePlateCancel" type="button" onclick="bePlateCancel()" hidden>Cancel search</button>
+   </div>
+   <div id="bePlateStatus" role="status" aria-live="polite" style="font-size:12px;color:#cbd5e1;margin-top:5px">Search only the current frame. Suggestions do not blur anything.</div>
+   <div id="bePlateResults" class="row" style="gap:5px;margin-top:5px"></div>
+  </details>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
@@ -6114,6 +6243,12 @@ function beDraw(){
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
    x.strokeRect(hx-5,hy-5,10,10);}
+ }
+ const suggestion=view.plate?.rows[view.plate.selected];
+ if(suggestion&&!BE.playing&&view.readySample?.serial===view.serial){
+  const[a1,b1,a2,b2]=mapped(suggestion.box);
+  x.strokeStyle='#22d3ee';x.lineWidth=3;x.setLineDash([7,5]);
+  x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
  }
 }
 function beAddMode(){
