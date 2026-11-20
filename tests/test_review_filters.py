@@ -128,7 +128,7 @@ def test_escape_uses_the_scheduler_gesture_cleanup(monkeypatch):
     import test_review_choices as choices
     harness = choices.HARNESS.replace(
         'const elements=new Map();', 'const elements=new Map(),documentEvents=new Map();'
-    ).replace('({elements,console,', '({elements,documentEvents,console,').replace(
+    ).replace('({elements,el,console,', '({elements,el,documentEvents,console,').replace(
         'querySelectorAll:()=>[],addEventListener(){},createElement:el}',
         'querySelectorAll:()=>[],addEventListener:(name,fn)=>documentEvents.set(name,fn),createElement:el}'
     )

@@ -208,9 +208,16 @@ def test_phase_actions_replacement_releases_only_removed_editor_owner():
     let disconnected=0,paused=0;BE.drag={kind:'move'};
     const video={paused:false,pause(){paused++;this.paused=true}};
     BE_VIEW={cv,vid:video,editor:BE,observer:{disconnect(){disconnected++}}};
+    let replaced=false;
+    Object.defineProperty(actions,'innerHTML',{configurable:true,set(value){
+      assert.equal(BE_VIEW,null,'action replacement preceded editor retirement');
+      assert.equal(disconnected,1,'action replacement preceded observer disposal');
+      assert.equal(video.paused,true,'action replacement preceded video pause');
+      replaced=true;
+    }});
     await advance(900);await cycle('rendering');
     assert.equal(BE_VIEW,null);assert.equal(BE.drag,null);
-    assert.equal(disconnected,1);assert.equal(paused,1);
+    assert.equal(disconnected,1);assert.equal(paused,1);assert(replaced);
     """)
 
 

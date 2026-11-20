@@ -57,7 +57,7 @@ def run(scenario):
     if not node:
         pytest.skip("Node is needed to evaluate the embedded review JavaScript")
     source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
-    result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([node], input=source, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -134,4 +134,17 @@ def test_action_failed_save_and_job_switch_keep_owning_draft():
     eq(EDITS.enabled,{0:false,1:false,11:false});eq(calls.filter(c=>c.url.endsWith('/render')).length,0);
     const retry=saveAndRender();openJob('B');await reply();await retry;openJob('A');
     eq(Object.keys(EDITS.enabled),[]);eq(calls.filter(c=>c.url.endsWith('/render')).length,0);
+    """)
+
+
+def test_delayed_save_preserves_newer_editor_and_review_selection():
+    from test_review_save_failures import MOUNT
+    run(MOUNT + """await review(rows);
+    const scheduler=REVIEW_SCHED;selSet.add(1);
+    const original=mountIn('beslot');const pending=saveAndRender();
+    showPanel('boxedit_rev');const newer=mountIn('beslot');
+    await reply();await reply();await pending;
+    eq(REVIEW_SCHED===scheduler,true);eq(scheduler.disposed,false);
+    eq(BE_VIEW===newer.view,true);eq(newer.view.observer.disconnected,false);
+    eq([...selSet],[1]);
     """)
