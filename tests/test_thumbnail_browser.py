@@ -154,7 +154,7 @@ def test_closed_failed_lightbox_survives_card_only_generation_recovery():
     tasks[2].resolve({ok:true,json:async()=>({duration:10,detections:rows,thumbnail_version:'b'.repeat(32)})});await tick();
     tasks[0].reject(Error('aborted'));await tick();const replacement=tasks.find(t=>t.url.includes('/thumb/0')&&t.url.includes('v='+('b'.repeat(32))));
     await headers(replacement);await body(replacement);if(a.img.onload)a.img.onload();
-    eq(a.reopen.hidden,false);eq(a.lightFailed,true);
+    eq(a.reopen.hidden,false);
     """)
 
 
@@ -186,4 +186,17 @@ def test_new_successful_review_has_fresh_recovery_budget():
     const first=REVIEW_SCHED;first.meta.thumbnails.attempted=true;
     const reopen=loadReview();await reply({duration:10,detections:[row],thumbnail_version:'b'.repeat(32)});await reopen;
     if(REVIEW_SCHED===first||REVIEW_META.thumbnails.attempted||REVIEW_META.thumbnails.version!=='b'.repeat(32))throw Error('new review did not acquire a fresh budget');
+    """)
+
+
+def test_compatible_lightbox_recovery_keeps_failure_visible_until_decode():
+    run(NETWORK + GENERATION + LIGHTBOX + """
+    const s=scheduler(),rows=[hashed(0)];versioned(s,rows);const card0=card(s,0);eligible(s,[0]);s.openLightbox(0);
+    const light=s.lightbox;tasks[1].resolve({ok:false,status:409,json:async()=>({error:'thumbnail_obsolete'})});await tick();
+    tasks[2].resolve({ok:true,json:async()=>({duration:10,detections:rows,thumbnail_version:'b'.repeat(32)})});await tick();
+    eq([card0.reopen.hidden,light.status.hidden,!!light.img.src],[false,false,false]);
+    tasks[0].reject(Error('aborted'));await tick();
+    const next=tasks.find(t=>t.url.includes('/detframe/0')&&t.url.includes('v='+('b'.repeat(32))));
+    await headers(next);await body(next);eq([card0.reopen.hidden,light.status.hidden],[false,false]);
+    light.img.onload();eq([card0.reopen.hidden,light.status.hidden],[true,true]);
     """)

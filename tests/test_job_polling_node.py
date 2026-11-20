@@ -212,3 +212,43 @@ def test_phase_actions_replacement_releases_only_removed_editor_owner():
     assert.equal(BE_VIEW,null);assert.equal(BE.drag,null);
     assert.equal(disconnected,1);assert.equal(paused,1);
     """)
+
+
+def test_manual_review_retry_owns_inflight_request_against_polling():
+    run_js("""openJob('A');await cycle('review');const initial=queue.shift();
+    initial.reject(Error('offline'));await tick();
+    const manual=loadReview(),request=queue.shift();assert.ok(request.url.endsWith('/detections'));
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'poll replaced manual retry');
+    request.resolve(response({duration:7,detections:[]}));await tick();await manual;
+    assert.equal(DUR,7);await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0);
+    """)
+
+
+def test_failed_manual_review_retry_restores_automatic_eligibility():
+    run_js("""openJob('A');await cycle('review');queue.shift().reject(Error('offline'));await tick();
+    const manual=loadReview(),request=queue.shift();request.reject(Error('offline'));await tick();await manual;
+    await advance(900);await cycle('review');assert.ok(queue[0].url.endsWith('/detections'));
+    await reply({duration:9,detections:[]});assert.equal(DUR,9);
+    """)
+
+
+def test_newer_manual_retry_retains_claim_when_older_manual_fails():
+    run_js("""openJob('A');await cycle('review');queue.shift().reject(Error('offline'));await tick();
+    const first=loadReview(),old=queue.shift(),second=loadReview(),current=queue.shift();
+    old.reject(Error('late failure'));await tick();await first;
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'old failure released newer claim');
+    current.resolve(response({duration:8,detections:[]}));await tick();await second;assert.equal(DUR,8);
+    """)
+
+
+def test_failed_auto_completion_cannot_release_manual_retry_claim():
+    run_js("""openJob('A');await cycle('review');const initial=queue.shift();let manual,request;
+    reviewLoadFailure=()=>{Promise.resolve().then(()=>{manual=loadReview();request=queue.shift()})};
+    initial.reject(Error('offline'));await tick();
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'old auto completion released manual claim');
+    request.resolve(response({duration:11,detections:[]}));await tick();await manual;assert.equal(DUR,11);
+    """)

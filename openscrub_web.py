@@ -5234,8 +5234,9 @@ async function refreshCycle(cycle){
  renderExportProgress();
  if(AUTO_REVIEW&&AUTO_REVIEW.state==="idle"){
   const auto=AUTO_REVIEW;auto.state="loading";
-  loadReview(auto).catch(()=>{
-   if(AUTO_REVIEW===auto&&ownsView(id,gen)){
+  const pending=loadReview(auto),request=REVIEW_REQUEST;
+  pending.catch(()=>{
+   if(AUTO_REVIEW===auto&&REVIEW_REQUEST===request&&ownsView(id,gen)){
     auto.state="idle";pollStatus("Review could not load — retrying job updates.");
    }
   });
@@ -5901,6 +5902,8 @@ function reviewLoadFailure(id,gen){
 }
 async function loadReview(auto=null){
  const id=CUR,gen=VIEW_GEN,request={};REVIEW_REQUEST=request;
+ const manualAuto=!auto&&AUTO_REVIEW?.state!=="ready"?AUTO_REVIEW:null;
+ if(manualAuto)manualAuto.state="loading";
  const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===request&&
   (!auto||(AUTO_REVIEW===auto&&PHPH==="review"));
  let d,thumbnails;
@@ -5913,7 +5916,10 @@ async function loadReview(auto=null){
   thumbnails=reviewMetadata(d);
   if(!thumbnails)throw new Error('Invalid review metadata');
  }catch(e){
-  if(current()){reviewLoadFailure(id,gen);if(auto)throw e;}
+  if(current()){
+   if(manualAuto&&AUTO_REVIEW===manualAuto)manualAuto.state="idle";
+   reviewLoadFailure(id,gen);if(auto)throw e;
+  }
   return;
  }
  if(AUTO_REVIEW)AUTO_REVIEW.state="ready";
@@ -5975,6 +5981,7 @@ function refreshReviewVisibleSet({jobId,viewGen,matchingCardIds}={}){
 class ReviewScheduler{
  constructor(jobId,viewGen,root,meta){
   Object.assign(this,{jobId,viewGen,root,meta});
+  if(!meta.lightboxFailures)meta.lightboxFailures=new Set();
   this.token={};this.disposed=false;this.frame=0;this.bindings=new Map();
   this.retries=new Map();this.eligible=new Map();this.queue=[];this.listeners=[];
   this.matching=new Set(meta.byId.keys());this.sections=[];this.normalIds=[];
@@ -6112,6 +6119,7 @@ class ReviewScheduler{
       const holder=document.createElement('div');holder.innerHTML=reviewCard(this.meta.byId.get(id));
       const card=holder.firstElementChild,img=card.querySelector('img');
       b={id,card,img,token:{},url:null,op:null};this.bindings.set(id,b);
+      this.previewStatus(b,false);
      }
      if(b.card.parentElement!==row)row.appendChild(b.card);orderedCards.push(b.card);
      b.card.style.gridColumn=String(col+1);b.card.dataset.focusPin=String(id===pin?1:0);
@@ -6197,9 +6205,12 @@ class ReviewScheduler{
   if(b.overlay){b.status.hidden=!unavailable;b.img.hidden=unavailable;}
   else b.img.parentElement.classList[unavailable?'add':'remove']('unavailable');
   const card=b.source||b;
-  if(b.overlay)card.lightFailed=unavailable;
+  if(b.overlay){
+   if(unavailable)this.meta.lightboxFailures.add(card.id);
+   else this.meta.lightboxFailures.delete(card.id);
+  }
   const reopen=card.card.querySelector?.('[data-thumb-reopen]');
-  if(reopen)reopen.hidden=!(card.lightFailed||this.retries.get(card.id)?.failures>=4||
+  if(reopen)reopen.hidden=!(this.meta.lightboxFailures.has(card.id)||this.retries.get(card.id)?.failures>=4||
    this.meta.thumbnails?.incompatible.has(card.id));
  }
  fail(b,obsolete=false){
@@ -6249,7 +6260,8 @@ class ReviewScheduler{
    }
    if(this.lightbox){
     const b=this.lightbox;this.cancel(b);this.clearURL(b);this.clearRetryTimer(b.retry);
-    b.retry={failures:0,readyAt:0,timer:0};this.previewStatus(b,state.incompatible.has(b.id));
+    b.retry={failures:0,readyAt:0,timer:0};
+    if(state.incompatible.has(b.id))this.previewStatus(b,true);
    }
   }catch(error){/* Keep the current review and the spent budget. */}
   finally{

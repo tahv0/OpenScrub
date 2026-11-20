@@ -75,7 +75,7 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   assert.equal(metadata.length,before+1);
   assert(images.some(x=>x.id===0&&x.kind==='detframe'&&x.version===versions[0]));
   release();holdRecovery=null;
-  await page.waitForFunction(()=>document.querySelector('#det2 img')?.naturalWidth>0&&document.querySelector('#det0 [data-thumb-reopen]')?.hidden===false);
+  await page.waitForFunction(()=>REVIEW_META?.thumbnails?.version==='b'.repeat(32)&&REVIEW_SCHED?.bindings.get(2)?.url&&document.querySelector('#det2 img')?.naturalWidth>0&&document.querySelector('#det0 [data-thumb-reopen]')?.hidden===false);
   assert(images.some(x=>x.id===2&&x.version===versions[1]));
   assert(!images.some(x=>x.id===0&&x.version===versions[1]));
   assert(await page.evaluate(()=>document.getElementById('review')===firstReview&&
@@ -96,8 +96,14 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   await page.locator('#lb [data-thumb-reopen]').click();
   await page.locator('[data-review-retry]').waitFor({state:'attached'});
   assert(await page.evaluate(()=>document.getElementById('review')===firstReview&&EDITS===firstDraft&&!!document.getElementById('lb')));
+  await page.evaluate(()=>document.getElementById('lb').click());
+  await page.evaluate(()=>scrollTo(0,0));
+  await page.waitForFunction(()=>!document.getElementById('det119'));
+  await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
+  await page.waitForFunction(()=>document.querySelector('#det119 [data-thumb-reopen]')?.hidden===false);
+  assert.equal(metadata.length,before+2,'remount cannot replenish recovery');
   failMetadata=false;
-  await page.locator('#lb [data-thumb-reopen]').click();
+  await page.locator('#det119 [data-thumb-reopen]').click();
   await page.waitForFunction(()=>document.getElementById('review')!==firstReview&&!!document.getElementById('review'));
   assert(await page.evaluate(()=>EDITS===firstDraft&&MAN===firstManual&&BE===firstEditor&&EDITS.enabled[0]===false));
   assert.deepEqual(errors,[]);

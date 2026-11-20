@@ -254,3 +254,24 @@ def test_pagehide_pageshow_preserves_retry_deadline_and_recreates_only_live_time
     windowEvents.get('pageshow')();eq(REVIEW_SCHED.retries.get(1).readyAt,600);eq(timers.size,1);
     stale();eq(tasks.length,1);advance(399);eq(tasks.length,1);advance(1);await tick();eq(tasks.length,2);
     """)
+
+
+def test_lightbox_failure_survives_virtual_card_remount_and_page_restore():
+    structure = STRUCTURE.replace(
+        "querySelector(selector){return selector==='img'?this.img:selector==='button'?this.button:null}",
+        "querySelector(selector){return selector==='img'?this.img:selector==='button'?this.button:selector==='[data-thumb-reopen]'?this.reopen:null}"
+    ).replace(
+        "card.img=new PrimitiveNode('img');card.button=new PrimitiveNode('button');",
+        "card.img=new PrimitiveNode('img');card.button=new PrimitiveNode('button');card.reopen={hidden:true};"
+    )
+    run(NETWORK + structure + """gridTop=100;const s=structure(1),first=s.bindings.get(1);
+    s.meta.thumbnails={version:'a'.repeat(32),attempted:true,incompatible:new Set()};
+    const failed={id:1,source:first,overlay:{},status:{hidden:true},img:{hidden:false}};
+    s.previewStatus(failed,true);eq(first.card.reopen.hidden,false);
+    s.matching.clear();s.layout();eq(s.bindings.has(1),false);
+    s.matching.add(1);s.layout();let current=s.bindings.get(1);
+    if(current===first)throw Error('card was not remounted');eq(current.card.reopen.hidden,false);
+    windowEvents.get('pagehide')();windowEvents.get('pageshow')();
+    current=REVIEW_SCHED.bindings.get(1);eq(current.card.reopen.hidden,false);
+    eq(REVIEW_SCHED.meta.thumbnails.attempted,true);
+    """)
