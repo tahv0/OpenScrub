@@ -52,6 +52,7 @@ import openscrub
 from openscrub_internal.reports import _staged_report
 from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 from openscrub_internal.job_logs import JobLog
@@ -2014,16 +2015,7 @@ def _report_committed_locked(job, doc=None, scan_owner=None):
 
 
 def _probe_exact_source(path):
-    try:
-        result = subprocess.run([
-            'ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries',
-            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames:stream_tags=rotate:stream_side_data',
-            '-of', 'json', path], capture_output=True, timeout=15, check=True)
-        if len(result.stdout) > 65536:
-            raise exact.ExactError('stream metadata exceeds bounded response')
-        return exact.metadata_facts(json.loads(result.stdout))
-    except (OSError, subprocess.SubprocessError, ValueError) as error:
-        raise exact.ExactError('successful exact stream metadata unavailable: '+str(error)) from None
+    return exact.probe_source(path)
 
 
 @contextlib.contextmanager
@@ -3216,6 +3208,41 @@ def _read_exact_source(selected, index, *, fps, count, tolerance_s):
     return decoded
 
 
+def _quad_edit_eligibility(doc, selected):
+    provenance = doc.get('provenance', {})
+    expected = provenance.get('input_sha256') if isinstance(provenance, dict) else None
+    if (not plate_quad.native_sdr(provenance, selected['facts'])
+            or not isinstance(expected, str) or re.fullmatch('[0-9a-f]{64}', expected) is None):
+        return 'unavailable'
+    verified = selected.get('quad_sha256')
+    if verified is None:
+        return 'verification_required'
+    return 'ready' if verified == expected else 'unavailable'
+
+
+def _quad_sample_eligibility(row, doc, selected, index, fps, count, timeline_eq):
+    quad = row.get('manual_plate_quad')
+    if quad is None:
+        return 'none'
+    if not plate_quad.valid_record(quad):
+        return 'unsupported'
+    facts, source, frame = selected['facts'], quad['source'], quad['frame']
+    if (not plate_quad.native_sdr(doc.get('provenance', {}), facts)
+            or source['width'] != facts['width'] or source['height'] != facts['height']
+            or source['stream'] != facts['stream'] or frame['fps'] != fps
+            or frame['count'] != count or frame['timeline_eq'] != timeline_eq
+            or doc.get('provenance', {}).get('input_sha256') != source['sha256']):
+        return 'unavailable'
+    if frame['index'] != index:
+        return 'other_frame'
+    digest = selected.get('quad_sha256')
+    if digest is None:
+        return 'unverified'
+    if digest != source['sha256'] or digest != doc.get('provenance', {}).get('input_sha256'):
+        return 'unavailable'
+    return 'eligible_sdr_frame'
+
+
 @app.route('/api/jobs/<jid>/edit_sample')
 def job_edit_sample(jid):
     job = JOBS.get(jid) or abort(404)
@@ -3249,10 +3276,18 @@ def job_edit_sample(jid):
             start, end, _ = baseline['span']
             if start-.01 <= decoded.canonical_s <= end+.01:
                 box = baseline['cbox']
-                boxes.append(dict(i=i, category=row['category'], text=row.get('text',''),
+                item = dict(i=i, category=row['category'], text=row.get('text',''),
                     enabled=row.get('enabled',True), t_start=start, t_end=end,
                     box=[box[0]+offset[0], box[1]+offset[1], box[2]+offset[0], box[3]+offset[1]],
-                    row_context_eq=exact.row_context_eq(row), base=baseline))
+                    row_context_eq=exact.row_context_eq(row), base=baseline)
+                if row['category'] == 'plate':
+                    item['quad_context_eq'] = _quad_context_eq(row)
+                    item['quad_edit_eligibility'] = _quad_edit_eligibility(doc, selected)
+                    item['quad_eligibility'] = _quad_sample_eligibility(
+                        row, doc, selected, index, fps, len(cum), timeline_eq)
+                    if 'manual_plate_quad' in row:
+                        item['manual_plate_quad'] = row['manual_plate_quad']
+                boxes.append(item)
         with _exact_owner_guard(job, lease):
             _exact_current_locked(job, selected, fence)
         return jsonify(version=1, sample=dict(source_ref=selected['source_ref'],
@@ -3541,6 +3576,39 @@ def _valid_manual_creation(value):
             and numbers(value["aoff"], 2))
 
 
+def _quad_context_eq(row):
+    # Existing geometry preconditions include this additive field. For a lost
+    # acknowledgement also compare the remainder of the row independently.
+    return exact.row_context_eq({key: value for key, value in row.items()
+                                 if key != 'manual_plate_quad'})
+
+
+def _quad_source_digest(job, prepared):
+    """One leased, descriptor-fenced digest, reused for this live selection."""
+    files = FILES.initialize(job)
+    with files.report_lock:
+        current = files.current_source
+        if (current is not None and (current['path'], current['stamp']) ==
+                (prepared['path'], prepared['stamp'])):
+            cached = current.get('quad_sha256')
+            if cached is not None:
+                return cached
+    with open(prepared['path'], 'rb') as opened:
+        if (_file_stamp(os.fstat(opened.fileno())) != prepared['stamp']
+                or _file_stamp(os.stat(prepared['path'])) != prepared['stamp']):
+            raise exact.ExactError('source changed before digest', 409, 'geometry_conflict')
+        digest = hashlib.sha256()
+        while True:
+            data = opened.read(1 << 20)
+            if not data:
+                break
+            digest.update(data)
+        if (_file_stamp(os.fstat(opened.fileno())) != prepared['stamp']
+                or _file_stamp(os.stat(prepared['path'])) != prepared['stamp']):
+            raise exact.ExactError('source changed during digest', 409, 'geometry_conflict')
+    return digest.hexdigest()
+
+
 def _parse_sample_precondition(value, row=False):
     def invalid():
         raise exact.ExactError('invalid geometry precondition shape', 400, 'invalid_sample_request')
@@ -3570,13 +3638,23 @@ def _parse_sample_precondition(value, row=False):
 
 def _strict_geometry(edits):
     preconditions = edits.get('geometry_preconditions', {})
+    quads = edits.get('manual_plate_quads', {})
+    if not isinstance(quads, dict):
+        raise exact.ExactError('manual_plate_quads must be an index map', 400, 'invalid_sample_request')
     if not isinstance(preconditions, dict):
         raise exact.ExactError('geometry_preconditions must be an index map', 400, 'invalid_sample_request')
     for key, value in preconditions.items():
         if (not isinstance(key, str) or re.fullmatch('0|[1-9][0-9]*', key) is None
-                or len(key) > 18 or not any(key in (edits.get(k) or {}) for k in ('box_overrides','time_overrides'))):
+                or len(key) > 18 or not any(key in (edits.get(k) or {}) for k in ('box_overrides','time_overrides','manual_plate_quads'))):
             raise exact.ExactError('strict row must name a submitted raw index', 400, 'invalid_sample_request')
         _parse_sample_precondition(value, row=True)
+        if key in quads:
+            if (not isinstance(value.get('quad_context_eq'), str)
+                    or re.fullmatch('[0-9a-f]{64}', value['quad_context_eq']) is None):
+                raise exact.ExactError('quad row context required', 400, 'invalid_sample_request')
+            quad = quads[key]
+            if quad is not None and (not isinstance(quad, dict) or set(quad) != {'points'}):
+                raise exact.ExactError('quad must be four corners or null', 400, 'invalid_sample_request')
         try:
             if key in (edits.get('box_overrides') or {}):
                 exact.vector(edits['box_overrides'][key], 4)
@@ -3586,9 +3664,11 @@ def _strict_geometry(edits):
                     raise ValueError()
         except (exact.ExactError, ValueError):
             raise exact.ExactError('invalid strict geometry target', 400, 'invalid_sample_request') from None
+    if not set(quads).issubset(preconditions):
+        raise exact.ExactError('quad needs an inspected row', 400, 'invalid_sample_request')
     if preconditions:
         strict_indices = {int(key) for key in preconditions}
-        for field in ('box_overrides', 'time_overrides'):
+        for field in ('box_overrides', 'time_overrides', 'manual_plate_quads'):
             for key in (edits.get(field) or {}):
                 try:
                     index = int(key)
@@ -3662,16 +3742,15 @@ def _check_sample_precondition(pc, selected, fps, cum, timeline_eq):
         raise exact.ExactError('sample source/timeline differs', 409, 'geometry_conflict')
 
 
-def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq):
+def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq, digest=None):
     targets = {}
+    quads = edits.get('manual_plate_quads', {})
     for key, pc in preconditions.items():
         _check_sample_precondition(pc, selected, fps, cum, timeline_eq)
         index = int(key)
         if index >= len(doc['detections']):
             raise exact.ExactError('raw row no longer exists', 409, 'geometry_conflict')
         row = doc['detections'][index]
-        if exact.row_context_eq(row) != pc['row_context_eq']:
-            raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
         baseline = pc['base']
         desired_box = list((edits.get('box_overrides') or {}).get(key, baseline['cbox']))
         span = (edits.get('time_overrides') or {}).get(key)
@@ -3679,9 +3758,34 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
                         if span is not None else list(baseline['span']))
         intended = dict(cbox=desired_box, span=desired_span)
         current = exact.row_base(row)
-        if current != baseline and current != intended:
-            raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
-        targets[key] = intended, current == intended
+        desired_quad = None
+        if key in quads:
+            if (row.get('category') != 'plate'
+                    or not baseline['span'][0]-.01 <= pc['index']/fps <= baseline['span'][1]+.01):
+                raise exact.ExactError('sample does not inspect this plate row', 409, 'geometry_conflict')
+            prov = doc.get('provenance', {})
+            if (not plate_quad.native_sdr(prov, selected['facts'])
+                    or not digest or prov.get('input_sha256') != digest):
+                raise exact.ExactError('verified native SDR scan identity unavailable', 409, 'geometry_conflict')
+            if _quad_context_eq(row) != pc['quad_context_eq']:
+                raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            try:
+                if quads[key] is not None:
+                    desired_quad = plate_quad.make_record(quads[key]['points'], pc, digest, fps, len(cum), selected['facts'])
+            except (ValueError, TypeError, OverflowError, cv2.error) as error:
+                raise exact.ExactError('invalid plate corners: '+str(error), 400, 'invalid_sample_request') from None
+            baseline_matches = current == baseline and exact.row_context_eq(row) == pc['row_context_eq']
+            wanted_matches = (current == intended and
+                              (('manual_plate_quad' not in row) if desired_quad is None else
+                               _same_json_value(row.get('manual_plate_quad'), desired_quad)))
+            if not baseline_matches and not wanted_matches:
+                raise exact.ExactError('quad baseline/intended tuple differs', 409, 'geometry_conflict')
+        else:
+            if exact.row_context_eq(row) != pc['row_context_eq']:
+                raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            if current != baseline and current != intended:
+                raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
+        targets[key] = intended, current == intended, desired_quad
     return targets
 
 
@@ -3693,6 +3797,8 @@ def job_save_edits(jid):
     prepared = lease = None
     needs_source = False
     preparation_authority = None
+    preparation_report = None
+    digest = None
     try:
         preconditions = _strict_geometry(edits)
         while True:
@@ -3711,6 +3817,8 @@ def job_save_edits(jid):
                         raise exact.ExactError('report has no selected scan input')
                     files = FILES.initialize(job)
                     preparation_authority = (files.current_source, files.source_epoch, files.operation)
+                    if edits.get('manual_plate_quads'):
+                        preparation_report = (files.committed_report_epoch, _file_stamp(os.stat(path)))
                 else:
                     selected = targets = None
                     if needs_source:
@@ -3726,10 +3834,13 @@ def job_save_edits(jid):
                         if (os.path.realpath(doc.get('provenance', {}).get('input','')) != prepared['path']
                                 or os.path.realpath(job['video']) != prepared['path']):
                             raise exact.ExactError('source changed while preparing save', 409, 'geometry_conflict')
+                        if (preparation_report is not None and
+                                (files.committed_report_epoch, _file_stamp(os.stat(path))) != preparation_report):
+                            raise exact.ExactError('report changed during quad preparation', 409, 'geometry_conflict')
                         selected = _select_observed_locked(job, prepared)
                         _exact_current_locked(job, selected)
                         fps,cum,timeline_eq,_ = _exact_policy(doc,selected)
-                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq)
+                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq,digest)
                         for manual,pc in strict_manual:
                             _check_sample_precondition(pc,selected,fps,cum,timeline_eq)
                             t0,t1,tref = manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])
@@ -3770,13 +3881,25 @@ def job_save_edits(jid):
                                 row = doc['detections'][i]
                                 assign(row, 't_start', t0); assign(row, 't_end', t1)
                                 assign(row, 'last_seen', min(max(row.get('last_seen',t0),t0),t1))
+                    for key, value in (edits.get('manual_plate_quads') or {}).items():
+                        row = doc['detections'][int(key)]
+                        desired = targets[key][2]
+                        if desired is None:
+                            if 'manual_plate_quad' in row:
+                                destination = (id(row), 'manual_plate_quad')
+                                touched[destination] = (row, 'manual_plate_quad', row['manual_plate_quad'])
+                                del row['manual_plate_quad']
+                        else:
+                            assign(row, 'manual_plate_quad', desired)
+                    if digest is not None:
+                        selected['quad_sha256'] = digest
                     doc['detections'].extend(additions)
                     if 'audio' in edits:
                         assign(doc, 'audio_redactions', [
                             dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
                             for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0])
                     if (len(doc['detections']) != original_count or
-                            any(original is missing or not _same_json_value(original, target[key])
+                            any(original is missing or key not in target or not _same_json_value(original, target[key])
                                 for target, key, original in touched.values())):
                         _publish_job_report_locked(job, path, doc)
                         _report_committed_locked(job, doc)
@@ -3787,11 +3910,20 @@ def job_save_edits(jid):
                     result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
                     if preconditions:
                         result['geometry_rows'] = {key:{**pc,'row_context_eq':exact.row_context_eq(doc['detections'][int(key)]),
-                            'base':exact.row_base(doc['detections'][int(key)])} for key,pc in preconditions.items()}
+                            'base':exact.row_base(doc['detections'][int(key)]),
+                            'quad_context_eq':_quad_context_eq(doc['detections'][int(key)])} for key,pc in preconditions.items()}
                     return jsonify(result)
             # A genuinely new strict mutation was found, before any mutation.
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.
             prepared, lease = _prepare_observed_source(job,candidate)
+            if edits.get('manual_plate_quads'):
+                if not plate_quad.native_sdr(doc.get('provenance', {}), prepared['facts']):
+                    raise exact.ExactError('native SDR scan identity unavailable', 409, 'geometry_conflict')
+                fps, cum, _, tolerance = _exact_policy(doc, prepared)
+                digest = _quad_source_digest(job, prepared)
+                for key in edits['manual_plate_quads']:
+                    pc = preconditions[key]
+                    _read_exact_source(prepared, pc['index'], fps=fps, count=len(cum), tolerance_s=tolerance)
     except exact.ExactError as error:
         if needs_source and error.status in (409, 422) and FILES.initialize(job).source_retired:
             error = exact.ExactError('sample source has changed; rescan required', 409, 'geometry_conflict')

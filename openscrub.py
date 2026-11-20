@@ -40,6 +40,7 @@ import cv2
 import numpy as np
 
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
@@ -755,6 +756,7 @@ class Detection:
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
                                # category); empty = plain box redaction
+    manual_plate_quad: object = None  # source-bound v1, never inherited by a track
 
 
 class PhiMemory:
@@ -4413,11 +4415,121 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 pass
 
 
+def _quad_stamp(observed):
+    return (observed.st_dev, observed.st_ino, observed.st_size,
+            observed.st_mtime_ns, observed.st_ctime_ns)
+
+
+def _quad_source_current(guard):
+    try:
+        return (guard is not None and _quad_stamp(os.fstat(guard['file'].fileno())) == guard['stamp']
+                and _quad_stamp(os.stat(guard['path'])) == guard['stamp'])
+    except OSError:
+        return False
+
+
+def _quad_render_context(args, state, detections):
+    guard = state.get('_quad_source_guard')
+    doc = state.get('source_report')
+    if (not guard or not isinstance(doc, dict) or not _quad_source_current(guard)
+            or getattr(args, 'hdr_source', None) or getattr(args, 'hdr_tonemapped', False)
+            or getattr(args, 'original_video', None)
+            or getattr(args, 'coverage', 'tight') in ('box', 'concealed')):
+        return None
+    prov = doc.get('provenance', {})
+    try:
+        facts = exact.probe_source(args.video)
+        if (not _quad_source_current(guard) or not plate_quad.native_sdr(prov, facts)
+                or prov.get('input_sha256') != guard['digest']):
+            return None
+        fps, cum, timeline = exact.timeline(doc, facts)
+        tolerance = exact.precision_bound(facts, fps, len(cum))
+        if fps != state['fps'] or len(cum) != len(state['cum']):
+            return None
+        records = {}
+        for d in detections:
+            q = d.manual_plate_quad
+            if d.category != 'plate' or not plate_quad.valid_record(q):
+                continue
+            source, frame = q['source'], q['frame']
+            if (source == {'sha256': guard['digest'], 'stream': facts['stream'],
+                           'width': facts['width'], 'height': facts['height']}
+                    and frame['fps'] == fps and frame['count'] == len(cum)
+                    and frame['timeline_eq'] == timeline):
+                records[id(d)] = q
+        return {'records': records, 'facts': facts, 'fps': fps,
+                'count': len(cum), 'tolerance': tolerance, 'guard': guard} if records else None
+    except (exact.ExactError, KeyError, TypeError, ValueError, OSError):
+        return None
+
+
+def _quad_at_frame(context, d, cap, frame, idx):
+    if not context:
+        return None
+    q = context['records'].get(id(d))
+    if not q or q['frame']['index'] != idx or not _quad_source_current(context['guard']):
+        return None
+    facts = context['facts']
+    try:
+        position = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        rate = cap.get(cv2.CAP_PROP_FPS)
+        count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        observed = cap.get(cv2.CAP_PROP_POS_MSEC)
+        if (not all(exact.finite(v) for v in (position, rate, observed))
+                or cap.getBackendName() != 'FFMPEG' or frame.shape[:2] != (facts['height'], facts['width'])
+                or position != idx + 1
+                or (exact.finite(count) and count > 0 and count != context['count'])
+                or abs(rate-context['fps']) > context['fps']*1e-6
+                or abs(observed/1000-idx/context['fps']) > context['tolerance']):
+            return None
+    except (AttributeError, cv2.error, ValueError, TypeError):
+        return None
+    return q
+
+
+def _quad_roi(frame, quad, pad_px):
+    height, width = frame.shape[:2]
+    vertices = [(x*width, y*height) for x,y in quad['points']]
+    pad = max(0, int(pad_px))
+    return (max(0, math.floor(min(x for x,y in vertices))-pad),
+            max(0, math.floor(min(y for x,y in vertices))-pad),
+            min(width, math.ceil(max(x for x,y in vertices))+pad+1),
+            min(height, math.ceil(max(y for x,y in vertices))+pad+1))
+
+
+def _paint_plate_quad(frame, quad, mode, pad_px):
+    height, width = frame.shape[:2]
+    if pad_px >= max(width, height):
+        blur_region(frame, 0, 0, width, height, mode)
+        return
+    x1, y1, x2, y2 = _quad_roi(frame, quad, pad_px)
+    blur_silhouette(frame, x1, y1, x2, y2, mode, [quad['points']],
+                    (0, 0, width, height), pad_px=pad_px)
+
+
+def _preview_plate_quad(frame, quad, pad_px):
+    height, width = frame.shape[:2]
+    if pad_px >= max(width, height):
+        cv2.rectangle(frame, (0, 0), (width-1, height-1), (0, 0, 255), 2)
+        return True
+    x1, y1, x2, y2 = _quad_roi(frame, quad, pad_px)
+    mask = _silhouette_mask([quad['points']], (0, 0, width, height),
+                            x1, y1, x2-x1, y2-y1)
+    if mask is None:
+        return False
+    if pad_px > 0:
+        k = 2 * int(pad_px) + 1
+        mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(frame, contours, -1, (0, 0, 255), 2, offset=(x1, y1))
+    return True
+
+
 def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
-           mute_tracks=(), out_quality="archival", audio_lanes=None):
+           mute_tracks=(), out_quality="archival", audio_lanes=None, quad_context=None):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -4557,10 +4669,13 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 # distance scrolled since detection — expand the box to cover it
                 (x1, y1, x2, y2), pbox, px = _geometry_box(
                     d, ox, oy, pad, f"SDR detection {ordinals[id(d)]} frame {idx}")
+                quad = _quad_at_frame(quad_context, d, cap, frame, idx)
                 if preview:
-                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                                  (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
-                    for pts in (d.poly or ()):
+                    quad_shown = quad is not None and _preview_plate_quad(frame, quad, px)
+                    if not quad_shown:
+                        cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                      (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                    for pts in (() if quad_shown else (d.poly or ())):
                         arr = np.array(
                             [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
                               int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
@@ -4572,6 +4687,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                         label = f"face {d.confidence:.2f}"
                     cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                elif quad is not None:
+                    _paint_plate_quad(frame, quad, _mode_for(d.category), px)
                 elif d.poly:
                     # segmentation silhouette: mask only the body, not the box —
                     # px (pad+drift) becomes an outward mask dilation
@@ -6663,6 +6780,13 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
             pass
 
 
+def _fresh_detection_row(detection, **extra):
+    row = asdict(detection)
+    if row.get('manual_plate_quad') is None:
+        row.pop('manual_plate_quad', None)
+    return dict(row, **extra)
+
+
 def _report_document(args, state, output_path=None, output_bytes_path=None):
     prov = {
         "tool": "openscrub", "version": VERSION,
@@ -6706,9 +6830,9 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
             },
-            "detections": ([dict(asdict(d), enabled=True)
+            "detections": ([_fresh_detection_row(d, enabled=True)
                             for d in state["detections"]]
-                           + [dict(asdict(d), enabled=False, zone_dropped=True)
+                           + [_fresh_detection_row(d, enabled=False, zone_dropped=True)
                               for d in state.get("zdropped", [])]),
         }
         if state.get("audio_suggestions"):
@@ -6761,7 +6885,8 @@ def _decode_report(doc):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+            poly=tuple(copy.deepcopy(r.get("poly") or ())),
+            manual_plate_quad=copy.deepcopy(r.get("manual_plate_quad"))))
     return dets, state, prov
 
 
@@ -8914,6 +9039,7 @@ def run_render(args, state, cb=None):
         clip = None
     dets_r = apply_coverage(state["detections"],
                             getattr(args, "coverage", "tight"), cb)
+    quad_context = _quad_render_context(args, state, dets_r)
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
@@ -8940,7 +9066,10 @@ def run_render(args, state, cb=None):
                    face_shape=getattr(args, "face_shape", "ellipse"),
                    encoder=args.encoder, audio_spans=aspans, clip=clip,
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-                   audio_lanes=getattr(args, "audio_lane_count", None))
+                   audio_lanes=getattr(args, "audio_lane_count", None),
+                   quad_context=quad_context)
+        if quad_context and not _quad_source_current(quad_context["guard"]):
+            raise RuntimeError("quad input changed during rendering")
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)
@@ -8999,20 +9128,46 @@ def run_pipeline(args, cb=None):
             raise RuntimeError("report has no render_state — re-run a scan "
                                "with --report using openscrub v4+")
         cb.log(f"      {len(dets)} enabled detections")
-        in_sha = sha256_file(args.video)
-        if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
-            cb.log("      WARNING: input file differs from the one this report "
-                   "was made from (sha256 mismatch) — blur positions may be wrong")
-        state = {"fps": rstate["fps"],
-                 "cum": [tuple(v) for v in rstate["cum"]],
-                 "bands": [tuple(v) for v in rstate["bands"]],
-                 "detections": dets, "input_sha256": in_sha,
-                 "source_report": source,
-                 "audio_redactions_overridden": audio_overridden,
-                 "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
-                 "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
-                           "recalls": 0, "remembered": 0}}
-        return run_render(args, state, cb)
+        # Hash from the descriptor held across the actual render only when a
+        # quad might be used. This replaces, rather than repeats, the existing
+        # render input digest work. Other reports keep their original path.
+        guard = None
+        if any(d.category == 'plate' and plate_quad.valid_record(d.manual_plate_quad) for d in dets):
+            opened = open(args.video, 'rb')
+            try:
+                stamp = _quad_stamp(os.fstat(opened.fileno()))
+                guard = {'file': opened, 'path': args.video, 'stamp': stamp}
+                if not _quad_source_current(guard):
+                    raise RuntimeError('quad input changed before digest')
+                digest = hashlib.sha256()
+                for block in iter(lambda: opened.read(1 << 20), b''):
+                    digest.update(block)
+                if not _quad_source_current(guard):
+                    raise RuntimeError('quad input changed during digest')
+                in_sha = guard['digest'] = digest.hexdigest()
+            except BaseException:
+                opened.close()
+                raise
+        else:
+            in_sha = sha256_file(args.video)
+        try:
+            if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+                cb.log("      WARNING: input file differs from the one this report "
+                       "was made from (sha256 mismatch) — blur positions may be wrong")
+            state = {"fps": rstate["fps"],
+                     "cum": [tuple(v) for v in rstate["cum"]],
+                     "bands": [tuple(v) for v in rstate["bands"]],
+                     "detections": dets, "input_sha256": in_sha,
+                     "source_report": source,
+                     "_quad_source_guard": guard,
+                     "audio_redactions_overridden": audio_overridden,
+                     "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+                     "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+                               "recalls": 0, "remembered": 0}}
+            return run_render(args, state, cb)
+        finally:
+            if guard is not None:
+                guard['file'].close()
     state = run_scan(args, cb)
     return run_render(args, state, cb)
 
