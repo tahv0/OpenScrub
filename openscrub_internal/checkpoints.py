@@ -304,9 +304,17 @@ def join_reports(previous, continuation, next_frame, total_frames, completed=Fal
     for row in rows:
         start = max(boundary, row.get('scan_frame_start', boundary))
         end = min(next_frame, row.get('scan_frame_end', next_frame))
-        # Intersect with the renderer's existing inclusive +/- .01 time test.
-        if (start >= end or row['t_end'] + .01 < start / fps or
-                row['t_start'] - .01 > (end - 1) / fps):
+        # Intersect the renderer's inclusive +/- .01 time test with actual
+        # frame indices, not merely the continuous interval between them.
+        if start >= end:
+            continue
+        time_start, time_end = row['t_start'] - .01, row['t_end'] + .01
+        if time_end < start / fps or time_start > (end - 1) / fps:
+            continue
+        first = max(start, math.floor(time_start * fps))
+        while first < end and first / fps < time_start:
+            first += 1
+        if first >= end or first / fps > time_end:
             continue
         new = _copy_json(row)
         new['scan_frame_start'], new['scan_frame_end'] = start, end
