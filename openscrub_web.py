@@ -3231,7 +3231,7 @@ def _quad_baseline_value(token):
 def _quad_edit_eligibility(doc, selected):
     provenance = doc.get('provenance', {})
     expected = provenance.get('input_sha256') if isinstance(provenance, dict) else None
-    if (not plate_quad.native_sdr(provenance, selected['facts'])
+    if (not plate_quad.same_sdr_scan(provenance, selected['facts'])
             or not isinstance(expected, str) or re.fullmatch('[0-9a-f]{64}', expected) is None):
         return 'unavailable'
     verified = selected.get('quad_sha256')
@@ -3247,7 +3247,7 @@ def _quad_sample_eligibility(row, doc, selected, index, fps, count, timeline_eq)
     if not plate_quad.valid_record(quad):
         return 'unsupported'
     facts, source, frame = selected['facts'], quad['source'], quad['frame']
-    if (not plate_quad.native_sdr(doc.get('provenance', {}), facts)
+    if (not plate_quad.same_sdr_scan(doc.get('provenance', {}), facts)
             or source['width'] != facts['width'] or source['height'] != facts['height']
             or source['stream'] != facts['stream'] or frame['fps'] != fps
             or frame['count'] != count or frame['timeline_eq'] != timeline_eq
@@ -3785,9 +3785,9 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
                     or not baseline['span'][0]-.01 <= pc['index']/fps <= baseline['span'][1]+.01):
                 raise exact.ExactError('sample does not inspect this plate row', 409, 'geometry_conflict')
             prov = doc.get('provenance', {})
-            if (not plate_quad.native_sdr(prov, selected['facts'])
+            if (not plate_quad.same_sdr_scan(prov, selected['facts'])
                     or not digest or prov.get('input_sha256') != digest):
-                raise exact.ExactError('verified native SDR scan identity unavailable', 409, 'geometry_conflict')
+                raise exact.ExactError('verified SDR scan identity unavailable', 409, 'geometry_conflict')
             if _quad_context_eq(row) != pc['quad_context_eq']:
                 raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
             try:
@@ -3979,8 +3979,8 @@ def job_save_edits(jid):
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.
             prepared, lease = _prepare_observed_source(job,candidate)
             if edits.get('manual_plate_quads'):
-                if not plate_quad.native_sdr(doc.get('provenance', {}), prepared['facts']):
-                    raise exact.ExactError('native SDR scan identity unavailable', 409, 'geometry_conflict')
+                if not plate_quad.same_sdr_scan(doc.get('provenance', {}), prepared['facts']):
+                    raise exact.ExactError('SDR scan identity unavailable', 409, 'geometry_conflict')
                 fps, cum, _, tolerance = _exact_policy(doc, prepared)
                 digest = _quad_source_digest(job, prepared)
                 for key in edits['manual_plate_quads']:

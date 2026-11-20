@@ -17,16 +17,42 @@ _SDR_TRANSFER = frozenset(('', 'unknown', 'bt709', 'smpte170m', 'bt470bg',
                            'iec61966-2-1', 'smpte240m'))
 
 
+def _sdr_facts(facts):
+    return (isinstance(facts, dict)
+            and facts.get('pixel_format') in _SDR_FORMATS
+            and facts.get('color_transfer', '').lower() in _SDR_TRANSFER
+            and facts.get('color_primaries', '').lower() != 'bt2020')
+
+
 def native_sdr(provenance, facts):
-    if not isinstance(provenance, dict) or not isinstance(facts, dict):
+    if not isinstance(provenance, dict):
         return False
     settings = provenance.get('settings') or {}
     return (isinstance(settings, dict)
             and not any(provenance.get(k) for k in ('vfr_normalized', 'hdr_tonemapped', 'hdr_output', 'original_input'))
             and not settings.get('no_vfr_fix') and settings.get('vfr') != 'ignore'
-            and facts.get('pixel_format') in _SDR_FORMATS
-            and facts.get('color_transfer', '').lower() in _SDR_TRANSFER
-            and facts.get('color_primaries', '').lower() != 'bt2020')
+            and _sdr_facts(facts))
+
+
+def same_sdr_scan(provenance, facts):
+    """A normalized SDR scan is eligible only when SDR is the intended output.
+
+    This admits no scan-to-original mapping. The caller must still verify the
+    selected scan digest, timeline and exact decoded frame at save/render, and
+    must never apply the quad to the separate HDR source.
+    """
+    if native_sdr(provenance, facts):
+        return True
+    if not isinstance(provenance, dict):
+        return False
+    source, original = provenance.get('input'), provenance.get('original_input')
+    settings = provenance.get('settings') or {}
+    return (provenance.get('vfr_normalized') is True
+            and provenance.get('hdr_output') is False
+            and isinstance(source, str) and bool(source)
+            and isinstance(original, str) and bool(original) and source != original
+            and isinstance(settings, dict) and not settings.get('no_vfr_fix')
+            and settings.get('vfr') != 'ignore' and _sdr_facts(facts))
 
 
 def points_in_frame(points, width, height, *, normalized=False):

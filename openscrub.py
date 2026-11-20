@@ -4437,14 +4437,13 @@ def _quad_render_context(args, state, detections):
     guard = state.get('_quad_source_guard')
     doc = state.get('source_report')
     if (not guard or not isinstance(doc, dict) or not _quad_source_current(guard)
-            or getattr(args, 'hdr_source', None) or getattr(args, 'hdr_tonemapped', False)
-            or getattr(args, 'original_video', None)
+            or getattr(args, 'hdr_source', None)
             or getattr(args, 'coverage', 'tight') in ('box', 'concealed')):
         return None
     prov = doc.get('provenance', {})
     try:
         facts = exact.probe_source(args.video)
-        if (not _quad_source_current(guard) or not plate_quad.native_sdr(prov, facts)
+        if (not _quad_source_current(guard) or not plate_quad.same_sdr_scan(prov, facts)
                 or prov.get('input_sha256') != guard['digest']):
             return None
         fps, cum, timeline = exact.timeline(doc, facts)
@@ -9048,15 +9047,20 @@ def run_render(args, state, cb=None):
     quad_guard = state.get('_quad_source_guard')
     _require_quad_source_current(quad_guard)
     if quad_guard is not None:
+        sources = (quad_guard['path'], getattr(args, 'original_video', None),
+                   getattr(args, 'hdr_source', None))
         for role, destination in (('render', dst), ('report', args.report)):
             if not destination:
                 continue
-            try:
-                same_input = os.path.samefile(quad_guard['path'], destination)
-            except FileNotFoundError:
-                same_input = False
-            if same_input:
-                raise RuntimeError('quad input cannot also be the %s destination' % role)
+            for source in sources:
+                if not source:
+                    continue
+                try:
+                    same_input = os.path.samefile(source, destination)
+                except FileNotFoundError:
+                    same_input = False
+                if same_input:
+                    raise RuntimeError('quad input cannot also be the %s destination' % role)
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
