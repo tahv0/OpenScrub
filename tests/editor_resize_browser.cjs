@@ -119,7 +119,7 @@ await page.locator('#bePlay').click();await page.waitForFunction(()=>!BE.playing
 result.video=videoState;
 // Close/remount and job switches disconnect the observer; even deliberately
 // delivered stale callbacks cannot clear or repaint the current mount.
-await page.evaluate(()=>{window.outgoingObserver=resizeObservers.at(-1);window.outgoingImage=document.getElementById('beImg');window.lateImage=outgoingImage.onload;loadReview()});
+await page.evaluate(async()=>{window.outgoingObserver=resizeObservers.at(-1);window.outgoingImage=document.getElementById('beImg');window.lateImage=outgoingImage.onload;await loadReview()});
 assert(await page.evaluate(()=>outgoingObserver.disconnected));assert.equal(await page.locator('#beCv').count(),0);
 await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
 const currentPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());

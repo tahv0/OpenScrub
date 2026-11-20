@@ -34,7 +34,7 @@ def run(scenario):
     if not node:
         pytest.skip('Node is needed to evaluate the embedded review JavaScript')
     script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
-    result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([node], input=script, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 

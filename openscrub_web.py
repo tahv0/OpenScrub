@@ -4813,11 +4813,11 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+ if(CUR===id){disposeReview();beUnmount();stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
- disposeReview();REVIEW_LOAD++;beUnmount();
+ disposeReview();beUnmount();
  const video=document.getElementById("beVid");
  if(video){try{video.pause();}catch(e){}}
  if(EDITS){
@@ -5768,20 +5768,7 @@ function beHook(){
   if(view&&view.current()){beEndGesture(BE,cv);beDraw();}
  });
 }
-function zoomDet(i){
- let ov=document.getElementById("lb");
- if(!ov){
-  ov=document.createElement("div");ov.id="lb";
-  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
-   "z-index:100;display:flex;align-items:center;justify-content:center;"+
-   "cursor:zoom-out;padding:18px";
-  ov.onclick=()=>ov.remove();
-  document.body.appendChild(ov);
- }
- ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
-  style="max-width:96%;max-height:96%;border-radius:8px;
-  box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
-}
+function zoomDet(i){REVIEW_SCHED?.openLightbox(i);}
 function beRemove(){
  if(BE.sel<0)return;
  applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
@@ -5804,6 +5791,8 @@ function showPanel(which){
   if(which!=="boxedit")clear(b);
   clear(b2);
   if(which!=="review"){
+   REVIEW_REQUEST=null;
+   document.getElementById("review-load-error")?.remove();
    disposeReview();const rev=document.getElementById("review");
    if(rev){beUnmountIn(rev);rev.remove();}
   }
@@ -5830,12 +5819,31 @@ function cmpShow(){
 }
 
 // Complete metadata stays authoritative even when its cards are unmounted.
-let TRKMEM={},ROWCARD={},REVIEW_META=null,REVIEW_SCHED=null,REVIEW_LOAD=0;
+let TRKMEM={},ROWCARD={},REVIEW_META=null,REVIEW_SCHED=null;
 const THUMB_FLIGHTS=new Set(); // unsettled fetch + body operations, across views
 let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
 function resetReviewView(){
  REVIEW_SCHED?.selectionCleanup?.();clearSel();TRKMEM={};ROWCARD={};REVIEW_META=null;
  REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all"};
+}
+function reviewGroupKey(row){
+ return row.zone_dropped?null:row.person>=0?'p'+row.person:row.track>=0?'t'+row.track:null;
+}
+function reviewCategoryName(category){
+ return Object.prototype.hasOwnProperty.call(CATDN,category)?CATDN[category]:category;
+}
+function reviewMetadata(data){
+ if(!data||!Number.isFinite(data.duration)||!Array.isArray(data.detections))return null;
+ const version=data.thumbnail_version,rows=new Map();
+ if(version!==undefined&&(typeof version!=='string'||!/^[0-9a-f]{32}$/.test(version)))return null;
+ for(const row of data.detections){
+  if(!row||!Number.isInteger(row.i)||row.i<0||rows.has(row.i)||typeof row.category!=='string'||
+     !Number.isFinite(row.t_start)||!Number.isFinite(row.t_end))return null;
+  const fingerprint=row.thumbnail_row;
+  if(version&&(typeof fingerprint!=='string'||!/^[0-9a-f]{64}$/.test(fingerprint)))return null;
+  rows.set(row.i,fingerprint);
+ }
+ return {version,rows,attempted:false,incompatible:new Set()};
 }
 function reviewDescriptors(rows){
  const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
@@ -5854,7 +5862,7 @@ function reviewDescriptors(rows){
  for(const [cat,raw] of Object.entries(groups)){
   const grouped=new Map(),items=[];
   for(const x of raw){
-   const key=x.person>=0?'p'+x.person:x.track>=0?'t'+x.track:null;
+   const key=reviewGroupKey(x);
    if(key){if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(x);}
    else{TRKMEM[x.i]=[x.i];items.push(x);}
   }
@@ -5876,21 +5884,44 @@ function reviewCard(c){
  return `<div class="det" id="det${c.id}" data-cat="${detLabel(cat)}">
   <div class="thumbwell"><img alt="Detection preview" style="cursor:zoom-in" onclick="zoomDet(${c.id})"></div>
   <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-  ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(CATDN[cat]||cat)} group</div>`:''}
-  ${detChoices(c.id,c.zone?'Outside-zone detection':CATDN[cat]||cat)}</div>`;
+  ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(reviewCategoryName(cat))} group</div>`:''}
+  ${detChoices(c.id,c.zone?'Outside-zone detection':reviewCategoryName(cat))}
+  <button type="button" class="sec" data-thumb-reopen hidden onclick="loadReview()">Re-open review</button></div>`;
+}
+function reviewLoadFailure(id,gen){
+ if(document.getElementById('review-load-error'))return;
+ const box=document.createElement('div');box.id='review-load-error';box.className='card';
+ const message=document.createElement('p');message.textContent='Review could not be loaded. Try again.';
+ message.setAttribute?.('role','status');
+ const retry=document.createElement('button');retry.type='button';retry.dataset.reviewRetry='';
+ retry.textContent='Retry review';
+ retry.onclick=()=>{if(ownsView(id,gen)&&document.getElementById(box.id)===box)loadReview();};
+ box.appendChild(message);box.appendChild(retry);detail.appendChild(box);
 }
 async function loadReview(auto=null){
- const id=CUR,gen=VIEW_GEN,request=++REVIEW_LOAD,reviewRequest={};REVIEW_REQUEST=reviewRequest;
+ const id=CUR,gen=VIEW_GEN,request={};REVIEW_REQUEST=request;
+ const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===request&&
+  (!auto||(AUTO_REVIEW===auto&&PHPH==="review"));
+ let d,thumbnails;
+ try{
+  const r=await fetch(`api/jobs/${id}/detections`);
+  if(!current())return;
+  if(!r.ok)throw new Error("Review HTTP "+r.status);
+  d=await r.json();
+  if(!current())return;
+  thumbnails=reviewMetadata(d);
+  if(!thumbnails)throw new Error('Invalid review metadata');
+ }catch(e){
+  if(current()){reviewLoadFailure(id,gen);if(auto)throw e;}
+  return;
+ }
+ if(AUTO_REVIEW)AUTO_REVIEW.state="ready";
  disposeReview();showPanel('review');
- const r=await fetch(`api/jobs/${id}/detections`);
- if(!r.ok)throw new Error("Review HTTP "+r.status);
- const d=await r.json();
- if(!ownsView(id,gen)||request!==REVIEW_LOAD||
-    (auto&&(REVIEW_REQUEST!==reviewRequest||AUTO_REVIEW!==auto||PHPH!=="review")))return;
- if(auto)auto.state="ready";
+ document.getElementById('review-load-error')?.remove();
  DUR=d.duration;
  const sections=reviewDescriptors(d.detections);
- REVIEW_META={jobId:id,viewGen:gen,sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+ REVIEW_META={jobId:id,viewGen:gen,sections,thumbnails,
+  byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
  let html=`<div class="card" id="review"><h2>Review — choose Blur or Keep visible.
  Drag a box around several to bulk-set.</h2>
  <div class="row" style="margin:0 0 8px"><button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes (before rendering)</button></div>
@@ -5914,10 +5945,10 @@ async function loadReview(auto=null){
    <summary style="cursor:pointer;color:#fbbf24;font-weight:600">⚠ <span id="reviewZoneCount">${section.ids.length} of ${section.ids.length}</span> detection(s) outside your zones — choose output below (mostly logos/labels by design; open only if something real was zoned out)</summary>
    <div class="row" style="margin:8px 0 4px"><button class="sec" onclick="setAllZd(true)">Blur all</button><button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>
    <div class="detscope">These actions affect all outside-zone detections, including filtered-out detections.</div>`;
-  else html+=`<section id="reviewSection${section.index}"><h3 style="margin:10px 0 6px">${detLabel(CATDN[cat]||cat)} <span class="badge" id="reviewCount${section.index}">${section.ids.length}</span>
+  else html+=`<section id="reviewSection${section.index}"><h3 style="margin:10px 0 6px">${detLabel(reviewCategoryName(cat))} <span class="badge" id="reviewCount${section.index}">${section.ids.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,true)" data-cat="${detLabel(cat)}">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px" onclick="setAll(this.dataset.cat,false)" data-cat="${detLabel(cat)}">Keep all visible</button></h3>
-   <div class="detscope">Category actions affect all ${detLabel(CATDN[cat]||cat)} groups, including filtered-out groups.</div>`;
+   <div class="detscope">Category actions affect all ${detLabel(reviewCategoryName(cat))} groups, including filtered-out groups.</div>`;
   html+=`<div class="grid3 reviewgrid" data-review-section="${n}"></div>`;
   html+=section.zone?'</details>':'</section>';
  });
@@ -5946,12 +5977,15 @@ class ReviewScheduler{
   this.token={};this.disposed=false;this.frame=0;this.bindings=new Map();
   this.retries=new Map();this.eligible=new Map();this.queue=[];this.listeners=[];
   this.matching=new Set(meta.byId.keys());this.sections=[];this.normalIds=[];
-  this.gesture=false;this.selectionCleanup=null;
+  this.gesture=false;this.selectionCleanup=null;this.lightbox=null;this.thumbnailRefresh=null;
  }
  owns(){return !this.disposed&&REVIEW_SCHED===this&&ownsView(this.jobId,this.viewGen)&&
   this.root.isConnected&&document.getElementById('review')===this.root;}
- valid(b,eligible=true){return this.owns()&&this.bindings.get(b.id)===b&&b.img.isConnected&&
-  b.card.isConnected&&(!eligible||this.eligible.has(b.id));}
+ valid(b,eligible=true){
+  if(!this.owns()||!b.img.isConnected)return false;
+  if(b.overlay)return this.lightbox===b&&b.overlay.isConnected&&b.overlay.contains(b.img)&&this.valid(b.source,false);
+  return this.bindings.get(b.id)===b&&b.card.isConnected&&(!eligible||this.eligible.has(b.id));
+ }
  listen(target,event,fn,options){target.addEventListener(event,fn,options);
   this.listeners.push(()=>target.removeEventListener(event,fn,options));}
  start(){
@@ -6120,39 +6154,131 @@ class ReviewScheduler{
    this.bindings.get(id)?.card.querySelector('button')?.focus({preventScroll:true});break;}
  }
  retryState(id){if(!this.retries.has(id))this.retries.set(id,{failures:0,readyAt:0,timer:0});return this.retries.get(id);}
+ retryFor(b){return b.retry||this.retryState(b.id);}
  clearURL(b){
   b.img.onload=null;b.img.onerror=null;b.img.removeAttribute('src');
   if(b.url){URL.revokeObjectURL(b.url);b.url=null;}
  }
  cancel(b){if(b.op&&!b.op.cancelled){b.op.cancelled=true;b.op.controller.abort();}}
+ clearRetryTimer(r){if(r?.timer){clearTimeout(r.timer);r.timer=0;}}
  retire(b){
+  if(this.lightbox?.source===b)this.closeLightbox();
   this.cancel(b);this.clearURL(b);this.bindings.delete(b.id);
-  const r=this.retries.get(b.id);if(r?.timer){clearTimeout(r.timer);r.timer=0;}
+  this.clearRetryTimer(this.retries.get(b.id));
   b.card.remove?.();
  }
- unavailable(b){if(this.valid(b,false))b.img.parentElement.classList.add('unavailable');}
- fail(b){
+ openLightbox(id){
+  const source=this.bindings.get(id);
+  if(!source||!this.valid(source,false)||this.meta.thumbnails?.incompatible.has(id))return;
+  this.closeLightbox();
+  const overlay=document.createElement('div');overlay.id='lb';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);'+
+   'z-index:100;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:18px';
+  overlay.innerHTML=`<img alt="Detection frame" style="max-width:96%;max-height:96%;border-radius:8px;box-shadow:0 12px 50px rgba(0,0,0,.6)">
+   <div data-thumb-status hidden><p role="status">Preview unavailable. Re-open review to refresh.</p>
+   <button type="button" class="sec" data-thumb-reopen>Re-open review</button></div>`;
+  const b={id,source,overlay,img:overlay.querySelector('img'),token:{},url:null,op:null,
+   retry:{failures:0,readyAt:0,timer:0},status:overlay.querySelector('[data-thumb-status]')};
+  document.body.appendChild(overlay);this.lightbox=b;
+  overlay.onclick=()=>{if(this.lightbox===b){this.closeLightbox();this.updateQueue();}};
+  overlay.querySelector('[data-thumb-reopen]').onclick=event=>{
+   event.stopPropagation();
+   if(this.valid(b)){this.closeLightbox();loadReview();}
+  };
+  this.updateQueue();
+ }
+ closeLightbox(){
+  const b=this.lightbox;if(!b)return;
+  this.lightbox=null;this.cancel(b);this.clearURL(b);this.clearRetryTimer(b.retry);
+  b.overlay.remove();
+ }
+ previewStatus(b,unavailable){
+  if(b.overlay){b.status.hidden=!unavailable;b.img.hidden=unavailable;}
+  else b.img.parentElement.classList[unavailable?'add':'remove']('unavailable');
+  const card=b.source||b;
+  if(b.overlay)card.lightFailed=unavailable;
+  const reopen=card.card.querySelector?.('[data-thumb-reopen]');
+  if(reopen)reopen.hidden=!(card.lightFailed||this.retries.get(card.id)?.failures>=4||
+   this.meta.thumbnails?.incompatible.has(card.id));
+ }
+ fail(b,obsolete=false){
   if(!this.valid(b))return;
-  this.clearURL(b);const r=this.retryState(b.id);r.failures++;
-  if(r.failures>=4){this.unavailable(b);return;}
-  r.readyAt=Date.now()+600*r.failures;this.updateQueue();
+  this.clearURL(b);const r=this.retryFor(b);
+  r.failures=obsolete?4:r.failures+1;
+  if(r.failures>=4){
+   this.previewStatus(b,true);
+   this.recoverThumbnails();
+  }else r.readyAt=Date.now()+600*r.failures;
+  this.updateQueue();
+ }
+ async recoverThumbnails(){
+  const state=this.meta.thumbnails;
+  if(!state?.version||state.attempted)return;
+  state.attempted=true;
+  const controller=new AbortController(),version=state.version;
+  this.thumbnailRefresh=controller;
+  try{
+   const r=await fetch(`api/jobs/${this.jobId}/detections`,{cache:'no-store',signal:controller.signal});
+   if(!this.owns()||!r.ok)return;
+   const data=await r.json();
+   if(!this.owns())return;
+   const next=reviewMetadata(data);
+   if(!next?.version||next.version===version)return;
+   const groups=new Map();
+   for(const row of data.detections){
+    const key=reviewGroupKey(row);if(!key)continue;
+    const group=JSON.stringify([row.category,key]);
+    if(!groups.has(group))groups.set(group,new Set());
+    groups.get(group).add(row.i);
+   }
+   for(const card of this.meta.byId.values()){
+    const key=reviewGroupKey(card.representative);
+    const group=key?groups.get(JSON.stringify([card.realCategory,key])):null;
+    const sameGroup=!key||(group?.size===card.members.length&&card.members.every(id=>group.has(id)));
+    if(!sameGroup||card.members.some(id=>state.rows.get(id)!==next.rows.get(id)))state.incompatible.add(card.id);
+   }
+   state.version=next.version;
+   // Compatible descriptors may remount later. Only the current scheduler
+   // can cancel old reads, revoke URLs, or publish to connected bindings.
+   for(const r of this.retries.values())this.clearRetryTimer(r);
+   this.retries.clear();
+   for(const b of this.bindings.values()){
+    this.cancel(b);this.clearURL(b);b.lightFailed=false;
+    this.previewStatus(b,state.incompatible.has(b.id));
+   }
+   if(this.lightbox){
+    const b=this.lightbox;this.cancel(b);this.clearURL(b);this.clearRetryTimer(b.retry);
+    b.retry={failures:0,readyAt:0,timer:0};this.previewStatus(b,state.incompatible.has(b.id));
+   }
+  }catch(error){/* Keep the current review and the spent budget. */}
+  finally{
+   this.thumbnailRefresh=null;
+   if(this.owns())this.updateQueue();
+  }
  }
  updateQueue(){
   if(!this.owns())return;
   this.queue=[];
   for(const [id,b]of this.bindings){
-   const r=this.retryState(id),priority=this.eligible.get(id);
-   if(!priority){this.cancel(b);if(r.timer){clearTimeout(r.timer);r.timer=0;}continue;}
-   if(b.url||b.op)continue;
-   if(r.failures>=4){this.unavailable(b);continue;}
-   if(r.readyAt>Date.now()){
-    if(!r.timer){const token=b.token;
-     r.timer=setTimeout(()=>{r.timer=0;if(this.valid(b)&&b.token===token)this.updateQueue();},r.readyAt-Date.now());}
-    continue;
-   }
-   this.queue.push({b,rank:priority.rank?2:r.failures?1:0,order:priority.order});
+   const priority=this.eligible.get(id);
+   if(!priority){this.cancel(b);this.clearRetryTimer(this.retries.get(id));}
+   this.queueBinding(b,priority);
   }
+  if(this.lightbox)this.queueBinding(this.lightbox,{rank:0,order:-1});
   this.queue.sort((a,b)=>a.rank-b.rank||a.order-b.order);this.pump();
+ }
+ queueBinding(b,priority){
+  const r=this.retryFor(b);
+  if(this.meta.thumbnails?.incompatible.has(b.id)||r.failures>=4){
+   this.previewStatus(b,true);return;
+  }
+  if(!priority||b.url||b.op||this.thumbnailRefresh)return;
+  if(r.readyAt>Date.now()){
+   if(!r.timer){const token=b.token;
+    r.timer=setTimeout(()=>{r.timer=0;if(this.valid(b)&&b.token===token)this.updateQueue();},r.readyAt-Date.now());}
+   return;
+  }
+  this.queue.push({b,rank:b.overlay?-1:priority.rank?2:r.failures?1:0,order:priority.order});
  }
  pump(){
   if(!this.owns())return;
@@ -6163,21 +6289,29 @@ class ReviewScheduler{
  }
  async request(b){
   const controller=new AbortController(),op={controller,cancelled:false,token:b.token};
+  const version=this.meta.thumbnails?.version,kind=b.overlay?'detframe':'thumb';
+  const current=()=>!op.cancelled&&this.valid(b)&&b.token===op.token&&this.meta.thumbnails?.version===version;
   b.op=op;THUMB_FLIGHTS.add(op);
   try{
-   const url=new URL(`api/jobs/${this.jobId}/thumb/${b.id}`,document.baseURI);
-   const r=this.retryState(b.id);if(r.failures)url.searchParams.set('r',String(Date.now()));
+   const url=new URL(`api/jobs/${this.jobId}/${kind}/${b.id}`,document.baseURI);
+   if(version)url.searchParams.set('v',version);
+   if(this.retryFor(b).failures)url.searchParams.set('r',String(Date.now()));
    const response=await fetch(url.href,{signal:controller.signal});
+   if(version&&response.status===409){
+    const problem=await response.json().catch(()=>null);
+    if(current())this.fail(b,problem?.error==='thumbnail_obsolete');
+    return;
+   }
    const blob=await response.blob();
    if(!response.ok)throw Error('Thumbnail HTTP '+response.status);
-   if(op.cancelled||!this.valid(b)||b.token!==op.token)return;
+   if(!current())return;
    const urlValue=URL.createObjectURL(blob);
-   if(op.cancelled||!this.valid(b)||b.token!==op.token){URL.revokeObjectURL(urlValue);return;}
-   b.url=urlValue;b.img.parentElement.classList.remove('unavailable');
-   b.img.onload=()=>{if(!this.valid(b)||b.token!==op.token||b.url!==urlValue)return;};
-   b.img.onerror=()=>{if(this.valid(b)&&b.token===op.token&&b.url===urlValue)this.fail(b);};
+   if(!current()){URL.revokeObjectURL(urlValue);return;}
+   b.url=urlValue;this.previewStatus(b,false);
+   b.img.onload=()=>{if(!current()||b.url!==urlValue)return;};
+   b.img.onerror=()=>{if(current()&&b.url===urlValue)this.fail(b);};
    b.img.src=urlValue;
-  }catch(error){if(!op.cancelled&&this.valid(b)&&b.token===op.token)this.fail(b);}
+  }catch(error){if(current())this.fail(b);}
   finally{
    if(b.op===op)b.op=null;THUMB_FLIGHTS.delete(op);
    // Replacements can mount immediately, but never borrow an unsettled slot.
@@ -6187,6 +6321,7 @@ class ReviewScheduler{
  dispose({suspend=false}={}){
   if(this.disposed){if(!suspend){this.retries.clear();this.suspended=false;}return;}
   this.disposed=true;this.suspended=suspend;
+  this.thumbnailRefresh?.abort();this.closeLightbox();
   if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
   this.observer?.disconnect();this.listeners.splice(0).forEach(remove=>remove());
   this.selectionCleanup?.();this.selectionCleanup=null;
@@ -6265,7 +6400,7 @@ function refreshReviewFilters(){
   const node=document.getElementById("det"+c.id);
   if(node&&!match&&focusedCard===node)lostFocus=true;
  }
- typeControl.innerHTML=`<option value="">All detected types (${otherTypeCount})</option>`+types.map(t=>`<option value="${detLabel(t)}">${detLabel(CATDN[t]||t)} (${typeCounts.get(t)})</option>`).join("");
+ typeControl.innerHTML=`<option value="">All detected types (${otherTypeCount})</option>`+types.map(t=>`<option value="${detLabel(t)}">${detLabel(reviewCategoryName(t))} (${typeCounts.get(t)})</option>`).join("");
  typeControl.value=type??"";
  outputControl.innerHTML=[["all","All outputs"],["blur","Includes blurred appearances"],["visible","Includes visible appearances"]].map(([v,label])=>`<option value="${v}">${label} (${outputCounts[v]})</option>`).join("");
  outputControl.value=output;
