@@ -334,3 +334,18 @@ def test_suffix_frame_authority_is_intersected_with_the_new_segment():
     assert len(result['detections']) == len(old['detections']) + 1
     assert result['detections'][-1]['scan_frame_start'] == 4
     assert result['detections'][-1]['scan_frame_end'] == 7
+
+
+def test_suffix_drops_a_time_span_between_discrete_frames():
+    options = identity()
+    options['timeline']['fps'] = 1.0
+    options['sources']['scan']['fps'] = 1.0
+    first = raw()
+    first['render_state']['fps'] = 1.0
+    old = with_checkpoint(first, 4, 10, options)
+    c = continuation(7, [row(5.2, 5.4), row(5.005, 5.005)])
+    c['render_state']['fps'] = 1.0
+    c['provenance']['checkpoint_identity'] = options
+    joined = join_reports(old, c, 7, 10)
+    assert len(joined['detections']) == len(old['detections']) + 1
+    assert joined['detections'][-1]['t_start'] == 5.005
