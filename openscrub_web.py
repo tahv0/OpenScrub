@@ -6623,11 +6623,13 @@ function beValidateSample(body,t,checkpoint=null){
    !row.box.every((v,i)=>Math.abs(v-row.base.cbox[i]-s.offset[i%2])<1e-8)||
    typeof row.enabled!=='boolean'||typeof row.category!=='string')throw Error('Invalid exact sample row');
   seen.add(row.i);
-  if(checkpoint){
+  const hasBounds=Object.prototype.hasOwnProperty.call(row,'scan_frame_bounds');
+  if(checkpoint&&!hasBounds)throw Error('Missing checkpoint row bounds');
+  if(hasBounds){
    const bounds=row.scan_frame_bounds;
-   if(!Object.prototype.hasOwnProperty.call(row,'scan_frame_bounds')||bounds!==null&&
+   if(bounds!==null&&
       (!Array.isArray(bounds)||bounds.length!==2||!bounds.every(Number.isSafeInteger)||
-       bounds[0]<0||bounds[0]>=bounds[1]||bounds[1]>checkpoint.frames))throw Error('Invalid checkpoint row bounds');
+       bounds[0]<0||bounds[0]>s.index||s.index>=bounds[1]||checkpoint&&bounds[1]>checkpoint.frames))throw Error('Invalid checkpoint row bounds');
   }
  }
  if(checkpoint&&(t<0||t>=checkpoint.duration||s.index>=checkpoint.frames||
@@ -6715,14 +6717,16 @@ function beReady(view=BE_VIEW){
 function beCaptureGeometry(view,row){
  if(!beReady(view)||!row||!view.readySample.rows.includes(row))return false;
  const b=view.editor,old=b.geometry[row.i];
+ const hasBounds=Object.prototype.hasOwnProperty.call(row,'scan_frame_bounds');
  if(row.category==='plate'&&beQuadRecord(row.manual_plate_quad)&&!beQuadWitness(row.quad_baseline,row.manual_plate_quad)){
   saveStatus(EDITS,'The plate baseline is unavailable; inspect the frame again before changing geometry.');return false;
  }
  if(old)return old.precondition.source_ref===view.readySample.sample.source_ref&&
  old.precondition.timeline_eq===view.readySample.sample.timeline_eq&&old.precondition.row_context_eq===row.row_context_eq&&
- (!view.checkpoint||sameEdit(old.precondition.scan_frame_bounds,row.scan_frame_bounds));
+ Object.prototype.hasOwnProperty.call(old.precondition,'scan_frame_bounds')===hasBounds&&
+ (!hasBounds||sameEdit(old.precondition.scan_frame_bounds,row.scan_frame_bounds));
  b.geometry[row.i]={precondition:{...copyEdit(view.readySample.precondition),row_context_eq:row.row_context_eq,base:copyEdit(row.base),
-  ...(view.checkpoint?{scan_frame_bounds:copyEdit(row.scan_frame_bounds)}:{}),
+  ...(hasBounds?{scan_frame_bounds:copyEdit(row.scan_frame_bounds)}:{}),
   ...(row.category==='plate'&&beQuadHash(row.quad_context_eq)?{quad_context_eq:row.quad_context_eq}:{}),
   ...(row.category==='plate'&&Object.prototype.hasOwnProperty.call(row,'quad_baseline')?{quad_baseline:row.quad_baseline}:{})},
   quadBaseline:row.category==='plate'&&beQuadRecord(row.manual_plate_quad)?copyEdit(row.manual_plate_quad):null,
@@ -8799,7 +8803,8 @@ function acknowledgeGeometry(editor,submission,result){
  let needFresh=false;
  // Validate the whole strict acknowledgement before acknowledging any edit kind.
  for(const [key,pc] of Object.entries(pcs)){
-  if(submission.checkpoint&&!Object.prototype.hasOwnProperty.call(pc,'scan_frame_bounds'))throw Error('Missing checkpoint row bounds; inspect again.');
+  const hasBounds=Object.prototype.hasOwnProperty.call(pc,'scan_frame_bounds');
+  if(submission.checkpoint&&!hasBounds)throw Error('Missing checkpoint row bounds; inspect again.');
   const row=result.geometry_rows?.[key],explicit=Object.prototype.hasOwnProperty.call(quads,key);
   const plate=beQuadHash(pc.quad_context_eq);
   const boxChanged=Object.prototype.hasOwnProperty.call(payload.box_overrides,key)&&!sameEdit(payload.box_overrides[key],pc.base.cbox);
@@ -8807,11 +8812,10 @@ function acknowledgeGeometry(editor,submission,result){
    beQuadHash(pc.quad_context_eq)&&row?.quad_context_eq===pc.quad_context_eq;
   const timeChanged=Object.prototype.hasOwnProperty.call(payload.time_overrides,key)&&
    !sameEdit(payload.time_overrides[key],pc.base.span.slice(0,2));
-  const released=submission.checkpoint&&pc.scan_frame_bounds!==null&&timeChanged;
-  const checkpointIdentity=released?row?.scan_frame_bounds===null&&beQuadHash(row?.row_context_eq):
-   row?.row_context_eq===pc.row_context_eq&&sameEdit(row?.scan_frame_bounds,pc.scan_frame_bounds);
-  const identityValid=submission.checkpoint?checkpointIdentity:
-   beQuadHash(row?.row_context_eq)&&(explicit||retired||row.row_context_eq===pc.row_context_eq);
+  const released=hasBounds&&pc.scan_frame_bounds!==null&&timeChanged;
+  const identityValid=beQuadHash(row?.row_context_eq)&&(released?row.scan_frame_bounds===null:
+   (explicit||retired||row.row_context_eq===pc.row_context_eq)&&
+   (!hasBounds||sameEdit(row.scan_frame_bounds,pc.scan_frame_bounds)));
   if(!row||!beBase(row.base)||!sameEdit(bePrecondition(row),bePrecondition(pc))||row.version!==1||
    !identityValid||
    !sameEdit(row.base.cbox,payload.box_overrides[key]||pc.base.cbox)||
