@@ -130,3 +130,29 @@ def test_missing_frame_timestamp_does_not_hang_while_decoder_is_writing(tmp_path
         with media.FrameStream(identity) as reader:
             reader.read()
     assert time.monotonic() - started < 1.0
+
+
+def test_source_replaced_after_probe_is_rejected_before_decoding(tmp_path):
+    media = media_module()
+    source = clip(tmp_path)
+    identity = media.inspect_source(str(source))
+    replacement_dir = tmp_path / 'replacement'
+    replacement_dir.mkdir()
+    other = clip(replacement_dir, count=18, rate='12')
+    os.replace(other, source)
+    with pytest.raises(media.FrameEvidenceError, match='source.*changed'):
+        with media.FrameStream(identity) as reader:
+            reader.read()
+
+
+def test_source_replaced_during_scan_invalidates_paused_evidence(tmp_path):
+    media = media_module()
+    source = clip(tmp_path)
+    identity = media.inspect_source(str(source))
+    replacement_dir = tmp_path / 'replacement'
+    replacement_dir.mkdir()
+    other = clip(replacement_dir, count=18, rate='12')
+    with pytest.raises(media.FrameEvidenceError, match='source.*changed'):
+        with media.FrameStream(identity) as reader:
+            assert reader.read()[0] == 0
+            os.replace(other, source)

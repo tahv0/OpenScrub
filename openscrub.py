@@ -1399,7 +1399,8 @@ def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
     return next_id
 
 
-def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
+def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
+                        _checkpoint_capture=None, _checkpoint_start=0):
     """Make each dense track leak-free from true first appearance to exit.
 
     Dense samples are instantaneous per-frame boxes; three gaps remain
@@ -1450,7 +1451,8 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                          ref.category, ref.text, ref.confidence, o,
                          last_seen=t0, dense=True, track=tid, poly=ref.poly)
 
-    capture = cv2.VideoCapture(video) if video else None
+    capture = (_checkpoint_capture if _checkpoint_capture is not None
+               else (cv2.VideoCapture(video) if video else None))
     try:
         cap = capture
         if cap is not None and not cap.isOpened():
@@ -1470,13 +1472,13 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
         # onset-sorted processing order. Memory stays bounded by one span
         # (~LEAD_MAX seconds of half-scale grays), not the file.
         gray_cache = {}
-        _seq = {"pos": 0}
+        _seq = {"pos": _checkpoint_start}
         _span_lo = {}                # frame index -> lowest span start needing it
         if cap is not None and tracks:
             for samples in tracks.values():
                 t0 = min(d.t_start for d in samples)
                 lo_t = max(0.0, t0 - LEAD_MAX - 0.2, win_start - 0.01)
-                lo = max(0, int(lo_t * _fps_g) - 2)
+                lo = max(_checkpoint_start, int(lo_t * _fps_g) - 2)
                 hi = int(round(t0 * _fps_g)) + 2
                 for k in range(lo, hi + 1):
                     _span_lo[k] = min(_span_lo.get(k, lo), lo)
@@ -7764,7 +7766,7 @@ def text_scan_stride(small, scan_small, step):
     return step * 2
 
 
-def run_scan(args, cb=None, *, stop_requested=None):
+def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None):
     """Scan pass only. A stop callback requests a whole-frame boundary.
 
     The opt-in boundary result is an unverified engine candidate, not a saved
@@ -7773,17 +7775,19 @@ def run_scan(args, cb=None, *, stop_requested=None):
     """
     main_capture = [None]
     try:
-        return _run_scan_impl(args, cb, stop_requested, main_capture)
+        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream)
     finally:
         if main_capture[0] is not None:
             main_capture[0].release()
 
 
-def _run_scan_impl(args, cb, stop_requested, main_capture):
+def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     cb = cb or Callbacks()
     if stop_requested is not None and not callable(stop_requested):
         raise TypeError("stop_requested must be a no-argument callback")
     monitor_stop = stop_requested is not None
+    if checkpoint_stream is not None and not monitor_stop:
+        raise ValueError("checkpoint stream requires a monitored scan")
     if not args.video or not os.path.exists(args.video):
         raise RuntimeError(f"input not found: {args.video}")
     # normalize attributes that may be absent when args come from an older
@@ -7951,7 +7955,11 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
     cb.log(f"[3/4] Scanning (every {args.sample_interval}s or {args.scan_trigger}px of scroll"
            + (", self-tuning to screen activity and scroll speed)"
               if getattr(args, "adaptive", "on") != "off" else ")"))
-    cap = cv2.VideoCapture(args.video)
+    if checkpoint_stream is None:
+        cap = cv2.VideoCapture(args.video)
+    else:
+        from openscrub_internal.checkpoint_media import ScanCapture
+        cap = ScanCapture(checkpoint_stream)
     main_capture[0] = cap
 
     def _release_scan_capture():
@@ -8155,8 +8163,9 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
     tracker = ScrollTracker()
     memory = None if (args.no_memory or not text_cats) else PhiMemory(
         threshold=78 if getattr(args, "paranoid", False) else 82)
-    cum = []
-    bands = []
+    checkpoint_start = checkpoint_stream.start_frame if checkpoint_stream is not None else 0
+    cum = [(0.0, 0.0)] * checkpoint_start
+    bands = [(0.0, 0.0)] * checkpoint_start
     raw = []
     scans = []
     cx = cy = 0.0
@@ -8219,7 +8228,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
                + (". Brief or fast-moving subjects can be missed — "
                   "review the output carefully." if dense_stride > 2
                   or detect_scale < 1.0 else "."))
-    idx = 0
+    idx = checkpoint_start
     dense_now = []
     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
     # manual jobs — exactly the "one person 16 minutes in" case), frames
@@ -8269,14 +8278,17 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
             ok, frame = cap.read()
         except Exception as error:
             _release_scan_capture()
-            if monitor_stop and not isinstance(error, PipelineCancelled):
+            if (monitor_stop and checkpoint_stream is None and
+                    not isinstance(error, PipelineCancelled)):
                 raise ScanDecodeError(idx, total) from error
             raise
         except BaseException:
             _release_scan_capture()
             raise
         if not ok or frame is None:
-            if ok:
+            if checkpoint_stream is not None and checkpoint_stream.completed:
+                scan_exit_reason = "decoder_clean_verified_range"
+            elif ok:
                 scan_exit_reason = "decoder_invalid_frame"
             elif not total:
                 scan_exit_reason = "decoder_read_stopped_unknown_count"
@@ -9008,9 +9020,20 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
         cb.log(f"      dense continuity: smoothing {n_tracks} track(s) — "
                "interpolating flicker gaps and walking each onset back "
                "through the video (the slow part of a dense scan)…")
-        n_gaps, n_lead, lead_s = smooth_dense_tracks(
-            detections, fps, args.video, cum=cum, win_start=win_start,
-            cb=cb)
+        if checkpoint_stream is None:
+            n_gaps, n_lead, lead_s = smooth_dense_tracks(
+                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb)
+        else:
+            from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+            secondary = ScanCapture(FrameStream(
+                checkpoint_stream.source, start_frame=checkpoint_start).__enter__())
+            try:
+                n_gaps, n_lead, lead_s = smooth_dense_tracks(
+                    detections, fps, args.video, cum=cum,
+                    win_start=max(win_start, checkpoint_start / fps), cb=cb,
+                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start)
+            finally:
+                secondary.release()
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "
@@ -9146,7 +9169,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
     state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
              "zdropped": zdropped, "audio_suggestions": audio_sugg,
              "audio_transcript": audio_tx,
-             "input_sha256": sha256_file(args.video),
+             "input_sha256": (checkpoint_stream.source.sha256 if checkpoint_stream is not None
+                              else sha256_file(args.video)),
              "stats": {"scans": n_scans, "raw_hits": len(raw),
                        "regions": len(detections), "recalls": n_recalled,
                        "remembered": len(memory.items) if memory else 0,

@@ -11,6 +11,7 @@ import os
 import queue
 import re
 import subprocess
+import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ class Source:
     fps: Fraction
     time_base: Fraction
     total_frames: int
+    sha256: str
+    file_stat: tuple
     count_verified: bool = False
 
 
@@ -44,6 +47,68 @@ def _fraction(value, name):
     return result
 
 
+def _source_hash(path):
+    # Use the engine's existing streaming fingerprint owner.  Import lazily
+    # so the engine can import this module without a circular import.
+    from openscrub import sha256_file
+    try:
+        return sha256_file(path)
+    except OSError as exc:
+        raise FrameEvidenceError('checkpoint source changed or is unavailable') from exc
+
+
+def _stat_tuple(value):
+    if not stat.S_ISREG(value.st_mode):
+        raise FrameEvidenceError('checkpoint source must be a regular file')
+    return (value.st_dev, value.st_ino, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns)
+
+
+def _path_stat(path):
+    try:
+        return _stat_tuple(os.stat(path))
+    except OSError as exc:
+        raise FrameEvidenceError('checkpoint source changed or is unavailable') from exc
+
+
+def _check_source(source):
+    if _path_stat(source.path) != source.file_stat:
+        raise FrameEvidenceError('checkpoint source changed; start a fresh scan')
+
+
+class SourceLease:
+    """Hold a descriptor and detect ordinary replacement or mutation.
+
+    External writers still require operation-level exclusion: a stat fence
+    is not a mandatory operating-system write lock.
+    """
+    def __init__(self, source):
+        self.source = source
+        self._file = None
+
+    def __enter__(self):
+        try:
+            self._file = open(self.source.path, 'rb')
+            self.check()
+            return self
+        except BaseException:
+            if self._file is not None:
+                self._file.close()
+            raise
+
+    def check(self):
+        _check_source(self.source)
+        if _stat_tuple(os.fstat(self._file.fileno())) != self.source.file_stat:
+            raise FrameEvidenceError('checkpoint source changed during the scan')
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if exc_type is None:
+                self.check()
+        finally:
+            self._file.close()
+
+
 def inspect_source(path):
     """Probe a single-track, progressive, 8-bit H.264 MP4.
 
@@ -51,6 +116,10 @@ def inspect_source(path):
     decoder termination are established by FrameStream as frames are read.
     """
     path = os.path.abspath(os.fspath(path))
+    source_stat = _path_stat(path)
+    digest = _source_hash(path)
+    if _path_stat(path) != source_stat:
+        raise FrameEvidenceError('checkpoint source changed during hashing')
     try:
         result = subprocess.run(
             ['ffprobe', '-v', 'error', '-show_entries',
@@ -87,7 +156,9 @@ def inspect_source(path):
             raise ValueError('frame rate does not map to integral source timestamps')
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise FrameEvidenceError('cannot probe supported MP4 source: %s' % exc) from exc
-    return Source(path, width, height, fps, time_base, count)
+    if _path_stat(path) != source_stat:
+        raise FrameEvidenceError('checkpoint source changed during probing')
+    return Source(path, width, height, fps, time_base, count, digest, source_stat)
 
 
 _SHOWINFO = re.compile(
@@ -104,7 +175,9 @@ class FrameStream:
 
     Only EOF plus a successful FFmpeg exit and the exact reported count set
     ``completed``. A caller stopping after the last expected frame has not
-    observed termination and must not promote the count.
+    observed termination and must not promote the count. Raw pipe reads are
+    synchronous: a decoder that stalls mid-frame can block cancellation until
+    that read returns. This primitive is not ready for interactive controls.
     """
     def __init__(self, source, start_frame=0):
         if (type(start_frame) is not int or not 0 <= start_frame < source.total_frames):
@@ -122,6 +195,7 @@ class FrameStream:
         self._closed = False
 
     def __enter__(self):
+        _check_source(self.source)
         # Seeking a frame before the requested overlap leaves a whole-frame
         # margin against FFmpeg's microsecond seek rounding.  Only the exact
         # requested index and later are returned to semantic analysis.
@@ -212,6 +286,7 @@ class FrameStream:
                     kind, _ = self._info.get()
                     if kind is not _END:
                         raise FrameEvidenceError('decoder emitted unpaired frame metadata')
+                _check_source(self.source)
                 self.completed = True
                 return None
             if len(data) != frame_size:
@@ -249,3 +324,33 @@ class FrameStream:
 
     def __exit__(self, exc_type, exc, tb):
         self.close()
+        # Do not mask a scanner or decoder failure during cleanup.
+        if exc_type is None:
+            _check_source(self.source)
+
+
+class ScanCapture:
+    """Expose an already-open verified stream to the existing scan loop."""
+    def __init__(self, stream):
+        self.stream = stream
+
+    def get(self, prop):
+        import cv2
+        source = self.stream.source
+        return {cv2.CAP_PROP_FPS: float(source.fps),
+                cv2.CAP_PROP_FRAME_COUNT: source.total_frames,
+                cv2.CAP_PROP_FRAME_WIDTH: source.width,
+                cv2.CAP_PROP_FRAME_HEIGHT: source.height}.get(prop, 0.0)
+
+    def read(self):
+        frame = self.stream.read()
+        return (False, None) if frame is None else (True, frame[1])
+
+    def grab(self):
+        return self.stream.read() is not None
+
+    def isOpened(self):
+        return not self.stream._closed
+
+    def release(self):
+        self.stream.close()
