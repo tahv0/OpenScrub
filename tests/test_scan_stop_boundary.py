@@ -487,3 +487,83 @@ def test_stop_after_last_selected_frame_does_not_claim_a_paused_prefix(tmp_path,
     assert status['count_verified'] is status['prefix_candidate'] is False
     assert status['checkpoint_available'] is False
     assert len(state['cum']) == len(state['bands']) == 4
+
+
+@pytest.mark.parametrize('kind', ['cancel', 'error'])
+def test_gap_capture_closes_with_retained_finalization_exception(tmp_path, monkeypatch, kind):
+    path = clip(tmp_path)
+    stop = threading.Event()
+    captures = watch_captures(monkeypatch, stop=stop, stop_after=3)
+    fake_ocr(monkeypatch)
+    def interrupted(*a, **kw):
+        if kind == 'cancel':
+            raise core.PipelineCancelled()
+        raise OSError('secondary gap decode failed')
+    def merge_with_gap(*a, **kw):
+        d = core.Detection(0, 1, (2, 2, 20, 20), 'email', 'x', .9, (0., 0.))
+        return kw['gap_check'](d, 0, 1)
+    monkeypatch.setattr(core, '_grab_frame', interrupted)
+    monkeypatch.setattr(core, 'merge_detections', merge_with_gap)
+    expected = core.PipelineCancelled if kind == 'cancel' else OSError
+    with pytest.raises(expected) as caught:
+        core.run_scan(args_for(path), Quiet(), stop_requested=stop.is_set)
+    assert caught.value.__traceback__ is not None  # keep the frame cycle alive
+    assert len(captures) == 2
+    assert [capture.closed for capture in captures] == [True, True]
+
+
+@pytest.mark.parametrize('kind', ['cancel', 'error'])
+def test_deep_backtrack_capture_closes_with_retained_exception(tmp_path, monkeypatch, kind):
+    path = tmp_path / 'textured.avi'
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'FFV1'), 6, (96, 64))
+    assert writer.isOpened()
+    image = np.random.default_rng(12).integers(0, 255, (64, 96, 3), dtype=np.uint8)
+    try:
+        for _ in range(12):
+            writer.write(image)
+    finally:
+        writer.release()
+    stop = threading.Event()
+    captures = watch_captures(monkeypatch, stop=stop, stop_after=3)
+    calls = []
+    class DelayedOCR:
+        def read(self, frame):
+            calls.append(True)
+            if len(calls) == 1:
+                return []
+            return [('alice@example.invalid', (8, 8, 78, 28), .99)]
+    monkeypatch.setattr(core, 'make_ocr', lambda *a, **kw: DelayedOCR())
+    monkeypatch.setattr(core, 'backtrack_onset', lambda d, buf, *a: buf[0][0] if buf else None)
+    def interrupted(*a, **kw):
+        if kind == 'cancel':
+            raise core.PipelineCancelled()
+        raise OSError('secondary backtrack decode failed')
+    monkeypatch.setattr(core, '_grab_frame', interrupted)
+    args = args_for(str(path))
+    args.no_backtrack = False
+    expected = core.PipelineCancelled if kind == 'cancel' else OSError
+    with pytest.raises(expected) as caught:
+        core.run_scan(args, Quiet(), stop_requested=stop.is_set)
+    assert caught.value.__traceback__ is not None
+    assert len(captures) == 2
+    assert [capture.closed for capture in captures] == [True, True]
+
+
+def test_successful_gap_capture_preserves_result_and_closes(tmp_path, monkeypatch):
+    path = clip(tmp_path)
+    stop = threading.Event()
+    captures = watch_captures(monkeypatch, stop=stop, stop_after=3)
+    fake_ocr(monkeypatch)
+    expected = core.run_scan(args_for(path), Quiet(), stop_requested=stop.is_set)
+    stop.clear()
+    fake_ocr(monkeypatch)
+    original = core.merge_detections
+    def merge_with_gap(*a, **kw):
+        d = core.Detection(0, 1, (2, 2, 20, 20), 'email', 'x', .9, (0., 0.))
+        assert kw['gap_check'](d, 0, 1) is False
+        return original(*a, **kw)
+    monkeypatch.setattr(core, 'merge_detections', merge_with_gap)
+    actual = core.run_scan(args_for(path), Quiet(), stop_requested=stop.is_set)
+    assert actual == expected
+    assert len(captures) == 3
+    assert all(capture.closed for capture in captures)
