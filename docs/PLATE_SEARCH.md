@@ -1,9 +1,9 @@
 # Experimental plate-text search core
 
-This optional Python core searches explicitly requested ASCII text using an
-installed local Tesseract. It is not wired into the app, does not change a
-report, does not select or blur anything, and does not require a vehicle or
-plate detector. A result is a suggestion for human inspection, not evidence
+This optional Python core and exact-frame HTTP route search explicitly requested
+ASCII text using an installed local Tesseract. The route has no editor control
+yet. Search does not change a report, select or blur anything, and does not
+require a vehicle or plate detector. A result is a suggestion for human inspection, not evidence
 that an identifier has been redacted or that its physical plate boundary is
 known. No model is trained or downloaded by this code.
 
@@ -63,13 +63,27 @@ seconds for 16 maximal frames; decode, crop computation and process startup are
 additional and are not interrupted by this timeout. Cancellation is checked
 between OCR calls and tiles; a call already in progress can take up to its
 individual timeout. Native decoder and OpenCV calls have no separate timeout.
-Concurrent requests must be bounded by the eventual worker owner. No latency or
+Callers using the core directly must bound concurrency themselves. No latency or
 memory reservation is guaranteed. Pytesseract writes temporary image/TSV files
 that can contain visual and recognized sensitive content; it cleans its own
 files on normal completion and handled timeout. Abrupt process termination may
-leave files behind. A future app integration must place transient data under
-its existing job/vault lifecycle and address abnormal termination before
-claiming that lifecycle is satisfied.
+leave files behind. The HTTP wrapper supplies the job-owned directory described
+below.
+
+The HTTP route searches one current exact sample in an isolated POSIX process
+(non-frozen Python only), with at most one search process per app instance. It
+has a 15-second admission-and-worker budget, kills its process group on timeout
+or cancellation, and uses a private temporary directory under the job. The
+directory is removed after the worker exits on normal completion and handled
+failure; a sudden server/process death can leave it until the job's existing
+deletion or vault lifecycle acts. Blocking filesystem and admission calls cannot
+be interrupted by the worker deadline. Search responses are private/no-store;
+cancel, timeout and failure are distinct from a completed search with no hits.
+The route holds file lifetimes and rechecks the current exact source and report
+before returning suggestions. The query is carried only in the request body and
+the worker's stdin, never in its argv or app logs. It returns box geometry and
+match kind, not the query or recognized OCR text. Search remains an opt-in
+inspection aid and does not alter the report.
 
 ## Synthetic checks
 

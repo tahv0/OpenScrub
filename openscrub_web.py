@@ -55,6 +55,8 @@ from openscrub_internal import exact_samples as exact
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 from openscrub_internal.job_logs import JobLog
+from openscrub_internal.plate_search import worker as plate_search_worker
+from openscrub_internal.plate_search.matching import normalize_queries as normalize_plate_queries
 import zones_ui
 
 
@@ -1077,6 +1079,8 @@ def _sanitize_argv(parser, argv, job=None):
 # The single job worker. WORKER["current"] is the job it is running right
 # now (read by Cancel and the watchdog); WORKER["thread"] is the live thread.
 WORKER = {"current": None, "thread": None}
+_PLATE_SEARCH_SLOT = threading.BoundedSemaphore(1)
+_PLATE_SEARCH_DEADLINE = 15.0
 _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
 
 
@@ -1556,7 +1560,8 @@ def enforce_vault_lock():
 
 @app.after_request
 def _finish_file_response(response):
-    if (request.endpoint in {"job_edit_sample", "job_detections", "job_thumb", "job_detframe"}
+    if (request.endpoint in {"job_edit_sample", "job_detections", "job_thumb", "job_detframe",
+                             "job_plate_search", "job_plate_search_cancel"}
             and not g.get('thumbnail_versioned_response')):
         response.headers["Cache-Control"] = "private, no-store"
     children = g.pop("file_children", [])
@@ -3267,6 +3272,170 @@ def job_edit_sample(jid):
     finally:
         if lease is not None:
             lease.release()
+
+
+def _run_plate_search_child(payload, directory, cancelled, timeout):
+    return plate_search_worker.run(payload, directory, cancelled, timeout=timeout)
+
+
+def _plate_search_json():
+    """Read a small request without asking Flask to buffer an unlimited body."""
+    if not request.is_json or (request.content_length is not None and request.content_length > 4096):
+        return None
+    try:
+        data = request.stream.read(4097)
+        return json.loads(data) if len(data) <= 4096 else None
+    except (ValueError, UnicodeError, RecursionError):
+        return None
+
+
+def _plate_search_result(value, width, height, mode):
+    """Admit only bounded, source-pixel suggestion data from the child."""
+    if (not isinstance(value, dict) or value.get('complete') is not True
+            or type(value.get('truncated')) is not bool
+            or not isinstance(value.get('suggestions'), list)
+            or len(value['suggestions']) > 128):
+        raise plate_search_worker.WorkerFailed()
+    allowed = 'full_equal' if mode == 'full' else 'fragment'
+    suggestions = []
+    for row in value['suggestions']:
+        if not isinstance(row, dict) or set(row) != {'box', 'match', 'boundary'}:
+            raise plate_search_worker.WorkerFailed()
+        box = row['box']
+        if (not isinstance(box, list) or len(box) != 4
+                or any(type(v) is not int for v in box)
+                or not 0 <= box[0] < box[2] <= width
+                or not 0 <= box[1] < box[3] <= height
+                or row['match'] != allowed or row['boundary'] != 'unknown'):
+            raise plate_search_worker.WorkerFailed()
+        suggestions.append({'box': list(box), 'match': row['match'], 'boundary': 'unknown'})
+    return suggestions
+
+
+@app.route('/api/jobs/<jid>/plate_search/cancel', methods=['POST'])
+def job_plate_search_cancel(jid):
+    job = JOBS.get(jid) or abort(404)
+    body = _plate_search_json()
+    identity = body.get('request_id') if isinstance(body, dict) else None
+    if not isinstance(identity, str) or re.fullmatch('[0-9a-f]{32}', identity) is None:
+        return jsonify(error='invalid_request'), 400
+    files = FILES.initialize(job)
+    with files.report_lock:
+        _report_current(job)
+        current = files.plate_search
+        if current is not None and current['id'] == identity:
+            current['cancel'].set()
+        elif current is None:
+            # One bounded tombstone covers cancellation before admission.
+            files.plate_cancel = identity
+    return jsonify(ok=True)
+
+
+@app.route('/api/jobs/<jid>/plate_search', methods=['POST'])
+def job_plate_search(jid):
+    """Search exactly the inspected sample; never publish a report mutation."""
+    job = JOBS.get(jid) or abort(404)
+    body = _plate_search_json()
+    try:
+        if not isinstance(body, dict) or set(body) != {'seed', 'query', 'mode', 'request_id'}:
+            raise ValueError()
+        seed = _parse_sample_precondition(body['seed'])
+        if set(seed) != {'version','source_ref','timeline_eq','policy','index','width','height','offset'}:
+            raise ValueError()
+        identity, mode, query = body['request_id'], body['mode'], body['query']
+        if (not isinstance(identity, str) or re.fullmatch('[0-9a-f]{32}', identity) is None
+                or not isinstance(query, str) or mode not in ('full', 'fragment')):
+            raise ValueError()
+        normalize_plate_queries(query, mode=mode)
+    except (ValueError, TypeError, exact.ExactError):
+        return jsonify(error='invalid_request'), 400
+    if not _PLATE_SEARCH_SLOT.acquire(blocking=False):
+        return jsonify(error='search_busy'), 409
+    deadline = time.monotonic() + _PLATE_SEARCH_DEADLINE
+    files = FILES.initialize(job)
+    work_lease = snapshot_lease = marker = None
+    try:
+        with files.report_lock:
+            _edit_gate(job)
+            if job.get('phase') not in ('review', 'done'):
+                raise exact.ExactError('search requires an active review',409,'sample_conflict')
+            admission_qgen, admission_cancel = job.get('qgen', 0), job['cancel']
+            admission_signalled = admission_cancel.is_set()
+        work_lease = _own_files(job, work=True)
+        doc, selected, fence, snapshot_lease = _exact_snapshot(job)
+        fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+        _check_sample_precondition(seed, selected, fps, cum, timeline_eq)
+        with _exact_owner_guard(job, snapshot_lease):
+            _exact_current_locked(job, selected, fence)
+            if (work_lease.source != selected['path']
+                    or work_lease.source_state is not snapshot_lease.source_state
+                    or job.get('qgen', 0) != admission_qgen
+                    or job['cancel'] is not admission_cancel
+                    or (not admission_signalled and admission_cancel.is_set())):
+                raise exact.ExactError('search admission changed',409,'sample_conflict')
+            if files.plate_search is not None:
+                raise exact.ExactError('search already running',409,'sample_conflict')
+            if files.tracker is not None and not files.tracker.released:
+                raise exact.ExactError('tracking already running',409,'sample_conflict')
+            if files.plate_cancel == identity:
+                files.plate_cancel = None
+                raise plate_search_worker.WorkerCancelled()
+            files.plate_cancel = None
+            marker = {'id': identity, 'cancel': threading.Event()}
+            files.plate_search = marker
+            # Give the lookup its own operation identity. A delayed job-cancel
+            # cannot then revoke a newer lookup after this one has finished.
+            work_lease.operation = marker['cancel']
+            files.operation = marker['cancel']
+            job['cancel'] = marker['cancel']
+            fence = ((fence[0][0], marker['cancel']), fence[1])
+
+        def current():
+            with _exact_owner_guard(job, snapshot_lease):
+                if marker['cancel'].is_set() or job.get('qgen', 0) != admission_qgen:
+                    raise plate_search_worker.WorkerCancelled()
+                if files.plate_search is not marker or not _operation_valid(job, work_lease):
+                    raise plate_search_worker.WorkerCancelled()
+                _exact_current_locked(job, selected, fence)
+
+        def cancelled():
+            return marker['cancel'].is_set() or files.operation is not marker['cancel']
+
+        payload = dict(path=selected['path'], stamp=list(selected['stamp']), index=seed['index'],
+                       fps=fps, count=len(cum), width=seed['width'], height=seed['height'],
+                       tolerance_s=tolerance, query=query, mode=mode)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise plate_search_worker.WorkerTimedOut()
+        try:
+            value = _run_plate_search_child(payload, job['dir'], cancelled, remaining)
+        except plate_search_worker.WorkerFailed:
+            current()
+            raise
+        suggestions = _plate_search_result(value, seed['width'], seed['height'], mode)
+        current()
+        return jsonify(state='complete', index=seed['index'], truncated=value['truncated'],
+                       suggestions=suggestions)
+    except plate_search_worker.WorkerCancelled:
+        return jsonify(state='cancelled', error='search_cancelled'), 409
+    except plate_search_worker.WorkerTimedOut:
+        return jsonify(state='timeout', error='search_timeout'), 504
+    except (plate_search_worker.WorkerFailed, OSError):
+        return jsonify(state='error', error='search_unavailable'), 503
+    except exact.ExactError as error:
+        return _exact_error(error)
+    finally:
+        if marker is not None:
+            with files.report_lock:
+                if files.plate_search is marker:
+                    files.plate_search = None
+                if files.operation is marker['cancel']:
+                    files.operation = None
+        if snapshot_lease is not None:
+            snapshot_lease.release()
+        if work_lease is not None:
+            work_lease.release()
+        _PLATE_SEARCH_SLOT.release()
 
 
 def _frame_at(job, t, rstate):

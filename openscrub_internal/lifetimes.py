@@ -16,6 +16,8 @@ class _JobFiles:
         self.closed = False
         self.queued = {}
         self.tracker = None
+        self.plate_search = None
+        self.plate_cancel = None
         # Initialized before a new/rehydrated job enters the registry. Never
         # persisted: one stable transaction boundary per live job identity.
         self.report_lock = threading.Lock()
