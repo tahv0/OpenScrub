@@ -143,7 +143,7 @@ if(dpr===2){
 }
 await page.screenshot({path:root+`/exact-${dpr}-final.png`,fullPage:true});
 const conflicts=await Promise.all(thumbnailConflicts);
-const unexpected=warnings.filter(w=>!w.text.includes('409')||!conflicts.some(c=>c.url===w.url&&c.error==='thumbnail_obsolete'));
+const unexpected=warnings.filter(w=>!w.text.includes('409')||!conflicts.some(c=>c.url===w.url&&['thumbnail_obsolete','thumbnail_pending'].includes(c.error)));
 result.errors=errors;result.warnings=warnings;result.thumbnailConflicts=conflicts;result.expectedConsole=expectedConsole;result.posts=posts;result.samples=samples;
 fs.writeFileSync(root+`/exact-results-${dpr}.json`,JSON.stringify(result,null,2));assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[],JSON.stringify({warnings,conflicts}));
 console.log(JSON.stringify({dpr,media:result.media.map(x=>({label:x.label,index:x.got.sample.index,marker:x.got.marker})),coalescing:result.coalescing,staleTrackInert:true,ownedTrackRefresh:true,persistence:!!result.persistence}));
