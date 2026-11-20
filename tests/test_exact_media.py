@@ -17,6 +17,7 @@ import pytest
 import openscrub_web as web
 from test_job_lifecycle import store,request
 from test_exact_samples import sample
+from artifact_support import artifact_directory
 
 
 @pytest.fixture
@@ -62,7 +63,7 @@ def marker(frame):
 @pytest.mark.parametrize('label,times,indices',[
     ('cfr24',[.2],[4]),('cfr5',[1.9,2.],[9,9]),
     ('normalized',[.5,2/13,3/13,14/13],[6,2,3,13])])
-def test_old_report_production_pixels_and_independent_pts(store,retained,monkeypatch,label,times,indices):
+def test_old_report_production_pixels_and_independent_pts(store,retained,monkeypatch,label,times,indices,tmp_path):
     value=retained[label];path=Path(value['path']);fps={'cfr24':24,'cfr5':5,'normalized':13}[label]
     refs,pts=oracle(path);install(store,path,fps,len(refs),label=='normalized')
     actual=[];real=web.exact.read_indexed_capture
@@ -81,7 +82,7 @@ def test_old_report_production_pixels_and_independent_pts(store,retained,monkeyp
         assert [box['i'] for box in response['boxes']]==[0,1]
         results.append(dict(t=t,index=index,marker=marker(shown),pts=str(pts[index]),observed_s=decoded.observed_s,
             canonical_s=decoded.canonical_s,tolerance_s=web.exact.precision_bound(web.FILES.initialize(store.job).current_source['facts'],fps,len(refs))))
-    output=Path(os.environ['VERIFY_RUN'])/'logs'/('media-'+label+'.json')
+    output=artifact_directory(tmp_path)/('media-'+label+'.json')
     output.write_text(json.dumps(dict(input=value,results=results),indent=2)+'\n')
 
 
@@ -97,6 +98,6 @@ def test_native_coarse_timebase_production_pixels_pts(store,retained,tmp_path):
     assert index==4 and marker(shown)==marker(refs[index])
     assert value['sample']['observed_s']==pytest.approx(float(pts[index]),abs=1e-12)
     assert 1e-4<abs(float(pts[index])-index/24)<bound<.25/24
-    (Path(os.environ['VERIFY_RUN'])/'logs'/'media-coarse.json').write_text(json.dumps(dict(
+    (artifact_directory(tmp_path)/'media-coarse.json').write_text(json.dumps(dict(
         sha256=hashlib.sha256(path.read_bytes()).hexdigest(),index=index,pts=str(pts[index]),
         sample=value['sample'],bound_s=bound,facts=facts),indent=2)+'\n')
