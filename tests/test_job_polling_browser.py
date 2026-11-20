@@ -3,6 +3,7 @@
 Optional existing Playwright/Chromium only. Set NODE_PATH and
 PLAYWRIGHT_BROWSERS_PATH for an isolated installation; no install is attempted.
 """
+import base64
 import json
 import os
 from pathlib import Path
@@ -183,6 +184,11 @@ async function setup(name){
   const [,id,tail]=m,kind=tail||'meta';q.events.push({id,kind,query:u.search,method:req.method()});
   if((q.pass===kind||q.pass==='both'&&['meta','log'].includes(kind))&&req.method()==='GET')return route.continue();
   if(/thumb|detframe|frame_at|preview.jpg/.test(kind))return route.fulfill({contentType:'image/png',body:tiny});
+  if(kind==='edit_sample')return route.fulfill({json:{version:1,
+   sample:{source_ref:'polling-fixture',timeline_eq:'0'.repeat(64),policy:'opencv-ffmpeg-zero-cfr-v1',
+    index:0,width:320,height:180,stream:0,requested_s:Number(u.searchParams.get('t')),
+    canonical_s:0,observed_s:0,origin:[0,0],offset:[0,0]},
+   image:{mime:'image/jpeg',base64:process.env.POLLING_SAMPLE_JPEG},boxes:[]}});
   let body=kind==='meta'?meta(id,q.phase,q.progress):kind==='log'?{from:+u.searchParams.get('from'),lines:q.logs[id].slice(+u.searchParams.get('from')),len:q.logs[id].length}:
    kind==='detections'?{duration:10,detections:[{i:0,category:'mrn',text:'review-'+id,enabled:true,t_start:0,t_end:1,track:-1,person:-1}]}:
    kind==='mediainfo'?{duration:10,width:320,height:180}:kind==='report'?{detections:[],audio_redactions:[{t0:1,t1:2,mode:'mute'}]}:{ok:true};
@@ -290,7 +296,8 @@ try{
  await advance(q,50); // the paused clock must run P09's scroll-triggered rAF
  console.log(JSON.stringify({afterClockAdvance:await schedulerState()}));
  await q.page.locator('#det0 img').click();await wait(async()=>await q.page.locator('#lb img').evaluate(e=>e.naturalWidth>0));await q.page.locator('#lb').click();
- await q.page.getByRole('button',{name:'▶ Preview video & edit boxes (before rendering)'}).click();await wait(async()=>await q.page.locator('#beCv').count()===1);
+ await q.page.getByRole('button',{name:'▶ Preview video & edit boxes (before rendering)'}).click();
+ await wait(async()=>await q.page.evaluate(()=>beReady()));
  assert.ok(await q.page.locator('#beCv').evaluate(e=>e.width>0));
  if(process.env.POLLING_ARTIFACTS)await q.page.screenshot({path:process.env.POLLING_ARTIFACTS+'/polling-review-preview.png'});
  await finish(q);
@@ -309,7 +316,13 @@ def test_emitted_page_polling_acceptance(polling_http):
     available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
     if available.returncode:
         pytest.skip('Existing Playwright required; no frontend dependencies installed')
-    env = dict(os.environ, POLLING_BASE=polling_http)
+    import cv2
+    import numpy as np
+
+    ok, jpeg = cv2.imencode('.jpg', np.full((180, 320, 3), 100, dtype=np.uint8))
+    assert ok
+    env = dict(os.environ, POLLING_BASE=polling_http,
+               POLLING_SAMPLE_JPEG=base64.b64encode(jpeg.tobytes()).decode('ascii'))
     result = subprocess.run([node, '-e', BROWSER], capture_output=True, text=True, env=env, timeout=120)
     if os.environ.get('POLLING_ARTIFACTS'):
         Path(os.environ['POLLING_ARTIFACTS'], 'polling-acceptance.log').write_text(result.stdout + result.stderr)
