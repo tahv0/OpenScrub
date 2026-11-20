@@ -8710,64 +8710,66 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
         # is found. No knobs to raise — it goes as far back as it needs to.
         cap2 = cv2.VideoCapture(args.video)
         deep_n, deep_gain = 0, 0.0
-        for d, dcx, dcy, tmpl in bt_deep:
-            if float(tmpl.std()) < 4:
-                continue
-            th_, tw_ = tmpl.shape
-            M = 10
+        try:
+            for d, dcx, dcy, tmpl in bt_deep:
+                if float(tmpl.std()) < 4:
+                    continue
+                th_, tw_ = tmpl.shape
+                M = 10
 
-            def _visible(t, d=d, dcx=dcx, dcy=dcy, tmpl=tmpl,
-                         th_=th_, tw_=tw_):
-                fr = _grab_frame(cap2, t,
-                                 cap2.get(cv2.CAP_PROP_FPS) or 30.0)
-                if fr is None:
-                    return False
-                sm = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
-                                fx=BT_SCALE, fy=BT_SCALE)
-                sh, sw = sm.shape[:2]
-                bx1 = int((d.cbox[0] + dcx) * BT_SCALE) - M
-                by1 = int((d.cbox[1] + dcy) * BT_SCALE) - M
-                bx2, by2 = bx1 + tw_ + 2 * M, by1 + th_ + 2 * M
-                bx1, by1 = max(0, bx1), max(0, by1)
-                bx2, by2 = min(sw, bx2), min(sh, by2)
-                if bx2 - bx1 < tw_ or by2 - by1 < th_:
-                    return False
-                reg = sm[by1:by2, bx1:bx2]
-                if float(reg.std()) < max(3.0, 0.30 * float(tmpl.std())):
-                    return False
-                return float(cv2.matchTemplate(
-                    reg, tmpl, cv2.TM_CCOEFF_NORMED).max()) >= 0.6
+                def _visible(t, d=d, dcx=dcx, dcy=dcy, tmpl=tmpl,
+                             th_=th_, tw_=tw_):
+                    fr = _grab_frame(cap2, t,
+                                     cap2.get(cv2.CAP_PROP_FPS) or 30.0)
+                    if fr is None:
+                        return False
+                    sm = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                                    fx=BT_SCALE, fy=BT_SCALE)
+                    sh, sw = sm.shape[:2]
+                    bx1 = int((d.cbox[0] + dcx) * BT_SCALE) - M
+                    by1 = int((d.cbox[1] + dcy) * BT_SCALE) - M
+                    bx2, by2 = bx1 + tw_ + 2 * M, by1 + th_ + 2 * M
+                    bx1, by1 = max(0, bx1), max(0, by1)
+                    bx2, by2 = min(sw, bx2), min(sh, by2)
+                    if bx2 - bx1 < tw_ or by2 - by1 < th_:
+                        return False
+                    reg = sm[by1:by2, bx1:bx2]
+                    if float(reg.std()) < max(3.0, 0.30 * float(tmpl.std())):
+                        return False
+                    return float(cv2.matchTemplate(
+                        reg, tmpl, cv2.TM_CCOEFF_NORMED).max()) >= 0.6
 
-            hi, step, lo, at_start = d.t_start, 1.0, None, False
-            for _ in range(11):          # doubling covers ~34 min of video
-                t = hi - step
-                if t <= win_start + 0.01:
-                    at_start = _visible(win_start)
-                    lo = win_start
-                    break
-                if _visible(t):
-                    hi, step = t, step * 2
-                else:
-                    lo = t
-                    break
-            if lo is None:
-                lo = max(win_start, hi - step)
-            if not at_start:
-                for _ in range(6):       # binary search to ~0.15s
-                    if hi - lo <= 0.15:
+                hi, step, lo, at_start = d.t_start, 1.0, None, False
+                for _ in range(11):          # doubling covers ~34 min of video
+                    t = hi - step
+                    if t <= win_start + 0.01:
+                        at_start = _visible(win_start)
+                        lo = win_start
                         break
-                    mid = (lo + hi) / 2
-                    if _visible(mid):
-                        hi = mid
+                    if _visible(t):
+                        hi, step = t, step * 2
                     else:
-                        lo = mid
-            new_start = max(win_start,
-                            (win_start if at_start else hi) - 0.12)
-            if new_start < d.t_start - 0.05:
-                deep_n += 1
-                deep_gain += d.t_start - new_start
-                d.t_start = new_start
-        cap2.release()
+                        lo = t
+                        break
+                if lo is None:
+                    lo = max(win_start, hi - step)
+                if not at_start:
+                    for _ in range(6):       # binary search to ~0.15s
+                        if hi - lo <= 0.15:
+                            break
+                        mid = (lo + hi) / 2
+                        if _visible(mid):
+                            hi = mid
+                        else:
+                            lo = mid
+                new_start = max(win_start,
+                                (win_start if at_start else hi) - 0.12)
+                if new_start < d.t_start - 0.05:
+                    deep_n += 1
+                    deep_gain += d.t_start - new_start
+                    d.t_start = new_start
+        finally:
+            cap2.release()
         if deep_n:
             cb.log(f"      deep backtrack: found the true onset of {deep_n} "
                    f"region(s) beyond the buffer, closing another "
@@ -8829,14 +8831,16 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
         _gap_stats["bridged"] += 1
         return True
 
-    detections = merge_detections(raw, hold=hold, scans=scans,
-                                  bridge_gap=args.bridge_gap, fuzz=_fuzz,
-                                  gap_check=_gap_check)
-    zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
-                                bridge_gap=args.bridge_gap, fuzz=_fuzz,
-                                gap_check=_gap_check) if zdrop_raw else []
-    if _gap_cap["cap"] is not None:
-        _gap_cap["cap"].release()
+    try:
+        detections = merge_detections(raw, hold=hold, scans=scans,
+                                      bridge_gap=args.bridge_gap, fuzz=_fuzz,
+                                      gap_check=_gap_check)
+        zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
+                                    bridge_gap=args.bridge_gap, fuzz=_fuzz,
+                                    gap_check=_gap_check) if zdrop_raw else []
+    finally:
+        if _gap_cap["cap"] is not None:
+            _gap_cap["cap"].release()
     n_tracks = assign_dense_tracks(detections)
     if n_tracks:
         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
