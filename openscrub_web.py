@@ -2042,6 +2042,33 @@ def _exact_error(error):
     return jsonify(error=error.code, detail=str(error)), error.status
 
 
+def _read_exact_source(selected, index, *, fps, count, tolerance_s):
+    """The caller holds source lifetime; this adapter owns only the decode."""
+    try:
+        opened_source = open(selected['path'], 'rb')
+    except FileNotFoundError:
+        raise exact.ExactError('selected source disappeared before decode',
+                               409, 'sample_conflict') from None
+    with opened_source as opened:
+        if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
+            raise exact.ExactError('opened source changed', 409, 'sample_conflict')
+        cap = cv2.VideoCapture(selected['path'])
+        try:
+            facts = selected['facts']
+            decoded = exact.read_indexed_capture(cap, index, fps=fps, count=count,
+                width=facts['width'], height=facts['height'], tolerance_s=tolerance_s)
+        finally:
+            cap.release()
+        try:
+            if (_file_stamp(os.fstat(opened.fileno())) != selected['stamp']
+                    or _file_stamp(os.stat(selected['path'])) != selected['stamp']):
+                raise exact.ExactError('opened source mutated', 409, 'sample_conflict')
+        except FileNotFoundError:
+            raise exact.ExactError('selected source disappeared during decode',
+                                   409, 'sample_conflict') from None
+    return decoded
+
+
 @app.route('/api/jobs/<jid>/edit_sample')
 def job_edit_sample(jid):
     job = JOBS.get(jid) or abort(404)
@@ -2059,29 +2086,15 @@ def job_edit_sample(jid):
         fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
         index = exact.resolve_time(requested, fps, len(cum))
         facts = selected['facts']
+        decoded = _read_exact_source(selected, index, fps=fps, count=len(cum),
+                                     tolerance_s=tolerance)
         try:
-            opened_source = open(selected['path'], 'rb')
-        except FileNotFoundError:
-            raise exact.ExactError('selected source disappeared before decode',
-                                   409, 'sample_conflict') from None
-        with opened_source as opened:
-            if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
-                raise exact.ExactError('opened source changed', 409, 'sample_conflict')
-            cap = cv2.VideoCapture(selected['path'])
-            try:
-                decoded = exact.read_indexed_capture(cap, index, fps=fps, count=len(cum),
-                    width=facts['width'], height=facts['height'], tolerance_s=tolerance)
-                try:
-                    ok, encoded = cv2.imencode('.jpg', decoded.pixels, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                    if not ok or encoded is None:
-                        raise ValueError('JPEG encoder returned no image')
-                    image = base64.b64encode(encoded.tobytes()).decode('ascii')
-                except Exception as error:
-                    raise exact.ExactError('JPEG encoding failed: '+str(error), 500, 'sample_encode_failed') from None
-            finally:
-                cap.release()
-            if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
-                raise exact.ExactError('opened source mutated', 409, 'sample_conflict')
+            ok, encoded = cv2.imencode('.jpg', decoded.pixels, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if not ok or encoded is None:
+                raise ValueError('JPEG encoder returned no image')
+            image = base64.b64encode(encoded.tobytes()).decode('ascii')
+        except Exception as error:
+            raise exact.ExactError('JPEG encoding failed: '+str(error), 500, 'sample_encode_failed') from None
         offset = cum[index]
         boxes = []
         for i, row in enumerate(doc['detections']):
@@ -2673,22 +2686,109 @@ def job_track_object(jid):
     it went. Runs in a background thread; poll /track_status."""
     job = JOBS.get(jid) or abort(404)
     p = request.get_json(force=True)
+    seed_pc, selected, snapshot_lease = None, None, None
     try:
+        if isinstance(p, dict) and 'seed' in p:
+            seed_pc = _parse_sample_precondition(p['seed'])
+            if set(seed_pc) != {'version','source_ref','timeline_eq','policy','index',
+                                'width','height','offset'}:
+                raise exact.ExactError('seed must be a sample precondition',400,'invalid_sample_request')
+            try:
+                exact.vector(p.get('box'), 4)
+            except exact.ExactError as error:
+                raise exact.ExactError(str(error),400,'invalid_sample_request') from None
+            if not all(exact.finite(p.get(key)) for key in ('t_ref','t0','t1')):
+                raise exact.ExactError('finite strict times required',400,'invalid_sample_request')
         box = [float(v) for v in p["box"]]
         t_ref, t0, t1 = (float(p["t_ref"]), float(p["t0"]), float(p["t1"]))
+        if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
+            abort(400)
+        if seed_pc is not None:
+            if (not 0 <= box[0] < box[2] <= seed_pc['width']
+                    or not 0 <= box[1] < box[3] <= seed_pc['height']):
+                raise exact.ExactError('strict box outside sample',400,'invalid_sample_request')
+            with FILES.initialize(job).report_lock:
+                admission_cancel = job['cancel']
+                admission_qgen = job.get('qgen', 0)
+                admission_signalled = admission_cancel.is_set()
+            doc, selected, snapshot_fence, snapshot_lease = _exact_snapshot(job)
+            fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+            _check_sample_precondition(seed_pc, selected, fps, cum, timeline_eq)
+            seed_count = len(cum)
+            if t_ref != seed_pc['index']/fps or t1 > len(cum)/fps:
+                raise exact.ExactError('strict reference/window differs from sample',400,'invalid_sample_request')
+    except exact.ExactError as error:
+        if snapshot_lease is not None:
+            snapshot_lease.release()
+        return _exact_error(error)
     except (KeyError, TypeError, ValueError):
+        if snapshot_lease is not None:
+            snapshot_lease.release()
         abort(400)
-    if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
-        abort(400)
+    except BaseException:
+        if snapshot_lease is not None:
+            snapshot_lease.release()
+        raise
     st = {"state": "running", "added": 0, "error": None}
     files = FILES.initialize(job)
-    current, operation = job.get("video"), files.operation
-    lease = _own_files(job, work=True)
+    current = job.get('video')
+    operation = snapshot_fence[0][1] if selected is not None else files.operation
     try:
-        with files.report_lock:
+        lease = _own_files(job, work=True)
+    finally:
+        if snapshot_lease is not None:
+            snapshot_lease.release()
+
+    def track_report_guard():
+        if selected is not None:
+            return _exact_owner_guard(job, lease)
+        return files.report_lock
+
+    def strict_current():
+        if lease.operation is None:
+            if (job.get('qgen', 0) != admission_qgen
+                    or job['cancel'] is not admission_cancel
+                    or (not admission_signalled and admission_cancel.is_set())
+                    or (operation is not None and operation.is_set())):
+                raise exact.ExactError('tracking admission was cancelled',409,'sample_conflict')
+        elif (not _operation_valid(job, lease) or job.get('trackbg') is not st
+                or lease.operation.is_set()):
+            raise exact.ExactError('tracking operation changed or was cancelled',409,'sample_conflict')
+
+    def strict_document():
+        _exact_current_locked(job, selected)
+        if lease.source != selected['path']:
+            raise exact.ExactError('work lease does not own selected source',409,'sample_conflict')
+        try:
+            latest = _load_job_report(job)
+        except (OSError, ValueError):
+            raise exact.ExactError('latest tracking report is unavailable', 409, 'sample_conflict') from None
+        provenance = latest.get('provenance') if isinstance(latest, dict) else None
+        report_input = provenance.get('input') if isinstance(provenance, dict) else None
+        if not isinstance(report_input, str) or os.path.realpath(report_input) != selected['path']:
+            raise exact.ExactError('report input differs from selected source', 409, 'sample_conflict')
+        current_fps, current_cum, current_eq, _ = _exact_policy(latest, selected)
+        _check_sample_precondition(seed_pc, selected, current_fps,current_cum,current_eq)
+        # Report I/O/projection may block while cancellation signals its Event.
+        _exact_current_locked(job, selected)
+        strict_current()
+        return latest
+
+    try:
+        if snapshot_lease is not None:
+            if lease.source_state is not snapshot_lease.source_state:
+                raise exact.ExactError('containing source changed', 409, 'sample_conflict')
+            if lease.source_state is not None and lease.source_state is not files:
+                # Use the owner observed with the sample, including changes
+                # between releasing the snapshot and entering the work gate.
+                lease.exact_source_epoch = snapshot_lease.exact_source_epoch
+        with track_report_guard():
             _edit_gate(job)
             if job.get("video") != current or files.operation is not operation:
                 abort(409, "job operation or source changed — retry tracking")
+            if selected is not None:
+                strict_current()
+                strict_document()
             if ((files.tracker is not None and not files.tracker.released)
                     or job.get("trackbg", {}).get("state") == "running"):
                 abort(409, "tracking already in progress")
@@ -2701,6 +2801,9 @@ def job_track_object(jid):
             job["cancel"] = lease.operation
             files.tracker = lease
             job["trackbg"] = st
+    except exact.ExactError as error:
+        lease.release()
+        return _exact_error(error)
     except BaseException:
         lease.release()
         raise
@@ -2712,6 +2815,19 @@ def job_track_object(jid):
                     job["log"].append(m)
                 def cancelled(self):
                     return lease.operation.is_set()
+            seed_kw = {}
+            if selected is not None:
+                decoded = _read_exact_source(selected, seed_pc['index'], fps=fps,
+                    count=seed_count, tolerance_s=tolerance)
+                seed = exact.StrictSeed(decoded.pixels, selected, decoded.index,
+                    decoded.canonical_s, decoded.observed_s, fps, seed_count,
+                    decoded.width, decoded.height, exact.POLICY, tolerance)
+                with track_report_guard():
+                    if (not _operation_valid(job, lease) or job.get('trackbg') is not st
+                            or lease.operation.is_set()):
+                        return
+                    strict_document()
+                seed_kw['strict_seed'] = seed
             det = None
             try:
                 # same person-model resolution the scan uses: the panel
@@ -2724,9 +2840,14 @@ def job_track_object(jid):
                     det = None
             except Exception:
                 det = None
+            if selected is not None:
+                # Model resolution can block after the decode's source check.
+                with track_report_guard():
+                    _exact_current_locked(job, selected)
+                    strict_current()
             samples = openscrub.track_manual_region(
-                lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
-            with files.report_lock:
+                lease.source, box, t_ref, t0, t1, cb=L(), person_det=det, **seed_kw)
+            with track_report_guard():
                 if (not _operation_valid(job, lease)
                         or job.get("trackbg") is not st or lease.operation.is_set()):
                     return
@@ -2735,10 +2856,10 @@ def job_track_object(jid):
                               error="could not track that region — try a "
                                     "larger box or a frame where it's clearer")
                     return
-                doc = _load_job_report(job)
+                doc = strict_document() if selected is not None else _load_job_report(job)
                 rs = doc["render_state"]
-                fps = float(rs["fps"]) or 30.0
-                step = 2.0 / fps
+                result_fps = float(rs["fps"]) or 30.0
+                step = 2.0 / result_fps
                 tid = max([d.get("track", -1) for d in doc["detections"]
                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
                 new = []
@@ -2750,7 +2871,8 @@ def job_track_object(jid):
                 for s in samples:
                     t, b, score = s[0], s[1], s[2]
                     poly = s[3] if len(s) > 3 and s[3] else ()
-                    fidx = min(int(t * fps), len(rs["cum"]) - 1)
+                    fidx = (seed_pc['index'] if selected is not None and t == t_ref
+                            else min(int(t * result_fps), len(rs["cum"]) - 1))
                     ox, oy = rs["cum"][fidx]
                     new.append({
                         "t_start": t, "t_end": t + step * 1.2,
@@ -2767,6 +2889,9 @@ def job_track_object(jid):
                 new[-1]["t_end"] += 0.25
                 doc["detections"].extend(new)
                 path = os.path.join(job["dir"], "report.json")
+                if selected is not None:
+                    _exact_current_locked(job, selected)
+                    strict_current()
                 _publish_job_report_locked(job, path, doc)
                 _report_committed_locked(job, doc)
                 job["log"].append(

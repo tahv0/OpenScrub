@@ -39,6 +39,7 @@ from dataclasses import dataclass, asdict
 import cv2
 import numpy as np
 
+from openscrub_internal import exact_samples as exact
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
@@ -1925,8 +1926,27 @@ def _iou(a, b):
     return inter / max(aa + bb - inter, 1e-9)
 
 
+def _validate_tracker_seed(seed, video, box, t_ref, t0, t1):
+    exact.validate_strict_inputs(seed, box, t_ref, t0, t1)
+    if (not isinstance(seed.source_selection, dict)
+            or not isinstance(seed.source_selection.get('path'), str)
+            or os.path.realpath(video) != os.path.realpath(seed.source_selection['path'])):
+        raise exact.ExactError('strict seed source differs from tracker source')
+
+
+def _prime_tracker_seed(cap, seed):
+    # Ignore these pixels: priming only establishes the after-index position.
+    try:
+        exact.read_indexed_capture(cap, seed.index, fps=seed.fps, count=seed.count,
+            width=seed.width, height=seed.height, tolerance_s=seed.tolerance_s)
+    except (exact.ExactError, PipelineCancelled):
+        raise
+    except Exception as error:
+        raise exact.ExactError('strict indexed prime failed: '+str(error)) from error
+
+
 def _track_person_dense(video, box, t_ref, t0, t1, det, log,
-                        step_frames=2, cancelled=None):
+                        step_frames=2, cancelled=None, *, strict_seed=None):
     """Follow the PERSON inside a user-drawn box using the person
     detector itself: per-frame detections give body-tight boxes (and
     silhouette polygons from -seg models), so the blur hugs the body
@@ -1944,29 +1964,42 @@ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
 
     Returns [(t, box, score, poly)] — or [] when no person overlaps the
     drawn box at t_ref (caller falls back to the generic tracker)."""
-    cap = cv2.VideoCapture(video)
-    if not cap.isOpened():
-        return []
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    step = max(1, int(step_frames)) / fps
-    t_ref = min(max(t_ref, t0), t1)
-    W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
-    H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
-
-    def _frame(t):
-        return _grab_frame(cap, t, fps)
-
-    def _poly(d):
-        return tuple(d[5]) if len(d) > 5 and d[5] else ()
-
-    def _cls(d):
-        return int(d[6]) if len(d) > 6 else 0
-
-    # tracking mode: decode EVERY COCO class — the drawn box may hold a
-    # person, a bird, a ball, a laptop… whatever it is, follow THAT
+    if strict_seed is not None:
+        _validate_tracker_seed(strict_seed, video, box, t_ref, t0, t1)
     prev_any = getattr(det, "want_any", False)
-    det.want_any = True
     try:
+        cap = cv2.VideoCapture(video)
+    except (exact.ExactError, PipelineCancelled):
+        raise
+    except Exception as error:
+        if strict_seed is not None:
+            raise exact.ExactError('strict person capture failed: '+str(error)) from error
+        raise
+    try:
+        if strict_seed is not None:
+            _prime_tracker_seed(cap, strict_seed)
+            if cancelled is not None and cancelled():
+                raise PipelineCancelled()
+        elif not cap.isOpened():
+            return []
+        fps = strict_seed.fps if strict_seed is not None else (cap.get(cv2.CAP_PROP_FPS) or 30.0)
+        step = max(1, int(step_frames)) / fps
+        t_ref = min(max(t_ref, t0), t1)
+        W = strict_seed.width if strict_seed is not None else (cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        H = strict_seed.height if strict_seed is not None else (cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+
+        def _frame(t):
+            return _grab_frame(cap, t, fps)
+
+        def _poly(d):
+            return tuple(d[5]) if len(d) > 5 and d[5] else ()
+
+        def _cls(d):
+            return int(d[6]) if len(d) > 6 else 0
+
+        # tracking mode: decode EVERY COCO class — the drawn box may hold a
+        # person, a bird, a ball, a laptop… whatever it is, follow THAT
+        det.want_any = True
         dbox = tuple(float(v) for v in box)
         darea = max((dbox[2] - dbox[0]) * (dbox[3] - dbox[1]), 1e-9)
         # the user pointed at something REAL: one unreadable or
@@ -1975,11 +2008,12 @@ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
         # then nearby frames inside the window.
         best, bsc, seed_t = None, 0.0, t_ref
         read_fail = 0
-        for dt in (0.0, 0.33, -0.33, 0.66, -0.66, 1.0, -1.0):
+        for dt in ((0.0,) if strict_seed is not None else
+                   (0.0, 0.33, -0.33, 0.66, -0.66, 1.0, -1.0)):
             ts = t_ref + dt
             if ts < t0 - 1e-6 or ts > t1 + 1e-6:
                 continue
-            fr0 = _frame(ts)
+            fr0 = strict_seed.pixels if strict_seed is not None else _frame(ts)
             if fr0 is None:
                 read_fail += 1
                 continue
@@ -2072,7 +2106,8 @@ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
             if direction == 1:  # forward: sequential reads, no re-seeking
                 # robust prime: positions the decoder just past t_ref's
                 # frame even when random POS_MSEC seek fails on this file
-                _grab_frame(cap, t_ref, fps)
+                if strict_seed is None:
+                    _grab_frame(cap, t_ref, fps)
                 rev = None
             else:
                 # backward: chunked forward reads served in reverse — a
@@ -2440,15 +2475,17 @@ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
                            t2, len(samples)))
                 t = t2
     finally:
-        det.want_any = prev_any
-        cap.release()
+        try:
+            det.want_any = prev_any
+        finally:
+            cap.release()
     samples.sort(key=lambda s: s[0])
     return samples
 
 
 def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                         step_frames=2, thr=0.55, scale=0.5,
-                        person_det=None):
+                        person_det=None, *, strict_seed=None):
     """Track a user-drawn screen-space box through [t0, t1], starting
     from its appearance at t_ref and walking both directions. This powers
     targeted redaction: circle anything the detectors don't know (a
@@ -2480,15 +2517,27 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
 
     # Cancellation takes precedence even when the input is unusable.
     _check_cancelled()
-    cap = cv2.VideoCapture(video)
+    if strict_seed is not None:
+        _validate_tracker_seed(strict_seed, video, box, t_ref, t0, t1)
     try:
-        if not cap.isOpened():
+        cap = cv2.VideoCapture(video)
+    except (exact.ExactError, PipelineCancelled):
+        raise
+    except Exception as error:
+        if strict_seed is not None:
+            raise exact.ExactError('strict generic capture failed: '+str(error)) from error
+        raise
+    try:
+        if strict_seed is not None:
+            _prime_tracker_seed(cap, strict_seed)
+            _check_cancelled()
+        elif not cap.isOpened():
             return []
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        fps = strict_seed.fps if strict_seed is not None else (cap.get(cv2.CAP_PROP_FPS) or 30.0)
         step = max(1, int(step_frames)) / fps
         t_ref = min(max(t_ref, t0), t1)
-        W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
-        H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+        W = strict_seed.width if strict_seed is not None else (cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        H = strict_seed.height if strict_seed is not None else (cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
 
         def _frame(t):
             return _grab_frame(cap, t, fps)
@@ -2509,15 +2558,18 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
             # tracking: body-tight boxes + silhouettes every frame, immune
             # to the scale/appearance drift that plagues generic trackers
             try:
+                seed_kw = {"strict_seed": strict_seed} if strict_seed is not None else {}
                 # detector masks are repainted at every sample; at the default
                 # 2-frame cadence the outline visibly STEPS/flickers at half
                 # the frame rate (real footage) — detect EVERY frame instead
                 ps = _track_person_dense(video, box, t_ref, t0, t1,
                                          person_det, log, step_frames=1,
-                                         cancelled=(cb.cancelled if cb else None))
+                                         cancelled=(cb.cancelled if cb else None), **seed_kw)
             except PipelineCancelled:
                 raise
             except Exception as e:
+                if strict_seed is not None and isinstance(e, exact.ExactError):
+                    raise
                 log("      track: person-detector path failed (%s) — using "
                     "the generic tracker" % e)
                 ps = []
@@ -2559,11 +2611,12 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
         _check_cancelled()
         if vit is not None:
             fr0 = None
-            for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+            for dt in ((0.0,) if strict_seed is not None else
+                       (0.0, 0.066, -0.066, 0.33, -0.33, 1.0)):
                 ts = t_ref + dt
                 if ts < t0 - 1e-6 or ts > t1 + 1e-6:
                     continue
-                fr0 = _frame(ts)
+                fr0 = strict_seed.pixels if strict_seed is not None else _frame(ts)
                 if fr0 is not None:
                     t_ref = ts
                     break
@@ -2584,7 +2637,8 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                 if direction == 1:  # forward: sequential reads, no re-seeking
                     # robust prime: positions the decoder just past t_ref's
                     # frame even when random POS_MSEC seek fails on this file
-                    _grab_frame(cap, t_ref, fps)
+                    if strict_seed is None:
+                        _grab_frame(cap, t_ref, fps)
                     rev = None
                 else:
                     # backward: chunked forward reads served in reverse — a
@@ -2667,7 +2721,9 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                            fx=scale, fy=scale)
             return cv2.GaussianBlur(g, (3, 3), 0)
 
-        g0 = _gray(t_ref)
+        g0 = (cv2.GaussianBlur(cv2.resize(cv2.cvtColor(strict_seed.pixels,
+                cv2.COLOR_BGR2GRAY), None, fx=scale, fy=scale), (3, 3), 0)
+              if strict_seed is not None else _gray(t_ref))
         if g0 is None:
             return []
         gh, gw = g0.shape[:2]
