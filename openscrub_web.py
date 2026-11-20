@@ -5551,10 +5551,10 @@ async function beApplySample(view,serial,data){
   if(inspection&&inspection.serial===serial){
    view.plate.inspect=null;
    const s=data.sample,old=inspection.sample;
-   view.plate.message=s.index===inspection.index&&s.source_ref===old.source_ref&&s.timeline_eq===old.timeline_eq&&
-    s.policy===old.policy&&s.width===old.width&&s.height===old.height?
-     `Frame ${s.index} is ready. Search this frame to see its suggestions.`:
-     'The source or frame changed since the sampled search. Inspect and search again.';
+   if(s.index===inspection.index&&bePlateSameSource(s,old)){
+    inspection.batch.index=s.index;view.plate.batch=inspection.batch;
+    view.plate.message=`Frame ${s.index} is ready. Search this frame to see its suggestions.`;
+   }else view.plate.message='The source or frame changed since the sampled search. Inspect and search again.';
   }
   const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
   beFilter();beDraw();beTLDraw();bePlateRender(view);
@@ -5619,6 +5619,14 @@ function beNewBox(view,box,t0,t1){
  [t0,t1].every(Number.isFinite)&&t0>=0&&t1>t0&&t1<=view.editor.dur&&t0<=s.canonical_s&&s.canonical_s<=t1;
 }
 
+function bePlateSameSource(a,b){
+ return !!a&&!!b&&a.source_ref===b.source_ref&&a.timeline_eq===b.timeline_eq&&
+  a.policy===b.policy&&a.width===b.width&&a.height===b.height;
+}
+function bePlateBatchCurrent(view,batch){
+ const s=view?.readySample?.sample;
+ return !!batch&&beReady(view)&&s.index===batch.index&&bePlateSameSource(s,batch.sample.sample);
+}
 function bePlateRender(view){
  if(!view?.current())return;
  const p=view.plate,run=document.getElementById('bePlateRun'),cancel=document.getElementById('bePlateCancel');
@@ -5653,9 +5661,10 @@ function bePlateRender(view){
    action.textContent='Adjust for tracking';action.onclick=bePlatePrepare;actions.appendChild(action);
   }
  }
- if(p.batch&&p.batch.sample===view.readySample&&beReady(view)){
+ if(bePlateBatchCurrent(view,p.batch)){
   for(const frame of p.batch.frames){
    const button=document.createElement('button');button.type='button';button.className='sec';
+   button.disabled=!!p.request;
    button.textContent=`Inspect frame ${frame.index} · ${frame.time_s.toFixed(2)}s · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
    button.onclick=()=>bePlateInspectSample(view,frame);samples.appendChild(button);
   }
@@ -5663,10 +5672,10 @@ function bePlateRender(view){
 }
 function bePlateInspectSample(view,frame){
  const p=view?.plate,batch=p?.batch;
- if(!batch||!view.current()||!beReady(view)||batch.sample!==view.readySample||!batch.frames.includes(frame))return;
+ if(!batch||p.request||!view.current()||!bePlateBatchCurrent(view,batch)||!batch.frames.includes(frame))return;
  const slider=document.getElementById('beT');if(slider)slider.value=frame.seek_s;
  beRequestSample(view,frame.seek_s);
- p.inspect={serial:view.serial,index:frame.index,sample:batch.sample.sample};
+ p.inspect={serial:view.serial,index:frame.index,sample:batch.sample.sample,batch};
  p.message=`Inspecting frame ${frame.index}. Search this frame to see its suggestions.`;
  bePlateRender(view);
 }
@@ -5695,7 +5704,7 @@ function bePlateTrack(){
   p.message='Expand the region and set a timeline window containing this frame before tracking.';
   bePlateRender(view);return;
  }
- bePlateDiscardRegion(view);p.message='Tracking requested. Review the tracked positions.';
+ bePlateDiscardRegion(view);p.batch=null;p.message='Tracking requested. Review the tracked positions.';
  bePlateRender(view);beDraw();beTrackGo(box);
 }
 function bePlateRetire(view,message){
@@ -5777,7 +5786,8 @@ async function bePlateGo(scope='frame'){
  try{identity=manualId().replace(/-/g,'');}
  catch(_){p.message='A secure request identifier is unavailable in this browser.';bePlateRender(view);return;}
  const req={id:identity,serial:view.serial,sample:view.readySample,retired:false,cancelRequested:false,userCancelled:false};
- bePlateDiscardRegion(view);p.request=req;p.rows=[];p.selected=-1;p.sample=null;p.batch=null;
+ const batch=!sampled&&bePlateBatchCurrent(view,p.batch)?p.batch:null;
+ bePlateDiscardRegion(view);p.request=req;p.rows=[];p.selected=-1;p.sample=null;p.batch=batch;
  p.message=sampled?'Searching up to four video samples…':'Searching this frame…';bePlateRender(view);beDraw();
  try{
   const response=await fetch(`api/jobs/${view.id}/plate_search`,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -5788,12 +5798,12 @@ async function bePlateGo(scope='frame'){
    if(result?.state==='timeout')p.message=sampled?'Sample search timed out; no sample results were returned.':'Search timed out; this frame was not fully searched.';
    else if(result?.state==='cancelled')p.message='Search cancelled; no suggestions were applied.';
    else if(result?.error==='search_busy')p.message='Another search is running. Try again when it finishes.';
-   else if(response.status===409)p.message='The inspected frame changed. Inspect it again and retry.';
+   else if(response.status===409){p.batch=null;p.message='The inspected frame changed. Inspect it again and retry.';}
    else p.message='Search unavailable. Check the local Tesseract installation and supported runtime.';
    return;
   }
   if(sampled){
-   const frames=bePlateValidateSamples(result);p.batch={frames,sample:req.sample};
+   const frames=bePlateValidateSamples(result);p.batch={frames,sample:req.sample,index:req.sample.sample.index};
    p.message=`Searched ${frames.length} of ${result.frame_count} frames; only the listed samples were searched. OCR can miss text. Select a frame to inspect it.`;
    if(frames.some(frame=>frame.truncated))p.message+=' Some sample results were truncated.';
   }else{

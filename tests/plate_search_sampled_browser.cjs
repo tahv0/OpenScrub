@@ -40,6 +40,47 @@ const [url,root]=process.argv.slice(2);
    assert(viewport.scroll<=viewport.client+2,JSON.stringify(viewport));
    await page.screenshot({path:root+'/plate-sampled-mobile.png',fullPage:true});
    await page.setViewportSize({width:1100,height:900});
+   // Deliberate inspection and a fresh single-frame search retain the list so
+   // another sampled hit can be opened without rerunning the video search.
+   await page.locator('#bePlateSamples button').nth(0).click();
+   await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===0&&BE_VIEW.readySample.sample.requested_s>0);
+   assert.equal(await page.locator('#bePlateSamples button').count(),4);
+   await page.locator('#bePlateRun').click();
+   await page.waitForFunction(()=>!BE_VIEW.plate.request);
+   assert((await page.locator('#bePlateResults button').count())>0);
+   assert.equal(await page.locator('#bePlateSamples button').count(),4);
+   await page.locator('#bePlateSamples button').nth(1).click();
+   await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===9);
+   assert.equal(await page.locator('#bePlateSamples button').count(),4);
+   await page.locator('#bePlateQuery').fill('TARGET2');
+   assert.equal(await page.locator('#bePlateSamples button').count(),0);
+   await page.locator('#bePlateQuery').fill('TARGET');
+   await page.getByRole('button',{name:'Search up to four video samples'}).click();
+   await page.waitForFunction(()=>document.querySelectorAll('#bePlateSamples button').length===4);
+   await page.locator('#bePlay').click();
+   await page.waitForFunction(()=>BE.playing);
+   assert.equal(await page.locator('#bePlateSamples button').count(),0);
+   await page.locator('#bePlay').click();await page.waitForFunction(()=>beReady());
+   await page.getByRole('button',{name:'Search up to four video samples'}).click();
+   await page.waitForFunction(()=>document.querySelectorAll('#bePlateSamples button').length===4);
+   let releaseFrame,startFrame,finishFrame;
+   const frameGate=new Promise(r=>releaseFrame=r),frameStarted=new Promise(r=>startFrame=r),frameDone=new Promise(r=>finishFrame=r);
+   await page.route('**/api/jobs/resize/plate_search',async route=>{
+    const response=await route.fetch();startFrame();await frameGate;await route.fulfill({response});finishFrame();
+   });
+   await page.locator('#bePlateRun').click();await frameStarted;
+   await page.locator('#bePlateCancel').click();releaseFrame();await frameDone;
+   await page.unroute('**/api/jobs/resize/plate_search');
+   await page.waitForFunction(()=>!BE_VIEW.plate.request);
+   assert.equal(await page.locator('#bePlateSamples button').count(),0);
+   await page.getByRole('button',{name:'Search up to four video samples'}).click();
+   await page.waitForFunction(()=>document.querySelectorAll('#bePlateSamples button').length===4);
+   // An ordinary seek retires it, even when both frames happened to match.
+   await page.locator('#beT').fill('0.8');await page.locator('#beT').dispatchEvent('input');
+   await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.requested_s===.8);
+   assert.equal(await page.locator('#bePlateSamples button').count(),0);
+   await page.getByRole('button',{name:'Search up to four video samples'}).click();
+   await page.waitForFunction(()=>document.querySelectorAll('#bePlateSamples button').length===4);
    // A different source at inspection time must not inherit old match claims.
    await page.route('**/api/jobs/resize/edit_sample?*',async route=>{
     const response=await route.fetch(),body=await response.json();
@@ -48,6 +89,7 @@ const [url,root]=process.argv.slice(2);
    await page.locator('#bePlateSamples button').nth(3).click();
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===29,null,{timeout:4000});
    assert((await page.locator('#bePlateStatus').innerText()).includes('changed'));
+   assert.equal(await page.locator('#bePlateSamples button').count(),0);
    assert.deepEqual(writes,[]);
    await page.unroute('**/api/jobs/resize/edit_sample?*');
    await page.evaluate(()=>beRequestSample(BE_VIEW,.6));
@@ -57,11 +99,12 @@ const [url,root]=process.argv.slice(2);
    // At 25 fps, 29/25 multiplied by 25 rounds below 29 in the resolver.
    await page.locator('#bePlateSamples button').nth(3).click();
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===29,null,{timeout:4000});
-   assert.equal(await page.locator('#bePlateSamples button').count(),0);
+   assert.equal(await page.locator('#bePlateSamples button').count(),4);
    assert((await page.locator('#bePlateStatus').innerText()).includes('Search this frame'));
    await page.locator('#bePlateRun').click();
    await page.waitForFunction(()=>!BE_VIEW.plate.request);
    assert((await page.locator('#bePlateResults button').count())>0,await page.locator('#bePlateStatus').innerText());
+   assert.equal(await page.locator('#bePlateSamples button').count(),4);
    assert.deepEqual(writes,[]);
    // A completed sampled response cannot publish after an A→B→A seek.
    let release,start,finish;const gate=new Promise(r=>release=r),started=new Promise(r=>start=r),done=new Promise(r=>finish=r);
