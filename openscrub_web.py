@@ -3291,25 +3291,7 @@ def _plate_search_json():
 
 def _plate_search_result(value, width, height, mode):
     """Admit only bounded, source-pixel suggestion data from the child."""
-    if (not isinstance(value, dict) or value.get('complete') is not True
-            or type(value.get('truncated')) is not bool
-            or not isinstance(value.get('suggestions'), list)
-            or len(value['suggestions']) > 128):
-        raise plate_search_worker.WorkerFailed()
-    allowed = 'full_equal' if mode == 'full' else 'fragment'
-    suggestions = []
-    for row in value['suggestions']:
-        if not isinstance(row, dict) or set(row) != {'box', 'match', 'boundary'}:
-            raise plate_search_worker.WorkerFailed()
-        box = row['box']
-        if (not isinstance(box, list) or len(box) != 4
-                or any(type(v) is not int for v in box)
-                or not 0 <= box[0] < box[2] <= width
-                or not 0 <= box[1] < box[3] <= height
-                or row['match'] != allowed or row['boundary'] != 'unknown'):
-            raise plate_search_worker.WorkerFailed()
-        suggestions.append({'box': list(box), 'match': row['match'], 'boundary': 'unknown'})
-    return suggestions
+    return plate_search_worker.validate_result(value, width, height, mode)
 
 
 @app.route('/api/jobs/<jid>/plate_search/cancel', methods=['POST'])

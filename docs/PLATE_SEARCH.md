@@ -71,9 +71,13 @@ leave files behind. The HTTP wrapper supplies the job-owned directory described
 below.
 
 The HTTP route searches one current exact sample in an isolated POSIX process
-(non-frozen Python only), with at most one search process per app instance. It
-has a 15-second admission-and-worker budget, kills its process group on timeout
-or cancellation, and uses a private temporary directory under the job. The
+(non-frozen Python with `waitid`/`WNOWAIT` support only), with at most one search
+process per app instance. It has a 15-second admission-and-worker budget, kills
+its process group on timeout, cancellation, or abnormal worker completion, and
+uses a private temporary directory under the job. The worker leader remains
+unreaped while its group is validated or stopped, preventing its process-group
+ID from being recycled during cleanup. Cleanup waits for live descendants to
+stop, and can exceed the budget if native work or process-table access stalls. The
 directory is removed after the worker exits on normal completion and handled
 failure; a sudden server/process death can leave it until the job's existing
 deletion or vault lifecycle acts. Blocking filesystem and admission calls cannot
