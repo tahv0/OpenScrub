@@ -190,3 +190,29 @@ def test_invalid_source_provenance_keeps_existing_thumbnail_refusal(exact):
     assert ordinary.status_code==optional.status_code==500
     assert ordinary.json==optional.json
     assert ordinary.json['error']=='thumbnail_invalid_report'
+
+
+def test_ordinary_review_does_not_filter_rows_or_card_members_for_policy():
+    run("""openJob('A');
+    const input=Array.from({length:3000},(_,i)=>row(i,true,'face',-1,i,.8));
+    const original=Array.prototype.filter;let rowPasses=0,memberPasses=0;
+    Array.prototype.filter=function(...args){
+      if(this===input)rowPasses++;
+      if(this.length&&this.every(x=>Number.isInteger(x)))memberPasses++;
+      return original.apply(this,args);
+    };
+    let sections;try{sections=reviewDescriptors(input);}finally{Array.prototype.filter=original;}
+    eq(sections[0].cards.length,3000);
+    if(rowPasses||memberPasses)throw Error(`ordinary policy passes: ${rowPasses} rows, ${memberPasses} cards`);
+    """)
+
+
+def test_mixed_review_keeps_policy_metadata_on_its_own_card():
+    run("""openJob('A');
+    const policy={...row(0,false,'plate',-1,7,.4),policy_status:'suggestion',policy_geometry_supported:true};
+    const ordinary=row(1,true,'face',-1,8,.8);
+    const sections=reviewDescriptors([policy,ordinary]);
+    const cards=sections.flatMap(s=>s.cards);
+    eq(cards.find(c=>c.realCategory==='plate').policyRows.get(0),policy);
+    eq(cards.find(c=>c.realCategory==='face').policyRows,undefined);
+    """)

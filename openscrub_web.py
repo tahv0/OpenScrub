@@ -6287,9 +6287,9 @@ function reviewMetadata(data){
 }
 function reviewDescriptors(rows){
  const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
- const policyRows=new Map(rows.filter(x=>typeof x.policy_status==='string'&&
-  typeof x.policy_geometry_supported==='boolean').map(x=>[x.i,x]));
+ const policyRows=new Map();
  for(const x of rows){
+  if(typeof x.policy_status==='string'&&typeof x.policy_geometry_supported==='boolean')policyRows.set(x.i,x);
   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
   if(x.zone_dropped)zones.push(x);
   else (groups[x.category]=groups[x.category]||[]).push(x);
@@ -6297,7 +6297,9 @@ function reviewDescriptors(rows){
  const sections=[];
  function section(category,items,zone=false){
   const cards=items.map(x=>{
-   const members=zone?[x.i]:TRKMEM[x.i],selected=members.filter(i=>policyRows.has(i));
+   const members=zone?[x.i]:TRKMEM[x.i];
+   if(!policyRows.size)return {id:x.i,category,realCategory:x.category,zone,representative:x,members};
+   const selected=members.filter(i=>policyRows.has(i));
    return {id:x.i,category,realCategory:x.category,zone,representative:x,members,
     ...(selected.length?{policyRows:new Map(selected.map(i=>[i,policyRows.get(i)]))}:{})};
   });
