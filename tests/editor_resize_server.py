@@ -34,6 +34,11 @@ for x,y in ((140,92),(340,92),(140,232),(340,232)):
  cv2.circle(frame,(x,y),4,(255,0,0),-1)
 cv2.putText(frame,'SYNTHETIC 640x360',(350,45),cv2.FONT_HERSHEY_SIMPLEX,.55,(20,20,20),1)
 cv2.putText(frame,'SOURCE TARGET 140,92 - 340,232',(80,270),cv2.FONT_HERSHEY_SIMPLEX,.65,(20,20,20),1)
+if os.environ.get('OPENSCRUB_PLATE_BROWSER_FIXTURE') == '1':
+ plate=np.full((82,300,3),240,np.uint8)
+ cv2.rectangle(plate,(0,0),(299,81),(20,20,20),3)
+ cv2.putText(plate,'KJF572',(18,60),cv2.FONT_HERSHEY_SIMPLEX,1.65,(0,0,0),4,cv2.LINE_AA)
+ frame[105:187,330:630]=plate
 v=cv2.VideoWriter(str(video),cv2.VideoWriter_fourcc(*'mp4v'),10,(640,360))
 assert v.isOpened()
 for _ in range(20):v.write(frame)
