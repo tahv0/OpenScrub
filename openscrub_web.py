@@ -1207,7 +1207,12 @@ def _unfinished_checkpoint_locked(job):
         return True
     path = os.path.join(job['dir'], 'report.json')
     try:
-        named = os.stat(path)
+        named = os.stat(path, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    try:
         if not stat.S_ISREG(named.st_mode):
             return True
         stamp = _file_stamp(named)
@@ -1219,10 +1224,11 @@ def _unfinished_checkpoint_locked(job):
             if not stat.S_ISREG(opened.st_mode) or _file_stamp(opened) != stamp:
                 return True
             doc = json.load(stream)
-            if _file_stamp(os.fstat(stream.fileno())) != stamp or _file_stamp(os.stat(path)) != stamp:
+            if (_file_stamp(os.fstat(stream.fileno())) != stamp or
+                    _file_stamp(os.stat(path, follow_symlinks=False)) != stamp):
                 return True
-    except (OSError, ValueError):
-        return False
+    except (OSError, ValueError, RecursionError):
+        return True
     result = isinstance(doc, dict) and 'stop_review' in doc
     job['_checkpoint_observation'] = (stamp, result)
     return result
@@ -1645,9 +1651,8 @@ def enforce_vault_lock():
             if job is not None and request.endpoint not in {"job_status", "job_log", "job_cancel"}:
                 _recovery_gate(job)
             if (job is not None and job.get('_checkpoint_unfinished') and
-                    request.endpoint in {'job_detections', 'job_detframe', 'job_thumb',
-                        'job_frame_at', 'job_video_stream', 'job_boxes_at',
-                        'job_edit_sample', 'job_save_edits', 'job_track_object'}):
+                    request.endpoint in {'job_frame_at', 'job_video_stream', 'job_boxes_at',
+                        'job_save_edits', 'job_track_object'}):
                 abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
@@ -2187,7 +2192,7 @@ def _snapshot_exact_source_owner(job, lease):
             lease.exact_source_epoch = foreign.output_epoch
 
 
-def _prepare_observed_source(job, path, thumbnail_recovery=False):
+def _prepare_observed_source(job, path, thumbnail_recovery=False, *, checkpoint_sha256=None):
     """Reserve containing lifetime before first stat/probe; never under report_lock."""
     with VAULT_LOCK:
         _validate_files_locked(job)
@@ -2214,11 +2219,23 @@ def _prepare_observed_source(job, path, thumbnail_recovery=False):
                     facts, policy_error = _probe_exact_source(canonical), None
                 except exact.ExactError as error:
                     facts, policy_error = None, str(error)
+            digest = cached.get('checkpoint_sha256') if cached is not None else None
+            if checkpoint_sha256 is not None:
+                if digest is None:
+                    hasher = hashlib.sha256()
+                    for chunk in iter(lambda: opened.read(1024 * 1024), b''):
+                        hasher.update(chunk)
+                    digest = hasher.hexdigest()
+                if digest != checkpoint_sha256:
+                    raise exact.ExactError('checkpoint source changed; rescan required', 409, 'sample_conflict')
             if stamp != _file_stamp(os.fstat(opened.fileno())) or stamp != _file_stamp(os.stat(canonical)):
                 raise exact.ExactError('source changed during preparation', 409, 'sample_conflict')
         with _exact_owner_guard(job, lease):
             pass  # Foreign owner must still match the pre-I/O snapshot.
-        return dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error), lease
+        prepared = dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error)
+        if digest is not None:
+            prepared['checkpoint_sha256'] = digest
+        return prepared, lease
     except _ThumbnailArtifactPending:
         _thumbnail_release_lease(job, lease, primary_pending=True)
         if has_request_context() and request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
@@ -2247,7 +2264,11 @@ def _select_observed_locked(job, prepared, authoritative=False, *, report_bound=
         files.current_source = None
         files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
         raise exact.ExactError(files.source_reason)
-    if not same:
+    new_proof = (same and prepared.get('checkpoint_sha256') is not None and
+                 current.get('checkpoint_sha256') != prepared['checkpoint_sha256'])
+    if new_proof:
+        thumbs.invalidate_locked(files.thumbnail, 'checkpoint source verified')
+    if not same or new_proof:
         files.source_epoch += 1
         prepared = dict(prepared, source_ref='%s:%d' % (files.incarnation, files.source_epoch))
         files.current_source = prepared
@@ -2322,6 +2343,7 @@ def _exact_snapshot(job):
         raise exact.ExactError('invalid raw report') from None
     if not isinstance(doc, dict):
         raise exact.ExactError('legacy list report has no exact timeline')
+    marker = _checkpoint_marker(doc)
     candidate = doc.get('provenance', {}).get('input')
     if not isinstance(candidate, str) or not candidate:
         raise exact.ExactError('report has no selected scan input')
@@ -2351,7 +2373,11 @@ def _exact_snapshot(job):
         raise exact.ExactError('scan adoption was cancelled or replaced')
     lease = None
     try:
-        prepared, lease = _prepare_observed_source(job, canonical)
+        if marker is None:
+            prepared, lease = _prepare_observed_source(job, canonical)
+        else:
+            prepared, lease = _prepare_observed_source(job, canonical,
+                checkpoint_sha256=marker['input_sha256'])
         with _exact_owner_guard(job, lease):
             _report_current(job)
             if ((files.committed_report_epoch, files.operation) != fence
@@ -2364,6 +2390,8 @@ def _exact_snapshot(job):
                     or recovery[3] != report_stamp
                     or prepared['path'] != os.path.realpath(recovery[2])):
                 raise exact.ExactError('scan recovery authority changed', 409, 'sample_conflict')
+            if marker is not None:
+                _checkpoint_source_policy(marker, prepared)
             selected = _select_observed_locked(job, prepared, authoritative=recovery is not None)
             if recovery:
                 job['video'] = selected['path']
@@ -2648,6 +2676,10 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
     if not isinstance(doc, dict):
         raise _thumbnail_observation_error(job, observation, fence, report_stamp,
             _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid'))
+    try:
+        marker = _checkpoint_marker(doc)
+    except exact.ExactError as error:
+        raise _ThumbnailError('thumbnail_source_conflict', error.status, str(error)) from None
     provenance = doc.get('provenance', {})
     if not isinstance(provenance, dict):
         raise _thumbnail_observation_error(job, observation, fence, report_stamp,
@@ -2684,7 +2716,11 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
             _ThumbnailError('thumbnail_source_conflict', 409, 'Source recovery unavailable'))
     lease = None
     try:
-        prepared, lease = _prepare_observed_source(job, canonical)
+        if marker is None:
+            prepared, lease = _prepare_observed_source(job, canonical)
+        else:
+            prepared, lease = _prepare_observed_source(job, canonical,
+                checkpoint_sha256=marker['input_sha256'])
         source_stat = os.stat(canonical)
         if not stat.S_ISREG(source_stat.st_mode) or _file_stamp(source_stat) != prepared['stamp']:
             raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source changed')
@@ -2709,6 +2745,8 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
                             or files.source_retired or files.source_status == 'unavailable'):
                 raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
             try:
+                if marker is not None:
+                    _checkpoint_source_policy(marker, prepared)
                 selected = _select_observed_locked(job, prepared, authoritative=recovery is not None,
                                                    report_bound=not missing)
             except exact.ExactError:
@@ -2772,7 +2810,10 @@ def _thumbnail_validate_report(doc):
             if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
                     or not math.isfinite(confidence)):
                 raise ValueError()
-            thumbs.recipe_for_row(row, rs, 'crop')
+            try:
+                thumbs.recipe_for_row(row, rs, 'crop', bounded_timeline='stop_review' in doc)
+            except thumbs.ThumbnailUnavailable:
+                pass  # Keep the row visible even if its bounded span has no sample.
         return rows, rs
     except (KeyError, TypeError, ValueError, OverflowError):
         raise _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid') from None
@@ -3081,7 +3122,11 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
             if snapshot_lease is not None:
                 _thumbnail_release_lease(job, snapshot_lease)
                 snapshot_lease = None
-            recipe = thumbs.recipe_for_row(rows[index], rs, kind)
+            try:
+                recipe = thumbs.recipe_for_row(rows[index], rs, kind,
+                                               bounded_timeline='stop_review' in doc)
+            except thumbs.ThumbnailUnavailable:
+                raise _ThumbnailError('thumbnail_unavailable', 404, 'Thumbnail unavailable') from None
             with _thumbnail_owner_guard(job, lease, generation):
                 _thumbnail_current_locked(job, generation.selected_source,
                     ((generation.report_epoch, generation.operation), generation.report_stamp),
@@ -3280,17 +3325,65 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                         _thumbnail_release_lease(job, lease, primary_pending=releasing_primary)
 
 
+def _checkpoint_marker(doc):
+    if 'stop_review' not in doc:
+        return None
+    try:
+        marker = checkpoints.validate_resume(doc)
+    except (ValueError, TypeError, RecursionError) as error:
+        raise exact.ExactError('invalid checkpoint: ' + str(error), 409, 'sample_conflict') from None
+    end = marker['next_frame'] / marker['fps']
+    for index, row in enumerate(doc['detections']):
+        if row.get('category') == 'manual' and (row['t_start'] >= end or row['t_end'] > end):
+            raise exact.ExactError('manual row %s span [%s, %s] exceeds inspected boundary %s' %
+                                   (index, row['t_start'], row['t_end'], end), 409, 'sample_conflict')
+    return marker
+
+
+def _checkpoint_source_policy(marker, selected):
+    """Tie a parsed prefix to the same bytes and stream described by its owner."""
+    facts = selected.get('facts')
+    options = marker['options']
+    sources, settings = options['sources'], options['effective_settings']
+    source = sources['scan']
+    categories = settings.get('categories')
+    categories = ({value.strip() for value in categories.split(',') if value.strip()}
+                  if isinstance(categories, str) else None)
+    unsupported = ('original_video', 'hdr_source', 'zones', 'zones_data', 'windows',
+                   'windows_data', 'ignore_region', 'ignore_regions', 'detect_windows',
+                   'detect_windows_frac', 'skip_start', 'skip_end', 'audio_pii',
+                   'allow_names', 'extra_names', 'phrases', 'face_model', 'plate_model',
+                   'person_model', 'dense_faces')
+    if (categories not in ({'qrcode'}, {'none'}, set()) or
+            settings.get('no_vfr_fix') is not True or settings.get('no_backtrack') is not True or
+            settings.get('scroll_track') != 'off' or any(settings.get(key) for key in unsupported) or
+            options['normalization'] != {'mode': 'none', 'target': 'none', 'transform_version': 'none'} or
+            sources.get('original') != source or sources.get('render') is not None or
+            source.get('fps_source') != 'mp4_rate_and_observed_pts_v1' or
+            options['timeline'].get('fps_source') != 'mp4_rate_and_observed_pts_v1' or
+            options['timeline'].get('count_source') != 'mp4_reported_nb_frames'):
+        raise exact.ExactError('checkpoint settings are outside the supported review scope', 409, 'sample_conflict')
+    if (selected.get('policy_error') or not isinstance(facts, dict) or
+            selected.get('checkpoint_sha256') != marker['input_sha256'] or
+            facts.get('count') != marker['total_frames'] or
+            facts.get('width') != source['width'] or facts.get('height') != source['height']):
+        raise exact.ExactError('checkpoint source no longer matches its report', 409, 'sample_conflict')
+    return exact.precision_bound(facts, marker['fps'], marker['total_frames'])
+
+
 def _exact_policy(doc, selected):
     if selected['policy_error']:
         raise exact.ExactError(selected['policy_error'])
+    marker = _checkpoint_marker(doc)
     provenance = doc.get('provenance', {})
     settings = provenance.get('settings', {})
     normalized = (provenance.get('vfr_normalized') and provenance.get('original_input')
                   and os.path.realpath(provenance['original_input']) != selected['path'])
-    if not normalized and (settings.get('no_vfr_fix') or settings.get('vfr') == 'ignore'):
+    if marker is None and not normalized and (settings.get('no_vfr_fix') or settings.get('vfr') == 'ignore'):
         raise exact.ExactError('known raw timing bypass is unsupported')
     fps, cum, timeline_eq = exact.timeline(doc, selected['facts'])
-    tolerance = exact.precision_bound(selected['facts'], fps, len(cum))
+    tolerance = (_checkpoint_source_policy(marker, selected) if marker is not None else
+                 exact.precision_bound(selected['facts'], fps, len(cum)))
     return fps, cum, timeline_eq, tolerance
 
 
@@ -3362,9 +3455,20 @@ def job_edit_sample(jid):
             raise exact.ExactError('exact samples use scan input only', 400, 'invalid_sample_request')
         doc, selected, fence, lease = _exact_snapshot(job)
         fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+        marker = _checkpoint_marker(doc)
+        if marker is not None and requested >= marker['next_frame'] / fps:
+            raise exact.ExactError('time outside inspected checkpoint prefix', 400, 'invalid_sample_request')
         index = exact.resolve_time(requested, fps, len(cum))
+        if marker is not None:
+            # A JSON representation of index/fps can multiply back just below
+            # its integer (for example 123/120). Preserve exact grid roundtrips
+            # without rounding a request that is actually before the frame.
+            nearest = round(requested * fps)
+            if 0 <= nearest < len(cum) and requested == nearest / fps:
+                index = nearest
         facts = selected['facts']
-        decoded = _read_exact_source(selected, index, fps=fps, count=len(cum),
+        source_count = marker['total_frames'] if marker is not None else len(cum)
+        decoded = _read_exact_source(selected, index, fps=fps, count=source_count,
                                      tolerance_s=tolerance)
         try:
             ok, encoded = cv2.imencode('.jpg', decoded.pixels, [cv2.IMWRITE_JPEG_QUALITY, 90])
@@ -3378,6 +3482,9 @@ def job_edit_sample(jid):
         for i, row in enumerate(doc['detections']):
             baseline = exact.row_base(row)
             start, end, _ = baseline['span']
+            authority = openscrub._frame_authority(row, total=len(cum))
+            if authority is not None and not authority[0] <= index < authority[1]:
+                continue
             if start-.01 <= decoded.canonical_s <= end+.01:
                 box = baseline['cbox']
                 boxes.append(dict(i=i, category=row['category'], text=row.get('text',''),
@@ -3442,10 +3549,11 @@ def job_detections(jid):
         rows, rs, reused = _thumbnail_validate_snapshot(job, fresh_snapshot)
         generation = _thumbnail_select(job, doc, selected, fence, lease,
             validated=None if reused else (rows, rs), reuse_generation=reused)
+        marker = _checkpoint_marker(doc)
         items = []
         for i, d in enumerate(rows):
             items.append({"i": i, "category": d["category"], "text": d["text"],
-                          "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+                          "t_start": d["t_start"], "t_end": d["t_end"] if marker is not None else round(d["t_end"], 2),
                           "enabled": d.get("enabled", True), "track": d.get("track", -1),
                           "person": d.get("person", -1), "confidence": d.get("confidence", 0),
                           "zone_dropped": bool(d.get("zone_dropped")),
@@ -3455,9 +3563,13 @@ def job_detections(jid):
             _thumbnail_current_locked(job, selected, fence)
             if files.thumbnail.current is not generation:
                 raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
-        return jsonify({"detections": items, "fps": rs['fps'],
-                        "duration": len(rs['cum']) / rs['fps'],
-                        "thumbnail_version": generation.version})
+        result = {"detections": items, "fps": rs['fps'],
+                  "duration": (marker['total_frames'] if marker is not None else len(rs['cum'])) / rs['fps'],
+                  "thumbnail_version": generation.version}
+        if marker is not None:
+            result.update(processed_duration=marker['next_frame'] / rs['fps'],
+                          processed_frames=marker['next_frame'], total_frames=marker['total_frames'])
+        return jsonify(result)
     except _ThumbnailError as error:
         return _thumbnail_error_response(error)
     except (KeyError, TypeError, ValueError, OverflowError):

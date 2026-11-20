@@ -48,6 +48,10 @@ class ThumbnailRecipeError(ValueError):
     pass
 
 
+class ThumbnailUnavailable(Exception):
+    """A valid bounded row has no frame within its time interval."""
+
+
 @dataclass(frozen=True)
 class Candidate:
     incarnation: object = None
@@ -188,7 +192,7 @@ def _number(value):
     return float(value)
 
 
-def recipe_for_row(row, render_state, kind):
+def recipe_for_row(row, render_state, kind, *, bounded_timeline=False):
     try:
         if kind not in ('crop', 'detframe'):
             raise ThumbnailRecipeError('invalid thumbnail kind')
@@ -200,7 +204,25 @@ def recipe_for_row(row, render_state, kind):
             raise ThumbnailRecipeError('invalid thumbnail recipe')
         times = (min(max(last, start), end), (start + end) / 2, min(start + .2, end))
         if kind == 'detframe': times = times[:1]
-        indices = tuple(max(0, min(math.floor(t * fps), len(cum) - 1)) for t in times)
+        first, after = row.get('scan_frame_start'), row.get('scan_frame_end')
+        has_bounds = 'scan_frame_start' in row or 'scan_frame_end' in row
+        if has_bounds or bounded_timeline:
+            if not has_bounds:
+                first, after = 0, len(cum)
+            if (type(first) is not int or type(after) is not int or
+                    first < 0 or first >= after or after > len(cum)):
+                raise ThumbnailRecipeError('invalid thumbnail frame authority')
+            low = max(first, math.floor(start * fps))
+            if low / fps < start:
+                low += 1
+            high = min(after - 1, math.floor(end * fps))
+            if high / fps > end:
+                high -= 1
+            if low > high:
+                raise ThumbnailUnavailable('no authorized thumbnail frame')
+            indices = tuple(max(low, min(math.floor(t * fps), high)) for t in times)
+        else:
+            indices = tuple(max(0, min(math.floor(t * fps), len(cum) - 1)) for t in times)
         offsets = tuple(tuple(_number(v) for v in cum[k]) for k in indices)
         if any(len(offset) != 2 for offset in offsets): raise ThumbnailRecipeError('invalid thumbnail recipe')
         return Recipe(kind, box, times, indices, offsets, 24, 80 if kind == 'crop' else 84,
