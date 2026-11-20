@@ -63,6 +63,17 @@ job['phase']='review'
 other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
 web.JOBS.pop(other['id']);new_dir=Path(web.JOBS_DIR)/'other';os.rename(other['dir'],new_dir);other['dir']=str(new_dir);other['id']='other';web.JOBS['other']=other
 Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
+if os.environ.get('OPENSCRUB_REAL_CHECKPOINT_PAGE')=='1':
+ from openscrub_internal import checkpoint_runtime
+ from test_checkpoint_runtime import movie,owned_scan,stop_after,Quiet
+ checkpoint_video=movie(runtime)
+ checkpoint_options={'categories':'qrcode','checkpoint_review':True,'use_zones':False}
+ paused=web.new_job(str(checkpoint_video),checkpoint_options,'real-checkpoint.mp4')
+ web.JOBS.pop(paused['id']);paused['id']='checkpoint';web.JOBS['checkpoint']=paused
+ result=owned_scan(checkpoint_runtime,web.build_args(paused),
+  str(Path(paused['dir'])/'report.json'),cb=Quiet(),stop_requested=stop_after(9))
+ assert result['stop_review']['next_frame']==9 and result['detections']
+ paused.update(phase='paused',_checkpoint_unfinished=True,output=None)
 # Native SDR plate with its actual scan-input digest; no detector/model is run.
 plate=web.new_job(str(video),{'categories':'plate','mode':'box','pad':0,'encoder':'x264'},'synthetic-plate.mp4')
 web.JOBS.pop(plate['id']);new_dir=Path(web.JOBS_DIR)/'plate';os.rename(plate['dir'],new_dir)
