@@ -94,6 +94,17 @@ openscrub.track_manual_region=deterministic_track
 class NoPersonModel:
  net=None;ort=None
 openscrub.PersonDetector=lambda *a,**kw:NoPersonModel()
+if os.environ.get('OPENSCRUB_CHECKPOINT_BROWSER_FIXTURE') == '1':
+ import time
+ from openscrub_internal.checkpoint_media import FrameStream
+ original_read = FrameStream.read
+ def slow_checkpoint_read(stream):
+  value = original_read(stream)
+  if value is not None:
+   (runtime/'checkpoint-frames').write_text(str(stream.next_frame))
+   time.sleep(.25)
+  return value
+ FrameStream.read = slow_checkpoint_read
 # Optional second process restores the exact report written by the first UI.
 # Keep its real selected media path; generated startup fixtures never replace it.
 reopened=None
