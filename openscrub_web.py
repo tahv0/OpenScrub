@@ -1228,6 +1228,25 @@ def _unfinished_checkpoint_locked(job):
     return result
 
 
+def _checkpoint_resume_token_locked(job):
+    """Identify the current report generation while the report lock is held."""
+    _report_current(job)
+    _recovery_gate(job)
+    files = FILES.initialize(job)
+    path = os.path.join(job['dir'], 'report.json')
+    try:
+        with open(path, 'rb', opener=_thumbnail_nonblocking_opener) as stream:
+            opened = os.fstat(stream.fileno())
+            named = os.stat(path, follow_symlinks=False)
+            if (not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode)
+                    or _file_stamp(opened) != _file_stamp(named)):
+                raise OSError('report changed')
+    except (OSError, ValueError):
+        raise Conflict('checkpoint report is unavailable or changed') from None
+    value = (files.incarnation, files.committed_report_epoch, *_file_stamp(opened))
+    return hashlib.sha256(json.dumps(value, separators=(',', ':')).encode('ascii')).hexdigest()
+
+
 def _operation_valid(job, owner):
     files = FILES.initialize(job)
     with JOBS_LOCK:
