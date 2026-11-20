@@ -1018,3 +1018,28 @@ def test_stale_tracking_action_cannot_discard_restarted_status_check():
     await reply({state:'done',added:2});await finish;const count=calls.length;await check.onclick();
     assert.equal(calls.length,count,'stale check replaced completed Track result');
     """)
+
+
+@pytest.mark.parametrize('status', [500, 503])
+def test_track_server_error_after_detachment_remains_unconfirmed_and_checkable(status):
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);const owner=EDITS;
+    const status=el(),actions=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',actions);
+    const start=beTrackGo([10,20,40,60]);showPanel('boxedit_rev');const next=exactMount();
+    await reply({error:'server failed after admission'},STATUS);await start;
+    assert.equal(BE_VIEW,next.view);assert.equal(EDITS,owner);
+    assert(status.textContent.includes('may have started'),'server error was treated as proof the operation did not start');
+    assert(actions.children.some(x=>x.textContent==='Check tracking status'));
+    assert(actions.children.some(x=>x.textContent==='Review tracked positions'));
+    """.replace('STATUS',str(status)))
+
+
+
+def test_track_authoritative_client_refusal_reports_failure_without_polling():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);
+    const status=el(),actions=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',actions);
+    const start=beTrackGo([10,20,40,60]);await reply({error:'sample_conflict'},409);await start;
+    assert(status.textContent.includes('sample_conflict'));
+    assert(!actions.children.some(x=>x.textContent==='Check tracking status'));
+    assert(actions.children.some(x=>x.textContent==='Dismiss tracking notice'));
+    assert.equal(calls.filter(c=>c.url.endsWith('/track_status')).length,0);
+    """)

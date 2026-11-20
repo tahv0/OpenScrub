@@ -5910,7 +5910,7 @@ async function beTrackGo(box){
   launch.state='running';renderTrackStatus(draft);scheduleTrackStatus(launch);
  }catch(error){
   if(!trackOwned(launch))return;
-  launch.uncertain=!Number.isInteger(error.status);
+  launch.uncertain=!(Number.isInteger(error.status)&&error.status>=400&&error.status<500);
   launch.state=launch.uncertain?'uncertain':'failed';launch.error=String(error.message||error);
   renderTrackStatus(draft);if(beTrackCurrent(launch))beRetireTrack(launch.view);
  }
