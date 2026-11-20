@@ -3208,6 +3208,26 @@ def _read_exact_source(selected, index, *, fps, count, tolerance_s):
     return decoded
 
 
+def _quad_baseline_token(row):
+    quad = row.get('manual_plate_quad')
+    if not plate_quad.valid_record(quad):
+        return None
+    # The browser must carry these bytes verbatim: JS numbers do not retain
+    # the int/float distinction used by the row-context hash.
+    return json.dumps(quad, sort_keys=True, ensure_ascii=True,
+                      separators=(',', ':'), allow_nan=False)
+
+
+def _quad_baseline_value(token):
+    if not isinstance(token, str) or len(token) > 8192:
+        return None
+    try:
+        quad = json.loads(token)
+    except (ValueError, TypeError, RecursionError):
+        return None
+    return quad if plate_quad.valid_record(quad) else None
+
+
 def _quad_edit_eligibility(doc, selected):
     provenance = doc.get('provenance', {})
     expected = provenance.get('input_sha256') if isinstance(provenance, dict) else None
@@ -3282,6 +3302,7 @@ def job_edit_sample(jid):
                     row_context_eq=exact.row_context_eq(row), base=baseline)
                 if row['category'] == 'plate':
                     item['quad_context_eq'] = _quad_context_eq(row)
+                    item['quad_baseline'] = _quad_baseline_token(row)
                     item['quad_edit_eligibility'] = _quad_edit_eligibility(doc, selected)
                     item['quad_eligibility'] = _quad_sample_eligibility(
                         row, doc, selected, index, fps, len(cum), timeline_eq)
@@ -3781,10 +3802,29 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
             if not baseline_matches and not wanted_matches:
                 raise exact.ExactError('quad baseline/intended tuple differs', 409, 'geometry_conflict')
         else:
-            if exact.row_context_eq(row) != pc['row_context_eq']:
+            box_requested = key in (edits.get('box_overrides') or {})
+            box_changed = box_requested and desired_box != baseline['cbox']
+            witness = pc.get('quad_context_eq')
+            witness_matches = (isinstance(witness, str)
+                               and re.fullmatch('[0-9a-f]{64}', witness) is not None
+                               and witness == _quad_context_eq(row))
+            context_matches = exact.row_context_eq(row) == pc['row_context_eq']
+            original_quad = _quad_baseline_value(pc.get('quad_baseline'))
+            valid_original_quad = plate_quad.valid_record(original_quad)
+            retired_replay = (row.get('category') == 'plate' and box_changed and current == intended
+                              and witness_matches and valid_original_quad
+                              and 'manual_plate_quad' not in row
+                              and exact.row_context_eq({**row, 'manual_plate_quad': original_quad})
+                                  == pc['row_context_eq'])
+            if not context_matches and not retired_replay:
                 raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
             if current != baseline and current != intended:
                 raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
+            if (box_requested and current['cbox'] != desired_box and row.get('category') == 'plate'
+                    and plate_quad.valid_record(row.get('manual_plate_quad'))
+                    and (not witness_matches or not valid_original_quad
+                         or not _same_json_value(original_quad, row['manual_plate_quad']))):
+                raise exact.ExactError('plate box change requires quad baseline', 409, 'geometry_conflict')
         targets[key] = intended, current == intended, desired_quad
     return targets
 
@@ -3856,18 +3896,36 @@ def job_save_edits(jid):
                         if destination not in touched:
                             touched[destination] = (target, key, target.get(key, missing))
                         target[key] = value
+                    def remove(target, key):
+                        destination = (id(target), key)
+                        if destination not in touched:
+                            touched[destination] = (target, key, target.get(key, missing))
+                        target.pop(key, None)
                     original_count = len(doc['detections'])
                     enabled = edits.get('enabled',{})
                     for i,row in enumerate(doc['detections']):
                         if str(i) in enabled:
                             assign(row, 'enabled', bool(enabled[str(i)]))
+                    original_boxes = {}
                     for key,box in (edits.get('box_overrides') or {}).items():
                         i = int(key)
+                        if 0 <= i < len(doc['detections']):
+                            row = doc['detections'][i]
+                            if row.get('category') == 'plate' and plate_quad.valid_record(row.get('manual_plate_quad')):
+                                original_boxes.setdefault(i, row.get('cbox'))
                         if key in preconditions:
                             if not targets[key][1]:
                                 assign(doc['detections'][i], 'cbox', [float(v) for v in targets[key][0]['cbox']])
                         elif 0 <= i < len(doc['detections']) and len(box) == 4:
                             assign(doc['detections'][i], 'cbox', [float(v) for v in box])
+                    for i, original_box in original_boxes.items():
+                        row = doc['detections'][i]
+                        key = str(i)
+                        if (row.get('cbox') != original_box
+                                and key not in (edits.get('manual_plate_quads') or {})
+                                and row.get('category') == 'plate'
+                                and plate_quad.valid_record(row.get('manual_plate_quad'))):
+                            remove(row, 'manual_plate_quad')
                     for key,span in (edits.get('time_overrides') or {}).items():
                         i = int(key)
                         if key in preconditions:
@@ -3886,9 +3944,7 @@ def job_save_edits(jid):
                         desired = targets[key][2]
                         if desired is None:
                             if 'manual_plate_quad' in row:
-                                destination = (id(row), 'manual_plate_quad')
-                                touched[destination] = (row, 'manual_plate_quad', row['manual_plate_quad'])
-                                del row['manual_plate_quad']
+                                remove(row, 'manual_plate_quad')
                         else:
                             assign(row, 'manual_plate_quad', desired)
                     if digest is not None:
@@ -3909,9 +3965,15 @@ def job_save_edits(jid):
                             per.setdefault(row['text'],[]).append(row.get('enabled',True))
                     result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
                     if preconditions:
-                        result['geometry_rows'] = {key:{**pc,'row_context_eq':exact.row_context_eq(doc['detections'][int(key)]),
-                            'base':exact.row_base(doc['detections'][int(key)]),
-                            'quad_context_eq':_quad_context_eq(doc['detections'][int(key)])} for key,pc in preconditions.items()}
+                        result['geometry_rows'] = {}
+                        for key, pc in preconditions.items():
+                            row = doc['detections'][int(key)]
+                            accepted = {**pc, 'row_context_eq': exact.row_context_eq(row),
+                                        'base': exact.row_base(row), 'quad_context_eq': _quad_context_eq(row)}
+                            if row.get('category') == 'plate':
+                                accepted['manual_plate_quad'] = row.get('manual_plate_quad')
+                                accepted['quad_baseline'] = _quad_baseline_token(row)
+                            result['geometry_rows'][key] = accepted
                     return jsonify(result)
             # A genuinely new strict mutation was found, before any mutation.
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.

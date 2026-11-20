@@ -4428,6 +4428,11 @@ def _quad_source_current(guard):
         return False
 
 
+def _require_quad_source_current(guard):
+    if guard is not None and not _quad_source_current(guard):
+        raise RuntimeError('quad input changed during rendering')
+
+
 def _quad_render_context(args, state, detections):
     guard = state.get('_quad_source_guard')
     doc = state.get('source_report')
@@ -9040,12 +9045,23 @@ def run_render(args, state, cb=None):
     dets_r = apply_coverage(state["detections"],
                             getattr(args, "coverage", "tight"), cb)
     quad_context = _quad_render_context(args, state, dets_r)
+    quad_guard = state.get('_quad_source_guard')
+    _require_quad_source_current(quad_guard)
+    if quad_guard is not None:
+        try:
+            same_input = os.path.samefile(quad_guard['path'], dst)
+        except FileNotFoundError:
+            same_input = False
+        if same_input:
+            raise RuntimeError('quad input cannot also be the render destination')
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     summary = dict(state["stats"], output=dst)
     with _RenderDelivery(dst, args.report) as delivery:
+        if quad_guard is not None:
+            delivery.validate_before_publication = lambda: _require_quad_source_current(quad_guard)
         if getattr(args, "hdr_source", None) and not args.preview:
             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
                        state["bands"], state["fps"], pad=args.pad, mode=args.mode,
@@ -9068,8 +9084,7 @@ def run_render(args, state, cb=None):
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None),
                    quad_context=quad_context)
-        if quad_context and not _quad_source_current(quad_context["guard"]):
-            raise RuntimeError("quad input changed during rendering")
+        _require_quad_source_current(quad_guard)
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)

@@ -76,6 +76,8 @@ class _RenderDelivery:
         self._old = []
         self._descriptor = None
         self._prepared = False
+        # Forward-only validation, distinct from the rollback epoch callback.
+        self.validate_before_publication = None
 
     def __enter__(self):
         os.close(_exclusive(self.video_stage))
@@ -136,6 +138,8 @@ class _RenderDelivery:
         attempted = []
         try:
             for old in self._old:
+                if self.validate_before_publication is not None:
+                    self.validate_before_publication()
                 attempted.append(old)
                 if before_mutation:
                     before_mutation()
@@ -147,6 +151,8 @@ class _RenderDelivery:
                     os.replace(self._report_stage, self.report_path)
             if publish_success:
                 publish_success()
+            if self.validate_before_publication is not None:
+                self.validate_before_publication()
             # Last fallible authoritative action; backups are still present.
             os.unlink(self._descriptor)
             self._descriptor = None
