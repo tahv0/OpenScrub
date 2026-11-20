@@ -93,6 +93,18 @@ def _equal_json(a, b):
         _error('identity cannot be encoded as portable JSON')
 
 
+def _check_current_identity(saved, current):
+    """Permit only monotonic verification evidence on the same identity."""
+    before = saved['timeline']['count_verified']
+    after = current['timeline']['count_verified']
+    if before and not after:
+        _error('verified source frame count cannot be downgraded')
+    expected = dict(saved)
+    expected['timeline'] = dict(saved['timeline'], count_verified=after)
+    if not _equal_json(expected, current):
+        _error('source or effective scan settings changed; start a fresh scan')
+
+
 def _copy_json(value):
     try:
         return copy.deepcopy(value)
@@ -263,8 +275,7 @@ def validate_resume(doc, source_sha256=None):
                 _error('scanned source changed; start a fresh scan')
         else:
             current = _identity(source_sha256, total, fps, scan_hash)
-            if not _equal_json(current, options):
-                _error('source or effective scan settings changed; start a fresh scan')
+            _check_current_identity(options, current)
     return _copy_json(meta)
 
 
@@ -284,8 +295,7 @@ def join_reports(previous, continuation, next_frame, total_frames, completed=Fal
     if fps != meta['fps'] or scan_hash != meta['input_sha256']:
         _error('continuation FPS or scanned source differs')
     current = _identity(prov.get('checkpoint_identity'), total, fps, scan_hash)
-    if not _equal_json(current, meta['options']):
-        _error('continuation source or effective scan settings changed')
+    _check_current_identity(meta['options'], current)
     if completed:
         proof = _object(continuation.get('scan_completion'), 'scan_completion')
         if (not current['timeline']['count_verified'] or
@@ -294,6 +304,12 @@ def join_reports(previous, continuation, next_frame, total_frames, completed=Fal
                 type(proof.get('total_frames')) is not int or proof['total_frames'] != total):
             _error('completion requires a verified count and accounted full-range proof')
     result = _copy_json(previous)
+    if (current['timeline']['count_verified'] and
+            not meta['options']['timeline']['count_verified']):
+        # Preserve the original identity and its unknown fields; this is the
+        # only permitted monotonic change to a saved source identity.
+        result['provenance']['checkpoint_identity']['timeline']['count_verified'] = True
+        result['stop_review']['options']['timeline']['count_verified'] = True
     result_state = result['render_state']
     for field in ('cum', 'bands'):
         result_state[field] = result_state[field] + _copy_json(state[field][boundary:next_frame])

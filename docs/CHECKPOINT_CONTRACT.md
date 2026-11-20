@@ -67,15 +67,35 @@ interoperable range through 2^53−1. Values/arrays must be finite and
 JSON-compatible, and render state FPS must equal the scan/timeline/marker FPS
 exactly. FPS/count provenance
 is descriptive; recording a reported count does not make it verified.
+`count_source` records where the original canonical N came from; it remains
+unchanged when later evidence verifies N.
 
 `validate_resume(doc)` checks saved structure and internal identity.
 `validate_resume(doc, source_sha256)` also accepts the scanned file's lowercase
 SHA-256, but that checks **only** the scan participant. For a resume, the caller
 must instead measure a complete current `options` snapshot and pass it as the
 second argument; the helper compares all participants, normalization, timeline,
-effective settings, and content identities. Before publication, check the
-selected sources again as required by the operation's stability contract. A
-hash cannot itself keep a file unchanged during an attempt.
+effective settings, and content identities. An initially reported but unverified
+count may later be promoted from `count_verified: false` to `true`, with every
+other identity value (including N and `count_source`) exactly unchanged. The
+producer may assert this promotion only after it has independently established
+that the **same hashed canonical scan source and normalization** have the exact
+saved N frames, using an authoritative, hash-bound count/timeline or a decoder
+termination signal that distinguishes clean EOF from failure. It must reject any
+observed contradictory frame or changed source and retain the old checkpoint
+when it cannot establish that evidence. A reported metadata count or `read()`
+returning false by itself is not proof. A promotion establishes the count, not
+that all selected work was scanned; completion still needs the separate proof
+below. Do not run an unbounded second full-video pass merely to obtain this
+evidence.
+
+Validation alone does not update a report. A successful advancing merge persists
+the promoted flag in both the provenance identity and a remaining paused marker;
+completion retains it in provenance. A verified flag may never be downgraded. If
+current verification is unavailable or any immutable identity value differs,
+refuse the attempt rather than weaken or guess the saved identity. Before
+publication, check selected sources again as required by the operation's
+stability contract. A hash cannot itself keep a file unchanged during an attempt.
 
 ## Boundary, rows and merge
 
@@ -118,8 +138,8 @@ Both counts must equal N and `timeline.count_verified` must be true. This is a
 producer attestation, not a decoder operation performed by this module. It may
 be supplied only after every index in the verified canonical range has been
 accounted for and normal finalization has succeeded. An early read failure,
-unknown/reported-only count, missing end frame, stop request or `completed=True`
-alone is not proof. The engine must reject contradictory observed frames and
-retain the previous checkpoint if it cannot establish count/termination
-confidence. No decoder, EOF, concurrency, crash durability, or actual rendering
+unknown/reported-only count without later successful verification, missing end
+frame, stop request or `completed=True` alone is not proof. The engine must
+reject contradictory observed frames and retain the previous checkpoint if it
+cannot establish count/termination confidence. No decoder, EOF, concurrency, crash durability, or actual rendering
 is tested or promised by this data contract.
