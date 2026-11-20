@@ -1121,6 +1121,7 @@ def _publish_job_report_locked(job, path, doc):
 
 _CHECKPOINT_FD_PUBLICATION = os.name == 'posix'
 _CHECKPOINT_RECOVERY_NAME = '.checkpoint-publication-recovery.json'
+_CHECKPOINT_UNOBSERVED = object()
 
 
 class _CheckpointPublicationCommittedError(RuntimeError):
@@ -1128,7 +1129,142 @@ class _CheckpointPublicationCommittedError(RuntimeError):
     committed = True
 
 
-def _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc):
+def _checkpoint_report_state(doc):
+    """Recognize only structurally valid paused or verified complete reports."""
+    if not isinstance(doc, dict) or not isinstance(doc.get('provenance'), dict):
+        raise ValueError('checkpoint report has invalid provenance')
+    provenance = doc['provenance']
+    if provenance.get('output') is not None or provenance.get('output_sha256') is not None:
+        raise ValueError('checkpoint report retains an output')
+    if 'stop_review' in doc:
+        checkpoints.validate_resume(doc)
+        return 'paused'
+    identity = provenance.get('checkpoint_identity')
+    if not isinstance(identity, dict) or not isinstance(identity.get('timeline'), dict):
+        raise ValueError('completed checkpoint lacks a timeline identity')
+    timeline = identity['timeline']
+    total = timeline.get('total_frames')
+    if type(total) is not int or total < 1 or timeline.get('count_verified') is not True:
+        raise ValueError('completed checkpoint lacks a verified frame count')
+    _, _, _, fps, scan_hash = checkpoints._report(doc, total, total)
+    checkpoints._identity(identity, total, fps, scan_hash)
+    openscrub._report_frame_authorities(doc)
+    return 'completed'
+
+
+def _checkpoint_file_evidence(path, *, absent=False, parse=False, durable=False):
+    """Hash an unchanged regular named file, without following symlinks."""
+    try:
+        stream = open(path, 'rb', opener=_thumbnail_nonblocking_opener)
+    except FileNotFoundError:
+        if absent and not os.path.lexists(path):
+            return None, None, None
+        raise
+    with stream:
+        before = os.fstat(stream.fileno())
+        named = os.stat(path, follow_symlinks=False)
+        if (not stat.S_ISREG(before.st_mode) or not stat.S_ISREG(named.st_mode)
+                or _file_stamp(before) != _file_stamp(named)):
+            raise ValueError('checkpoint file is not a stable regular file')
+        digest = hashlib.sha256()
+        while True:
+            chunk = stream.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        doc = None
+        if parse:
+            stream.seek(0)
+            doc = json.load(stream)
+        if (before.st_size > (1 << 53) - 1 or
+                _file_stamp(os.fstat(stream.fileno())) != _file_stamp(before) or
+                _file_stamp(os.stat(path, follow_symlinks=False)) != _file_stamp(before)):
+            raise ValueError('checkpoint file changed during inspection')
+        if durable:
+            os.fsync(stream.fileno())
+        return {'size': before.st_size, 'sha256': digest.hexdigest()}, _file_stamp(before), doc
+
+
+def _recover_checkpoint_publication(directory):
+    """Resolve only byte-proven old/new outcomes; otherwise retain the fence."""
+    marker = os.path.join(directory, _CHECKPOINT_RECOVERY_NAME)
+    report = os.path.join(directory, 'report.json')
+    try:
+        directory_stat = os.stat(directory, follow_symlinks=False)
+        if not stat.S_ISDIR(directory_stat.st_mode):
+            raise ValueError('checkpoint directory is not a directory')
+        with open(marker, 'rb', opener=_thumbnail_nonblocking_opener) as stream:
+            observed = os.fstat(stream.fileno())
+            named = os.stat(marker, follow_symlinks=False)
+            if (not stat.S_ISREG(observed.st_mode) or not stat.S_ISREG(named.st_mode)
+                    or _file_stamp(observed) != _file_stamp(named)
+                    or observed.st_size > 1024):
+                raise ValueError('invalid checkpoint recovery marker')
+            def unique_pairs(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError('duplicate checkpoint recovery field')
+                    result[key] = value
+                return result
+            proof = json.loads(stream.read(1025), object_pairs_hook=unique_pairs)
+            if (_file_stamp(os.fstat(stream.fileno())) != _file_stamp(observed) or
+                    _file_stamp(os.stat(marker, follow_symlinks=False)) != _file_stamp(observed)):
+                raise ValueError('checkpoint recovery marker changed')
+        if (type(proof) is not dict or set(proof) != {'version', 'kind', 'old', 'new'}
+                or type(proof['version']) is not int or proof['version'] != 2
+                or proof['kind'] != 'checkpoint-publication'):
+            raise ValueError('unsupported checkpoint recovery marker')
+        def valid_evidence(value, *, new=False):
+            keys = {'size', 'sha256', 'state'} if new else {'size', 'sha256'}
+            return (type(value) is dict and set(value) == keys
+                    and type(value['size']) is int and 0 <= value['size'] <= (1 << 53) - 1
+                    and type(value['sha256']) is str
+                    and re.fullmatch('[0-9a-f]{64}', value['sha256']) is not None
+                    and (not new or value['state'] in ('paused', 'completed')))
+        if ((proof['old'] is not None and not valid_evidence(proof['old']))
+                or not valid_evidence(proof['new'], new=True)):
+            raise ValueError('invalid checkpoint file evidence')
+        evidence, report_stamp, doc = _checkpoint_file_evidence(
+            report, absent=True, parse=True, durable=True)
+        new = {key: proof['new'][key] for key in ('size', 'sha256')}
+        if evidence == new:
+            if _checkpoint_report_state(doc) != proof['new']['state']:
+                raise ValueError('checkpoint report state does not match its proof')
+        elif evidence == proof['old']:
+            if evidence is not None and _checkpoint_report_state(doc) != 'paused':
+                raise ValueError('previous checkpoint is not paused')
+        else:
+            raise ValueError('checkpoint report matches neither recorded outcome')
+        flags = (os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) |
+                 getattr(os, 'O_CLOEXEC', 0) | getattr(os, 'O_NOFOLLOW', 0))
+        dirfd = os.open(directory, flags)
+        try:
+            current = os.fstat(dirfd)
+            named_directory = os.stat(directory, follow_symlinks=False)
+            if (not stat.S_ISDIR(current.st_mode) or not stat.S_ISDIR(named_directory.st_mode)
+                    or (current.st_dev, current.st_ino) != (directory_stat.st_dev, directory_stat.st_ino)
+                    or (named_directory.st_dev, named_directory.st_ino) !=
+                       (directory_stat.st_dev, directory_stat.st_ino)):
+                raise ValueError('checkpoint directory changed during recovery')
+            # Persist the chosen report/absence before removing the fence.
+            os.fsync(dirfd)
+            if (_file_stamp(os.stat(marker, follow_symlinks=False)) != _file_stamp(observed)
+                    or (report_stamp is None and os.path.lexists(report))
+                    or (report_stamp is not None and
+                        _file_stamp(os.stat(report, follow_symlinks=False)) != report_stamp)):
+                raise ValueError('checkpoint outcome changed during recovery')
+            os.unlink(marker)
+            os.fsync(dirfd)
+        finally:
+            os.close(dirfd)
+        return True
+    except (OSError, TypeError, ValueError, OverflowError, RecursionError):
+        return False
+
+
+def _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc,
+                               *, _stage_stamp=None, _old_stamp=_CHECKPOINT_UNOBSERVED):
     """Commit a checkpoint stage under the existing per-job report lock.
 
     The owning worker remains responsible for its phase transition, source
@@ -1186,7 +1322,21 @@ def _publish_checkpoint_locked(job, owner, generation, operation, staged, path, 
             raise ValueError('checkpoint stage changed before publication')
         # A failing preparation or replacement leaves the old report and
         # committed epochs intact. Generation retirement is conservative.
+        initial_stamp = _file_stamp(held)
         thumbs.invalidate_locked(files.thumbnail, 'checkpoint report preparing')
+        held, named = os.fstat(opened.fileno()), os.stat(staged, follow_symlinks=False)
+        if (not stat.S_ISREG(held.st_mode) or not stat.S_ISREG(named.st_mode)
+                or _file_stamp(held) != initial_stamp or _file_stamp(named) != initial_stamp):
+            raise ValueError('checkpoint stage changed during publication preparation')
+        if _stage_stamp is not None and _file_stamp(held) != _stage_stamp:
+            raise ValueError('checkpoint stage changed after recording recovery evidence')
+        if _old_stamp is None:
+            if os.path.lexists(target):
+                raise ValueError('checkpoint report appeared after recording recovery evidence')
+        elif _old_stamp is not _CHECKPOINT_UNOBSERVED:
+            old = os.stat(target, follow_symlinks=False)
+            if not stat.S_ISREG(old.st_mode) or _file_stamp(old) != _old_stamp:
+                raise ValueError('checkpoint report changed after recording recovery evidence')
         os.replace(staged, target)
         files.output_epoch += 1
         try:
@@ -1216,6 +1366,11 @@ def _publish_checkpoint_job_locked(job, owner, generation, operation, staged, pa
     dirfd = os.open(directory, flags)
     created = replaced = False
     try:
+        state = _checkpoint_report_state(doc)
+        old, old_stamp, _ = _checkpoint_file_evidence(os.path.join(directory, 'report.json'), absent=True)
+        new, stage_stamp, _ = _checkpoint_file_evidence(staged)
+        proof = {'version': 2, 'kind': 'checkpoint-publication', 'old': old,
+                 'new': dict(new, state=state)}
         marker_flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                         getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_CLOEXEC', 0))
         descriptor = os.open(marker, marker_flags, 0o600)
@@ -1226,11 +1381,12 @@ def _publish_checkpoint_job_locked(job, owner, generation, operation, staged, pa
             os.close(descriptor)
             raise
         with opened_marker as stream:
-            stream.write(b'{"version":1,"kind":"checkpoint-publication"}\n')
+            stream.write((json.dumps(proof, separators=(',', ':')) + '\n').encode('ascii'))
             stream.flush()
             os.fsync(stream.fileno())
         os.fsync(dirfd)
-        _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc)
+        _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc,
+                                   _stage_stamp=stage_stamp, _old_stamp=old_stamp)
         replaced = True
         os.fsync(dirfd)  # the report rename is durable before marker retirement
         unfinished = 'stop_review' in doc
@@ -8536,7 +8692,10 @@ def _rehydrate_jobs():
         if jid in JOBS:
             continue
         checkpoint_recovery = os.path.lexists(os.path.join(jdir, _CHECKPOINT_RECOVERY_NAME))
-        if _has_render_recovery(jdir) or checkpoint_recovery:
+        render_recovery = _has_render_recovery(jdir)
+        if checkpoint_recovery and not render_recovery:
+            checkpoint_recovery = not _recover_checkpoint_publication(jdir)
+        if render_recovery or checkpoint_recovery:
             # Do not follow descriptor paths or infer validity from final names.
             up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
                        if os.path.isfile(os.path.join(jdir, "input" + e))), None)
