@@ -1,0 +1,29 @@
+# Clean OpenScrub v1.0.97 integration
+
+The local integration `integration/upstream-focused-candidate` at `d80cf9c6936d1658c6087eef5c93e4a3acb8d4c8` uses Austin’s v1.0.97 main at `50c5a9e03564983ea0bc2a7841824b1fffaf35e0`. It brings the reviewed OpenScrub fixes together as a build to exercise locally. The individual topics remain the units for upstream review. [Austin’s base commit](https://github.com/austinmabry/OpenScrub/commit/50c5a9e03564983ea0bc2a7841824b1fffaf35e0)
+
+## What, why and delivery order
+
+| Work | What and why | When to propose it to Austin |
+| --- | --- | --- |
+| Save As | Keep streamed video and report saves, amount written out of the total, a progress bar, cancellation and the download fallback. Align the controls on narrow viewports. | Continue the existing PR discussion on the already published topic. [Save As #24](https://github.com/austinmabry/OpenScrub/pull/24) |
+| Scan input and long-file performance | Return a typed client response before recording malformed scan options, including JSON beyond the decoder’s nesting depth. Keep the existing dense-smoothing optimisation and bounded scan/log work. | Submit scan options and dense smoothing separately. Use the version-matched standalone branches and measured or reproducible examples from the topic drafts. |
+| Report, export and file ownership | Retain manual and disabled rows, groups and audio choices through saves, rendering and reopening. Publish completed files atomically, skip unchanged report writes and keep source, vault and decoder ownership consistent. | Review the underlying transaction and lifetime fixes before the browser features that assume them. |
+| Video review | Keep explicit Blur and Keep visible, visible-first review, filtering, thumbnail generations, and reuse of eligible source validation. Keep unacknowledged drafts through refresh and view changes. | Submit in owner order, with small scheduling and save-recovery reproductions. |
+| Exact-frame editor and Track | Use the displayed indexed sample for edits and as the initial Track seed. Keep tracking status with the job, so a later result can be opened explicitly after a user chooses another editor. | Review the indexed sample, strict seed and browser owners in that order. Use an encoded clip for the selected pixels and held responses for the browser races. |
+| Optional tighter masks and stopping mid-scan | Deliver a verified four-corner plate edit and partial-scan checkpoint in their own stacks. Each has a narrower ownership and compatibility surface for review. | Follow the exact editor for plate geometry. Follow raw report preservation with the checkpoint contract, bounded engine progress and then restart and controls. |
+
+The source-tree audit records Austin’s ancestry, 11 checked product modules, 52 route literals and the existing OpenCV compatibility pin. The selected tree uses stock inference and ordinary review. The audit excludes custom training, Findings, learning, journal and section implementation files, imports, routes and training dependencies.
+
+## Synthetic scale and package evidence
+
+- Full discovery on `d80cf9c` passed 2,720 tests on Python 3.12.16. Python 3.9.25 passed the same 2,720 tests on `af7dbaf`, which has identical runtime source and differs only in one browser test's allowed thumbnail response codes. The eight Python 3.9 checks covering that browser area also passed on `d80cf9c`. These runs used Linux/WSL, OpenCV 4.14.0, stock FFmpeg and Tesseract, and local Chromium with synthetic inputs.
+- The 610-second, 6,100-frame long-GOP clip returned the same encoded review JPEG at frame 6,000 as an independent sequential decode. The separately tested 15-frame 3840×2160 clip returned the matching JPEG at frame 12. Its actual web render redacted the chosen area and its export matched the rendered file bytes. These are two separate workload checks.
+- The 69,956,372-byte, 100,000-row report check on `e818807` retained identical bytes and file identity on unchanged saves, with one parse and zero report encodes, staging writes, fsyncs or replacements. The paired test also compared sparse and bulk outputs to the previous reviewed source. The no-op median was 961.4 ms on `d31939a` and 958.8 ms on `e818807`. The timing varies by workload and host.
+- The offline build produced an sdist and a wheel from the extracted sdist, verified source bytes for 114 sdist members, checked 24 wheel `RECORD` digests and compared installed file bytes. The package declares Python ≥3.9.
+- The installed wheel passed both launcher help checks and a local HTTP sequence with a warm 304, stale-generation 409 and current-generation 200.
+- Independent review accepted the repaired editor and Track ownership. The scoped donor revision passed 23 checks on each of Python 3.12 and 3.9 and three real browser scenarios. Track status is job-scoped, so independent attribution to concurrent browser clients remains unverified.
+
+## Working version and PR sequence
+
+Keep the integration build available for local evaluation and retain the original experiment as a recovery reference. Switching the working installation and publishing a topic are separate steps. Each topic PR should carry one symptom, a synthetic reproduction, observed before and after behavior, exact prerequisites, and relevant package or render checks. The current default-policy comparison remains part of evaluating any later confidence, continuity, detached-plate OCR or lettering-only options. [Plate discussion #21](https://github.com/austinmabry/OpenScrub/issues/21) · [Plate discussion #22](https://github.com/austinmabry/OpenScrub/issues/22)
