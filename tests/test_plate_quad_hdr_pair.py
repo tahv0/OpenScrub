@@ -144,3 +144,17 @@ def test_cancelled_fresh_trace_removes_its_stage_and_preserves_source(store):
     assert source.read_bytes() == original
     assert not list(source.parent.glob('.hdr-quad-*'))
     assert not source.with_name('hdr.sdr.mp4').exists()
+
+
+@pytest.mark.parametrize('bypass', [False, True])
+def test_reused_arguments_discard_prior_fresh_pair_before_cache_reuse(store, bypass):
+    source = Path(store.job['dir']) / 'hdr.mp4'
+    _hdr_source(source)
+    args = _normalize(source, verify=True)
+    openscrub._quad_scan_digest(args)
+    assert args._hdr_quad_candidate and args._hdr_quad_proof
+    args.video = str(source)
+    args.no_vfr_fix = bypass
+    openscrub.normalize_vfr(args, Quiet())
+    assert getattr(args, '_hdr_quad_candidate', None) is None
+    assert getattr(args, '_hdr_quad_proof', None) is None

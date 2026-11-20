@@ -7028,6 +7028,11 @@ def normalize_vfr(args, cb):
     default), a 10-bit CFR HDR source is kept for the render and
     args.hdr_source/hdr_encoder/hdr_tags are set. Reuses NVENC when
     available. No-op for CFR SDR input."""
+    # A proof belongs to one fresh conversion attempt, never a reused args
+    # object, cached copy, or an early-return path.
+    for attr in ('_hdr_quad_candidate', '_hdr_quad_proof'):
+        if hasattr(args, attr):
+            delattr(args, attr)
     if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
         return
     is_vfr, avg = probe_vfr(args.video)
