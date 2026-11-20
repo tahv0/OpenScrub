@@ -502,18 +502,58 @@ def test_every_advanced_setting_has_a_help_tip():
     page = zones_ui.ZONES_PAGE
     adv = page[page.index("<summary>Advanced settings"):
                page.index("</div></details>")]
-    blocks = re.split(r"\n  <div", adv)[1:]
-    controls = re.findall(r'id="([a-z]+)"', adv)
-    assert len(controls) >= 26
-    for cid in controls:
-        holder = next(b for b in blocks if 'id="%s"' % cid in b)
-        if 'class="full" style="display:flex' in holder:   # checkbox row
-            lab = re.search(r'<label[^>]*><input[^>]*id="%s"[^>]*>(.*?)</label>'
-                            % cid, holder, re.S).group(1)
-        else:
-            lab = re.search(r"<label>(.*?)</label>", holder, re.S).group(1)
-        m = re.search(r'class="qm" data-tip="([^"]+)"', lab)
-        assert m and len(m.group(1)) > 40, "no help tip for #" + cid
+    from html.parser import HTMLParser
+
+    class Controls(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.divs, self.labels, self.controls = [], [], []
+            self.label = None
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "div":
+                self.divs.append(object())
+            elif tag == "label":
+                self.label = {"for": attrs.get("for"), "holder": self.divs[-1], "tips": []}
+                self.labels.append(self.label)
+            elif tag in ("input", "select", "textarea") and attrs.get("id"):
+                self.controls.append((attrs["id"], self.divs[-1], self.label))
+            elif tag == "span" and self.label and "qm" in attrs.get("class", "").split():
+                self.label["tips"].append(attrs.get("data-tip", ""))
+
+        def handle_endtag(self, tag):
+            if tag == "label":
+                self.label = None
+            elif tag == "div":
+                self.divs.pop()
+
+    def missing_tips(markup):
+        parsed = Controls()
+        parsed.feed(markup)
+        missing = []
+        for cid, holder, wrapped in parsed.controls:
+            labels = ([wrapped] if wrapped else
+                      [label for label in parsed.labels if label["for"] == cid])
+            if not labels:
+                labels = [label for label in parsed.labels if label["holder"] is holder]
+            if len(labels) != 1 or not any(len(tip) > 40 for tip in labels[0]["tips"]):
+                missing.append(cid)
+        return parsed.controls, missing
+
+    controls, missing = missing_tips(adv)
+    ids = {cid for cid, _, _ in controls}
+    assert len(ids) >= 26
+    assert {"plate-policy", "plate-auto-cutoff", "plateletters", "verifyhdrplates"} <= ids
+    assert not missing, "no help tip for " + ", ".join("#" + cid for cid in missing)
+    without_policy_tip = adv.replace(
+        'for="plate-policy">Plate confidence policy <span class="qm"',
+        'for="plate-policy">Plate confidence policy <span class="removed"', 1)
+    assert "plate-policy" in missing_tips(without_policy_tip)[1]
+    without_checkbox_tip = adv.replace(
+        'id="plateletters"> Plate lettering only (experimental) <span class="qm"',
+        'id="plateletters"> Plate lettering only (experimental) <span class="removed"', 1)
+    assert "plateletters" in missing_tips(without_checkbox_tip)[1]
     assert "function qmPlace" in w.PAGE and "e.preventDefault();qmPlace(q)" \
         in w.PAGE
 

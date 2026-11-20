@@ -192,6 +192,33 @@ def test_positional_detection_and_fresh_report_omit_absent_quad():
     assert doc['detections'][1]['zone_dropped'] is True
 
 
+def test_corner_state_preserves_ordinary_shape_and_survives_lettering_and_bounds():
+    from dataclasses import asdict
+    import numpy as np
+    import openscrub
+
+    quad = {'version': 1, 'points': [[.1, .1], [.8, .1], [.8, .8], [.1, .8]]}
+    plain = openscrub.Detection(0., 1., (1, 2, 8, 9), 'plate', 'p', .9,
+                                manual_plate_quad=quad)
+    assert 'manual_plate_quad' not in asdict(plain)
+    frame = np.zeros((16, 16, 3), np.uint8)
+    narrow = openscrub._record_narrow_plate(plain, 0, openscrub._frame_sha256(frame),
+                                            (((.1, .1), (.8, .1), (.8, .8)),), 0, '')
+    assert narrow.manual_plate_quad == quad
+    bounded = openscrub.FrameBoundedNarrowPlateDetection(
+        **asdict(narrow), manual_plate_quad=quad, scan_frame_start=0, scan_frame_end=1)
+    assert 'manual_plate_quad' not in asdict(bounded)
+    saved = openscrub._fresh_detection_row(bounded, enabled=True)
+    assert saved['manual_plate_quad'] == quad
+    assert saved['scan_frame_start'] == 0 and saved['scan_frame_end'] == 1
+    doc = {'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': [[0, 0]]},
+           'detections': [saved]}
+    loaded, _, _ = openscrub._decode_report(doc)
+    assert loaded[0].manual_plate_quad == quad
+    assert (loaded[0].scan_frame_start, loaded[0].scan_frame_end) == (0, 1)
+    assert isinstance(loaded[0], openscrub.NarrowPlateDetection)
+
+
 def test_exact_frame_edges_are_accepted(plate):
     edits = quad_edit(plate, [[0, 0], [64, 0], [64, 48], [0, 48]])
     assert post(plate, **edits).status_code == 200

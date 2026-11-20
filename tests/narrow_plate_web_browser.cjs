@@ -18,6 +18,12 @@ const [url,root]=process.argv.slice(2);
    await page.locator('#cats .catrow').filter({hasText:/plate/i}).first().locator('input[type=checkbox]').check();
    await page.locator('details summary').filter({hasText:'Advanced settings'}).click();
    assert.equal(await page.locator('#plateletters').isChecked(),false);
+   for(const id of ['plateletters','verifyhdrplates']){
+    const tip=page.locator(`label:has(#${id}) .qm`);
+    await tip.click();assert(await tip.evaluate(e=>e.classList.contains('open')));
+    assert.equal(await page.locator(`#${id}`).isChecked(),false,`${id} changed when its help tip was clicked`);
+    await tip.click();
+   }
    assert((await page.locator('#platelettersNote').innerText()).includes('character'));
    async function scan(){
     const response=page.waitForResponse(r=>r.url().endsWith('/api/jobs')&&r.request().method()==='POST');

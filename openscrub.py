@@ -34,7 +34,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import InitVar, dataclass, asdict
 from types import MappingProxyType
 
 import cv2
@@ -759,7 +759,12 @@ class Detection:
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
                                # category); empty = plain box redaction
-    manual_plate_quad: object = None  # source-bound v1, never inherited by a track
+    manual_plate_quad: InitVar[object] = None  # source-bound v1, never inherited by a track
+
+    def __post_init__(self, manual_plate_quad):
+        # Runtime geometry remains available without changing the ordinary
+        # Detection serialization used by existing callers.
+        self.manual_plate_quad = manual_plate_quad
 
 
 @dataclass
@@ -783,7 +788,8 @@ def _narrow_evidence_digest(d, evidence):
 
 
 def _record_narrow_plate(d, frame_index, frame_digest, poly, margin, reason):
-    row = NarrowPlateDetection(**asdict(d), narrow_plate={})
+    row = NarrowPlateDetection(**asdict(d), manual_plate_quad=copy.deepcopy(d.manual_plate_quad),
+                               narrow_plate={})
     row.poly = poly
     evidence = {"frame_index": frame_index,
                 "frame_sha256": frame_digest,
@@ -7281,8 +7287,8 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
 
 def _fresh_detection_row(detection, **extra):
     row = asdict(detection)
-    if row.get('manual_plate_quad') is None:
-        row.pop('manual_plate_quad', None)
+    if detection.manual_plate_quad is not None:
+        row['manual_plate_quad'] = copy.deepcopy(detection.manual_plate_quad)
     return dict(row, **extra)
 
 

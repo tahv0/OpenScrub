@@ -15,6 +15,9 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
    await page.locator('details summary').filter({hasText:'Advanced settings'}).click();
    assert.equal(await page.locator('#plate-policy').count(),1,'Scan Setup needs the optional plate policy control');
    const policy=page.locator('#plate-policy'),cutoff=page.locator('#plate-auto-cutoff');
+   const policyTip=page.locator('label[for="plate-policy"] .qm');
+   await policyTip.click();assert(await policyTip.evaluate(e=>e.classList.contains('open')));
+   await policyTip.click();
    assert.equal(await policy.inputValue(),'');
    assert.equal(await cutoff.inputValue(),'');
    assert.equal(await cutoff.isVisible(),false);
@@ -37,6 +40,9 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
    assert(!Object.hasOwn(standard,'plate_auto_cutoff'));
    await policy.selectOption('manual_review');
    assert.equal(await cutoff.isVisible(),true);
+   const cutoffTip=page.locator('label[for="plate-auto-cutoff"] .qm');
+   await cutoffTip.click();assert(await cutoffTip.evaluate(e=>e.classList.contains('open')));
+   await cutoffTip.click();
    assert((await page.locator('#plate-policy-help').innerText()).includes('remain visible'));
    const count=captured.length;
    await page.locator('button.start').click();

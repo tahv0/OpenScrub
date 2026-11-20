@@ -176,7 +176,7 @@ details .inner .full{grid-column:1/-1}
   <div><label>Face threshold <span class="qm" data-tip="How sure the face detector must be before it blurs something (0-1, default 0.6). Lower it to catch small, distant, turned or partly hidden faces - you may get a few false faces, which you can reject in review. Raise it only if many non-faces are being flagged; a missed face is never blurred.">?</span></label><input type="number" id="fthr" value="0.6" step="0.05" min="0" max="1"></div>
   <div><label>Face expand <span class="qm" data-tip="Grow each detected face box by this fraction before blurring (0.15 = 15% larger). Default 0.15. Close-up faces (filling roughly 15-30% or more of the frame) automatically get more, up to 0.45, so the neck and collar under the face are covered too - those can still identify someone. Raise it if hairlines, ears or chins show around the edge of face blurs.">?</span></label><input type="number" id="fex" value="0.15" step="0.05"></div>
   <div><label for="pthr">Plate threshold <span class="qm" data-tip="The lowest detector score retained for plates (0.05-0.95, default 0.35). A higher threshold can miss plates. With an optional confidence policy, retained candidates may stay visible for review; lowering this threshold later requires a new scan.">?</span></label><input type="number" id="pthr" value="0.35" step="0.05" min="0.05" max="0.95" oninput="clearPlatePolicyError()"></div>
-  <div class="full"><label for="plate-policy">Plate confidence policy</label>
+  <div class="full"><label for="plate-policy">Plate confidence policy <span class="qm" data-tip="Standard keeps the usual plate behavior. Review uncertain leaves unsupported candidates visible for review; Blur candidates masks eligible detections. You can make explicit Blur or Keep choices in review.">?</span></label>
    <select id="plate-policy" onchange="platePolicyChanged()">
     <option value="">Standard (current behavior)</option>
     <option value="manual_review">Review uncertain</option>
@@ -185,21 +185,21 @@ details .inner .full{grid-column:1/-1}
    <div id="plate-policy-help" class="mutd" aria-live="polite"></div>
   </div>
   <div class="full" id="plate-auto-cutoff-wrap" hidden>
-   <label for="plate-auto-cutoff">Automatic plate cutoff</label>
+   <label for="plate-auto-cutoff">Automatic plate cutoff <span class="qm" data-tip="Review uncertain uses consecutive eligible observations at or above this score to support an automatic mask. Choose a value at least as high as the plate threshold; no cutoff is preset.">?</span></label>
    <input type="number" id="plate-auto-cutoff" min="0.05" max="0.95" step="any"
     inputmode="decimal" disabled oninput="clearPlatePolicyError()"
     aria-describedby="plate-policy-help plate-policy-error">
    <div class="mutd">Choose a cutoff at least as high as the plate threshold. No cutoff is preset.</div>
   </div>
   <div class="full" id="plate-policy-error" role="alert" hidden style="color:#fca5a5"></div>
-  <div class="full"><label style="display:inline"><input type="checkbox" id="plateletters"> Plate lettering only (experimental)</label>
+  <div class="full"><label style="display:inline"><input type="checkbox" id="plateletters"> Plate lettering only (experimental) <span class="qm" data-tip="Try to cover only the lettering on detected plates. Text detection can miss characters, and the visible plate background may still identify someone. Unverified frames use the full detected plate box when available; review the output.">?</span></label>
    <div id="platelettersNote" class="mutd">For the plate category. Text detection can miss letters; the plate background and character positions remain visible and may identify someone. Checks every frame and can be slow. Unsupported sources or uncertain text use the full detected plate box when available; review the output.</div></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
    <option>rect</option></select></div>
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
   <div><label>HDR output <span class="qm" data-tip="Only matters for HDR video (e.g. recent iPhones). match source keeps the output HDR with its full brightness and color. tone-map to SDR converts it to standard video, which looks right on every screen and app. Standard (SDR) input is always output as SDR.">?</span></label><select id="hdrout"><option value="match">match source</option>
    <option value="sdr">tone-map to SDR</option></select></div>
-  <div class="full"><label style="display:inline"><input type="checkbox" id="verifyhdrplates"> Enable HDR plate-corner verification (experimental)</label>
+  <div class="full"><label style="display:inline"><input type="checkbox" id="verifyhdrplates"> Enable HDR plate-corner verification (experimental) <span class="qm" data-tip="Verify matching frames during a fresh supported HDR scan so edited plate corners can be used for HDR output. This adds work. If live proof is unavailable or lost after restart, the renderer uses the full plate box.">?</span></label>
    <div id="verifyhdrplatesNote" class="mutd">Only fresh, supported 10-bit PQ/HLG constant-frame-rate scans with HDR output qualify. Frame verification adds work and may take longer. Proof is live only; after restart or if unavailable, HDR rendering uses the existing full plate box. Edit corners in review.</div></div>
   <div><label>Codec <span class="qm" data-tip="Video compression for the output. h264 plays everywhere (default). hevc (H.265) makes smaller files but some older devices and browsers can't play it. HDR output always uses HEVC.">?</span></label><select id="vcodec"><option>h264</option><option>hevc</option></select></div>
   <div><label>Output format <span class="qm" data-tip="File type of the output. mp4 plays almost everywhere (default). mov suits Apple apps like Final Cut and QuickTime. mkv suits editors and media servers that prefer it.">?</span></label><select id="outfmt"><option>mp4</option>
