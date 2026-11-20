@@ -199,6 +199,8 @@ details .inner .full{grid-column:1/-1}
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
   <div><label>HDR output <span class="qm" data-tip="Only matters for HDR video (e.g. recent iPhones). match source keeps the output HDR with its full brightness and color. tone-map to SDR converts it to standard video, which looks right on every screen and app. Standard (SDR) input is always output as SDR.">?</span></label><select id="hdrout"><option value="match">match source</option>
    <option value="sdr">tone-map to SDR</option></select></div>
+  <div class="full"><label style="display:inline"><input type="checkbox" id="verifyhdrplates"> Enable HDR plate-corner verification (experimental)</label>
+   <div id="verifyhdrplatesNote" class="mutd">Only fresh, supported 10-bit PQ/HLG constant-frame-rate scans with HDR output qualify. Frame verification adds work and may take longer. Proof is live only; after restart or if unavailable, HDR rendering uses the existing full plate box. Edit corners in review.</div></div>
   <div><label>Codec <span class="qm" data-tip="Video compression for the output. h264 plays everywhere (default). hevc (H.265) makes smaller files but some older devices and browsers can't play it. HDR output always uses HEVC.">?</span></label><select id="vcodec"><option>h264</option><option>hevc</option></select></div>
   <div><label>Output format <span class="qm" data-tip="File type of the output. mp4 plays almost everywhere (default). mov suits Apple apps like Final Cut and QuickTime. mkv suits editors and media servers that prefer it.">?</span></label><select id="outfmt"><option>mp4</option>
    <option>mov</option><option>mkv</option></select></div>
@@ -1258,6 +1260,7 @@ async function startScan(){
  };
  if(platePolicy){o.uncertain_policy=platePolicy.policy;o.plate_auto_cutoff=platePolicy.cutoff;}
  if($("plateletters").checked)o.plate_coverage="narrow";
+ if($("verifyhdrplates").checked)o.verify_hdr_plate_frames=true;
  const fd=new FormData();
  if(S.file)fd.append("video",S.file);
  fd.append("server_path",$("spath").value.trim());

@@ -85,6 +85,53 @@ def test_editor_supersedes_auto_review_and_reopens_deliberately(tmp_path):
     launch_editor_page(tmp_path, "editor_recovery_browser.cjs", restart=False)
 
 
+def test_plate_corner_editor_real_page_and_render_pixels(tmp_path):
+    launch_editor_page(tmp_path, "plate_quad_browser.cjs", restart=False)
+    import cv2
+    artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path))) / "plate_quad_browser"
+    cap = cv2.VideoCapture(str(artifacts / "actual-output.mp4"))
+    try:
+        ok0, first = cap.read()
+        ok1, second = cap.read()
+    finally:
+        cap.release()
+    assert ok0 and ok1 and first.shape == second.shape == (360, 640, 3)
+    # The saved polygon covers the center of only frame 0; the next frame
+    # retains ordinary full-plate coverage, including the top-left margin.
+    assert int(first[150, 240].max()) < 30
+    assert int(first[110, 150].max()) > 100
+    assert int(second[110, 150].max()) < 30
+    cap = cv2.VideoCapture(str(artifacts / "resized-output.mp4"))
+    try:
+        resized_ok, resized_frame = cap.read()
+    finally:
+        cap.release()
+    assert resized_ok and resized_frame.shape == (360, 640, 3)
+    # This pixel lies outside the original box and saved polygon, but inside
+    # the expanded box.  It proves the resized box covers its new full extent.
+    assert int(resized_frame[150, 350].max()) < 30
+    assert int(resized_frame[110, 150].max()) < 30
+    cv2.imwrite(str(artifacts / "resized-frame-0.png"), resized_frame)
+    cap = cv2.VideoCapture(str(artifacts / "reset-output.mp4"))
+    try:
+        reset_ok, reset_frame = cap.read()
+    finally:
+        cap.release()
+    assert reset_ok and reset_frame.shape == (360, 640, 3)
+    assert int(reset_frame[110, 150].max()) < 30
+    cv2.imwrite(str(artifacts / "reset-frame-0.png"), reset_frame)
+    cv2.imwrite(str(artifacts / "render-frame-0.png"), first)
+    cv2.imwrite(str(artifacts / "render-frame-1.png"), second)
+    (artifacts / "render-pixels.json").write_text(json.dumps({
+        "frame0_inside": first[150, 240].tolist(),
+        "frame0_outside_quad_inside_box": first[110, 150].tolist(),
+        "frame1_full_plate": second[110, 150].tolist(),
+        "resized_frame0_new_extent": resized_frame[150, 350].tolist(),
+        "resized_frame0_original_quad_margin": resized_frame[110, 150].tolist(),
+        "reset_frame0_full_plate": reset_frame[110, 150].tolist(),
+    }, indent=2))
+
+
 def verify_render(artifacts):
     """Decode the real SDR output and independently check the edited source region."""
     import cv2

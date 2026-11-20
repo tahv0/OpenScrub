@@ -80,10 +80,37 @@ def test_confidence_and_lettering_scan_render_and_reopen(tmp_path, monkeypatch, 
     assert [inside < 50 for _, inside in initial] == enabled
     assert all(outside > 150 for outside, _ in initial)
 
+    # A verified manual quad and the automatic lettering polygon remain
+    # independent. At the inspected frame the explicit quad wins.
+    facts = core.exact.probe_source(str(path))
+    fps, cum, timeline = core.exact.timeline(doc, facts)
+    direct[2]["output_choice"] = "blur"
+    direct[2]["manual_plate_quad"] = core.plate_quad.make_record(
+        [[65, 20], [75, 20], [75, 35], [65, 35]],
+        {"index": 2, "timeline_eq": timeline}, doc["provenance"]["input_sha256"],
+        fps, len(cum), facts)
+    (tmp_path / "report.json").write_text(json.dumps(doc))
+    quad_args = core._prep_args(parser.parse_args([
+        str(path), "--from-report", args.report, "--encoder", "x264",
+        "--mode", "box", "--pad", "0", "--output", str(tmp_path / "quad.mp4"),
+    ]), parser)
+    core.run_pipeline(quad_args, Quiet())
+    cap = cv2.VideoCapture(quad_args.output)
+    quad_frames = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        quad_frames.append(frame)
+    cap.release()
+    assert quad_frames[2][25, 70].mean() < 50
+    assert quad_frames[2][30, 45].mean() > 150
+
     # Explicit choices supersede the policy, while a stale lettering proof
     # falls back to the full box only on the explicitly enabled source frame.
     direct[0]["output_choice"] = "blur"
     direct[2]["output_choice"] = "keep"
+    direct[2].pop("manual_plate_quad")
     direct[0]["narrow_plate"]["frame_sha256"] = "0" * 64
     (tmp_path / "report.json").write_text(json.dumps(doc))
     reopened = core._prep_args(parser.parse_args([

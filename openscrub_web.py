@@ -52,6 +52,7 @@ import openscrub
 from openscrub_internal.reports import _staged_report
 from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 from openscrub_internal.job_logs import JobLog
@@ -970,6 +971,8 @@ def build_args(job, for_render=False):
             p = find_model_file("%s.onnx" % mid)
             if p:
                 argv += [flag, p]
+    if o.get("verify_hdr_plate_frames") is True:
+        argv.append("--verify-hdr-plate-frames")
     if o.get("no_memory"):
         argv.append("--no-memory")
     if o.get("no_ner"):
@@ -1363,7 +1366,11 @@ def _run_job(job, action, owner=None):
                 if not _operation_valid(job, owner):
                     return
                 job["stats"] = state["stats"]
-            coherent = _adopt_scan_source(job, owner)
+            hdr_proof = getattr(args, '_hdr_quad_proof', None)
+            if hdr_proof is None:
+                coherent = _adopt_scan_source(job, owner)
+            else:
+                coherent = _adopt_scan_source(job, owner, hdr_proof, state.get('input_sha256'))
             if owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
             if coherent:
@@ -1439,6 +1446,10 @@ def _run_job(job, action, owner=None):
                 _select_render_input(job, owner)
             args = build_args(dict(job, video=owner.source), for_render=True)
             args._report_input = owner.source
+            with files.report_lock:
+                selected = files.current_source
+                if selected is not None:
+                    args._hdr_quad_render_proof = selected.get('hdr_quad_proof')
             res = openscrub.run_pipeline(args, cb)
             # Compatibility for substituted pipelines which do not use the new
             # hook. Actual renders publish their terminal fields inside it.
@@ -2048,16 +2059,7 @@ def _report_committed_locked(job, doc=None, scan_owner=None):
 
 
 def _probe_exact_source(path):
-    try:
-        result = subprocess.run([
-            'ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries',
-            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames:stream_tags=rotate:stream_side_data',
-            '-of', 'json', path], capture_output=True, timeout=15, check=True)
-        if len(result.stdout) > 65536:
-            raise exact.ExactError('stream metadata exceeds bounded response')
-        return exact.metadata_facts(json.loads(result.stdout))
-    except (OSError, subprocess.SubprocessError, ValueError) as error:
-        raise exact.ExactError('successful exact stream metadata unavailable: '+str(error)) from None
+    return exact.probe_source(path)
 
 
 @contextlib.contextmanager
@@ -2121,7 +2123,10 @@ def _prepare_observed_source(job, path, thumbnail_recovery=False):
                 raise exact.ExactError('source changed during preparation', 409, 'sample_conflict')
         with _exact_owner_guard(job, lease):
             pass  # Foreign owner must still match the pre-I/O snapshot.
-        return dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error), lease
+        prepared = dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error)
+        if cached is not None and cached.get('hdr_quad_proof') is not None:
+            prepared['hdr_quad_proof'] = cached['hdr_quad_proof']
+        return prepared, lease
     except _ThumbnailArtifactPending:
         _thumbnail_release_lease(job, lease, primary_pending=True)
         if has_request_context() and request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
@@ -2163,7 +2168,7 @@ def _select_observed_locked(job, prepared, authoritative=False, *, report_bound=
     return files.current_source
 
 
-def _adopt_scan_source(job, owner):
+def _adopt_scan_source(job, owner, hdr_proof=None, scan_digest=None):
     files = FILES.initialize(job)
     with files.report_lock:
         pair = files.source_pair
@@ -2182,6 +2187,11 @@ def _adopt_scan_source(job, owner):
             if _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != pair[3]:
                 raise exact.ExactError('committed scan report changed during adoption', 409, 'sample_conflict')
             selected = _select_observed_locked(job, prepared, authoritative=True)
+            selected.pop('hdr_quad_proof', None)
+            if isinstance(hdr_proof, dict) and hdr_proof.get('scan_sha256') == scan_digest:
+                doc = _load_job_report(job)
+                if openscrub.hdr_quad_pairs.usable(hdr_proof, doc, selected):
+                    selected['hdr_quad_proof'] = hdr_proof
             job['video'] = selected['path']
             return True
     except Exception as error:
@@ -3250,6 +3260,66 @@ def _read_exact_source(selected, index, *, fps, count, tolerance_s):
     return decoded
 
 
+def _quad_baseline_token(row):
+    quad = row.get('manual_plate_quad')
+    if not plate_quad.valid_record(quad):
+        return None
+    # The browser must carry these bytes verbatim: JS numbers do not retain
+    # the int/float distinction used by the row-context hash.
+    return json.dumps(quad, sort_keys=True, ensure_ascii=True,
+                      separators=(',', ':'), allow_nan=False)
+
+
+def _quad_baseline_value(token):
+    if not isinstance(token, str) or len(token) > 8192:
+        return None
+    try:
+        quad = json.loads(token)
+    except (ValueError, TypeError, RecursionError):
+        return None
+    return quad if plate_quad.valid_record(quad) else None
+
+
+def _quad_scan_supported(doc, selected):
+    return (plate_quad.same_sdr_scan(doc.get('provenance', {}), selected['facts'])
+            or openscrub.hdr_quad_pairs.usable(selected.get('hdr_quad_proof'), doc, selected))
+
+
+def _quad_edit_eligibility(doc, selected):
+    provenance = doc.get('provenance', {})
+    expected = provenance.get('input_sha256') if isinstance(provenance, dict) else None
+    if (not _quad_scan_supported(doc, selected)
+            or not isinstance(expected, str) or re.fullmatch('[0-9a-f]{64}', expected) is None):
+        return 'unavailable'
+    verified = selected.get('quad_sha256')
+    if verified is None:
+        return 'verification_required'
+    return 'ready' if verified == expected else 'unavailable'
+
+
+def _quad_sample_eligibility(row, doc, selected, index, fps, count, timeline_eq):
+    quad = row.get('manual_plate_quad')
+    if quad is None:
+        return 'none'
+    if not plate_quad.valid_record(quad):
+        return 'unsupported'
+    facts, source, frame = selected['facts'], quad['source'], quad['frame']
+    if (not _quad_scan_supported(doc, selected)
+            or source['width'] != facts['width'] or source['height'] != facts['height']
+            or source['stream'] != facts['stream'] or frame['fps'] != fps
+            or frame['count'] != count or frame['timeline_eq'] != timeline_eq
+            or doc.get('provenance', {}).get('input_sha256') != source['sha256']):
+        return 'unavailable'
+    if frame['index'] != index:
+        return 'other_frame'
+    digest = selected.get('quad_sha256')
+    if digest is None:
+        return 'unverified'
+    if digest != source['sha256'] or digest != doc.get('provenance', {}).get('input_sha256'):
+        return 'unavailable'
+    return 'eligible_sdr_frame'
+
+
 @app.route('/api/jobs/<jid>/edit_sample')
 def job_edit_sample(jid):
     job = JOBS.get(jid) or abort(404)
@@ -3288,10 +3358,19 @@ def job_edit_sample(jid):
             start, end, _ = baseline['span']
             if start-.01 <= decoded.canonical_s <= end+.01:
                 box = baseline['cbox']
-                boxes.append(dict(i=i, category=row['category'], text=row.get('text',''),
+                item = dict(i=i, category=row['category'], text=row.get('text',''),
                     enabled=row.get('enabled',True), t_start=start, t_end=end,
                     box=[box[0]+offset[0], box[1]+offset[1], box[2]+offset[0], box[3]+offset[1]],
-                    row_context_eq=exact.row_context_eq(row), base=baseline))
+                    row_context_eq=exact.row_context_eq(row), base=baseline)
+                if row['category'] == 'plate':
+                    item['quad_context_eq'] = _quad_context_eq(row)
+                    item['quad_baseline'] = _quad_baseline_token(row)
+                    item['quad_edit_eligibility'] = _quad_edit_eligibility(doc, selected)
+                    item['quad_eligibility'] = _quad_sample_eligibility(
+                        row, doc, selected, index, fps, len(cum), timeline_eq)
+                    if 'manual_plate_quad' in row:
+                        item['manual_plate_quad'] = row['manual_plate_quad']
+                boxes.append(item)
         with _exact_owner_guard(job, lease):
             _exact_current_locked(job, selected, fence)
         return jsonify(version=1, sample=dict(source_ref=selected['source_ref'],
@@ -3763,6 +3842,39 @@ def _valid_manual_creation(value):
             and numbers(value["aoff"], 2))
 
 
+def _quad_context_eq(row):
+    # Existing geometry preconditions include this additive field. For a lost
+    # acknowledgement also compare the remainder of the row independently.
+    return exact.row_context_eq({key: value for key, value in row.items()
+                                 if key != 'manual_plate_quad'})
+
+
+def _quad_source_digest(job, prepared):
+    """One leased, descriptor-fenced digest, reused for this live selection."""
+    files = FILES.initialize(job)
+    with files.report_lock:
+        current = files.current_source
+        if (current is not None and (current['path'], current['stamp']) ==
+                (prepared['path'], prepared['stamp'])):
+            cached = current.get('quad_sha256')
+            if cached is not None:
+                return cached
+    with open(prepared['path'], 'rb') as opened:
+        if (_file_stamp(os.fstat(opened.fileno())) != prepared['stamp']
+                or _file_stamp(os.stat(prepared['path'])) != prepared['stamp']):
+            raise exact.ExactError('source changed before digest', 409, 'geometry_conflict')
+        digest = hashlib.sha256()
+        while True:
+            data = opened.read(1 << 20)
+            if not data:
+                break
+            digest.update(data)
+        if (_file_stamp(os.fstat(opened.fileno())) != prepared['stamp']
+                or _file_stamp(os.stat(prepared['path'])) != prepared['stamp']):
+            raise exact.ExactError('source changed during digest', 409, 'geometry_conflict')
+    return digest.hexdigest()
+
+
 def _parse_sample_precondition(value, row=False):
     def invalid():
         raise exact.ExactError('invalid geometry precondition shape', 400, 'invalid_sample_request')
@@ -3792,13 +3904,23 @@ def _parse_sample_precondition(value, row=False):
 
 def _strict_geometry(edits):
     preconditions = edits.get('geometry_preconditions', {})
+    quads = edits.get('manual_plate_quads', {})
+    if not isinstance(quads, dict):
+        raise exact.ExactError('manual_plate_quads must be an index map', 400, 'invalid_sample_request')
     if not isinstance(preconditions, dict):
         raise exact.ExactError('geometry_preconditions must be an index map', 400, 'invalid_sample_request')
     for key, value in preconditions.items():
         if (not isinstance(key, str) or re.fullmatch('0|[1-9][0-9]*', key) is None
-                or len(key) > 18 or not any(key in (edits.get(k) or {}) for k in ('box_overrides','time_overrides'))):
+                or len(key) > 18 or not any(key in (edits.get(k) or {}) for k in ('box_overrides','time_overrides','manual_plate_quads'))):
             raise exact.ExactError('strict row must name a submitted raw index', 400, 'invalid_sample_request')
         _parse_sample_precondition(value, row=True)
+        if key in quads:
+            if (not isinstance(value.get('quad_context_eq'), str)
+                    or re.fullmatch('[0-9a-f]{64}', value['quad_context_eq']) is None):
+                raise exact.ExactError('quad row context required', 400, 'invalid_sample_request')
+            quad = quads[key]
+            if quad is not None and (not isinstance(quad, dict) or set(quad) != {'points'}):
+                raise exact.ExactError('quad must be four corners or null', 400, 'invalid_sample_request')
         try:
             if key in (edits.get('box_overrides') or {}):
                 exact.vector(edits['box_overrides'][key], 4)
@@ -3808,9 +3930,11 @@ def _strict_geometry(edits):
                     raise ValueError()
         except (exact.ExactError, ValueError):
             raise exact.ExactError('invalid strict geometry target', 400, 'invalid_sample_request') from None
+    if not set(quads).issubset(preconditions):
+        raise exact.ExactError('quad needs an inspected row', 400, 'invalid_sample_request')
     if preconditions:
         strict_indices = {int(key) for key in preconditions}
-        for field in ('box_overrides', 'time_overrides'):
+        for field in ('box_overrides', 'time_overrides', 'manual_plate_quads'):
             for key in (edits.get(field) or {}):
                 try:
                     index = int(key)
@@ -3886,16 +4010,15 @@ def _check_sample_precondition(pc, selected, fps, cum, timeline_eq):
         raise exact.ExactError('sample source/timeline differs', 409, 'geometry_conflict')
 
 
-def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq):
+def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq, digest=None):
     targets = {}
+    quads = edits.get('manual_plate_quads', {})
     for key, pc in preconditions.items():
         _check_sample_precondition(pc, selected, fps, cum, timeline_eq)
         index = int(key)
         if index >= len(doc['detections']):
             raise exact.ExactError('raw row no longer exists', 409, 'geometry_conflict')
         row = doc['detections'][index]
-        if exact.row_context_eq(row) != pc['row_context_eq']:
-            raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
         baseline = pc['base']
         desired_box = list((edits.get('box_overrides') or {}).get(key, baseline['cbox']))
         span = (edits.get('time_overrides') or {}).get(key)
@@ -3903,9 +4026,53 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
                         if span is not None else list(baseline['span']))
         intended = dict(cbox=desired_box, span=desired_span)
         current = exact.row_base(row)
-        if current != baseline and current != intended:
-            raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
-        targets[key] = intended, current == intended
+        desired_quad = None
+        if key in quads:
+            if (row.get('category') != 'plate'
+                    or not baseline['span'][0]-.01 <= pc['index']/fps <= baseline['span'][1]+.01):
+                raise exact.ExactError('sample does not inspect this plate row', 409, 'geometry_conflict')
+            prov = doc.get('provenance', {})
+            if (not _quad_scan_supported(doc, selected)
+                    or not digest or prov.get('input_sha256') != digest):
+                raise exact.ExactError('verified SDR scan identity unavailable', 409, 'geometry_conflict')
+            if _quad_context_eq(row) != pc['quad_context_eq']:
+                raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            try:
+                if quads[key] is not None:
+                    desired_quad = plate_quad.make_record(quads[key]['points'], pc, digest, fps, len(cum), selected['facts'])
+            except (ValueError, TypeError, OverflowError, cv2.error) as error:
+                raise exact.ExactError('invalid plate corners: '+str(error), 400, 'invalid_sample_request') from None
+            baseline_matches = current == baseline and exact.row_context_eq(row) == pc['row_context_eq']
+            wanted_matches = (current == intended and
+                              (('manual_plate_quad' not in row) if desired_quad is None else
+                               _same_json_value(row.get('manual_plate_quad'), desired_quad)))
+            if not baseline_matches and not wanted_matches:
+                raise exact.ExactError('quad baseline/intended tuple differs', 409, 'geometry_conflict')
+        else:
+            box_requested = key in (edits.get('box_overrides') or {})
+            box_changed = box_requested and desired_box != baseline['cbox']
+            witness = pc.get('quad_context_eq')
+            witness_matches = (isinstance(witness, str)
+                               and re.fullmatch('[0-9a-f]{64}', witness) is not None
+                               and witness == _quad_context_eq(row))
+            context_matches = exact.row_context_eq(row) == pc['row_context_eq']
+            original_quad = _quad_baseline_value(pc.get('quad_baseline'))
+            valid_original_quad = plate_quad.valid_record(original_quad)
+            retired_replay = (row.get('category') == 'plate' and box_changed and current == intended
+                              and witness_matches and valid_original_quad
+                              and 'manual_plate_quad' not in row
+                              and exact.row_context_eq({**row, 'manual_plate_quad': original_quad})
+                                  == pc['row_context_eq'])
+            if not context_matches and not retired_replay:
+                raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            if current != baseline and current != intended:
+                raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
+            if (box_requested and current['cbox'] != desired_box and row.get('category') == 'plate'
+                    and plate_quad.valid_record(row.get('manual_plate_quad'))
+                    and (not witness_matches or not valid_original_quad
+                         or not _same_json_value(original_quad, row['manual_plate_quad']))):
+                raise exact.ExactError('plate box change requires quad baseline', 409, 'geometry_conflict')
+        targets[key] = intended, current == intended, desired_quad
     return targets
 
 
@@ -3917,6 +4084,8 @@ def job_save_edits(jid):
     prepared = lease = None
     needs_source = False
     preparation_authority = None
+    preparation_report = None
+    digest = None
     try:
         preconditions = _strict_geometry(edits)
         while True:
@@ -3935,6 +4104,8 @@ def job_save_edits(jid):
                         raise exact.ExactError('report has no selected scan input')
                     files = FILES.initialize(job)
                     preparation_authority = (files.current_source, files.source_epoch, files.operation)
+                    if edits.get('manual_plate_quads'):
+                        preparation_report = (files.committed_report_epoch, _file_stamp(os.stat(path)))
                 else:
                     selected = targets = None
                     if needs_source:
@@ -3950,10 +4121,13 @@ def job_save_edits(jid):
                         if (os.path.realpath(doc.get('provenance', {}).get('input','')) != prepared['path']
                                 or os.path.realpath(job['video']) != prepared['path']):
                             raise exact.ExactError('source changed while preparing save', 409, 'geometry_conflict')
+                        if (preparation_report is not None and
+                                (files.committed_report_epoch, _file_stamp(os.stat(path))) != preparation_report):
+                            raise exact.ExactError('report changed during quad preparation', 409, 'geometry_conflict')
                         selected = _select_observed_locked(job, prepared)
                         _exact_current_locked(job, selected)
                         fps,cum,timeline_eq,_ = _exact_policy(doc,selected)
-                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq)
+                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq,digest)
                         for manual,pc in strict_manual:
                             _check_sample_precondition(pc,selected,fps,cum,timeline_eq)
                             t0,t1,tref = manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])
@@ -3969,6 +4143,11 @@ def job_save_edits(jid):
                         if destination not in touched:
                             touched[destination] = (target, key, target.get(key, missing))
                         target[key] = value
+                    def remove(target, key):
+                        destination = (id(target), key)
+                        if destination not in touched:
+                            touched[destination] = (target, key, target.get(key, missing))
+                        target.pop(key, None)
                     original_count = len(doc['detections'])
                     capable = doc.get('plate_policy_evidence_version') == 1
                     switch = edits.get('plate_policy')
@@ -3997,13 +4176,26 @@ def job_save_edits(jid):
                             assign(row, 'enabled', bool(enabled[str(i)]))
                             if capable:
                                 assign(row, 'output_choice', 'blur' if enabled[str(i)] else 'keep')
+                    original_boxes = {}
                     for key,box in (edits.get('box_overrides') or {}).items():
                         i = int(key)
+                        if 0 <= i < len(doc['detections']):
+                            row = doc['detections'][i]
+                            if row.get('category') == 'plate' and plate_quad.valid_record(row.get('manual_plate_quad')):
+                                original_boxes.setdefault(i, row.get('cbox'))
                         if key in preconditions:
                             if not targets[key][1]:
                                 assign(doc['detections'][i], 'cbox', [float(v) for v in targets[key][0]['cbox']])
                         elif 0 <= i < len(doc['detections']) and len(box) == 4:
                             assign(doc['detections'][i], 'cbox', [float(v) for v in box])
+                    for i, original_box in original_boxes.items():
+                        row = doc['detections'][i]
+                        key = str(i)
+                        if (row.get('cbox') != original_box
+                                and key not in (edits.get('manual_plate_quads') or {})
+                                and row.get('category') == 'plate'
+                                and plate_quad.valid_record(row.get('manual_plate_quad'))):
+                            remove(row, 'manual_plate_quad')
                     for key,span in (edits.get('time_overrides') or {}).items():
                         i = int(key)
                         if key in preconditions:
@@ -4017,6 +4209,16 @@ def job_save_edits(jid):
                                 row = doc['detections'][i]
                                 assign(row, 't_start', t0); assign(row, 't_end', t1)
                                 assign(row, 'last_seen', min(max(row.get('last_seen',t0),t0),t1))
+                    for key, value in (edits.get('manual_plate_quads') or {}).items():
+                        row = doc['detections'][int(key)]
+                        desired = targets[key][2]
+                        if desired is None:
+                            if 'manual_plate_quad' in row:
+                                remove(row, 'manual_plate_quad')
+                        else:
+                            assign(row, 'manual_plate_quad', desired)
+                    if digest is not None:
+                        selected['quad_sha256'] = digest
                     doc['detections'].extend(additions)
                     if capable:
                         policy = settings.get('uncertain_policy')
@@ -4035,7 +4237,7 @@ def job_save_edits(jid):
                             dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
                             for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0])
                     if (len(doc['detections']) != original_count or
-                            any(original is missing or not _same_json_value(original, target[key])
+                            any(original is missing or key not in target or not _same_json_value(original, target[key])
                                 for target, key, original in touched.values())):
                         _publish_job_report_locked(job, path, doc)
                         _report_committed_locked(job, doc)
@@ -4045,12 +4247,27 @@ def job_save_edits(jid):
                             per.setdefault(row['text'],[]).append(row.get('enabled',True))
                     result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
                     if preconditions:
-                        result['geometry_rows'] = {key:{**pc,'row_context_eq':exact.row_context_eq(doc['detections'][int(key)]),
-                            'base':exact.row_base(doc['detections'][int(key)])} for key,pc in preconditions.items()}
+                        result['geometry_rows'] = {}
+                        for key, pc in preconditions.items():
+                            row = doc['detections'][int(key)]
+                            accepted = {**pc, 'row_context_eq': exact.row_context_eq(row),
+                                        'base': exact.row_base(row), 'quad_context_eq': _quad_context_eq(row)}
+                            if row.get('category') == 'plate':
+                                accepted['manual_plate_quad'] = row.get('manual_plate_quad')
+                                accepted['quad_baseline'] = _quad_baseline_token(row)
+                            result['geometry_rows'][key] = accepted
                     return jsonify(result)
             # A genuinely new strict mutation was found, before any mutation.
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.
             prepared, lease = _prepare_observed_source(job,candidate)
+            if edits.get('manual_plate_quads'):
+                if not _quad_scan_supported(doc, prepared):
+                    raise exact.ExactError('SDR scan identity unavailable', 409, 'geometry_conflict')
+                fps, cum, _, tolerance = _exact_policy(doc, prepared)
+                digest = _quad_source_digest(job, prepared)
+                for key in edits['manual_plate_quads']:
+                    pc = preconditions[key]
+                    _read_exact_source(prepared, pc['index'], fps=fps, count=len(cum), tolerance_s=tolerance)
     except exact.ExactError as error:
         if needs_source and error.status in (409, 422) and FILES.initialize(job).source_retired:
             error = exact.ExactError('sample source has changed; rescan required', 409, 'geometry_conflict')
@@ -5081,7 +5298,7 @@ document.addEventListener("visibilitychange",()=>{
 window.addEventListener("pagehide",stopPolling);
 for(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);
 const REVIEW_DRAFTS=new Map();
-function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},geometry:{},adds:[],
+function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},quads:{},geometry:{},adds:[],
  add:false,addAnchor:null,drag:null,scale:1,dur:10,
  audio:[],audioSaved:[],audioLoaded:false};}
 function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
@@ -5108,7 +5325,7 @@ function trimReviewDraft(d){
 function hasReviewEdits(d){
  const b=d.editor;
  return !!d.submitted||Object.keys(d.enabled).length||d.manual.length||b.adds.length||
-  Object.keys(b.ov).length||Object.keys(b.times).length||
+  Object.keys(b.ov).length||Object.keys(b.times).length||Object.keys(b.quads).length||
   !sameEdit(b.audio,b.audioSaved);
 }
 
@@ -5593,13 +5810,13 @@ const EDIT_SAMPLE_IO={active:null,wanted:null};
 function beSampleCurrent(view,serial){return !!view&&view.current()&&view.serial===serial&&!view.editor.playing;}
 function beInvalidateSample(view,message){
  if(!view)return;
- view.serial++;view.readySample=null;view.loading=true;view.transform=null;
+ view.serial++;view.readySample=null;view.loading=true;view.transform=null;view.quadEdit=null;
  bePlateRetire(view,'Frame changed. Search again after inspecting this frame.');
  beEndGesture(view.editor,view.cv);view.editor.sel=-1;
  for(const id of ['beRm','beTimes']){const e=document.getElementById(id);if(e)e.style.display='none';}
  if(view.current()){
   const label=document.getElementById('beL');if(label&&message)label.textContent=message;
-  beDraw();
+  beQuadControls(view);beDraw();
  }
 }
 function beVector(value,n){return Array.isArray(value)&&value.length===n&&value.every(x=>typeof x==='number'&&Number.isFinite(x));}
@@ -5644,7 +5861,7 @@ async function beApplySample(view,serial,data){
   const b=view.editor;b.raw=data.rows;b.ox=data.sample.offset[0];b.oy=data.sample.offset[1];b.t=data.sample.canonical_s;
   view.readySample={serial,...data,imageURL:url};
   const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
-  beFilter();beDraw();beTLDraw();bePlateRender(view);
+  beFilter();beQuadControls(view);beDraw();beTLDraw();bePlateRender(view);
  }finally{if(url&&!installed)URL.revokeObjectURL(url);}
 }
 function beRequestSample(view,t){
@@ -5694,10 +5911,120 @@ function beReady(view=BE_VIEW){
 function beCaptureGeometry(view,row){
  if(!beReady(view)||!row||!view.readySample.rows.includes(row))return false;
  const b=view.editor,old=b.geometry[row.i];
+ if(row.category==='plate'&&beQuadRecord(row.manual_plate_quad)&&!beQuadWitness(row.quad_baseline,row.manual_plate_quad)){
+  saveStatus(EDITS,'The plate baseline is unavailable; inspect the frame again before changing geometry.');return false;
+ }
  if(old)return old.precondition.source_ref===view.readySample.sample.source_ref&&
  old.precondition.timeline_eq===view.readySample.sample.timeline_eq&&old.precondition.row_context_eq===row.row_context_eq;
- b.geometry[row.i]={precondition:{...copyEdit(view.readySample.precondition),row_context_eq:row.row_context_eq,base:copyEdit(row.base)}};
+ b.geometry[row.i]={precondition:{...copyEdit(view.readySample.precondition),row_context_eq:row.row_context_eq,base:copyEdit(row.base),
+  ...(row.category==='plate'&&beQuadHash(row.quad_context_eq)?{quad_context_eq:row.quad_context_eq}:{}),
+  ...(row.category==='plate'&&Object.prototype.hasOwnProperty.call(row,'quad_baseline')?{quad_baseline:row.quad_baseline}:{})},
+  quadBaseline:row.category==='plate'&&beQuadRecord(row.manual_plate_quad)?copyEdit(row.manual_plate_quad):null,
+  quadStream:row.category==='plate'?view.readySample.sample.stream:null};
  return true;
+}
+function beQuadHash(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
+function beQuadValid(points,width,height){
+ if(!Array.isArray(points)||points.length!==4||!Number.isSafeInteger(width)||!Number.isSafeInteger(height))return false;
+ if(!points.every(p=>beVector(p,2)&&p[0]>=0&&p[0]<=width&&p[1]>=0&&p[1]<=height))return false;
+ for(let i=0;i<4;i++){
+  const a=points[i],b=points[(i+1)%4],c=points[(i+2)%4];
+  if(!((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0])>0))return false;
+ }
+ const q=points.map(p=>p.map(Math.round));let area=0;
+ for(let i=0;i<4;i++)area+=q[i][0]*q[(i+1)%4][1]-q[(i+1)%4][0]*q[i][1];
+ return Number.isFinite(area)&&area>0;
+}
+function beQuadRecord(q){
+ const keys=(o,k)=>!!o&&sameEdit(Object.keys(o).sort(),k.slice().sort());
+ if(!keys(q,['version','points','source','frame'])||!keys(q.source,['sha256','stream','width','height'])||
+  !keys(q.frame,['index','fps','count','policy','timeline_eq'])||q.version!==1||!q.source||!q.frame||!beQuadHash(q.source.sha256)||
+  !Number.isSafeInteger(q.source.stream)||q.source.stream<0||!Number.isSafeInteger(q.source.width)||q.source.width<=0||
+  !Number.isSafeInteger(q.source.height)||q.source.height<=0||!Number.isSafeInteger(q.frame.index)||q.frame.index<0||
+  !Number.isSafeInteger(q.frame.count)||q.frame.count<=q.frame.index||typeof q.frame.fps!=='number'||!Number.isFinite(q.frame.fps)||q.frame.fps<=0||
+  q.frame.policy!=='opencv-ffmpeg-zero-cfr-v1'||!beQuadHash(q.frame.timeline_eq)||!Array.isArray(q.points)||
+  q.points.length!==4||!q.points.every(p=>beVector(p,2)&&p.every(v=>v>=0&&v<=1)))return false;
+ return beQuadValid(q.points.map(p=>[p[0]*q.source.width,p[1]*q.source.height]),q.source.width,q.source.height);
+}
+function beSameJson(a,b){
+ if(a===b)return true;
+ if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
+ const ak=Object.keys(a).sort(),bk=Object.keys(b).sort();
+ return sameEdit(ak,bk)&&ak.every(k=>beSameJson(a[k],b[k]));
+}
+function beQuadWitness(token,record){
+ if(!beQuadRecord(record))return token===null;
+ if(typeof token!=='string'||token.length===0||token.length>16384)return false;
+ try{return beSameJson(JSON.parse(token),record);}catch(_){return false;}
+}
+function beQuadForSample(q,s){return beQuadRecord(q)&&q.source.width===s.width&&q.source.height===s.height&&
+ q.source.stream===s.stream&&q.frame.index===s.index&&q.frame.timeline_eq===s.timeline_eq;}
+function beQuadControls(view=BE_VIEW){
+ const button=document.getElementById('beQuad'),reset=document.getElementById('beQuadReset'),note=document.getElementById('beQuadStatus');
+ if(!button||!reset||!note)return;
+ const row=view?.editor?.raw?.find(r=>r.i===view.editor.sel),plate=row?.category==='plate';
+ button.style.display=reset.style.display=note.style.display=plate?'':'none';if(!plate)return;
+ const ready=!!view?.current()&&!!view.readySample&&!view.loading&&!view.editor.playing;
+ const family=view.editor.geometry[row.i],sample=view.readySample?.sample;
+ const wrongFrame=!!(ready&&family&&(family.precondition.index!==sample.index||family.precondition.source_ref!==sample.source_ref||
+  family.precondition.timeline_eq!==sample.timeline_eq||family.precondition.row_context_eq!==row.row_context_eq));
+ const allowed=ready&&!wrongFrame&&beQuadHash(row.quad_context_eq)&&['ready','verification_required'].includes(row.quad_edit_eligibility);
+ button.disabled=!allowed;reset.disabled=!allowed;
+ button.textContent=view.quadEdit?'Done editing corners':'Edit plate corners';
+ let message='Corners apply only to this inspected frame; other frames keep the existing mask. Render padding still applies.';
+ if(wrongFrame)message='Pending geometry belongs to another frame or source. Save or discard it before editing these corners.';
+ else if(!allowed)message='Plate corners unavailable for this source or frame; the existing mask is retained.';
+ else if(row.quad_edit_eligibility==='verification_required')message+=' Source identity will be verified on Save.';
+ if(allowed&&row.quad_eligibility==='unverified')message+=' Saved corners are unverified and are not shown; new corners replace them.';
+ else if(allowed&&row.quad_eligibility==='other_frame')message+=' Saved corners belong to another frame; new corners replace them.';
+ else if(allowed&&['unsupported','unavailable'].includes(row.quad_eligibility))message+=' Saved corners are unavailable and are not shown; new corners replace them.';
+ if(view.editor.ov[row.i]&&!sameEdit(view.editor.ov[row.i],row.base.cbox)&&!(row.i in view.editor.quads))
+  message+=' The pending box change restores the full plate mask unless new corners are saved.';
+ note.textContent=message;
+}
+function beQuadCapture(view,row){
+ if(!beReady(view)||!row||row.category!=='plate'||!beQuadHash(row.quad_context_eq)||
+  !['ready','verification_required'].includes(row.quad_edit_eligibility))return false;
+ const old=view.editor.geometry[row.i],sample=view.readySample.sample;
+ if(old&&(old.precondition.index!==sample.index||old.precondition.quad_context_eq&&old.precondition.quad_context_eq!==row.quad_context_eq)){
+  saveStatus(EDITS,'Save or discard the earlier geometry before editing corners on another frame.');return false;
+ }
+ if(!beCaptureGeometry(view,row))return false;
+ const family=view.editor.geometry[row.i];
+ if(!family.precondition.quad_context_eq)family.precondition.quad_context_eq=row.quad_context_eq;
+ return true;
+}
+function beQuadMode(){
+ const view=BE_VIEW;if(!beReady(view))return;const b=view.editor,row=b.raw?.find(r=>r.i===b.sel);
+ if(!row||row.category!=='plate'||!beQuadHash(row.quad_context_eq)||!['ready','verification_required'].includes(row.quad_edit_eligibility))return;
+ if(view.quadEdit){view.quadEdit=null;beEndGesture(b,view.cv);beQuadControls(view);beDraw();return;}
+ const family=b.geometry[row.i],sample=view.readySample.sample;
+ if(family&&(family.precondition.index!==sample.index||family.precondition.row_context_eq!==row.row_context_eq||
+  family.precondition.source_ref!==sample.source_ref||family.precondition.timeline_eq!==sample.timeline_eq)){
+  saveStatus(EDITS,'Save or discard the earlier geometry before editing corners on another frame.');return;
+ }
+ const pending=b.quads[row.i],changed=b.ov[row.i]&&!sameEdit(b.ov[row.i],row.base.cbox);
+ let points;
+ if(pending?.points)points=copyEdit(pending.points);
+ else if(!(row.i in b.quads)&&!changed&&row.quad_eligibility==='eligible_sdr_frame'&&beQuadForSample(row.manual_plate_quad,sample))
+  points=row.manual_plate_quad.points.map(p=>[p[0]*sample.width,p[1]*sample.height]);
+ else{
+  const box=b.boxes.find(x=>x.i===row.i)?.box;if(!box)return;
+  const [x0,y0,x1,y1]=box,clamp=(v,max)=>Math.max(0,Math.min(max,v));
+  points=[[clamp(x0,sample.width),clamp(y0,sample.height)],[clamp(x1,sample.width),clamp(y0,sample.height)],
+   [clamp(x1,sample.width),clamp(y1,sample.height)],[clamp(x0,sample.width),clamp(y1,sample.height)]];
+ }
+ if(!beQuadValid(points,sample.width,sample.height)){saveStatus(EDITS,'The visible plate box cannot initialize four valid corners.');return;}
+ b.add=false;b.trk=false;document.getElementById('beAdd')?.classList.remove('on');
+ document.getElementById('beTrk')?.classList.remove('on');beEndGesture(b,view.cv);view.quadEdit={row,serial:view.serial,points};
+ beQuadControls(view);beDraw();
+}
+function beQuadReset(){
+ const view=BE_VIEW;if(!beReady(view))return;const b=view.editor,row=b.raw?.find(r=>r.i===b.sel);
+ if(!row||row.category!=='plate'||!(row.i in b.quads)&&!Object.prototype.hasOwnProperty.call(row,'manual_plate_quad'))return;
+ if(!beQuadCapture(view,row))return;
+ b.quads[row.i]=null;view.quadEdit=null;beEndGesture(b,view.cv);reviewResolveActions(EDITS);
+ beQuadControls(view);beDraw();
 }
 function beNewBox(view,box,t0,t1){
  if(!beReady(view))return false;const s=view.readySample.sample;
@@ -5949,12 +6276,15 @@ async function loadBoxEdit(fromReview){
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
    <button class="danger" id="beRm" style="display:none" onclick="beRemove()">Remove blur</button>
+   <button class="sec" id="beQuad" style="display:none" onclick="beQuadMode()">Edit plate corners</button>
+   <button class="sec" id="beQuadReset" style="display:none" onclick="beQuadReset()">Reset to full plate mask</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
     from <input type="number" id="beT0" step="0.1" min="0" style="width:74px">
     to <input type="number" id="beT1" step="0.1" style="width:74px"> s
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
    <button data-save-edits onclick="beSave()">Save changes &amp; re-render</button></div>
+  <p id="beQuadStatus" role="status" style="display:none;font-size:12px;color:#bfdbfe;margin:4px 0"></p>
   <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
    video with the boxes moving live (pause to edit). Click a red box to
    select — drag inside to move, a corner to resize, edit its from/to times,
@@ -6175,6 +6505,7 @@ function tlHook(){
 }
 function beWinReset(){BE.win=[0,BE.dur];beTLDraw();}
 function beMuteMode(){
+ if(BE_VIEW?.quadEdit){BE_VIEW.quadEdit=null;beEndGesture(BE,BE_VIEW.cv);beQuadControls(BE_VIEW);}
  BE.muteArm=!BE.muteArm;BE.trk=false;BE.add=false;BE.addAnchor=null;
  document.getElementById("beMute").classList.toggle("on",BE.muteArm);
  document.getElementById("beTrk").classList.remove("on");
@@ -6187,6 +6518,7 @@ function beAudioRm(){
 }
 function beTrackMode(){
  if(!beReady()||BE_VIEW.trackLaunch||EDITS?.track)return;
+ if(BE_VIEW.quadEdit){BE_VIEW.quadEdit=null;beEndGesture(BE,BE_VIEW.cv);beQuadControls(BE_VIEW);}
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
  document.getElementById("beTrk").classList.toggle("on",BE.trk);
  document.getElementById("beAdd").classList.remove("on");
@@ -6355,7 +6687,7 @@ function beDraw(){
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
-  if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
+  if(b.i===BE.sel&&!view.quadEdit)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
    x.strokeRect(hx-5,hy-5,10,10);}
  }
@@ -6365,10 +6697,29 @@ function beDraw(){
   x.strokeStyle='#22d3ee';x.lineWidth=3;x.setLineDash([7,5]);
   x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
  }
+ const row=BE.raw?.find(r=>r.i===BE.sel),sample=view.readySample?.sample;
+ if(!BE.playing&&row?.category==='plate'&&sample){
+  const draft=BE.quads[row.i],family=BE.geometry[row.i],sameFrame=!family||
+   (family.precondition.index===sample.index&&family.precondition.source_ref===sample.source_ref&&
+    family.precondition.timeline_eq===sample.timeline_eq&&family.precondition.row_context_eq===row.row_context_eq);
+  const boxChanged=BE.ov[row.i]&&!sameEdit(BE.ov[row.i],row.base.cbox);
+  let points=sameFrame&&view.quadEdit?.row===row&&view.quadEdit.serial===view.serial?view.quadEdit.points:null;
+  if(!points&&sameFrame&&draft?.points)points=draft.points;
+  if(!points&&!(row.i in BE.quads)&&!boxChanged&&row.quad_eligibility==='eligible_sdr_frame'&&beQuadForSample(row.manual_plate_quad,sample))
+   points=row.manual_plate_quad.points.map(p=>[p[0]*sample.width,p[1]*sample.height]);
+  if(points&&beQuadValid(points,sample.width,sample.height)){
+   x.beginPath();points.forEach((p,i)=>{const a=p[0]*tr.sx,b=p[1]*tr.sy;if(i)x.lineTo(a,b);else x.moveTo(a,b)});
+   x.closePath();x.strokeStyle='#22d3ee';x.lineWidth=2;x.stroke();
+   if(view.quadEdit){x.font='12px sans-serif';points.forEach((p,i)=>{const a=p[0]*tr.sx,b=p[1]*tr.sy;
+    x.fillStyle='#fff';x.fillRect(a-5,b-5,10,10);x.strokeStyle='#0891b2';x.strokeRect(a-5,b-5,10,10);
+    x.fillStyle='#fff';x.fillText(String(i+1),a+7,b-7);});}
+  }
+ }
 }
 function beAddMode(){
  if(!beReady())return;
- BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;
+ if(BE_VIEW.quadEdit){BE_VIEW.quadEdit=null;beEndGesture(BE,BE_VIEW.cv);beQuadControls(BE_VIEW);}
+ BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;beQuadControls(BE_VIEW);
  BE.trk=false;BE.muteArm=false;
  document.getElementById("beAdd").classList.toggle("on",BE.add);
  const tb=document.getElementById("beTrk");if(tb)tb.classList.remove("on");
@@ -6413,6 +6764,13 @@ function beHook(){
  cv.addEventListener("pointerdown",e=>{
   const p=pt(e);if(!p||BE.pointerId!=null&&BE.pointerId!==e.pointerId)return;
   cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
+  if(view.quadEdit){
+   const q=view.quadEdit,row=BE.raw?.find(r=>r.i===BE.sel),tr=view.transform;
+   if(q.row!==row||q.serial!==view.serial)return;
+   const i=q.points.findIndex(v=>Math.abs(p[0]-v[0])<9/tr.sx&&Math.abs(p[1]-v[1])<9/tr.sy);
+   if(i>=0)BE.drag={kind:'quad',ci:i,serial:view.serial,i:BE.sel,row};
+   return;
+  }
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion
    // the region is template-tracked through the active timeline window
@@ -6463,7 +6821,7 @@ function beHook(){
   const hit=[...BE.boxes].reverse().find(b=>{
    const[a1,b1,a2,b2]=b.box;
    return p[0]>=a1&&p[0]<=a2&&p[1]>=b1&&p[1]<=b2;});
-  BE.sel=hit?hit.i:-1;
+  BE.sel=hit?hit.i:-1;view.quadEdit=null;beQuadControls(view);
   document.getElementById("beRm").style.display=hit?"inline-block":"none";
   if(hit)beShowTimes(hit);
   else document.getElementById("beTimes").style.display="none";
@@ -6473,6 +6831,12 @@ function beHook(){
   const p=pt(e);if(!p||BE.pointerId!=null&&BE.pointerId!==e.pointerId)return;
   if(BE.add&&BE.addAnchor){BE.addFloat=p;beDraw();return;}
   if(!BE.drag||BE.sel<0||BE.drag.serial!==view.serial||BE.drag.i!==BE.sel||BE.drag.row!==BE.raw.find(b=>b.i===BE.sel))return;
+  if(BE.drag.kind==='quad'){
+   const q=view.quadEdit,s=view.readySample?.sample;if(!q||q.row!==BE.drag.row||q.serial!==view.serial||!s)return;
+   const points=copyEdit(q.points);points[BE.drag.ci]=p;
+   if(!beQuadValid(points,s.width,s.height)||!beQuadCapture(view,q.row))return;
+   q.points=points;BE.quads[BE.sel]={points:copyEdit(points)};beDraw();return;
+  }
   const b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
   let[a1,b1,a2,b2]=b.box;
   if(BE.drag.kind==="move"){
@@ -6488,7 +6852,7 @@ function beHook(){
   if(!beVector(box,4)||box[2]<=box[0]||box[3]<=box[1]||!beCaptureGeometry(view,BE.raw.find(x=>x.i===BE.sel)))return;
   b.box=box;
   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
-  beDraw();
+  beQuadControls(view);beDraw();
  });
  const end=e=>{if(view&&view.current()&&BE.pointerId===e.pointerId){BE.drag=null;delete BE.pointerId;reviewResolveActions(EDITS);}};
  cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",e=>{
@@ -6499,7 +6863,7 @@ function zoomDet(i){REVIEW_SCHED?.openLightbox(i);}
 function beRemove(){
  if(BE.sel<0)return;
  applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
- BE.sel=-1;
+ BE.sel=-1;if(BE_VIEW){BE_VIEW.quadEdit=null;beQuadControls(BE_VIEW);}
  document.getElementById("beRm").style.display="none";
  document.getElementById("beTimes").style.display="none";
 }
@@ -7387,7 +7751,7 @@ function acknowledgeAdds(current,refs,submitted){
 }
 function reviewResolveActions(d){
  if(d!==EDITS)return;const el=document.getElementById('reviewResolveActions');if(!el)return;
- const b=d.editor,rows=[...new Set([...Object.keys(b.ov),...Object.keys(b.times)])];
+ const b=d.editor,rows=[...new Set([...Object.keys(b.ov),...Object.keys(b.times),...Object.keys(b.quads)])];
  el.innerHTML='';
  if(d.submitted?.everUncertain){const button=document.createElement('button');button.textContent='Abandon unconfirmed save…';button.disabled=!!d.busy;button.onclick=reviewAbandon;el.appendChild(button);}
  if(!rows.length&&!b.adds.length)return;
@@ -7410,13 +7774,13 @@ async function reviewDiscard(key){
  const addition=key?.startsWith('add:')?b.adds.find(a=>a.manual_id===key.slice(4)):null;
  if(row!==null&&!/^[0-9]+$/.test(row)||row===null&&!addition)return;
  const family=row!==null?b.geometry[row]:null,familySnapshot=family?copyEdit(family):null;
- const values=row!==null?copyEdit({ov:b.ov[row]??null,times:b.times[row]??null}):copyEdit(addition);
- if(row!==null&&values.ov===null&&values.times===null)return;
+ const values=row!==null?copyEdit({ov:b.ov[row]??null,times:b.times[row]??null,quad:row in b.quads?{value:b.quads[row]}:null}):copyEdit(addition);
+ if(row!==null&&values.ov===null&&values.times===null&&values.quad===null)return;
  if(!confirm('Discard only this pending geometry and inspect the saved frame? Other edits stay pending. This does not undo saved changes.'))return;
  if(EDITS!==d||d.editor!==b||!ownsView(id,gen)||BE_VIEW!==view||d.busy||d.submitted)return;
  if(row!==null){
-  if(b.geometry[row]!==family||!sameEdit(b.geometry[row]||null,familySnapshot)||!sameEdit(values,{ov:b.ov[row]??null,times:b.times[row]??null}))return;
-  delete b.ov[row];delete b.times[row];delete b.geometry[row];
+  if(b.geometry[row]!==family||!sameEdit(b.geometry[row]||null,familySnapshot)||!sameEdit(values,{ov:b.ov[row]??null,times:b.times[row]??null,quad:row in b.quads?{value:b.quads[row]}:null}))return;
+  delete b.ov[row];delete b.times[row];delete b.quads[row];delete b.geometry[row];
  }else{
   if(!b.adds.includes(addition)||!sameEdit(addition,values))return;
   b.adds.splice(b.adds.indexOf(addition),1);
@@ -7432,31 +7796,56 @@ function reviewSubmission(d){
  const payload=copyEdit({enabled:d.enabled,manual:[...manualSnapshot,...addSnapshot.map(a=>({
   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box,
   ...(a.sample_precondition?{sample_precondition:a.sample_precondition}:{})}))],box_overrides:b.ov,time_overrides:b.times});
- const geometryOwners={},geometrySnapshot={};
- for(const key of new Set([...Object.keys(payload.box_overrides),...Object.keys(payload.time_overrides)])){
-  if(!b.geometry[key])continue; // genuinely preexisting legacy drafts keep their optional wire path
+ const geometryOwners={},geometrySnapshot={},quadBaselines={},quadStreams={};
+ if(Object.keys(b.quads).length)payload.manual_plate_quads=copyEdit(b.quads);
+ for(const key of new Set([...Object.keys(payload.box_overrides),...Object.keys(payload.time_overrides),...Object.keys(b.quads)])){
+  if(!b.geometry[key]){if(key in b.quads)throw Error('Inspect the plate frame before saving corners.');continue;}
   geometryOwners[key]=b.geometry[key];geometrySnapshot[key]=copyEdit(b.geometry[key].precondition);
+  quadBaselines[key]=copyEdit(b.geometry[key].quadBaseline??null);quadStreams[key]=b.geometry[key].quadStream;
  }
  if(Object.keys(geometrySnapshot).length)payload.geometry_preconditions=copyEdit(geometrySnapshot);
  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved))payload.audio=copyEdit(b.audio);
- return {payload,manualRefs,addRefs,manualSnapshot,addSnapshot,geometryOwners,geometrySnapshot,view:BE_VIEW,everUncertain:false};
+ return {payload,manualRefs,addRefs,manualSnapshot,addSnapshot,geometryOwners,geometrySnapshot,quadBaselines,quadStreams,view:BE_VIEW,everUncertain:false};
+}
+function beQuadAck(record,requested,pc,stream){
+ if(requested===null)return record===null;
+ if(!requested||!beQuadRecord(record)||record.source.width!==pc.width||record.source.height!==pc.height||
+  record.source.stream!==stream||record.frame.index!==pc.index||record.frame.policy!==pc.policy||record.frame.timeline_eq!==pc.timeline_eq)return false;
+ return sameEdit(record.points,requested.points.map(p=>[p[0]/pc.width,p[1]/pc.height]));
 }
 function acknowledgeGeometry(editor,submission,result){
- const pcs=submission.geometrySnapshot,payload=submission.payload,validated={};
+ const pcs=submission.geometrySnapshot,payload=submission.payload,validated={},quads=payload.manual_plate_quads||{};
  // Validate the whole strict acknowledgement before acknowledging any edit kind.
  for(const [key,pc] of Object.entries(pcs)){
-  const row=result.geometry_rows?.[key];
+  const row=result.geometry_rows?.[key],explicit=Object.prototype.hasOwnProperty.call(quads,key);
+  const plate=beQuadHash(pc.quad_context_eq);
+  const boxChanged=Object.prototype.hasOwnProperty.call(payload.box_overrides,key)&&!sameEdit(payload.box_overrides[key],pc.base.cbox);
+  const retired=!explicit&&boxChanged&&beQuadRecord(submission.quadBaselines[key])&&row?.manual_plate_quad===null&&
+   beQuadHash(pc.quad_context_eq)&&row?.quad_context_eq===pc.quad_context_eq;
   if(!row||!beBase(row.base)||!sameEdit(bePrecondition(row),bePrecondition(pc))||row.version!==1||
-   row.row_context_eq!==pc.row_context_eq||!sameEdit(row.base.cbox,payload.box_overrides[key]||pc.base.cbox)||
-   !sameEdit(row.base.span.slice(0,2),payload.time_overrides[key]||pc.base.span.slice(0,2)))throw Error('Missing or invalid geometry acknowledgement; retry the same save.');
+   !beQuadHash(row.row_context_eq)||(!explicit&&!retired&&row.row_context_eq!==pc.row_context_eq)||
+   !sameEdit(row.base.cbox,payload.box_overrides[key]||pc.base.cbox)||
+   !sameEdit(row.base.span.slice(0,2),payload.time_overrides[key]||pc.base.span.slice(0,2))||
+   (plate&&(!Object.prototype.hasOwnProperty.call(row,'manual_plate_quad')||
+    !Object.prototype.hasOwnProperty.call(row,'quad_baseline')||!beQuadWitness(row.quad_baseline,row.manual_plate_quad)))||
+   (explicit&&(!beQuadHash(pc.quad_context_eq)||row.quad_context_eq!==pc.quad_context_eq||
+    !Object.prototype.hasOwnProperty.call(row,'manual_plate_quad')||!beQuadAck(row.manual_plate_quad,quads[key],pc,submission.quadStreams[key]))))
+   throw Error('Missing or invalid geometry acknowledgement; retry the same save.');
   validated[key]=copyEdit(row);
  }
  for(const [key,row] of Object.entries(validated)){
   const owner=editor.geometry[key];if(owner!==submission.geometryOwners[key])continue;
   if(sameEdit(editor.ov[key],payload.box_overrides[key]))delete editor.ov[key];
   if(sameEdit(editor.times[key],payload.time_overrides[key]))delete editor.times[key];
-  owner.precondition=copyEdit(row);
-  if(!(key in editor.ov)&&!(key in editor.times))delete editor.geometry[key];
+  if(Object.prototype.hasOwnProperty.call(quads,key)&&sameEdit(editor.quads[key],quads[key]))delete editor.quads[key];
+  const {manual_plate_quad,quad_baseline,quad_context_eq,...precondition}=row;
+  // The backend may report a quad-independent hash for any row. Only a
+  // captured plate owner may carry it into the next geometry transaction.
+  if(beQuadHash(pcs[key].quad_context_eq))precondition.quad_context_eq=quad_context_eq;
+  if(Object.prototype.hasOwnProperty.call(row,'quad_baseline'))precondition.quad_baseline=quad_baseline;
+  owner.precondition=copyEdit(precondition);
+  if(Object.prototype.hasOwnProperty.call(row,'manual_plate_quad'))owner.quadBaseline=beQuadRecord(manual_plate_quad)?copyEdit(manual_plate_quad):null;
+  if(!(key in editor.ov)&&!(key in editor.times)&&!(key in editor.quads))delete editor.geometry[key];
  }
  // Legacy compatibility is intentionally separate from strict ownership.
  for(const [key,value] of Object.entries(payload.box_overrides))if(!(key in pcs)&&sameEdit(editor.ov[key],value))delete editor.ov[key];
@@ -7472,10 +7861,17 @@ function acknowledgeGeometry(editor,submission,result){
  if(refresh){beRequestSample(view,view.readySample?.sample.requested_s??editor.t);return;}
  for(const [key,ack] of Object.entries(validated)){
   const row=view.readySample.rows.find(r=>String(r.i)===key);row.base=copyEdit(ack.base);row.row_context_eq=ack.row_context_eq;
+  if(row.category==='plate'&&Object.prototype.hasOwnProperty.call(ack,'manual_plate_quad')){
+   row.quad_context_eq=ack.quad_context_eq;row.quad_baseline=ack.quad_baseline;
+   if(ack.manual_plate_quad===null){delete row.manual_plate_quad;row.quad_eligibility='none';}
+   else{row.manual_plate_quad=copyEdit(ack.manual_plate_quad);
+    if(key in quads)row.quad_eligibility=beQuadForSample(ack.manual_plate_quad,view.readySample.sample)?'eligible_sdr_frame':'other_frame';}
+   if(key in quads)row.quad_edit_eligibility='ready';
+  }
   row.t_start=ack.base.span[0];row.t_end=ack.base.span[1];
   row.box=ack.base.cbox.map((v,i)=>v+view.readySample.sample.offset[i%2]);
  }
- beFilter();beDraw();
+ beFilter();beQuadControls(view);beDraw();
 }
 
 async function saveAndRender(){

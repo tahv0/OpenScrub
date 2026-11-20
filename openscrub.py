@@ -42,6 +42,8 @@ import numpy as np
 
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_policy
+from openscrub_internal import plate_quads as plate_quad
+from openscrub_internal import hdr_quad_pairs
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
@@ -757,6 +759,7 @@ class Detection:
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
                                # category); empty = plain box redaction
+    manual_plate_quad: object = None  # source-bound v1, never inherited by a track
 
 
 @dataclass
@@ -4295,7 +4298,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
 def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
-               mute_tracks=(), out_quality="archival", audio_lanes=None):
+               mute_tracks=(), out_quality="archival", audio_lanes=None, quad_context=None):
     """render(), but 10-bit end to end: decode the HDR source to raw
     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
@@ -4321,7 +4324,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
 
         dec = subprocess.Popen(
             ["ffmpeg", "-loglevel", "error", "-i", src,
-             "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+             "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
+             *(["-fps_mode", "passthrough"] if quad_context else []), "pipe:1"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             bufsize=w * h * 6)
         q = _out_q(encoder, out_quality)
@@ -4404,7 +4408,10 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
-                if d.poly and not isinstance(d, NarrowPlateDetection):
+                quad = _quad_at_hdr_frame(quad_context, d, y, idx)
+                if quad is not None:
+                    _paint_plate_quad_yuv10(y, u, v, quad, _mode_for(d.category), px)
+                elif d.poly and not isinstance(d, NarrowPlateDetection):
                     _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
                                            d.poly, pbox, pad_px=px)
                 else:
@@ -4437,7 +4444,9 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 cb.log(f"  rendering… {idx}/{max(total, idx)}")
 
         dec.stdout.close()
-        dec.wait()
+        decoder_status = dec.wait()
+        if quad_context and (decoder_status != 0 or idx != quad_context['count']):
+            raise RuntimeError('verified HDR frame decoding did not complete')
         cb.progress("render", max(total, idx), max(total, idx))
         try:
             enc.stdin.close()
@@ -4495,12 +4504,191 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 pass
 
 
+def _quad_stamp(observed):
+    return (observed.st_dev, observed.st_ino, observed.st_size,
+            observed.st_mtime_ns, observed.st_ctime_ns)
+
+
+def _quad_source_current(guard):
+    try:
+        return (guard is not None and _quad_stamp(os.fstat(guard['file'].fileno())) == guard['stamp']
+                and _quad_stamp(os.stat(guard['path'])) == guard['stamp'])
+    except OSError:
+        return False
+
+
+def _require_quad_source_current(guard):
+    if guard is not None and not _quad_source_current(guard):
+        raise RuntimeError('quad input changed during rendering')
+
+
+def _quad_hdr_source_guard(args, scan_guard):
+    proof = getattr(args, '_hdr_quad_render_proof', None)
+    source = getattr(args, 'hdr_source', None)
+    if not isinstance(proof, dict) or not source or scan_guard is None:
+        return None
+    opened = None
+    try:
+        if (os.path.realpath(source) != proof['source_path']
+                or os.path.realpath(scan_guard['path']) != proof['scan_path']
+                or scan_guard['stamp'] != proof['scan_stamp']
+                or scan_guard['digest'] != proof['scan_sha256']):
+            return None
+        opened = open(source, 'rb')
+        stamp = _quad_stamp(os.fstat(opened.fileno()))
+        guard = {'file': opened, 'path': source, 'stamp': stamp}
+        if stamp != proof['source_stamp'] or not _quad_source_current(guard):
+            return None
+        digest = hashlib.sha256()
+        for block in iter(lambda: opened.read(1 << 20), b''):
+            digest.update(block)
+        if not _quad_source_current(guard) or digest.hexdigest() != proof['source_sha256']:
+            return None
+        guard['digest'] = digest.hexdigest()
+        opened = None  # the returned guard owns the descriptor
+        return guard
+    except (KeyError, OSError, TypeError, ValueError):
+        return None
+    finally:
+        if opened is not None:
+            opened.close()
+
+
+def _quad_render_context(args, state, detections):
+    guard = state.get('_quad_source_guard')
+    doc = state.get('source_report')
+    if (not guard or not isinstance(doc, dict) or not _quad_source_current(guard)
+            or getattr(args, 'coverage', 'tight') in ('box', 'concealed')):
+        return None
+    prov = doc.get('provenance', {})
+    try:
+        facts = exact.probe_source(args.video)
+        hdr_guard = state.get('_quad_hdr_guard')
+        if getattr(args, 'hdr_source', None):
+            proof = getattr(args, '_hdr_quad_render_proof', None)
+            selected = {'path': os.path.realpath(guard['path']), 'stamp': guard['stamp'],
+                        'facts': facts}
+            supported = (hdr_guard is not None and _quad_source_current(hdr_guard)
+                         and hdr_guard['digest'] == proof['source_sha256']
+                         and hdr_quad_pairs.usable(proof, doc, selected, args.hdr_source))
+        else:
+            supported = plate_quad.same_sdr_scan(prov, facts)
+        if (not _quad_source_current(guard) or not supported
+                or prov.get('input_sha256') != guard['digest']):
+            return None
+        fps, cum, timeline = exact.timeline(doc, facts)
+        tolerance = exact.precision_bound(facts, fps, len(cum))
+        if fps != state['fps'] or len(cum) != len(state['cum']):
+            return None
+        records = {}
+        for d in detections:
+            q = d.manual_plate_quad
+            if d.category != 'plate' or not plate_quad.valid_record(q):
+                continue
+            source, frame = q['source'], q['frame']
+            if (source == {'sha256': guard['digest'], 'stream': facts['stream'],
+                           'width': facts['width'], 'height': facts['height']}
+                    and frame['fps'] == fps and frame['count'] == len(cum)
+                    and frame['timeline_eq'] == timeline):
+                records[id(d)] = q
+        return {'records': records, 'facts': facts, 'fps': fps,
+                'count': len(cum), 'tolerance': tolerance, 'guard': guard,
+                'hdr_guard': hdr_guard} if records else None
+    except (exact.ExactError, KeyError, TypeError, ValueError, OSError):
+        return None
+
+
+def _quad_at_frame(context, d, cap, frame, idx):
+    if not context:
+        return None
+    q = context['records'].get(id(d))
+    if not q or q['frame']['index'] != idx or not _quad_source_current(context['guard']):
+        return None
+    facts = context['facts']
+    try:
+        position = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        rate = cap.get(cv2.CAP_PROP_FPS)
+        count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        observed = cap.get(cv2.CAP_PROP_POS_MSEC)
+        if (not all(exact.finite(v) for v in (position, rate, observed))
+                or cap.getBackendName() != 'FFMPEG' or frame.shape[:2] != (facts['height'], facts['width'])
+                or position != idx + 1
+                or (exact.finite(count) and count > 0 and count != context['count'])
+                or abs(rate-context['fps']) > context['fps']*1e-6
+                or abs(observed/1000-idx/context['fps']) > context['tolerance']):
+            return None
+    except (AttributeError, cv2.error, ValueError, TypeError):
+        return None
+    return q
+
+
+def _quad_at_hdr_frame(context, detection, y, index):
+    if not context or not context.get('hdr_guard'):
+        return None
+    quad = context['records'].get(id(detection))
+    facts = context['facts']
+    if (quad is None or quad['frame']['index'] != index
+            or y.shape != (facts['height'], facts['width'])
+            or not _quad_source_current(context['guard'])
+            or not _quad_source_current(context['hdr_guard'])):
+        return None
+    return quad
+
+
+def _paint_plate_quad_yuv10(y, u, v, quad, mode, pad_px):
+    height, width = y.shape
+    if pad_px >= max(width, height):
+        _blur_yuv10(y, u, v, 0, 0, width, height, mode)
+        return
+    x1, y1, x2, y2 = _quad_roi(y, quad, pad_px)
+    _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode,
+                           [quad['points']], (0, 0, width, height), pad_px=pad_px)
+
+
+def _quad_roi(frame, quad, pad_px):
+    height, width = frame.shape[:2]
+    vertices = [(x*width, y*height) for x,y in quad['points']]
+    pad = max(0, int(pad_px))
+    return (max(0, math.floor(min(x for x,y in vertices))-pad),
+            max(0, math.floor(min(y for x,y in vertices))-pad),
+            min(width, math.ceil(max(x for x,y in vertices))+pad+1),
+            min(height, math.ceil(max(y for x,y in vertices))+pad+1))
+
+
+def _paint_plate_quad(frame, quad, mode, pad_px):
+    height, width = frame.shape[:2]
+    if pad_px >= max(width, height):
+        blur_region(frame, 0, 0, width, height, mode)
+        return
+    x1, y1, x2, y2 = _quad_roi(frame, quad, pad_px)
+    blur_silhouette(frame, x1, y1, x2, y2, mode, [quad['points']],
+                    (0, 0, width, height), pad_px=pad_px)
+
+
+def _preview_plate_quad(frame, quad, pad_px):
+    height, width = frame.shape[:2]
+    if pad_px >= max(width, height):
+        cv2.rectangle(frame, (0, 0), (width-1, height-1), (0, 0, 255), 2)
+        return True
+    x1, y1, x2, y2 = _quad_roi(frame, quad, pad_px)
+    mask = _silhouette_mask([quad['points']], (0, 0, width, height),
+                            x1, y1, x2-x1, y2-y1)
+    if mask is None:
+        return False
+    if pad_px > 0:
+        k = 2 * int(pad_px) + 1
+        mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(frame, contours, -1, (0, 0, 255), 2, offset=(x1, y1))
+    return True
+
+
 def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
            mute_tracks=(), out_quality="archival", audio_lanes=None,
-           exact_frames=False, *, narrow_plates=True):
+           exact_frames=False, quad_context=None, *, narrow_plates=True):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -4650,7 +4838,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     cb.log("      narrow plates: frame or geometry evidence unavailable; "
                            "using full plate coverage where the box is available")
                     plate_mismatch_logged = True
-                if narrow:
+                quad = _quad_at_frame(quad_context, d, cap, frame, idx)
+                if narrow and quad is None:
                     margin = min(math.ceil(d.narrow_plate["margin"]), max(w, h))
                     # At the inspected frame the source-space anchor is exact;
                     # rounded report offsets must not shift the polygon.
@@ -4661,9 +4850,11 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     (x1, y1, x2, y2), pbox, px = _geometry_box(
                         d, ox, oy, pad, f"SDR detection {ordinals[id(d)]} frame {idx}")
                 if preview:
-                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                                  (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
-                    for pts in (poly or ()):
+                    quad_shown = quad is not None and _preview_plate_quad(frame, quad, px)
+                    if not quad_shown:
+                        cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                      (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                    for pts in (() if quad_shown else (poly or ())):
                         arr = np.array(
                             [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
                               int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
@@ -4675,6 +4866,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                         label = f"face {d.confidence:.2f}"
                     cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                elif quad is not None:
+                    _paint_plate_quad(frame, quad, _mode_for(d.category), px)
                 elif poly:
                     # segmentation silhouette: mask only the body, not the box —
                     # px (pad+drift) becomes an outward mask dilation
@@ -6676,8 +6869,8 @@ def _settings_dict(args):
     if getattr(args, "uncertain_policy", None) in (None, "off"):
         skip.update(("uncertain_policy", "plate_auto_cutoff"))
     out = {k: v for k, v in vars(args).items()
-           if k not in skip and isinstance(v, (str, int, float, bool, list,
-                                               tuple, type(None)))}
+           if k not in skip and not (k == 'verify_hdr_plate_frames' and not v)
+           and isinstance(v, (str, int, float, bool, list, tuple, type(None)))}
     if getattr(args, "plate_coverage", "full") != "narrow":
         out.pop("plate_coverage", None)
         out.pop("plate_narrow_margin", None)
@@ -6909,6 +7102,13 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
             pass
 
 
+def _fresh_detection_row(detection, **extra):
+    row = asdict(detection)
+    if row.get('manual_plate_quad') is None:
+        row.pop('manual_plate_quad', None)
+    return dict(row, **extra)
+
+
 def _report_document(args, state, output_path=None, output_bytes_path=None):
     prov = {
         "tool": "openscrub", "version": VERSION,
@@ -6959,14 +7159,14 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
             decisions = plate_policy.evaluate(state["detections"], *optional)
             rows = []
             for d, decision in zip(state["detections"], decisions):
-                row = dict(asdict(d), enabled=decision.enabled)
+                row = _fresh_detection_row(d, enabled=decision.enabled)
                 if hasattr(d, "_plate_policy_evidence"):
                     row["policy_evidence"] = dict(d._plate_policy_evidence)
                 if getattr(d, "_plate_output_choice", None) is not None:
                     row["output_choice"] = d._plate_output_choice
                 rows.append(row)
         else:
-            rows = [dict(asdict(d), enabled=True) for d in state["detections"]]
+            rows = [_fresh_detection_row(d, enabled=True) for d in state["detections"]]
         doc = {
             "provenance": prov,
             "render_state": {
@@ -6974,7 +7174,7 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
             },
-            "detections": (rows + [dict(asdict(d), enabled=False, zone_dropped=True)
+            "detections": (rows + [_fresh_detection_row(d, enabled=False, zone_dropped=True)
                                    for d in state.get("zdropped", [])]),
         }
         if optional:
@@ -7047,7 +7247,8 @@ def _decode_report(doc, optional_full=False):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(copy.deepcopy(r.get("poly") or ())), **extra)
+            poly=tuple(copy.deepcopy(r.get("poly") or ())),
+            manual_plate_quad=copy.deepcopy(r.get("manual_plate_quad")), **extra)
         if capable:
             d._plate_saved_enabled = bool(r.get("enabled", True))
             if d.category == "plate":
@@ -7159,9 +7360,7 @@ def _ffmpeg_has(filter_name):
 
 # proper PQ/HLG -> BT.709 tone mapping (linearize, gamut-map, hable curve),
 # instead of the flat washed-out colors a naive 8-bit decode produces
-_TONEMAP_VF = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
-               "tonemap=tonemap=hable:desat=0,"
-               "zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+_TONEMAP_VF = hdr_quad_pairs.TONEMAP_VF
 
 
 def _count_video_frames(path):
@@ -7200,6 +7399,11 @@ def normalize_vfr(args, cb):
     default), a 10-bit CFR HDR source is kept for the render and
     args.hdr_source/hdr_encoder/hdr_tags are set. Reuses NVENC when
     available. No-op for CFR SDR input."""
+    # A proof belongs to one fresh conversion attempt, never a reused args
+    # object, cached copy, or an early-return path.
+    for attr in ('_hdr_quad_candidate', '_hdr_quad_proof'):
+        if hasattr(args, attr):
+            delattr(args, attr)
     if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
         return
     is_vfr, avg = probe_vfr(args.video)
@@ -7327,11 +7531,30 @@ def normalize_vfr(args, cb):
            + ("" if want_hdr else "; output will be SDR"))
     if _cached(sdr):
         cb.log(f"      reusing existing {os.path.basename(sdr)}")
+        if getattr(args, "verify_hdr_plate_frames", False):
+            if getattr(args, '_hdr_quad_render_proof', None) is not None:
+                cb.log("      checking live HDR frame evidence for this scan copy")
+            else:
+                cb.log("      cached scan copy has no fresh HDR frame evidence; "
+                       "the ordinary plate mask remains in use for HDR output")
     else:
         sdr_ref = hdr_src or src0
         sdr_cfr = is_vfr and hdr_src is None
-        _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
-        if not sdr_cfr:
+        pair_candidate = None
+        if (getattr(args, "verify_hdr_plate_frames", False) and want_hdr and not is_vfr
+                and sdr_ref == src0):
+            pair_candidate = hdr_quad_pairs.fresh_tonemap(
+                sdr_ref, sdr, cb, PipelineCancelled)
+            if pair_candidate is not None:
+                args._hdr_quad_candidate = pair_candidate
+                cb.log("      captured fresh HDR frame correspondence; "
+                       "source identity will be checked after scanning")
+            else:
+                cb.log("      HDR frame correspondence unavailable; "
+                       "the ordinary plate mask remains in use for HDR output")
+        if pair_candidate is None:
+            _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
+        if not sdr_cfr and pair_candidate is None:
             # fail closed: the scan trusts this copy's frame indexes as
             # timestamps. A GPU encode that drops or duplicates even a few
             # frames shifts every later detection onto the wrong output
@@ -7408,6 +7631,8 @@ def build_parser():
     ap.add_argument("--pad", "--blur-buffer", type=int, default=8, dest="pad",
                     help="blur buffer: pixels of blur beyond the tightly-"
                          "cropped word/face (default 8)")
+    ap.add_argument("--verify-hdr-plate-frames", action="store_true",
+                    help="verify fresh CFR HDR frames for plate corners during this live job")
     ap.add_argument("--no-vfr-fix", action="store_true",
                     help="skip automatic CFR normalization of VFR input")
     ap.add_argument("--out-quality", choices=["archival", "balanced", "share"],
@@ -7950,6 +8175,19 @@ def _narrow_frame_matches(cap, frame, index, fps, width, height, tolerance):
                 and math.isfinite(observed) and abs(observed - index / fps) <= tolerance)
     except (TypeError, ValueError, OverflowError, AttributeError, cv2.error):
         return False
+
+
+def _quad_scan_digest(args):
+    candidate = getattr(args, '_hdr_quad_candidate', None)
+    if candidate is not None:
+        if hasattr(args, '_hdr_quad_proof'):
+            del args._hdr_quad_proof
+        if os.path.realpath(args.video) == candidate.get('scan_path'):
+            proof = hdr_quad_pairs.bind_scan(candidate)
+            if proof is not None:
+                args._hdr_quad_proof = proof
+                return proof['scan_sha256']
+    return sha256_file(args.video)
 
 
 def run_scan(args, cb=None):
@@ -9287,7 +9525,7 @@ def run_scan(args, cb=None):
             **({"plate_coverage_limitation": narrow_limitation} if narrow_plate and narrow_limitation else {}),
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
-            "input_sha256": sha256_file(args.video),
+            "input_sha256": _quad_scan_digest(args),
             "stats": {"scans": n_scans, "raw_hits": len(raw),
                       "regions": len(detections), "recalls": n_recalled,
                       "remembered": len(memory.items) if memory else 0,
@@ -9367,12 +9605,40 @@ def run_render(args, state, cb=None):
             cb.log("      narrow plates unavailable: %s; using full plate coverage" % limitation)
             state["plate_coverage_limitation"] = limitation
             narrow_render = False
+    quad_context = _quad_render_context(args, state, dets_r)
+    if (getattr(args, 'hdr_source', None) and quad_context is None
+            and any(d.category == 'plate' and plate_quad.valid_record(d.manual_plate_quad)
+                    for d in dets_r)):
+        cb.log('      HDR frame evidence unavailable; the ordinary plate mask remains in use for HDR output')
+    quad_guard = state.get('_quad_source_guard')
+    hdr_guard = state.get('_quad_hdr_guard')
+    def require_quad_sources():
+        _require_quad_source_current(quad_guard)
+        _require_quad_source_current(hdr_guard)
+    require_quad_sources()
+    if quad_guard is not None:
+        sources = (quad_guard['path'], getattr(args, 'original_video', None),
+                   getattr(args, 'hdr_source', None))
+        for role, destination in (('render', dst), ('report', args.report)):
+            if not destination:
+                continue
+            for source in sources:
+                if not source:
+                    continue
+                try:
+                    same_input = os.path.samefile(source, destination)
+                except FileNotFoundError:
+                    same_input = False
+                if same_input:
+                    raise RuntimeError('quad input cannot also be the %s destination' % role)
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     summary = dict(state["stats"], output=dst)
     with _RenderDelivery(dst, args.report) as delivery:
+        if quad_guard is not None:
+            delivery.validate_before_publication = require_quad_sources
         if getattr(args, "hdr_source", None) and not args.preview:
             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
                        state["bands"], state["fps"], pad=args.pad, mode=args.mode,
@@ -9382,7 +9648,8 @@ def run_render(args, state, cb=None):
                        mode_map=getattr(args, "mode_map", None),
                        audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
                        out_quality=out_q,
-                       audio_lanes=getattr(args, "audio_lane_count", None))
+                       audio_lanes=getattr(args, "audio_lane_count", None),
+                       quad_context=quad_context)
         else:
             _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
                    state["bands"],
@@ -9394,8 +9661,9 @@ def run_render(args, state, cb=None):
                    encoder=args.encoder, audio_spans=aspans, clip=clip,
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None),
-                   narrow_plates=narrow_render,
+                   narrow_plates=narrow_render, quad_context=quad_context,
                    **({"exact_frames": True} if state.get("plate_policy") else {}))
+        require_quad_sources()
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)
@@ -9473,24 +9741,55 @@ def run_pipeline(args, cb=None):
             raise RuntimeError("report has no render_state — re-run a scan "
                                "with --report using openscrub v4+")
         cb.log(f"      {len(dets)} enabled detections")
-        in_sha = sha256_file(args.video)
-        if capable and expected != in_sha:
-            raise ValueError("optional plate source differs from the scanned source")
-        if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
-            cb.log("      WARNING: input file differs from the one this report "
-                   "was made from (sha256 mismatch) — blur positions may be wrong")
-        state = {"fps": rstate["fps"],
-                 "cum": [tuple(v) for v in rstate["cum"]],
-                 "bands": [tuple(v) for v in rstate["bands"]],
-                 "detections": dets, "input_sha256": in_sha,
-                 "source_report": source,
-                 "audio_redactions_overridden": audio_overridden,
-                 "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
-                 "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
-                           "recalls": 0, "remembered": 0}}
-        if optional:
-            state["plate_policy"] = optional
-        return run_render(args, state, cb)
+        # Hash from the descriptor held across the actual render only when a
+        # quad might be used. This replaces, rather than repeats, the existing
+        # render input digest work. Other reports keep their original path.
+        guard = None
+        if any(d.category == 'plate' and plate_quad.valid_record(d.manual_plate_quad) for d in dets):
+            opened = open(args.video, 'rb')
+            try:
+                stamp = _quad_stamp(os.fstat(opened.fileno()))
+                guard = {'file': opened, 'path': args.video, 'stamp': stamp}
+                if not _quad_source_current(guard):
+                    raise RuntimeError('quad input changed before digest')
+                digest = hashlib.sha256()
+                for block in iter(lambda: opened.read(1 << 20), b''):
+                    digest.update(block)
+                if not _quad_source_current(guard):
+                    raise RuntimeError('quad input changed during digest')
+                in_sha = guard['digest'] = digest.hexdigest()
+            except BaseException:
+                opened.close()
+                raise
+        else:
+            in_sha = sha256_file(args.video)
+        hdr_guard = None
+        try:
+            hdr_guard = _quad_hdr_source_guard(args, guard)
+            if capable and expected != in_sha:
+                raise ValueError("optional plate source differs from the scanned source")
+            if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+                cb.log("      WARNING: input file differs from the one this report "
+                       "was made from (sha256 mismatch) — blur positions may be wrong")
+            state = {"fps": rstate["fps"],
+                     "cum": [tuple(v) for v in rstate["cum"]],
+                     "bands": [tuple(v) for v in rstate["bands"]],
+                     "detections": dets, "input_sha256": in_sha,
+                     "source_report": source,
+                     "_quad_source_guard": guard,
+                     "_quad_hdr_guard": hdr_guard,
+                     "audio_redactions_overridden": audio_overridden,
+                     "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+                     "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+                               "recalls": 0, "remembered": 0}}
+            if optional:
+                state["plate_policy"] = optional
+            return run_render(args, state, cb)
+        finally:
+            if hdr_guard is not None:
+                hdr_guard['file'].close()
+            if guard is not None:
+                guard['file'].close()
     state = run_scan(args, cb)
     return run_render(args, state, cb)
 

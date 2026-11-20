@@ -8,6 +8,7 @@ from fractions import Fraction
 import hashlib
 import json
 import math
+import subprocess
 
 import cv2
 import numpy as np
@@ -107,9 +108,26 @@ def metadata_facts(probe):
             raise ValueError('invalid stream count')
         return dict(stream=stream['index'], width=width, height=height,
                     rate=float(rate), tick_s=float(tick),
+                    pixel_format=stream.get('pix_fmt', ''),
+                    color_transfer=stream.get('color_transfer', '') or '',
+                    color_primaries=stream.get('color_primaries', '') or '',
                     grid_aligned=(1/rate/tick).denominator == 1, count=count)
     except (KeyError, ValueError, TypeError, ZeroDivisionError, OverflowError) as error:
         raise ExactError('unsupported stream metadata: '+str(error)) from None
+
+
+def probe_source(path):
+    """Qualify the same bounded stream metadata used by exact editing."""
+    try:
+        result = subprocess.run([
+            'ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries',
+            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames,pix_fmt,color_transfer,color_primaries:stream_tags=rotate:stream_side_data',
+            '-of', 'json', path], capture_output=True, timeout=15, check=True)
+        if len(result.stdout) > 65536:
+            raise ExactError('stream metadata exceeds bounded response')
+        return metadata_facts(json.loads(result.stdout))
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        raise ExactError('successful exact stream metadata unavailable: '+str(error)) from None
 
 
 def precision_bound(facts, fps, count):

@@ -19,8 +19,8 @@ openscrub._fetch_model=deny_fetch
 import openscrub_web as web
 assert Path(web.__file__).resolve()==source/'openscrub_web.py'
 assert Path(openscrub.__file__).resolve()==source/'openscrub.py'
-if os.environ.get('OPENSCRUB_LETTERING_WEB_FIXTURE') == '1':
- # Exercise real multipart admission without starting the model worker.
+if (os.environ.get('OPENSCRUB_LETTERING_WEB_FIXTURE') == '1'
+        or os.environ.get('OPENSCRUB_HDR_PROOF_WEB_FIXTURE') == '1'):
  web.enqueue=lambda *args,**kwargs:None
 web._data_root=lambda:str(runtime)
 for name in ('JOBS_DIR','ZONES_PATH','MODEL_SELECT_PATH','CERT_DIR','WEB_SETTINGS_PATH','CUSTOM_CATS_PATH'):
@@ -61,6 +61,19 @@ job['phase']='review'
 other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
 web.JOBS.pop(other['id']);new_dir=Path(web.JOBS_DIR)/'other';os.rename(other['dir'],new_dir);other['dir']=str(new_dir);other['id']='other';web.JOBS['other']=other
 Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
+# Native SDR plate with its actual scan-input digest; no detector/model is run.
+plate=web.new_job(str(video),{'categories':'plate','mode':'box','pad':0,'encoder':'x264'},'synthetic-plate.mp4')
+web.JOBS.pop(plate['id']);new_dir=Path(web.JOBS_DIR)/'plate';os.rename(plate['dir'],new_dir)
+plate.update(dir=str(new_dir),id='plate',phase='review');web.JOBS['plate']=plate
+plate_report={'provenance':{'input':str(video),'input_sha256':hashlib.sha256(video.read_bytes()).hexdigest(),
+ 'settings':{'pad':0,'mode':'box'}},
+ 'render_state':{'fps':10,'cum':[[0,0]]*20,'bands':[[0,0]]*20},
+ 'detections':[{'t_start':0,'t_end':2,'last_seen':0,'cbox':[140,92,340,232],
+ 'aoff':[0,0],'category':'plate','text':'synthetic plate','confidence':1,'enabled':True,'opaque':{'keep':True}},
+ {'t_start':0,'t_end':2,'last_seen':0,'cbox':[10,10,30,30],
+ 'aoff':[0,0],'category':'name','text':'other','confidence':1,'enabled':False}],
+ 'audio_redactions':[]}
+Path(plate['dir'],'report.json').write_text(json.dumps(plate_report))
 # Retained media: expected ordinals/PTS/pixels come from sequential native decode
 # and FFprobe, independent of edit_sample and the embedded editor state.
 manifest=os.environ.get('OPENSCRUB_EXACT_MEDIA')
