@@ -5592,6 +5592,7 @@ APP_JS = """function renderAudioSugg(){
  el.innerHTML=h;
 }
 function applyAudioSugg(i){
+ if(BE_VIEW?.checkpoint)return;
  const sg=BE.audioSugg||[];
  const list=(i<0)?sg:[sg[i]].filter(Boolean);
  for(const s of list){
@@ -5633,6 +5634,7 @@ function renderTranscript(){
  el.innerHTML=h;
 }
 function txWordClick(i){
+ if(BE_VIEW?.checkpoint)return;
  const tx=BE.audioTx||[];if(!tx[i])return;
  if(BE.txAnchor<0){BE.txAnchor=i;renderTranscript();return;}
  const a=Math.min(BE.txAnchor,i),b=Math.max(BE.txAnchor,i);
@@ -5858,6 +5860,10 @@ function hasReviewEdits(d){
  return !!d.submitted||Object.keys(d.enabled).length||d.manual.length||b.adds.length||
   Object.keys(b.ov).length||Object.keys(b.times).length||Object.keys(b.quads).length||
   !sameEdit(b.audio,b.audioSaved);
+}
+function reviewGesturePending(editor){
+ return !!(editor.addAnchor||editor.drag||editor.tlDrag||editor.pointerId!=null||
+  BE_VIEW?.editor===editor&&BE_VIEW.tlGesture);
 }
 
 // Job names are text inside the list link and detail heading.
@@ -6220,11 +6226,14 @@ async function refreshCycle(cycle){
  // (rehydrated jobs mid-phase), with its history reset on phase change so
  // it never extrapolates a scan-speed rate across the render phase.
  if(PHPH!==j.phase){
+  if(PHPH==='paused'&&j.phase!=='paused'){
+   BE_OPEN_INTENT++;beUnmount();disposeReview();document.getElementById('review')?.remove();resetReviewView();
+  }
   PHIST=[];PHPH=j.phase;
   // Phase eligibility is separate from view identity. Leave-and-return creates
   // a new token; slow same-phase review requests remain eligible.
   const pendingManual=REVIEW_REQUEST?.pending&&REVIEW_REQUEST.manual;
-  AUTO_REVIEW=j.phase==="review"?{id,gen,state:pendingManual?"loading":
+  AUTO_REVIEW=(j.phase==="review"||j.phase==="paused"&&j.checkpoint_unfinished===true)?{id,gen,phase:j.phase,state:pendingManual?"loading":
    EDITS?.reviewEditorGen===gen?"deferred":"idle"}:null;
   renderReviewAccess();
  }
@@ -6301,7 +6310,7 @@ async function refreshCycle(cycle){
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
   if(j.phase=="paused")
-   a=`<div>Partial scan saved. Resume is not available in this version; the source and report are retained.</div>`;
+   a=`<div>Scan paused. Review the processed portion before resuming.</div>`;
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
@@ -6359,7 +6368,7 @@ function beVector(value,n){return Array.isArray(value)&&value.length===n&&value.
 function beBase(base){return !!base&&beVector(base.cbox,4)&&beVector(base.span,3);}
 function bePrecondition(sample){const {source_ref,timeline_eq,policy,index,width,height,offset}=sample;
  return copyEdit({version:1,source_ref,timeline_eq,policy,index,width,height,offset});}
-function beValidateSample(body,t){
+function beValidateSample(body,t,checkpoint=null){
  const s=body?.sample,hex=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
  if(body?.version!==1||!s||typeof s.source_ref!=='string'||s.source_ref.length<1||s.source_ref.length>128||
  !hex(s.timeline_eq)||s.policy!=='opencv-ffmpeg-zero-cfr-v1'||!Number.isSafeInteger(s.index)||s.index<0||
@@ -6375,7 +6384,15 @@ function beValidateSample(body,t){
    !row.box.every((v,i)=>Math.abs(v-row.base.cbox[i]-s.offset[i%2])<1e-8)||
    typeof row.enabled!=='boolean'||typeof row.category!=='string')throw Error('Invalid exact sample row');
   seen.add(row.i);
+  if(checkpoint){
+   const bounds=row.scan_frame_bounds;
+   if(!Object.prototype.hasOwnProperty.call(row,'scan_frame_bounds')||bounds!==null&&
+      (!Array.isArray(bounds)||bounds.length!==2||!bounds.every(Number.isSafeInteger)||
+       bounds[0]<0||bounds[0]>=bounds[1]||bounds[1]>checkpoint.frames))throw Error('Invalid checkpoint row bounds');
+  }
  }
+ if(checkpoint&&(t<0||t>=checkpoint.duration||s.index>=checkpoint.frames||
+    s.index!==Math.floor(t*checkpoint.fps)||s.canonical_s!==s.index/checkpoint.fps))throw Error('Sample outside processed prefix');
  return {sample:copyEdit(s),precondition:bePrecondition(s),rows:copyEdit(body.boxes),image:body.image};
 }
 async function beApplySample(view,serial,data){
@@ -6411,6 +6428,7 @@ async function beApplySample(view,serial,data){
 }
 function beRequestSample(view,t){
  if(!view||!view.current()||!Number.isFinite(t))return;
+ if(view.checkpoint&&(PHPH!=='paused'||t<0||t>=view.checkpoint.duration))return;
  beInvalidateSample(view,`Inspecting ${t.toFixed(3)}s…`);
  EDIT_SAMPLE_IO.wanted={view,serial:view.serial,t};
  return bePumpSamples();
@@ -6432,7 +6450,7 @@ function bePumpSamples(){
    }
    const body=await response.json();
    if(!beSampleCurrent(view,serial))return;
-   await beApplySample(view,serial,beValidateSample(body,t));
+   await beApplySample(view,serial,beValidateSample(body,t,view.checkpoint));
   }catch(error){
    if(beSampleCurrent(view,serial)){
     view.readySample=null;view.loading=true;view.transform=null;
@@ -6446,6 +6464,7 @@ function bePumpSamples(){
 }
 function beReady(view=BE_VIEW){
  if(!view||!view.current()||view.editor.playing||!view.img.isConnected||!view.cv.isConnected)return false;
+ if(view.checkpoint&&PHPH!=='paused')return false;
  const ready=view.readySample;
  if(!ready||ready.serial!==view.serial||ready.imageURL!==view.imageURL||view.img.src!==view.imageURL||
  !view.img.complete||view.img.naturalWidth!==ready.sample.width||view.img.naturalHeight!==ready.sample.height)return false;
@@ -6461,8 +6480,10 @@ function beCaptureGeometry(view,row){
   saveStatus(EDITS,'The plate baseline is unavailable; inspect the frame again before changing geometry.');return false;
  }
  if(old)return old.precondition.source_ref===view.readySample.sample.source_ref&&
- old.precondition.timeline_eq===view.readySample.sample.timeline_eq&&old.precondition.row_context_eq===row.row_context_eq;
+ old.precondition.timeline_eq===view.readySample.sample.timeline_eq&&old.precondition.row_context_eq===row.row_context_eq&&
+ (!view.checkpoint||sameEdit(old.precondition.scan_frame_bounds,row.scan_frame_bounds));
  b.geometry[row.i]={precondition:{...copyEdit(view.readySample.precondition),row_context_eq:row.row_context_eq,base:copyEdit(row.base),
+  ...(view.checkpoint?{scan_frame_bounds:copyEdit(row.scan_frame_bounds)}:{}),
   ...(row.category==='plate'&&beQuadHash(row.quad_context_eq)?{quad_context_eq:row.quad_context_eq}:{}),
   ...(row.category==='plate'&&Object.prototype.hasOwnProperty.call(row,'quad_baseline')?{quad_baseline:row.quad_baseline}:{})},
   quadBaseline:row.category==='plate'&&beQuadRecord(row.manual_plate_quad)?copyEdit(row.manual_plate_quad):null,
@@ -6508,7 +6529,7 @@ function beQuadForSample(q,s){return beQuadRecord(q)&&q.source.width===s.width&&
 function beQuadControls(view=BE_VIEW){
  const button=document.getElementById('beQuad'),reset=document.getElementById('beQuadReset'),note=document.getElementById('beQuadStatus');
  if(!button||!reset||!note)return;
- const row=view?.editor?.raw?.find(r=>r.i===view.editor.sel),plate=row?.category==='plate';
+ const row=view?.editor?.raw?.find(r=>r.i===view.editor.sel),plate=!view?.checkpoint&&row?.category==='plate';
  button.style.display=reset.style.display=note.style.display=plate?'':'none';if(!plate)return;
  const ready=!!view?.current()&&!!view.readySample&&!view.loading&&!view.editor.playing;
  const family=view.editor.geometry[row.i],sample=view.readySample?.sample;
@@ -6735,7 +6756,7 @@ function bePlateValidateSamples(value){
  return value.frames.map(frame=>({...frame}));
 }
 async function bePlateGo(scope='frame'){
- const view=BE_VIEW;if(!view||!view.current()||view.plate.request)return;
+ const view=BE_VIEW;if(!view||view.checkpoint||!view.current()||view.plate.request)return;
  const sampled=scope==='sampled';
  const p=view.plate,query=document.getElementById('bePlateQuery')?.value||'',
        mode=document.getElementById('bePlateMode')?.value;
@@ -6815,9 +6836,9 @@ function beUnmountIn(root){
  beUnmount();view.editor.playing=false;
  try{if(view.vid&&!view.vid.paused)view.vid.pause();}catch(e){}
 }
-function beMount(img,vid,cv,id,gen,editor){
+function beMount(img,vid,cv,id,gen,editor,checkpoint=null){
  beUnmount();
- const view={img,vid,cv,id,gen,editor,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false,
+ const view={img,vid,cv,id,gen,editor,checkpoint,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false,
   plate:{request:null,rows:[],selected:-1,sample:null,region:null,batch:null,inspect:null,message:'Choose a frame search or video samples. Suggestions do not blur anything.'}};
  view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
   document.getElementById("beCv")===cv;
@@ -6857,13 +6878,18 @@ function beMount(img,vid,cv,id,gen,editor){
 }
 async function loadBoxEdit(fromReview){
  const id=CUR,gen=VIEW_GEN,editor=BE;
+ const checkpoint=PHPH==='paused'?REVIEW_META?.checkpoint:null;
+ if(PHPH==='paused'&&(!checkpoint||REVIEW_META.jobId!==id||REVIEW_META.viewGen!==gen))return;
  showPanel(fromReview?"boxedit_rev":"boxedit");
  const intent=++BE_OPEN_INTENT;
  let mi;
  try{
-  const response=await fetch(`api/jobs/${id}/mediainfo`);
-  if(!response.ok)throw Error(`Media information unavailable (HTTP ${response.status})`);
-  mi=await response.json();if(!Number.isFinite(mi.duration)||mi.duration<=0)throw Error('Invalid media duration');
+  if(checkpoint)mi={duration:checkpoint.duration};
+  else{
+   const response=await fetch(`api/jobs/${id}/mediainfo`);
+   if(!response.ok)throw Error(`Media information unavailable (HTTP ${response.status})`);
+   mi=await response.json();if(!Number.isFinite(mi.duration)||mi.duration<=0)throw Error('Invalid media duration');
+  }
  }catch(error){if(ownsView(id,gen)&&BE===editor&&intent===BE_OPEN_INTENT)saveStatus(EDITS,error.message);return;}
  if(!ownsView(id,gen)||BE!==editor||intent!==BE_OPEN_INTENT)return;
  // in review: the slot right under the Preview button; on done: the actions slot
@@ -6876,9 +6902,9 @@ async function loadBoxEdit(fromReview){
 
  beUnmountIn(c);
  c.innerHTML=`<div class="row" style="margin-top:8px">
-  <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
-  <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
-   step="0.1" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span></div>
+  <button class="sec" id="bePlay" ${checkpoint?'hidden':''} style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
+  <input type="range" id="beT" min="0" max="${checkpoint?checkpoint.frames-1:Math.max(0.2,mi.duration-0.1).toFixed(1)}"
+   step="${checkpoint?'1':'0.1'}" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span></div>
   <div style="position:relative;display:inline-block;max-width:100%">
    <img id="beImg" style="max-width:100%;border-radius:8px">
    <video id="beVid" style="max-width:100%;border-radius:8px;display:none" playsinline preload="none"></video>
@@ -6896,7 +6922,7 @@ async function loadBoxEdit(fromReview){
    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
-  <details id="bePlate" style="margin-top:8px" ontoggle="bePlateToggle()">
+  <details id="bePlate" ${checkpoint?'hidden':''} style="margin-top:8px" ontoggle="bePlateToggle()">
    <summary onclick="bePlateSummary()">Find plate text</summary>
    <p style="font-size:12px;color:#94a3b8;margin:5px 0">Search this frame or up to four evenly spaced video samples with local OCR. Results are approximate suggestions, not redactions.</p>
    <div class="row" style="gap:6px;align-items:end">
@@ -6922,28 +6948,28 @@ async function loadBoxEdit(fromReview){
   </details>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
-   <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
+   <button class="tog" id="beTrk" ${checkpoint?'hidden':''} onclick="beTrackMode()">&#8857; Track object</button>
    <button class="danger" id="beRm" style="display:none" onclick="beRemove()">Remove blur</button>
    <button class="sec" id="beQuad" style="display:none" onclick="beQuadMode()">Edit plate corners</button>
    <button class="sec" id="beQuadReset" style="display:none" onclick="beQuadReset()">Reset to full plate mask</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
-    from <input type="number" id="beT0" step="0.1" min="0" style="width:74px">
-    to <input type="number" id="beT1" step="0.1" style="width:74px"> s
+    from <input type="number" id="beT0" step="${checkpoint?'any':'0.1'}" min="0" style="width:74px">
+    to <input type="number" id="beT1" step="${checkpoint?'any':'0.1'}" style="width:74px"> s
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
-   <button data-save-edits onclick="beSave()">Save changes &amp; re-render</button></div>
+   <button data-save-edits onclick="${checkpoint?'saveAndResume()':'beSave()'}">${checkpoint?'Save &amp; Resume':'Save changes &amp; re-render'}</button></div>
   <p id="beQuadStatus" role="status" style="display:none;font-size:12px;color:#bfdbfe;margin:4px 0"></p>
-  <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
+  ${checkpoint?'<p style="font-size:12px;color:#94a3b8">Inspect still frames and edit boxes or audio spans only within the processed portion. Automatic audio scanning is incomplete. Playback and tracking are available after the scan finishes.</p>':`<p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
    video with the boxes moving live (pause to edit). Click a red box to
    select — drag inside to move, a corner to resize, edit its from/to times,
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
    to a frame where the object is clear, draw a box around it — it will be
    followed and blurred through the window. &#128263; Audio span: drag on the
-   timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+   timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`}`;
  const img=document.getElementById("beImg"),bv=document.getElementById("beVid"),
        cv=document.getElementById("beCv");
- const view=beMount(img,bv,cv,id,gen,editor);
+ const view=beMount(img,bv,cv,id,gen,editor,checkpoint);
  img.onload=()=>{if(view.current()&&!BE.playing){view.sync();beDraw();}};
  bv.addEventListener("loadedmetadata",()=>{if(view.current())view.sync();});
  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
@@ -6957,6 +6983,7 @@ async function loadBoxEdit(fromReview){
 async function beTogglePlay(){
  const id=CUR,gen=VIEW_GEN,editor=BE;
  const v=document.getElementById("beVid"),img=document.getElementById("beImg"),view=BE_VIEW;
+ if(PHPH==='paused'||view?.checkpoint)return;
  if(!v)return;
  if(BE.playing){bePlayStop();return;}
  const serial=view?++view.playbackSerial:(editor.playbackSerial=(editor.playbackSerial||0)+1);
@@ -7048,17 +7075,19 @@ async function tlInit(){
   }
   BE.tlspans=Object.values(per);
   if(!BE.audioLoaded){
-   const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+   const stored=(doc.audio_redactions||[]).filter(s=>!view?.checkpoint||
+    Number.isFinite(s.t0)&&Number.isFinite(s.t1)&&s.t0>=0&&s.t1>s.t0&&s.t1<=view.checkpoint.duration)
+    .map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
    // Audio controls can be used while this initial report request is pending.
    BE.audio=[...stored,...BE.audio];BE.audioSaved=copyEdit(stored);BE.audioLoaded=true;
   }
-  BE.audioSugg=doc.audio_suggestions||[];
-  BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
+  BE.audioSugg=view?.checkpoint?[]:doc.audio_suggestions||[];
+  BE.audioTx=view?.checkpoint?[]:doc.audio_transcript||[];BE.txAnchor=-1;
   renderAudioSugg();renderTranscript();
  }catch(e){if(!current())return;BE.tlspans=[];}
  beTLDraw();
 }
-function tlX(t,w){return Math.max(0,Math.min(w,t/Math.max(0.1,BE.dur)*w));}
+function tlX(t,w){return Math.max(0,Math.min(w,t/(BE_VIEW?.checkpoint?BE.dur:Math.max(0.1,BE.dur))*w));}
 function beTLDraw(){
  const cv=document.getElementById("beTL");if(!cv)return;
  const w=cv.clientWidth||600;cv.width=w;cv.height=72;
@@ -7092,7 +7121,7 @@ function beTLDraw(){
  g.strokeStyle="#f8fafc";g.beginPath();
  g.moveTo(tlX(BE.t,w),0);g.lineTo(tlX(BE.t,w),72);g.stroke();
  const full=BE.win[0]<0.05&&BE.win[1]>BE.dur-0.05;
- document.getElementById("beWinL").textContent=full?"window: whole video"
+ document.getElementById("beWinL").textContent=full?(BE_VIEW?.checkpoint?"window: processed portion":"window: whole video")
   :`window: ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s`;
 }
 function tlHook(){
@@ -7112,8 +7141,8 @@ function tlHook(){
   const t=tAt(e);if(t===null)return;
   view.tlGesture={pointerId:e.pointerId,drag:null};editor.tlDrag=null;cv.setPointerCapture(e.pointerId);
   const w=cv.clientWidth,px=e.clientX-cv.getBoundingClientRect().left;
-  if(Math.abs(px-tlX(BE.win[0],w))<7){start({k:"w0"});return;}
-  if(Math.abs(px-tlX(BE.win[1],w))<7){start({k:"w1"});return;}
+  if(!view.checkpoint&&Math.abs(px-tlX(BE.win[0],w))<7){start({k:"w0"});return;}
+  if(!view.checkpoint&&Math.abs(px-tlX(BE.win[1],w))<7){start({k:"w1"});return;}
   if(yAt(e)>=54){                                  // audio lane
    if(BE.muteArm){start({k:"anew",t0:t});
     BE.audio.push({t0:t,t1:t,mode:document.getElementById("beAMode").value});
@@ -7124,7 +7153,7 @@ function tlHook(){
    beTLDraw();return;
   }
   start({k:"seek"});
-  document.getElementById("beT").value=t.toFixed(1);beScrub();
+  beSetSliderTime(t);beScrub();
  });
  cv.addEventListener("pointermove",e=>{
   if(!owned(e)||!editor.tlDrag)return;
@@ -7135,14 +7164,15 @@ function tlHook(){
    const s=BE.audio[BE.audioSel];
    s.t0=Math.min(BE.tlDrag.t0,t);s.t1=Math.max(BE.tlDrag.t0,t);
   }else if(BE.tlDrag.k==="seek"){
-   document.getElementById("beT").value=t.toFixed(1);beScrub();}
+   beSetSliderTime(t);beScrub();}
   beTLDraw();
  });
  cv.addEventListener("pointerup",e=>{
   if(!owned(e))return;
   if(BE.tlDrag&&BE.tlDrag.k==="anew"){
    const s=BE.audio[BE.audioSel];
-   if(s.t1-s.t0<0.15){BE.audio.pop();BE.audioSel=-1;}   // stray click
+   const minimum=view.checkpoint?Math.min(.15,.5/view.checkpoint.fps):.15;
+   if(s.t1-s.t0<minimum){BE.audio.pop();BE.audioSel=-1;}   // stray click
    BE.muteArm=false;document.getElementById("beMute").classList.remove("on");
    document.getElementById("beARm").style.display=BE.audioSel>=0?"inline-block":"none";
    renderTranscript();
@@ -7166,7 +7196,7 @@ function beAudioRm(){
   renderTranscript();renderAudioSugg();beTLDraw();}
 }
 function beTrackMode(){
- if(!beReady()||BE_VIEW.trackLaunch||EDITS?.track)return;
+ if(PHPH==='paused'||BE_VIEW?.checkpoint||!beReady()||BE_VIEW.trackLaunch||EDITS?.track)return;
  if(BE_VIEW.quadEdit){BE_VIEW.quadEdit=null;beEndGesture(BE,BE_VIEW.cv);beQuadControls(BE_VIEW);}
  bePlateDiscardRegion(BE_VIEW);bePlateRender(BE_VIEW);beDraw();
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
@@ -7273,7 +7303,7 @@ async function pollTrackStatus(track){
  }finally{track.polling=false;}
 }
 async function beTrackGo(box){
- const view=BE_VIEW,draft=EDITS;if(!beReady(view)||view.trackLaunch||!draft||draft.track)return;
+ const view=BE_VIEW,draft=EDITS;if(PHPH==='paused'||view?.checkpoint||!beReady(view)||view.trackLaunch||!draft||draft.track)return;
  const editor=view.editor,[t0,t1]=editor.win||[];
  if(!beNewBox(view,box,t0,t1)){saveStatus(draft,"Track requires an in-frame box and a window containing the canonical frame time.");return;}
  const st=document.getElementById("beTrkSt"),launch={view,editor,draft,id:view.id,gen:view.gen,st,
@@ -7293,9 +7323,14 @@ async function beTrackGo(box){
  }
 }
 
+function beSetSliderTime(t){
+ const sl=document.getElementById('beT'),checkpoint=BE_VIEW?.checkpoint;if(!sl)return;
+ sl.value=checkpoint?Math.max(0,Math.min(checkpoint.frames-1,Math.floor(t*checkpoint.fps))):t.toFixed(1);
+}
 function beScrub(){
  const view=BE_VIEW,sl=document.getElementById("beT");if(!sl||!view||!view.current())return;
- const t=+sl.value;if(!Number.isFinite(t))return;
+ const value=+sl.value,t=view.checkpoint?(value+.25)/view.checkpoint.fps:value;
+ if(!Number.isFinite(t))return;
  if(BE.playing){if(view.vid)view.vid.currentTime=t;return;}
  return beRequestSample(view,t);
 }
@@ -7400,8 +7435,8 @@ function beApplyTimes(){
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
  el.style.display="inline-flex";
- document.getElementById("beT0").value=b.t_start.toFixed(1);
- document.getElementById("beT1").value=b.t_end.toFixed(1);
+ document.getElementById("beT0").value=BE_VIEW?.checkpoint?String(b.t_start):b.t_start.toFixed(1);
+ document.getElementById("beT1").value=BE_VIEW?.checkpoint?String(b.t_end):b.t_end.toFixed(1);
 }
 function manualId(){
  const c=globalThis.crypto;
@@ -7640,6 +7675,14 @@ function reviewMetadata(data){
  }
  return {version,rows,attempted:false,incompatible:new Set()};
 }
+function checkpointReviewMetadata(data){
+ const {duration,processed_duration,processed_frames,total_frames,fps}=data||{};
+ if(![duration,processed_duration,fps].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0)||
+    ![processed_frames,total_frames].every(v=>Number.isSafeInteger(v)&&v>0)||processed_frames>total_frames||
+    processed_duration>duration||Math.abs(processed_duration-processed_frames/fps)>
+     Number.EPSILON*Math.max(1,processed_duration)*16)return null;
+ return {duration:processed_duration,frames:processed_frames,total:total_frames,fps};
+}
 function reviewDescriptors(rows){
  const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
  const policyRows=new Map();
@@ -7712,13 +7755,13 @@ function renderReviewAccess(){
 async function loadReview(auto=null){
  beRetireTrack();
  if(!auto&&EDITS)EDITS.reviewEditorGen=null;
- const id=CUR,gen=VIEW_GEN,intent=BE_OPEN_INTENT,request={pending:true,manual:!auto};REVIEW_REQUEST=request;
+ const id=CUR,gen=VIEW_GEN,intent=BE_OPEN_INTENT,phase=PHPH,request={pending:true,manual:!auto};REVIEW_REQUEST=request;
  const manualAuto=!auto&&AUTO_REVIEW?.state!=="ready"?AUTO_REVIEW:null;
  if(manualAuto)manualAuto.state="loading";
  renderReviewAccess();
- const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===request&&intent===BE_OPEN_INTENT&&
-  (!auto||(AUTO_REVIEW===auto&&PHPH==="review"));
- let d,thumbnails;
+ const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===request&&intent===BE_OPEN_INTENT&&PHPH===phase&&
+  (!auto||(AUTO_REVIEW===auto&&auto.phase===phase));
+ let d,thumbnails,checkpoint=null;
  try{
   const r=await fetch(`api/jobs/${id}/detections`);
   if(!current()){request.pending=false;return;}
@@ -7727,6 +7770,7 @@ async function loadReview(auto=null){
   if(!current()){request.pending=false;return;}
   thumbnails=reviewMetadata(d);
   if(!thumbnails)throw new Error('Invalid review metadata');
+  if(phase==='paused'&&!(checkpoint=checkpointReviewMetadata(d)))throw new Error('Invalid processed-prefix metadata');
  }catch(e){
   request.pending=false;
   if(current()){
@@ -7742,7 +7786,7 @@ async function loadReview(auto=null){
  document.getElementById('review-load-error')?.remove();
  DUR=d.duration;
  const sections=reviewDescriptors(d.detections);
- REVIEW_META={jobId:id,viewGen:gen,sections,thumbnails,
+ REVIEW_META={jobId:id,viewGen:gen,sections,thumbnails,checkpoint,
   byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
  const plateMode=d.plate_policy?.uncertain_policy;
  const plateNote=plateMode==='manual_review'
@@ -7754,7 +7798,8 @@ async function loadReview(auto=null){
  let html=`<div class="card" id="review"><h2>Review — choose Blur or Keep visible.
  Drag a box around several to bulk-set.</h2>
  ${plateNote?`<p class="detscope">${plateNote}</p>`:''}
- <div class="row" style="margin:0 0 8px"><button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes (before rendering)</button></div>
+ ${checkpoint?`<p role="status">Processed ${checkpoint.frames} of ${checkpoint.total} frames (${checkpoint.duration.toFixed(2)} s). Review only this portion before resuming.</p>`:''}
+ <div class="row" style="margin:0 0 8px"><button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes (${checkpoint?'processed frames only':'before rendering'})</button></div>
  <div class="row reviewfilters">
   <label>Detection type <select id="reviewType" onchange="setReviewFilter(this.value||null,REVIEW_FILTER.output)"></select></label>
   <label>Output <select id="reviewOutput" onchange="setReviewFilter(REVIEW_FILTER.type,this.value)"></select></label>
@@ -7782,7 +7827,7 @@ async function loadReview(auto=null){
   html+=`<div class="grid3 reviewgrid" data-review-section="${n}"></div>`;
   html+=section.zone?'</details>':'</section>';
  });
- html+=`</div><div class="row" style="margin-top:12px"><button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
+ html+=`</div><div class="row" style="margin-top:12px"><button data-save-edits onclick="${checkpoint?'saveAndResume()':'saveAndRender()'}">${checkpoint?'Save &amp; Resume':'Save edits &amp; render'}</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old add-region tool</span></div></div>`;
  const old=document.getElementById('review');if(old){beUnmountIn(old);old.remove();}
  detail.insertAdjacentHTML('beforeend',html);
@@ -8313,7 +8358,7 @@ function refreshDet(i){
 }
 let DET_BATCH=0,DET_DIRTY=new Set();
 function finishDetChoices(){
- if(!EDITS.busy)saveStatus(EDITS,'Unsaved edits — save to include them in the render.');
+ if(!EDITS.busy)saveStatus(EDITS,PHPH==='paused'?'Unsaved edits — save before resuming.':'Unsaved edits — save to include them in the render.');
  DET_DIRTY.forEach(refreshDet);DET_DIRTY.clear();
  if(document.getElementById('beCv')){beFilter();beDraw();}
  refreshReviewFilters();
@@ -8486,7 +8531,7 @@ async function reviewDiscard(key){
  else await loadBoxEdit(!!document.getElementById('review'));
  saveStatus(d,'Selected geometry discarded. Inspect the exact frame, then deliberately edit again; missing rows are never remapped.');
 }
-function reviewSubmission(d){
+function reviewSubmission(d,checkpoint=false){
  const b=d.editor;
  for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,'manual_id'))a.manual_id=manualId();
  const manualRefs=[...d.manual],addRefs=[...b.adds],manualSnapshot=copyEdit(d.manual),addSnapshot=copyEdit(b.adds);
@@ -8502,7 +8547,7 @@ function reviewSubmission(d){
  }
  if(Object.keys(geometrySnapshot).length)payload.geometry_preconditions=copyEdit(geometrySnapshot);
  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved))payload.audio=copyEdit(b.audio);
- return {payload,manualRefs,addRefs,manualSnapshot,addSnapshot,geometryOwners,geometrySnapshot,quadBaselines,quadStreams,view:BE_VIEW,everUncertain:false};
+ return {payload,manualRefs,addRefs,manualSnapshot,addSnapshot,geometryOwners,geometrySnapshot,quadBaselines,quadStreams,view:BE_VIEW,checkpoint,everUncertain:false};
 }
 function beQuadAck(record,requested,pc,stream){
  if(requested===null)return record===null;
@@ -8512,15 +8557,24 @@ function beQuadAck(record,requested,pc,stream){
 }
 function acknowledgeGeometry(editor,submission,result){
  const pcs=submission.geometrySnapshot,payload=submission.payload,validated={},quads=payload.manual_plate_quads||{};
+ let needFresh=false;
  // Validate the whole strict acknowledgement before acknowledging any edit kind.
  for(const [key,pc] of Object.entries(pcs)){
+  if(submission.checkpoint&&!Object.prototype.hasOwnProperty.call(pc,'scan_frame_bounds'))throw Error('Missing checkpoint row bounds; inspect again.');
   const row=result.geometry_rows?.[key],explicit=Object.prototype.hasOwnProperty.call(quads,key);
   const plate=beQuadHash(pc.quad_context_eq);
   const boxChanged=Object.prototype.hasOwnProperty.call(payload.box_overrides,key)&&!sameEdit(payload.box_overrides[key],pc.base.cbox);
   const retired=!explicit&&boxChanged&&beQuadRecord(submission.quadBaselines[key])&&row?.manual_plate_quad===null&&
    beQuadHash(pc.quad_context_eq)&&row?.quad_context_eq===pc.quad_context_eq;
+  const timeChanged=Object.prototype.hasOwnProperty.call(payload.time_overrides,key)&&
+   !sameEdit(payload.time_overrides[key],pc.base.span.slice(0,2));
+  const released=submission.checkpoint&&pc.scan_frame_bounds!==null&&timeChanged;
+  const checkpointIdentity=released?row?.scan_frame_bounds===null&&beQuadHash(row?.row_context_eq):
+   row?.row_context_eq===pc.row_context_eq&&sameEdit(row?.scan_frame_bounds,pc.scan_frame_bounds);
+  const identityValid=submission.checkpoint?checkpointIdentity:
+   beQuadHash(row?.row_context_eq)&&(explicit||retired||row.row_context_eq===pc.row_context_eq);
   if(!row||!beBase(row.base)||!sameEdit(bePrecondition(row),bePrecondition(pc))||row.version!==1||
-   !beQuadHash(row.row_context_eq)||(!explicit&&!retired&&row.row_context_eq!==pc.row_context_eq)||
+   !identityValid||
    !sameEdit(row.base.cbox,payload.box_overrides[key]||pc.base.cbox)||
    !sameEdit(row.base.span.slice(0,2),payload.time_overrides[key]||pc.base.span.slice(0,2))||
    (plate&&(!Object.prototype.hasOwnProperty.call(row,'manual_plate_quad')||
@@ -8528,6 +8582,7 @@ function acknowledgeGeometry(editor,submission,result){
    (explicit&&(!beQuadHash(pc.quad_context_eq)||row.quad_context_eq!==pc.quad_context_eq||
     !Object.prototype.hasOwnProperty.call(row,'manual_plate_quad')||!beQuadAck(row.manual_plate_quad,quads[key],pc,submission.quadStreams[key]))))
    throw Error('Missing or invalid geometry acknowledgement; retry the same save.');
+  if(released)needFresh=true;
   validated[key]=copyEdit(row);
  }
  for(const [key,row] of Object.entries(validated)){
@@ -8549,7 +8604,7 @@ function acknowledgeGeometry(editor,submission,result){
  for(const [key,value] of Object.entries(payload.time_overrides))if(!(key in pcs)&&sameEdit(editor.times[key],value))delete editor.times[key];
  const view=BE_VIEW;
  if(!Object.keys(validated).length||!view||view.editor!==editor||!view.current())return;
- let refresh=view!==submission.view||!beReady(view);
+ let refresh=needFresh||view!==submission.view||!beReady(view);
  if(!refresh)for(const [key,ack] of Object.entries(validated)){
   const pc=pcs[key],ready=view.readySample,old=ready.rows.find(r=>String(r.i)===key);
   if(!old||ready.sample.source_ref!==pc.source_ref||ready.sample.timeline_eq!==pc.timeline_eq||
@@ -8571,12 +8626,18 @@ function acknowledgeGeometry(editor,submission,result){
  beFilter();beQuadControls(view);beDraw();
 }
 
-async function saveAndRender(){
+async function saveAndResume(){return saveAndRender(true);}
+async function saveAndRender(resume=false){
  const id=CUR,gen=VIEW_GEN,d=EDITS,reviewOwner=REVIEW_SCHED,editorIntent=BE_OPEN_INTENT;
  if(!id||!d||d.busy)return false;
+ if(resume?(PHPH!=='paused'||!REVIEW_META?.checkpoint||REVIEW_META.jobId!==id||REVIEW_META.viewGen!==gen):PHPH==='paused')return false;
  const b=d.editor;
+ if(resume&&reviewGesturePending(b)){saveStatus(d,'Finish or cancel the current edit before resuming.');return false;}
  let submission;
- try{submission=d.submitted||(d.submitted=reviewSubmission(d));}
+ try{
+  if(d.submitted&&!!d.submitted.checkpoint!==resume)throw Error('Resolve the previous unconfirmed save before continuing.');
+  submission=d.submitted||(d.submitted=reviewSubmission(d,resume));
+ }
  catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
  const payload=submission.payload;
  d.audioInFlight=payload.audio!==undefined;
@@ -8584,6 +8645,8 @@ async function saveAndRender(){
  let saved=false;
  try{
   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+  if(resume&&(typeof result.resume_token!=='string'||!result.resume_token||result.resume_token.length>1024))
+   throw Error('Missing or invalid resume token.');
   acknowledgeGeometry(b,submission,result);
   saved=true;d.submitted=null;d.audioInFlight=false;
   const policyCards=ownsView(id,gen)?acknowledgePolicyChoices(reviewOwner,payload.enabled):[];
@@ -8593,7 +8656,21 @@ async function saveAndRender(){
   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
   // A switched-away view never opens a confirmation or changes current UI.
   if(!ownsView(id,gen)){
-   saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+   saveStatus(d,resume?"Edits saved. Reopen review before resuming.":"Edits saved. Review pending edits, then save to render this job.");return false;
+  }
+  if(resume){
+   if(PHPH!=='paused'||REVIEW_SCHED!==reviewOwner||BE_OPEN_INTENT!==editorIntent){
+    saveStatus(d,'Edits saved. Reopen review before resuming.');return false;
+   }
+   if(hasReviewEdits(d)||reviewGesturePending(b)){
+    saveStatus(d,'Submitted edits saved. Newer or unfinished edits are still pending — finish and save again before resuming.');return false;
+   }
+   saveStatus(d,'Edits saved; requesting resume…');
+   await reviewPost(`api/jobs/${id}/resume`,{resume_token:result.resume_token});
+   if(hasReviewEdits(d)){
+    saveStatus(d,'Scan resuming. Newer edits remain pending and were not included.');return true;
+   }
+   saveStatus(d,'Scan resuming with saved edits…');return true;
   }
   let allowError="";
   if(result.suggest_allowlist&&result.suggest_allowlist.length&&
@@ -8622,11 +8699,14 @@ async function saveAndRender(){
  }catch(e){
   // A failed response leaves the audio baseline uncertain. Retain even a
   // newer toggle-back to the old baseline and deliberately send it on retry.
+  let rejected=false;
   if(!saved){
-   if(e.status===409&&e.code==="geometry_conflict"&&!submission.everUncertain)d.submitted=null;
+   if(!submission.everUncertain&&(e.status===409&&e.code==="geometry_conflict"||resume&&e.status>=400&&e.status<500)){
+    d.submitted=null;rejected=resume;
+   }
    else {submission.everUncertain=true;if(payload.audio!==undefined)b.audioSaved=null;}
   }
-  saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+  saveStatus(d,(rejected?"Save rejected; your drafts remain editable. ":saved?(resume?"Edits saved; resume was not confirmed. Check the job before retrying. ":"Edits saved; render was not confirmed. Retry with Save to render. "):
    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
   return false;
  }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
