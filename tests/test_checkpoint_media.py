@@ -79,6 +79,19 @@ def test_stopping_is_never_completion_even_at_reported_count(tmp_path):
     assert reader.completed is False
 
 
+def test_slow_reader_keeps_every_decoder_timestamp(tmp_path):
+    import time
+
+    media = media_module()
+    identity = media.inspect_source(str(clip(tmp_path, count=28)))
+    with media.FrameStream(identity) as reader:
+        for index in range(identity.total_frames):
+            assert reader.read()[0] == index
+            time.sleep(.08)
+        assert reader.read() is None
+        assert reader.completed
+
+
 @pytest.mark.parametrize('reported', [17, 19])
 def test_contradictory_reported_count_fails_instead_of_certifying(tmp_path, reported):
     media = media_module()
