@@ -43,8 +43,7 @@ separate outcome instead of a negative match. **Cancel search** discards its
 result; cleanup can take a moment. The query remains in the editor field until
 the panel is closed or the editor is removed.
 
-The source distribution includes this guide at `docs/PLATE_SEARCH.md`; the
-wheel includes it as `openscrub_internal/plate_search/PLATE_SEARCH.md`.
+The source distribution includes this guide at `docs/PLATE_SEARCH.md`.
 
 `PlateQuery(text, "full")` requires equality after the literal normalizer
 removes spaces, tabs, dots and hyphens; `PlateQuery(text, "fragment")` requires

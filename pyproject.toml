@@ -77,7 +77,6 @@ path = "openscrub.py"
 pattern = "VERSION = \"(?P<version>[^\"]+)\""
 
 [tool.hatch.build.targets.wheel.force-include]
-"docs/CHECKPOINT_CONTRACT.md" = "openscrub_internal/CHECKPOINT_CONTRACT.md"
 "plate_models.json" = "plate_models.json"
 "face_models.json" = "face_models.json"
 "person_models.json" = "person_models.json"
@@ -85,11 +84,8 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
 # site-packages beside the registries, so it gets a project-prefixed name
 # that can't collide with another package's notices file.
 "THIRD_PARTY_NOTICES.md" = "openscrub_THIRD_PARTY_NOTICES.md"
-# Plate coverage guidance for installed web and CLI users.
-"PLATES.md" = "openscrub_internal/PLATES.md"
 # branded icon for the Start Menu shortcut openscrub-setup creates
 "assets/openscrub.ico" = "openscrub.ico"
-"docs/PLATE_SEARCH.md" = "openscrub_internal/plate_search/PLATE_SEARCH.md"
 
 [tool.hatch.build.targets.wheel]
 include = [
