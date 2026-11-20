@@ -101,6 +101,7 @@ def test_cursor_priority_tail_and_replacement():
 @pytest.mark.parametrize('query', ['from=no', 'from=1.5', 'from=' + '9' * 65, 'epoch=' + 'a' * 129])
 def test_invalid_cursor_is_bounded_400(monkeypatch, tmp_path, query):
     import openscrub_web as web
+    monkeypatch.setattr(web, 'JOBS', {})
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     job = web.new_job('', {}, 'query')
     result = web.app.test_client().get('/api/jobs/' + job['id'] + '/log?' + query)
@@ -110,6 +111,7 @@ def test_invalid_cursor_is_bounded_400(monkeypatch, tmp_path, query):
 
 def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
     import openscrub_web as web
+    monkeypatch.setattr(web, 'JOBS', {})
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     monkeypatch.setattr(web, 'enqueue', lambda *_: None)
     job = web.new_job('', {}, 'retry')
@@ -137,6 +139,7 @@ def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
 def test_two_event_controlled_producers_and_http_readers(monkeypatch, tmp_path):
     import openscrub_web as web
     from openscrub_internal.job_logs import JobLog
+    monkeypatch.setattr(web, 'JOBS', {})
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     job = web.new_job('', {}, 'concurrent')
     # Construct before publication; small bounds force eviction on every round.
