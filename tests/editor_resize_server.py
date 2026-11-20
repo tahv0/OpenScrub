@@ -53,6 +53,28 @@ job['phase']='review'
 other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
 web.JOBS.pop(other['id']);new_dir=Path(web.JOBS_DIR)/'other';os.rename(other['dir'],new_dir);other['dir']=str(new_dir);other['id']='other';web.JOBS['other']=other
 Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
+if os.environ.get('OPENSCRUB_REAL_CHECKPOINT_PAGE')=='1':
+ from openscrub_internal import checkpoint_runtime
+ from test_checkpoint_runtime import movie,args_for,owned_scan,stop_after,Quiet
+ checkpoint_video=movie(runtime)
+ checkpoint_options={'categories':'qrcode','checkpoint_review':True,'skip_review':True}
+ paused=web.new_job(str(checkpoint_video),checkpoint_options,'real-checkpoint.mp4')
+ web.JOBS.pop(paused['id']);paused['id']='checkpoint';web.JOBS['checkpoint']=paused
+ result=owned_scan(checkpoint_runtime,args_for(checkpoint_video),
+  str(Path(paused['dir'])/'report.json'),cb=Quiet(),stop_requested=stop_after(9))
+ assert result['stop_review']['next_frame']==9 and result['detections']
+ paused.update(phase='paused',_checkpoint_unfinished=True,output=None)
+if os.environ.get('OPENSCRUB_REAL_COMPLETED_CHECKPOINT_PAGE')=='1':
+ from openscrub_internal import checkpoint_runtime
+ from test_checkpoint_runtime import movie,args_for,owned_scan,Quiet
+ completed_video=movie(runtime)
+ completed_options={'categories':'qrcode','checkpoint_review':True,'use_zones':False}
+ completed=web.new_job(str(completed_video),completed_options,'completed-checkpoint.mp4')
+ web.JOBS.pop(completed['id']);completed['id']='completed';web.JOBS['completed']=completed
+ result=owned_scan(checkpoint_runtime,args_for(completed_video),
+  str(Path(completed['dir'])/'report.json'),cb=Quiet(),stop_requested=lambda:False)
+ assert 'stop_review' not in result and result['detections']
+ completed.update(phase='review',_checkpoint_unfinished=False,output=None)
 # Retained media: expected ordinals/PTS/pixels come from sequential native decode
 # and FFprobe, independent of edit_sample and the embedded editor state.
 manifest=os.environ.get('OPENSCRUB_EXACT_MEDIA')
