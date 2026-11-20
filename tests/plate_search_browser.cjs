@@ -98,7 +98,7 @@ const [url,root]=process.argv.slice(2);
    await page.unroute('**/api/jobs/resize/plate_search');
    await page.evaluate(()=>{const summary=document.querySelector('#bePlate summary');summary.click();summary.click()});
    assert.equal(await page.locator('#bePlateQuery').inputValue(),'');
-   assert((await page.locator('#bePlateStatus').innerText()).includes('Search only the current frame'));
+   assert((await page.locator('#bePlateStatus').innerText()).includes('Choose a frame search or video samples'));
    // A response for an unmounted editor cannot publish into a later mount.
    await page.locator('#bePlateQuery').fill('F57');
    let releaseMount,startMount,finishedMount;

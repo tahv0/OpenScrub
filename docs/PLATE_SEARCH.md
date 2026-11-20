@@ -1,8 +1,9 @@
 # Optional plate-text search
 
 This optional feature searches explicitly requested ASCII text in the currently
-inspected exact frame using an installed local Tesseract. Search does not change
-a report, select or blur anything, and does not require a vehicle or plate
+inspected exact frame, or in up to four samples across the video, using an
+installed local Tesseract. Search does not change a report, select or blur
+anything, and does not require a vehicle or plate
 detector. A result is a suggestion for human inspection, not evidence
 that an identifier has been redacted or that its physical plate boundary is
 known. No model is trained or downloaded by this code.
@@ -10,7 +11,7 @@ known. No model is trained or downloaded by this code.
 ## Using the editor
 
 In review, open **Preview video & edit boxes**, pause and inspect the frame you
-want, then expand **Find plate text in this frame**. Enter 3–16 letters or
+want, then expand **Find plate text**. Enter 3–16 letters or
 digits, choose **Full text** or **Text fragment**, and select **Search this
 frame**. Select a result to highlight its approximate region in cyan. It is not
 a plate outline and the matching text may be unrelated to a plate. To track a
@@ -22,12 +23,19 @@ discards the proposed region. Search, selection and adjustment alone do not
 start tracking or make a Blur or Keep decision. You can also use the ordinary
 **Add box** or **Track object** tools to draw a region yourself.
 
-Only the selected frame is searched; a negative result does not establish
-absence elsewhere or even on that frame. Seek to another frame and search again
-as needed. Seeking, playback, closing the editor, or changing the query retires
-the old suggestions and any unconfirmed region, and requests cancellation of an
-in-flight search. A
-timeout, cancellation, unavailable recognizer, or changed source is shown as a
+**Search up to four video samples** instead checks up to four evenly spaced frame
+indices, including the first and last frame, and lists the number of suggestions
+at each sampled frame. For videos with fewer than four frames it checks each
+frame once. Frames between the listed indices are not searched. Select a listed
+frame to inspect it, then search that frame to see and adjust its suggestions.
+The editor checks the newly inspected frame against the sampled source and
+timeline; it does not transfer a sampled box directly into a blur.
+
+A negative result does not establish absence elsewhere or even on a searched
+frame. Seek to another frame and search again as needed. Seeking, playback,
+closing the editor, or changing the query retires the old suggestions and any
+unconfirmed region, and requests cancellation of an in-flight search. A timeout,
+cancellation, unavailable recognizer, or changed source is shown as a
 separate outcome instead of a negative match. **Cancel search** discards its
 result; cleanup can take a moment. The query remains in the editor field until
 the panel is closed or the editor is removed.
@@ -98,8 +106,9 @@ files on normal completion and handled timeout. Abrupt process termination may
 leave files behind. The HTTP wrapper supplies the job-owned directory described
 below.
 
-The editor's HTTP route searches one current exact sample in an isolated POSIX process
-(non-frozen Python with `waitid`/`WNOWAIT` support only), with at most one search
+The editor's HTTP route searches one current exact sample, or up to four evenly
+spaced exact samples, in an isolated POSIX process (non-frozen Python with
+`waitid`/`WNOWAIT` support only), with at most one search
 process per app instance. It has a 15-second admission-and-worker budget, kills
 its process group on timeout, cancellation, or abnormal worker completion, and
 uses a private temporary directory under the job. The worker leader remains
@@ -111,10 +120,15 @@ failure; a sudden server/process death can leave it until the job's existing
 deletion or vault lifecycle acts. Blocking filesystem and admission calls cannot
 be interrupted by the worker deadline. Search responses are private/no-store;
 cancel, timeout and failure are distinct from a completed search with no hits.
-The route holds file lifetimes and rechecks the current exact source and report
+For a sampled request, the single 15-second budget covers all samples; if it
+times out, is cancelled or fails, no partial sample results are returned. A
+completed response lists every sampled index and marks truncated sample results;
+it makes no claim about the frames between samples. The route holds file
+lifetimes and rechecks the current exact source and report
 before returning suggestions. The query is carried only in the request body and
-the worker's stdin, never in its argv or app logs. It returns box geometry and
-match kind, not the query or recognized OCR text. Search remains an opt-in
+the worker's stdin, never in its argv or app logs. Single-frame responses return
+box geometry and match kind; sampled responses return counts. Neither returns
+the query or recognized OCR text. Search remains an opt-in
 inspection aid and does not alter the report.
 
 ## Synthetic checks

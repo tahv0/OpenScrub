@@ -10,3 +10,9 @@ def test_plate_search_editor_page(tmp_path,monkeypatch):
 def test_plate_suggestion_track_editor_page(tmp_path,monkeypatch):
     monkeypatch.setenv('OPENSCRUB_PLATE_BROWSER_FIXTURE','1')
     launch_editor_page(tmp_path,'plate_search_track_browser.cjs',restart=False)
+
+
+def test_plate_sampled_search_editor_page(tmp_path,monkeypatch):
+    monkeypatch.setenv('OPENSCRUB_PLATE_BROWSER_FIXTURE','1')
+    monkeypatch.setenv('OPENSCRUB_PLATE_SAMPLED_FPS','25')
+    launch_editor_page(tmp_path,'plate_search_sampled_browser.cjs',restart=False)

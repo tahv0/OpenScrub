@@ -42,9 +42,11 @@ if os.environ.get('OPENSCRUB_PLATE_BROWSER_FIXTURE') == '1':
  cv2.rectangle(plate,(0,0),(299,81),(20,20,20),3)
  cv2.putText(plate,'KJF572',(18,60),cv2.FONT_HERSHEY_SIMPLEX,1.65,(0,0,0),4,cv2.LINE_AA)
  frame[105:187,330:630]=plate
-v=cv2.VideoWriter(str(video),cv2.VideoWriter_fourcc(*'mp4v'),10,(640,360))
+sampled_fixture=os.environ.get('OPENSCRUB_PLATE_SAMPLED_FPS')=='25'
+fixture_fps,fixture_count=(25,30) if sampled_fixture else (10,20)
+v=cv2.VideoWriter(str(video),cv2.VideoWriter_fourcc(*'mp4v'),fixture_fps,(640,360))
 assert v.isOpened()
-for _ in range(20):v.write(frame)
+for _ in range(fixture_count):v.write(frame)
 v.release();cv2.imwrite(str(runtime/'source.png'),frame)
 encoded=runtime/'source.mp4'
 subprocess.run(['ffmpeg','-nostdin','-y','-loglevel','error','-i',str(video),'-c:v','libx264','-pix_fmt','yuv420p',str(encoded)],check=True)
@@ -52,7 +54,7 @@ video=encoded
 job=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-resize.mp4')
 web.JOBS.pop(job['id']);new_dir=Path(web.JOBS_DIR)/'resize';os.rename(job['dir'],new_dir);job['dir']=str(new_dir);job['id']='resize';web.JOBS['resize']=job
 report={'provenance':{'input':str(video),'settings':{'pad':0,'mode':'box'}},
- 'render_state':{'fps':10,'cum':[[20,12]]*20,'bands':[[0,0]]*20},
+ 'render_state':{'fps':fixture_fps,'cum':[[20,12]]*fixture_count,'bands':[[0,0]]*fixture_count},
  'detections':[{'t_start':0,'t_end':2,'last_seen':0,'cbox':[120,80,320,220],
  'aoff':[0,0],'category':'name','text':'Synthetic rectangular target','confidence':1,'enabled':True}],
  'audio_redactions':[]}
