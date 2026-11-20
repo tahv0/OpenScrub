@@ -125,11 +125,13 @@ def inspect_source(path):
             ['ffprobe', '-v', 'error', '-show_entries',
              'format=format_name:stream=index,codec_type,codec_name,width,height,'
              'pix_fmt,r_frame_rate,avg_frame_rate,time_base,start_pts,nb_frames,'
-             'field_order:stream_tags=rotate:stream_side_data=rotation',
+             'field_order:stream_tags=rotate:stream_side_data_list',
              '-of', 'json', path],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         if result.returncode:
-            raise ValueError('ffprobe exited %s' % result.returncode)
+            detail = (result.stderr or b'')[:2000].decode('utf-8', errors='replace').strip()
+            raise ValueError('ffprobe exited %s%s'
+                             % (result.returncode, ': ' + detail if detail else ''))
         data = json.loads(result.stdout)
         if 'mp4' not in data['format']['format_name'].split(','):
             raise ValueError('not an MP4-family container')

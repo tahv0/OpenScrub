@@ -119,13 +119,19 @@ def metadata_facts(probe):
 def probe_source(path):
     """Qualify the same bounded stream metadata used by exact editing."""
     try:
+        # The parent includes all side data on FFmpeg 4.4 too; the child
+        # alias stream_side_data was only added in FFmpeg 5.1.
         result = subprocess.run([
             'ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries',
-            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames,pix_fmt,color_transfer,color_primaries:stream_tags=rotate:stream_side_data',
+            'stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames,pix_fmt,color_transfer,color_primaries:stream_tags=rotate:stream_side_data_list',
             '-of', 'json', path], capture_output=True, timeout=15, check=True)
         if len(result.stdout) > 65536:
             raise ExactError('stream metadata exceeds bounded response')
         return metadata_facts(json.loads(result.stdout))
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or b'')[:2000].decode('utf-8', errors='replace').strip()
+        raise ExactError('successful exact stream metadata unavailable: ffprobe exited %s%s'
+                         % (error.returncode, ': ' + detail if detail else '')) from None
     except (OSError, subprocess.SubprocessError, ValueError) as error:
         raise ExactError('successful exact stream metadata unavailable: '+str(error)) from None
 
