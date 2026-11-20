@@ -1337,8 +1337,11 @@ def _run_job(job, action, owner=None):
                 if not _operation_valid(job, owner):
                     return
                 job["stats"] = state["stats"]
-            coherent = _adopt_scan_source(job, owner, getattr(args, '_hdr_quad_proof', None),
-                                            state.get('input_sha256'))
+            hdr_proof = getattr(args, '_hdr_quad_proof', None)
+            if hdr_proof is None:
+                coherent = _adopt_scan_source(job, owner)
+            else:
+                coherent = _adopt_scan_source(job, owner, hdr_proof, state.get('input_sha256'))
             if owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
             if coherent:
