@@ -299,18 +299,26 @@ def test_foreign_source_change_during_pregen_never_writes_thumbnail(exact, monke
         for _ in range(3): writer.write(np.random.default_rng(2).integers(0,256,(96,128,3),dtype=np.uint8))
     finally: writer.release()
     source.update(video=str(foreign), phase='review'); exact.job['video'] = str(foreign)
+    doc = json.loads(exact.path.read_text())
+    doc['provenance']['input'] = str(foreign)
+    doc['render_state'] = {'fps': 5, 'cum': [[0, 0]] * 3}
+    doc['detections'] = [dict(doc['detections'][0], last_seen=0, t_start=0,
+                              t_end=.4, cbox=[50, 40, 70, 60])]
     def scan(args, cb):
-        return dict(fps=5,cum=[[0,0]]*10,bands=[[0,0]]*10,detections=[],stats={})
+        return dict(source_report=doc, stats={})
     monkeypatch.setattr(web.openscrub, 'run_scan', scan)
     deferred = []
     monkeypatch.setattr(web, '_start_owned_thread', lambda target, lease: deferred.append((target,lease)))
     web._run_job(exact.job, 'scan'); assert len(deferred) == 1
-    monkeypatch.setattr(web, '_load_job_report', lambda job: {'render_state': {'fps':5,'cum':[[0,0]]*10}, 'detections':[{'last_seen':0,'t_start':0,'t_end':1,'cbox':[50,40,70,60]}]})
     native = cv2.VideoCapture(str(foreign)); owner = web.FILES.initialize(source)
     source_report = Path(source['dir'])/'report.json'; source_report.write_text('{}')
+    reads = []
     class Capture:
+        def __getattr__(self, attribute):
+            return getattr(native, attribute)
         def read(self):
             result = native.read()
+            reads.append(result[0])
             with owner.report_lock:
                 if change == 'recovery': owner.recovery_required = True
                 else: web._publish_job_report_locked(source, str(source_report), {'updated':True})
@@ -318,14 +326,14 @@ def test_foreign_source_change_during_pregen_never_writes_thumbnail(exact, monke
         def set(self,*args): return native.set(*args)
         def release(self): native.release()
     monkeypatch.setattr(web.cv2, 'VideoCapture', lambda path: Capture())
-    writes = []
-    monkeypatch.setattr(web.cv2, 'imwrite', lambda *args: writes.append(args) or True)
     target, lease = deferred.pop()
     try: target()
     finally:
         lease.release()
         with owner.report_lock: owner.recovery_required = False
-    assert writes == []
+    assert reads == [True]
+    assert not web.FILES.initialize(exact.job).thumbnail.entries
+    assert web.FILES.count == 0
 
 
 @pytest.mark.parametrize('timing', ['admission', 'worker'])

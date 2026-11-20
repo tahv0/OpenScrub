@@ -578,7 +578,11 @@ def test_web_decoder_exception_closes_handle_before_owner_release(store, monkeyp
             web.VAULT_LOCK.release()
             self.closed = True
     monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *a: Decoder())
-    assert request('get', store.url + '/' + endpoint).status_code == 500
+    response = request('get', store.url + '/' + endpoint)
+    if endpoint in ('detframe/0', 'thumb/0'):
+        assert response.status_code == 404 and response.json['error'] == 'thumbnail_unavailable'
+    else:
+        assert response.status_code == 500
     assert handles and all(handle.closed for handle in handles)
     assert web.FILES.count == 0
 

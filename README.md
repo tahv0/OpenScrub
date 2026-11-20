@@ -480,6 +480,16 @@ that the browser download started. Without picker support, enable **Ask where
 to save each file** in browser download settings. The destination is on the
 device running the browser, including when OpenScrub runs in Docker.
 
+Review thumbnails refresh once when an outdated image is requested. If a
+report changes a detection (including its blur choice or a member of a
+collapsed group), its image may instead show “Review changed; reopen review
+to refresh.” Reopen the review to see current images and recheck any pending
+edits. Already displayed images do not update until requested again. Image
+identity detects ordinary file replacement; external changes that preserve all
+observed file attributes, and filesystems with weak file identity, may not be
+detected. Old private thumbnail files may remain after a restart; they are
+not used as current images and are removed with their job data.
+
 **Settings** (gear icon): detection model pickers for **Face**,
 **License-plate**, and **Person (full-body blur)** — optional models are
 downloaded on demand with SHA-256 verification and license badges —
