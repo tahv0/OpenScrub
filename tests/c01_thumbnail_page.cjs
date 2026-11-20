@@ -16,6 +16,10 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   const errors=[],images=[],metadata=[];
   page.on('pageerror',e=>errors.push(e.message));
   let generation=0,failMetadata=false,holdRecovery=null,holdInitial=false;
+  let releaseCrop,markCropStarted,markCropFinished,cropHeld=false;
+  const heldCrop=new Promise(resolve=>{releaseCrop=resolve});
+  const cropStarted=new Promise(resolve=>{markCropStarted=resolve});
+  const cropFinished=new Promise(resolve=>{markCropFinished=resolve});
   await page.route('**/*',async route=>{
    const url=new URL(route.request().url()),path=url.pathname;
    if(path==='/')return route.fulfill({contentType:'text/html;charset=utf-8',body:pageHTML});
@@ -34,7 +38,14 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
    if(image){
     const version=url.searchParams.get('v');
     images.push({kind:image[1],id:+image[2],version});
-    if(version!==versions[generation])return route.fulfill({status:409,json:{error:'thumbnail_obsolete',refresh:'detections'}});
+    if(image[1]==='thumb'&&image[2]==='2'&&version===versions[0]&&!cropHeld){
+     cropHeld=true;markCropStarted();await heldCrop;
+     await route.fulfill({contentType:'image/png',body:pixel});markCropFinished();return;
+    }
+    // Keep already-started old crop reads successful through this controlled
+    // transition, so only detframe/0 starts the held metadata recovery.
+    const controlledOldCrop=generation===1&&image[1]==='thumb'&&version===versions[0];
+    if(version!==versions[generation]&&!controlledOldCrop)return route.fulfill({status:409,json:{error:'thumbnail_obsolete',refresh:'detections'}});
     return route.fulfill({contentType:'image/png',body:pixel});
    }
    return route.fulfill({json:{}});
@@ -50,6 +61,8 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   await page.locator('#review').waitFor();
   await page.evaluate(()=>scrollTo(0,document.getElementById('detwrap').getBoundingClientRect().top+scrollY-55));
   await page.waitForFunction(()=>document.querySelector('#det0 img')?.naturalWidth>0);
+  let cropTimer;try{await Promise.race([cropStarted,new Promise((_,reject)=>{cropTimer=setTimeout(()=>reject(Error('old crop did not start')),5000)})]);}finally{clearTimeout(cropTimer)}
+  assert(cropHeld,'expected an outstanding crop during the generation transition');
   assert(images.some(x=>x.id===0&&x.version===versions[0]));
   assert.match(await page.locator('#det0').innerText(),/literal <strong>0<\/strong>/);
   assert.equal(await page.locator('#det0 strong').count(),0);
@@ -74,6 +87,7 @@ const rows=Array.from({length:120},(_,i)=>row(i,i<2?{track:7,confidence:i===0?.9
   await page.waitForFunction(()=>document.querySelector('#lb [data-thumb-status]')?.hidden===false);
   assert.equal(metadata.length,before+1);
   assert(images.some(x=>x.id===0&&x.kind==='detframe'&&x.version===versions[0]));
+  releaseCrop();await cropFinished;
   release();holdRecovery=null;
   await page.waitForFunction(()=>REVIEW_META?.thumbnails?.version==='b'.repeat(32)&&REVIEW_SCHED?.bindings.get(2)?.url&&document.querySelector('#det2 img')?.naturalWidth>0&&document.querySelector('#det0 [data-thumb-reopen]')?.hidden===false);
   assert(images.some(x=>x.id===2&&x.version===versions[1]));
