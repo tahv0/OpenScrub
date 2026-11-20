@@ -117,8 +117,9 @@ legacy reports retain their existing choices and are not converted. Unhandled
 suggestions do not prevent export.
 
 The options are available through the CLI, job API and the web Scan Setup's
-advanced settings. The existing review screens do not yet label all optional
-suggestions or provide post-scan policy controls. An API client can submit
+advanced settings. Review cards identify unmasked uncertain observations,
+automatic masks and unsupported samples. The frame editor does not yet show
+uncertain candidates as overlays or offer post-scan policy controls. An API client can submit
 `uncertain_policy`, `plate_threshold` and
 `plate_auto_cutoff` in the scan options. On a capable report, a
 `POST /api/jobs/<id>/detections` request may include, for example,

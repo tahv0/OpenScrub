@@ -3270,7 +3270,12 @@ def job_edit_sample(jid):
             raise exact.ExactError('JPEG encoding failed: '+str(error), 500, 'sample_encode_failed') from None
         offset = cum[index]
         boxes = []
+        capable = doc.get('plate_policy_evidence_version') == 1
         for i, row in enumerate(doc['detections']):
+            if capable and row.get('category') == 'plate':
+                if (not openscrub.plate_policy._valid_geometry(row)
+                        or row['policy_evidence']['frame'] != index):
+                    continue
             baseline = exact.row_base(row)
             start, end, _ = baseline['span']
             if start-.01 <= decoded.canonical_s <= end+.01:
@@ -3337,22 +3342,54 @@ def job_detections(jid):
         rows, rs, reused = _thumbnail_validate_snapshot(job, fresh_snapshot)
         generation = _thumbnail_select(job, doc, selected, fence, lease,
             validated=None if reused else (rows, rs), reuse_generation=reused)
+        capable = doc.get('plate_policy_evidence_version') == 1
+        policy = decisions = None
+        if capable:
+            provenance = doc.get('provenance')
+            settings = provenance.get('settings') if isinstance(provenance, dict) else None
+            if isinstance(settings, dict):
+                policy = {key: settings.get(key) for key in
+                          ('uncertain_policy', 'plate_threshold', 'plate_auto_cutoff')}
+                try:
+                    if policy['uncertain_policy'] not in ('manual_review', 'blur_candidates', 'off'):
+                        raise ValueError('missing policy')
+                    openscrub.plate_policy.validate_settings(
+                        'manual_review', policy['plate_threshold'], policy['plate_auto_cutoff'])
+                    decisions = openscrub.plate_policy.evaluate(
+                        rows, policy['uncertain_policy'], policy['plate_threshold'],
+                        policy['plate_auto_cutoff'], capable_off=True)
+                except ValueError:
+                    decisions = None
+            if decisions is None:
+                policy = {'uncertain_policy': 'unavailable', 'plate_threshold': None,
+                          'plate_auto_cutoff': None}
         items = []
         for i, d in enumerate(rows):
-            items.append({"i": i, "category": d["category"], "text": d["text"],
+            item = {"i": i, "category": d["category"], "text": d["text"],
                           "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
                           "enabled": d.get("enabled", True), "track": d.get("track", -1),
                           "person": d.get("person", -1), "confidence": d.get("confidence", 0),
                           "zone_dropped": bool(d.get("zone_dropped")),
-                          "thumbnail_row": thumbs.raw_row_fingerprint(d)})
+                          "thumbnail_row": thumbs.raw_row_fingerprint(d)}
+            if capable and d.get('category') == 'plate' and not d.get('zone_dropped'):
+                if decisions is not None:
+                    item['enabled'] = decisions[i].enabled
+                item['policy_status'] = decisions[i].status if decisions is not None else 'unknown'
+                item['policy_geometry_supported'] = openscrub.plate_policy._valid_geometry(d)
+                if d.get('output_choice') in ('blur', 'keep'):
+                    item['output_choice'] = d['output_choice']
+            items.append(item)
         files = FILES.initialize(job)
         with _thumbnail_owner_guard(job, lease, generation):
             _thumbnail_current_locked(job, selected, fence)
             if files.thumbnail.current is not generation:
                 raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')
-        return jsonify({"detections": items, "fps": rs['fps'],
-                        "duration": len(rs['cum']) / rs['fps'],
-                        "thumbnail_version": generation.version})
+        result = {"detections": items, "fps": rs['fps'],
+                  "duration": len(rs['cum']) / rs['fps'],
+                  "thumbnail_version": generation.version}
+        if capable:
+            result['plate_policy'] = policy
+        return jsonify(result)
     except _ThumbnailError as error:
         return _thumbnail_error_response(error)
     except (KeyError, TypeError, ValueError, OverflowError):
@@ -6250,6 +6287,8 @@ function reviewMetadata(data){
 }
 function reviewDescriptors(rows){
  const groups=Object.create(null),zones=[];TRKMEM={};ROWCARD={};
+ const policyRows=new Map(rows.filter(x=>typeof x.policy_status==='string'&&
+  typeof x.policy_geometry_supported==='boolean').map(x=>[x.i,x]));
  for(const x of rows){
   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
   if(x.zone_dropped)zones.push(x);
@@ -6257,7 +6296,11 @@ function reviewDescriptors(rows){
  }
  const sections=[];
  function section(category,items,zone=false){
-  const cards=items.map(x=>({id:x.i,category,realCategory:x.category,zone,representative:x,members:zone?[x.i]:TRKMEM[x.i]}));
+  const cards=items.map(x=>{
+   const members=zone?[x.i]:TRKMEM[x.i],selected=members.filter(i=>policyRows.has(i));
+   return {id:x.i,category,realCategory:x.category,zone,representative:x,members,
+    ...(selected.length?{policyRows:new Map(selected.map(i=>[i,policyRows.get(i)]))}:{})};
+  });
   for(const c of cards)for(const m of c.members)ROWCARD[m]=c.id;
   sections.push({category,zone,index:sections.length,cards,ids:cards.map(c=>c.id)});
  }
@@ -6284,11 +6327,12 @@ function reviewDescriptors(rows){
 }
 function reviewCard(c){
  const x=c.representative,cat=c.category;
+ const unit=c.policyRows?'sample':'appearance';
  return `<div class="det" id="det${c.id}" data-cat="${detLabel(cat)}">
   <div class="thumbwell"><img alt="Detection preview" style="cursor:zoom-in" onclick="zoomDet(${c.id})"></div>
-  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-  ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(reviewCategoryName(cat))} group</div>`:''}
-  ${detChoices(c.id,c.zone?'Outside-zone detection':reviewCategoryName(cat))}
+  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} ${c.policyRows?'samples':'frames'}</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+  ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} ${unit}s in this ${detLabel(reviewCategoryName(cat))} group</div>`:''}
+  ${detChoices(c.id,c.zone?'Outside-zone detection':reviewCategoryName(cat),!!c.policyRows)}
   <button type="button" class="sec" data-thumb-reopen hidden onclick="loadReview()">Re-open review</button></div>`;
 }
 function reviewLoadFailure(id,gen){
@@ -6343,8 +6387,16 @@ async function loadReview(auto=null){
  const sections=reviewDescriptors(d.detections);
  REVIEW_META={jobId:id,viewGen:gen,sections,thumbnails,
   byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+ const plateMode=d.plate_policy?.uncertain_policy;
+ const plateNote=plateMode==='manual_review'
+  ?'Plate policy: Review uncertain. Uncertain observations remain unmasked for review.'
+  :plateMode==='blur_candidates'
+   ?'Plate policy: Blur candidates. Supported candidates may be masked automatically, including short appearances.'
+   :plateMode==='off'?'Plate policy is off; saved output and choices are retained.'
+   :plateMode==='unavailable'?'Plate policy settings are unavailable. Inspect the report before rendering.':'';
  let html=`<div class="card" id="review"><h2>Review — choose Blur or Keep visible.
  Drag a box around several to bulk-set.</h2>
+ ${plateNote?`<p class="detscope">${plateNote}</p>`:''}
  <div class="row" style="margin:0 0 8px"><button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes (before rendering)</button></div>
  <div class="row reviewfilters">
   <label>Detection type <select id="reviewType" onchange="setReviewFilter(this.value||null,REVIEW_FILTER.output)"></select></label>
@@ -6778,9 +6830,14 @@ window.addEventListener?.('pageshow',()=>{
   REVIEW_SCHED.start();initMarquee();
  }
 });
+function reviewOn(card,i){
+ const evidence=card.policyRows?.get(i);
+ if(evidence?.policy_status==='unknown')return null;
+ return !!EN[i]&&(!evidence||evidence.policy_geometry_supported===true);
+}
 function reviewMatches(card,type,output){
  return (type===null||card.realCategory===type)&&(output==="all"||
-  card.members.some(i=>output==="blur"?!!EN[i]:!EN[i]));
+  card.members.some(i=>output==="blur"?reviewOn(card,i)===true:reviewOn(card,i)===false));
 }
 function setReviewFilter(type,output){
  if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
@@ -6819,8 +6876,9 @@ function refreshReviewFilters(){
  let lostFocus=false;
  // Derive aggregates once per transaction, independently of mounted/closed cards.
  for(const s of REVIEW_META.sections)for(const c of s.cards){
-  let blurred=0;for(const i of c.members)if(EN[i])blurred++;
-  const kept=c.members.length-blurred,typeMatch=type===null||c.realCategory===type;
+  let blurred=0,kept=0;for(const i of c.members){
+   const on=reviewOn(c,i);if(on===true)blurred++;else if(on===false)kept++;}
+  const typeMatch=type===null||c.realCategory===type;
   const outputMatch=output==="all"||(output==="blur"?blurred>0:kept>0),match=typeMatch&&outputMatch;
   if(outputMatch){typeCounts.set(c.realCategory,typeCounts.get(c.realCategory)+1);otherTypeCount++;}
   if(typeMatch){outputCounts.all++;if(blurred)outputCounts.blur++;if(kept)outputCounts.visible++;}
@@ -6850,11 +6908,12 @@ function refreshReviewFilters(){
 }
 
 function detLabel(s){return String(s).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","\'":"&#39;"}[c]));}
-function detChoices(i,category){
+function detChoices(i,category,samples=false){
  const count=(TRKMEM[i]||[i]).length;
+ const unit=samples?'sample':'appearance';
  return `<div class="detstate" id="ds${i}"></div>
  <div class="detchoices" id="dc${i}" role="group"
-  aria-label="${detLabel(category)} output, appearance ${i+1}, ${count} appearance${count===1?"":"s"}"
+  aria-label="${detLabel(category)} output, ${unit} ${i+1}, ${count} ${unit}${count===1?"":"s"}"
   aria-describedby="ds${i}">
   <button class="blurbtn blur" id="bb${i}" aria-pressed="false"
    onclick="applyDet(${i},true)">Blur</button>
@@ -6862,9 +6921,32 @@ function detChoices(i,category){
    onclick="applyDet(${i},false)">Keep visible</button></div>`;
 }
 function refreshDet(i){
- const members=TRKMEM[i]||[i],blurred=members.reduce((n,m)=>n+(EN[m]?1:0),0);
+ const members=TRKMEM[i]||[i],meta=REVIEW_META?.byId.get(i);
+ const blurred=members.reduce((n,m)=>n+(meta?reviewOn(meta,m):!!EN[m]),0);
  const kept=members.length-blurred;
  const state=document.getElementById("ds"+i),card=document.getElementById("det"+i);
+ if(meta?.policyRows){
+  let uncertain=0,gaps=0,automatic=0,unknown=0;const choices=[];
+  for(const m of members){
+   const row=meta.policyRows.get(m),pending=Object.prototype.hasOwnProperty.call(EDITS.enabled,m);
+   if(row&&!row.policy_geometry_supported)gaps++;
+   if(row?.policy_status==='suggestion'&&!pending)uncertain++;
+   if(row?.policy_status==='automatic'&&!pending)automatic++;
+   if(row?.policy_status==='unknown')unknown++;
+   choices.push(pending?(EDITS.enabled[m]?'blur':'keep'):(row?.output_choice||null));
+  }
+  let text=unknown?'Plate policy unavailable; inspect before rendering':
+   `${blurred} of ${members.length} samples will be blurred`;
+  if(uncertain)text+=` · ${uncertain} uncertain observation${uncertain===1?' remains':'s remain'} unmasked`;
+  if(gaps)text+=` · ${gaps} unsupported sample${gaps===1?'':'s'}`;
+  if(automatic)text+=` · ${automatic} automatic mask${automatic===1?'':'s'}`;
+  if(state)state.textContent=text;
+  const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
+  if(blur)blur.setAttribute("aria-pressed",String(!gaps&&choices.every(x=>x==='blur')));
+  if(keep)keep.setAttribute("aria-pressed",String(choices.every(x=>x==='keep')));
+  if(card)card.classList.toggle("off",blurred===0&&!uncertain&&!unknown);
+  return;
+ }
  if(state)state.textContent=kept===0?"Will be blurred":blurred===0?"Will stay visible":
   `Mixed — ${blurred} will be blurred; ${kept} will stay visible`;
  const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
@@ -6989,6 +7071,18 @@ function acknowledgeMap(current,submitted){
  for(const [key,value] of Object.entries(submitted))
   if(sameEdit(current[key],value))delete current[key];
 }
+function acknowledgePolicyChoices(owner,submitted){
+ if(!owner||REVIEW_SCHED!==owner)return [];
+ const changed=new Set();
+ for(const [key,value] of Object.entries(submitted)){
+  const id=ROWCARD[key]??+key,card=owner.meta.byId.get(id),row=card?.policyRows?.get(+key);
+  if(!row)continue;
+  row.output_choice=value?'blur':'keep';
+  row.policy_status=value?(row.policy_geometry_supported?'blur':'gap'):'keep';
+  changed.add(id);
+ }
+ return [...changed];
+}
 function acknowledgeAdds(current,refs,submitted){
  for(let i=current.length-1;i>=0;i--){
   const index=refs.indexOf(current[i]);
@@ -7103,7 +7197,9 @@ async function saveAndRender(){
   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
   acknowledgeGeometry(b,submission,result);
   saved=true;d.submitted=null;d.audioInFlight=false;
+  const policyCards=ownsView(id,gen)?acknowledgePolicyChoices(reviewOwner,payload.enabled):[];
   acknowledgeMap(d.enabled,payload.enabled);
+  if(policyCards.length){policyCards.forEach(refreshDet);refreshReviewFilters();}
   acknowledgeAdds(d.manual,submission.manualRefs,submission.manualSnapshot);acknowledgeAdds(b.adds,submission.addRefs,submission.addSnapshot);
   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
   // A switched-away view never opens a confirmation or changes current UI.
