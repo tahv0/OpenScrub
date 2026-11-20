@@ -360,3 +360,58 @@ def test_source_guard_survives_quad_context_downgrade(exact, tmp_path):
         openscrub.run_pipeline(args, Publish())
     assert output.read_bytes() == b'previous-output'
     assert exact.path.read_bytes() == old_report
+
+
+@pytest.mark.parametrize('alias_kind', ['same_path', 'hardlink', 'symlink'])
+def test_guarded_report_source_alias_refused_before_any_stage(exact, tmp_path, alias_kind, monkeypatch):
+    source = saved_plate(exact)
+    prior_source = source.read_bytes()
+    initial = source.stat()
+    prior_report = exact.path.read_bytes()
+    output = tmp_path / 'redacted.mp4'
+    output.write_bytes(b'previous output')
+    if alias_kind == 'same_path':
+        report = source
+    else:
+        report = tmp_path / 'source-alias'
+        if alias_kind == 'hardlink':
+            os.link(source, report)
+        else:
+            report.symlink_to(source)
+        initial = source.stat()  # Creating the hardlink changes ctime.
+    entries = []
+    real_enter = _RenderDelivery.__enter__
+    def track_stage(delivery):
+        entries.append(delivery.video_stage)
+        return real_enter(delivery)
+    monkeypatch.setattr(_RenderDelivery, '__enter__', track_stage)
+    args = openscrub.build_parser().parse_args([str(source), '--from-report', str(exact.path),
+        '--report', str(report), '--output', str(output), '--encoder', 'x264',
+        '--mode', 'box', '--pad', '0'])
+    with pytest.raises(RuntimeError, match='quad input'):
+        openscrub.run_pipeline(args, Quiet())
+    after = source.stat()
+    assert not entries
+    assert (after.st_dev, after.st_ino, after.st_mtime_ns) == (
+        initial.st_dev, initial.st_ino, initial.st_mtime_ns)
+    assert source.read_bytes() == prior_source
+    assert output.read_bytes() == b'previous output'
+    assert exact.path.read_bytes() == prior_report
+    assert not list(tmp_path.glob('.render-*'))
+    assert not list(source.parent.glob('.render-*'))
+    assert not list(tmp_path.glob('.report-*.tmp'))
+    assert not list(source.parent.glob('.report-*.tmp'))
+
+
+def test_no_quad_report_source_alias_keeps_legacy_publication(exact, tmp_path):
+    source = saved_plate(exact)
+    doc = raw(exact)
+    del doc['detections'][0]['manual_plate_quad']
+    exact.path.write_text(json.dumps(doc))
+    output = tmp_path / 'redacted.mp4'
+    args = openscrub.build_parser().parse_args([str(source), '--from-report', str(exact.path),
+        '--report', str(source), '--output', str(output), '--encoder', 'x264',
+        '--mode', 'box', '--pad', '0'])
+    openscrub.run_pipeline(args, Quiet())
+    assert json.loads(source.read_text())['detections'][0]['category'] == 'plate'
+    assert output.is_file() and output.stat().st_size > 0

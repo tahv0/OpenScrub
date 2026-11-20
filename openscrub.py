@@ -9048,12 +9048,15 @@ def run_render(args, state, cb=None):
     quad_guard = state.get('_quad_source_guard')
     _require_quad_source_current(quad_guard)
     if quad_guard is not None:
-        try:
-            same_input = os.path.samefile(quad_guard['path'], dst)
-        except FileNotFoundError:
-            same_input = False
-        if same_input:
-            raise RuntimeError('quad input cannot also be the render destination')
+        for role, destination in (('render', dst), ('report', args.report)):
+            if not destination:
+                continue
+            try:
+                same_input = os.path.samefile(quad_guard['path'], destination)
+            except FileNotFoundError:
+                same_input = False
+            if same_input:
+                raise RuntimeError('quad input cannot also be the %s destination' % role)
     out_q = getattr(args, "out_quality", "archival") or "archival"
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
