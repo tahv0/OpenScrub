@@ -28,4 +28,6 @@ The source-tree audit records Austin’s ancestry, 11 checked product modules, 5
 
 ## Working version and PR sequence
 
+The verified `9db95db` wheel and source archive are retained in the local runtime evidence under `c01-upstream-focused-v1.0.97/distributions`, with their audited hashes. The existing installed-wheel and launcher checks use an isolated data profile. The working-environment choice in C02 remains separate.
+
 Keep the integration build available for local evaluation and retain the original experiment as a recovery reference. Switching the working installation and publishing a topic are separate steps. Each topic PR should carry one symptom, a synthetic reproduction, observed before and after behavior, exact prerequisites, and relevant package or render checks. The current default-policy comparison remains part of evaluating any later confidence, continuity, detached-plate OCR or lettering-only options. [Plate discussion #21](https://github.com/austinmabry/OpenScrub/issues/21) · [Plate discussion #22](https://github.com/austinmabry/OpenScrub/issues/22)
