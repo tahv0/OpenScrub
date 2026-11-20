@@ -1132,7 +1132,7 @@ function platePolicyChanged(){
  $("plate-policy-help").textContent=policy==="manual_review"
   ?"Uncertain observations remain visible for manual review. Automatic blur starts after two associated high-score observations. Unsupported frames can remain visible."
   :policy==="blur_candidates"
-   ?"Blur retained candidates, including single observations. Extra short masks can appear; unsupported frames can remain visible."
+   ?"Blur retained candidates at the plate threshold, including single observations. Extra short masks can appear; unsupported frames can remain visible. The automatic cutoff is saved for Review uncertain."
    :"";
  clearPlatePolicyError();
 }

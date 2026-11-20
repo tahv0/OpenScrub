@@ -50,6 +50,8 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
    assert.equal(review.uncertain_policy,'manual_review');assert.equal(review.plate_auto_cutoff,.8);
    await policy.selectOption('blur_candidates');
    assert((await page.locator('#plate-policy-help').innerText()).includes('short'));
+   assert((await page.locator('#plate-policy-help').innerText()).includes('plate threshold'));
+   assert((await page.locator('#plate-policy-help').innerText()).includes('saved for Review uncertain'));
    const aggressive=await submit();
    assert.equal(aggressive.uncertain_policy,'blur_candidates');assert.equal(aggressive.plate_auto_cutoff,.8);
    await page.screenshot({path:path.join(root,'setup-'+label+'.png'),fullPage:true});
