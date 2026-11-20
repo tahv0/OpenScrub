@@ -206,3 +206,73 @@ def test_request_body_is_bounded_before_json_parsing(exact,monkeypatch):
     response=request('post',exact.url+'/plate_search',
                      data=b' '*4097, content_type='application/json')
     assert response.status_code == 400
+
+
+def test_sampled_search_uses_bounded_evenly_spaced_indices(exact,search_request,monkeypatch):
+    seen=[]
+    def run(payload,directory,cancelled,timeout):
+        seen.append(payload)
+        return {'complete':True,'frames':[{'index':index,'truncated':False,
+                'suggestions':_result()['suggestions'] if index==3 else []}
+                for index in payload['indices']]}
+    monkeypatch.setattr(web,'_run_plate_search_child',run)
+    before=exact.path.read_bytes()
+    response=request('post',exact.url+'/plate_search',json=dict(search_request,scope='sampled'))
+    assert response.status_code==200
+    assert seen[0]['indices']==[0,3,6,9]
+    assert response.json=={'state':'complete','frame_count':10,'fps':5.,'frames':[
+        {'index':0,'time_s':0.,'seek_s':.1,'matches':0,'truncated':False},
+        {'index':3,'time_s':.6,'seek_s':.7,'matches':1,'truncated':False},
+        {'index':6,'time_s':1.2,'seek_s':1.3,'matches':0,'truncated':False},
+        {'index':9,'time_s':1.8,'seek_s':1.9,'matches':0,'truncated':False}]}
+    assert exact.path.read_bytes()==before
+
+
+@pytest.mark.parametrize('count,expected', [(1,[0]),(2,[0,1]),(3,[0,1,2])])
+def test_sampled_search_short_videos_have_no_duplicate_indices(exact,monkeypatch,count,expected):
+    import cv2
+    import json
+    import numpy as np
+    writer=cv2.VideoWriter(exact.job['video'],cv2.VideoWriter_fourcc(*'MJPG'),5,(64,48))
+    assert writer.isOpened()
+    try:
+        for _ in range(count):writer.write(np.zeros((48,64,3),np.uint8))
+    finally:
+        writer.release()
+    doc=json.loads(exact.path.read_text());doc['render_state']['cum']=[[0,0]]*count
+    exact.path.write_text(json.dumps(doc))
+    body=dict(seed=precondition(sample(exact,0),None),query='ABC',mode='full',
+              request_id='b'*32,scope='sampled')
+    seen=[]
+    def run(payload,directory,cancelled,timeout):
+        seen.extend(payload['indices'])
+        return {'complete':True,'frames':[{'index':i,'truncated':False,'suggestions':[]}
+                                          for i in payload['indices']]}
+    monkeypatch.setattr(web,'_run_plate_search_child',run)
+    response=request('post',exact.url+'/plate_search',json=body)
+    assert response.status_code==200 and seen==expected
+    assert [frame['index'] for frame in response.json['frames']]==expected
+
+
+def test_sampled_search_rejects_incomplete_worker_coverage(exact,search_request,monkeypatch):
+    monkeypatch.setattr(web,'_run_plate_search_child',lambda *args:{'complete':True,'frames':[]})
+    response=request('post',exact.url+'/plate_search',json=dict(search_request,scope='sampled'))
+    assert response.status_code==503 and response.json['state']=='error'
+    assert 'frames' not in response.json
+
+
+def test_sampled_search_rejects_source_replacement(exact,search_request,monkeypatch):
+    entered,release=threading.Event(),threading.Event()
+    def run(payload,directory,cancelled,timeout):
+        entered.set();assert release.wait(5)
+        return {'complete':True,'frames':[{'index':i,'truncated':False,'suggestions':[]}
+                                          for i in payload['indices']]}
+    monkeypatch.setattr(web,'_run_plate_search_child',run)
+    call=start_call('post',exact.url+'/plate_search',json=dict(search_request,scope='sampled'))
+    try:
+        assert entered.wait(3)
+        Path(exact.job['video']).write_bytes(b'replaced')
+    finally:
+        release.set();response=finish(call)
+    assert response.status_code==409 and response.json['error']=='sample_conflict'
+    assert 'frames' not in response.json

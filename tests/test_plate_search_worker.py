@@ -103,3 +103,32 @@ def test_actual_worker_cancel_kills_descendants_and_cleans_job_temp(exact,video_
     assert response.status_code == 409 and response.json['state'] == 'cancelled'
     assert _dead(int(marker.read_text()))
     assert not list(Path(exact.job['dir']).glob('.plate-search-*'))
+
+
+def test_sampled_worker_timeout_is_not_a_negative_result(exact,video_request,tmp_path,monkeypatch):
+    marker=slow_tesseract(exact,tmp_path,monkeypatch)
+    monkeypatch.setattr(web,'_PLATE_SEARCH_DEADLINE',1.5)
+    response=request('post',exact.url+'/plate_search',json=dict(video_request,scope='sampled'))
+    assert marker.exists(), 'OCR subprocess never started'
+    assert response.status_code==504 and response.json['state']=='timeout'
+    assert 'frames' not in response.json
+    assert _dead(int(marker.read_text()))
+    assert not list(Path(exact.job['dir']).glob('.plate-search-*'))
+
+
+def test_sampled_worker_cancel_kills_descendants_without_partial_results(exact,video_request,tmp_path,monkeypatch):
+    marker=slow_tesseract(exact,tmp_path,monkeypatch)
+    call=start_call('post',exact.url+'/plate_search',json=dict(video_request,scope='sampled'))
+    try:
+        deadline=time.monotonic()+5
+        while not marker.exists() and time.monotonic()<deadline:
+            time.sleep(.02)
+        assert marker.exists(), 'OCR subprocess never started'
+        assert request('post',exact.url+'/plate_search/cancel',
+                       json={'request_id':video_request['request_id']}).status_code==200
+    finally:
+        response=finish(call)
+    assert response.status_code==409 and response.json['state']=='cancelled'
+    assert 'frames' not in response.json
+    assert _dead(int(marker.read_text()))
+    assert not list(Path(exact.job['dir']).glob('.plate-search-*'))

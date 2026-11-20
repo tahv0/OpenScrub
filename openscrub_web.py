@@ -3315,12 +3315,15 @@ def job_plate_search_cancel(jid):
 
 @app.route('/api/jobs/<jid>/plate_search', methods=['POST'])
 def job_plate_search(jid):
-    """Search exactly the inspected sample; never publish a report mutation."""
+    """Search the inspected sample or four explicit video samples without report writes."""
     job = JOBS.get(jid) or abort(404)
     body = _plate_search_json()
     try:
-        if not isinstance(body, dict) or set(body) != {'seed', 'query', 'mode', 'request_id'}:
+        fields = {'seed', 'query', 'mode', 'request_id'}
+        if (not isinstance(body, dict) or set(body) not in (fields, fields | {'scope'})
+                or ('scope' in body and body['scope'] != 'sampled')):
             raise ValueError()
+        sampled = body.get('scope') == 'sampled'
         seed = _parse_sample_precondition(body['seed'])
         if set(seed) != {'version','source_ref','timeline_eq','policy','index','width','height','offset'}:
             raise ValueError()
@@ -3386,6 +3389,10 @@ def job_plate_search(jid):
         payload = dict(path=selected['path'], stamp=list(selected['stamp']), index=seed['index'],
                        fps=fps, count=len(cum), width=seed['width'], height=seed['height'],
                        tolerance_s=tolerance, query=query, mode=mode)
+        if sampled:
+            n = min(4, len(cum))
+            indices = [0] if n == 1 else [i*(len(cum)-1)//(n-1) for i in range(n)]
+            payload['indices'] = indices
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise plate_search_worker.WorkerTimedOut()
@@ -3394,8 +3401,15 @@ def job_plate_search(jid):
         except plate_search_worker.WorkerFailed:
             current()
             raise
-        suggestions = _plate_search_result(value, seed['width'], seed['height'], mode)
+        if sampled:
+            frames = plate_search_worker.validate_sampled_result(value, seed['width'], seed['height'], mode, indices)
+        else:
+            suggestions = _plate_search_result(value, seed['width'], seed['height'], mode)
         current()
+        if sampled:
+            return jsonify(state='complete', frame_count=len(cum), fps=fps, frames=[
+                dict(index=frame['index'], time_s=frame['index']/fps, seek_s=(frame['index']+.5)/fps,
+                     matches=len(frame['suggestions']), truncated=frame['truncated']) for frame in frames])
         return jsonify(state='complete', index=seed['index'], truncated=value['truncated'],
                        suggestions=suggestions)
     except plate_search_worker.WorkerCancelled:
@@ -5533,6 +5547,15 @@ async function beApplySample(view,serial,data){
   if(previous&&previous!==url)URL.revokeObjectURL(previous);
   const b=view.editor;b.raw=data.rows;b.ox=data.sample.offset[0];b.oy=data.sample.offset[1];b.t=data.sample.canonical_s;
   view.readySample={serial,...data,imageURL:url};
+  const inspection=view.plate.inspect;
+  if(inspection&&inspection.serial===serial){
+   view.plate.inspect=null;
+   const s=data.sample,old=inspection.sample;
+   view.plate.message=s.index===inspection.index&&s.source_ref===old.source_ref&&s.timeline_eq===old.timeline_eq&&
+    s.policy===old.policy&&s.width===old.width&&s.height===old.height?
+     `Frame ${s.index} is ready. Search this frame to see its suggestions.`:
+     'The source or frame changed since the sampled search. Inspect and search again.';
+  }
   const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
   beFilter();beDraw();beTLDraw();bePlateRender(view);
  }finally{if(url&&!installed)URL.revokeObjectURL(url);}
@@ -5565,6 +5588,7 @@ function bePumpSamples(){
    if(beSampleCurrent(view,serial)){
     view.readySample=null;view.loading=true;view.transform=null;
     const label=document.getElementById('beL');if(label)label.textContent=String(error.message||error);
+    if(view.plate.inspect?.serial===serial){view.plate.inspect=null;view.plate.message='The sampled frame could not be inspected. Try again.';bePlateRender(view);}
     beDraw();
    }
   }finally{if(EDIT_SAMPLE_IO.active===request){EDIT_SAMPLE_IO.active=null;bePumpSamples();}}
@@ -5599,11 +5623,13 @@ function bePlateRender(view){
  if(!view?.current())return;
  const p=view.plate,run=document.getElementById('bePlateRun'),cancel=document.getElementById('bePlateCancel');
  const status=document.getElementById('bePlateStatus'),list=document.getElementById('bePlateResults'),
-       actions=document.getElementById('bePlateActions');
- if(!run||!cancel||!status||!list||!actions)return;
+       actions=document.getElementById('bePlateActions'),samples=document.getElementById('bePlateSamples'),
+       sampleRun=document.getElementById('bePlateSampleRun');
+ if(!run||!cancel||!status||!list||!actions||!samples||!sampleRun)return;
  run.disabled=!!p.request||!beReady(view);
+ sampleRun.disabled=run.disabled;
  cancel.hidden=!p.request||p.request.cancelRequested;
- status.textContent=p.message;list.replaceChildren();actions.replaceChildren();
+ status.textContent=p.message;list.replaceChildren();actions.replaceChildren();samples.replaceChildren();
  p.rows.forEach((row,i)=>{
   const button=document.createElement('button');button.type='button';button.className='sec';
   button.textContent=`Suggestion ${i+1} · ${row.match==='full_equal'?'full text':'fragment'} match`;
@@ -5627,6 +5653,22 @@ function bePlateRender(view){
    action.textContent='Adjust for tracking';action.onclick=bePlatePrepare;actions.appendChild(action);
   }
  }
+ if(p.batch&&p.batch.sample===view.readySample&&beReady(view)){
+  for(const frame of p.batch.frames){
+   const button=document.createElement('button');button.type='button';button.className='sec';
+   button.textContent=`Inspect frame ${frame.index} · ${frame.time_s.toFixed(2)}s · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
+   button.onclick=()=>bePlateInspectSample(view,frame);samples.appendChild(button);
+  }
+ }
+}
+function bePlateInspectSample(view,frame){
+ const p=view?.plate,batch=p?.batch;
+ if(!batch||!view.current()||!beReady(view)||batch.sample!==view.readySample||!batch.frames.includes(frame))return;
+ const slider=document.getElementById('beT');if(slider)slider.value=frame.seek_s;
+ beRequestSample(view,frame.seek_s);
+ p.inspect={serial:view.serial,index:frame.index,sample:batch.sample.sample};
+ p.message=`Inspecting frame ${frame.index}. Search this frame to see its suggestions.`;
+ bePlateRender(view);
 }
 function bePlateDiscardRegion(view){
  const p=view?.plate;if(!p?.region)return;
@@ -5667,7 +5709,7 @@ function bePlateRetire(view,message){
     body:JSON.stringify({request_id:request.id})}).catch(()=>{});
   }
  }
- bePlateDiscardRegion(view);p.rows=[];p.selected=-1;p.sample=null;if(message)p.message=message;
+ bePlateDiscardRegion(view);p.rows=[];p.selected=-1;p.sample=null;p.batch=null;p.inspect=null;if(message)p.message=message;
  if(view.current()){bePlateRender(view);beDraw();}
 }
 function bePlateChanged(){
@@ -5676,9 +5718,9 @@ function bePlateChanged(){
  view.plate.message='Text or match mode changed. Search again.';bePlateRender(view);
 }
 function bePlateClose(view){
- bePlateRetire(view,'Search only the current frame. Suggestions do not blur anything.');
+ bePlateRetire(view,'Choose a frame search or video samples. Suggestions do not blur anything.');
  const query=document.getElementById('bePlateQuery');if(query)query.value='';
- view.plate.message='Search only the current frame. Suggestions do not blur anything.';bePlateRender(view);
+ view.plate.message='Choose a frame search or video samples. Suggestions do not blur anything.';bePlateRender(view);
 }
 function bePlateSummary(){
  const view=BE_VIEW,details=document.getElementById('bePlate');
@@ -5704,8 +5746,26 @@ function bePlateValidate(value,sample,mode){
  }
  return value.suggestions.map(row=>({box:[...row.box],match:row.match}));
 }
-async function bePlateGo(){
+function bePlateValidateSamples(value){
+ if(value?.state!=='complete'||!Number.isSafeInteger(value.frame_count)||value.frame_count<1||
+    typeof value.fps!=='number'||!Number.isFinite(value.fps)||value.fps<=0||
+    !Array.isArray(value.frames)||value.frames.length!==Math.min(4,value.frame_count))throw Error('invalid sampled response');
+ let previous=-1;
+ for(const frame of value.frames){
+  if(!frame||!Number.isSafeInteger(frame.index)||frame.index<=previous||frame.index>=value.frame_count||
+     typeof frame.time_s!=='number'||!Number.isFinite(frame.time_s)||frame.time_s<0||
+     Math.abs(frame.time_s-frame.index/value.fps)>Number.EPSILON*Math.max(1,frame.time_s)*4||
+     typeof frame.seek_s!=='number'||!Number.isFinite(frame.seek_s)||frame.seek_s<frame.time_s||
+     Math.floor(frame.seek_s*value.fps)!==frame.index||
+     !Number.isSafeInteger(frame.matches)||frame.matches<0||frame.matches>128||typeof frame.truncated!=='boolean')
+   throw Error('invalid sampled frame');
+  previous=frame.index;
+ }
+ return value.frames.map(frame=>({...frame}));
+}
+async function bePlateGo(scope='frame'){
  const view=BE_VIEW;if(!view||!view.current()||view.plate.request)return;
+ const sampled=scope==='sampled';
  const p=view.plate,query=document.getElementById('bePlateQuery')?.value||'',
        mode=document.getElementById('bePlateMode')?.value;
  if(!beReady(view)){p.message='Pause and inspect a frame before searching.';bePlateRender(view);return;}
@@ -5717,24 +5777,31 @@ async function bePlateGo(){
  try{identity=manualId().replace(/-/g,'');}
  catch(_){p.message='A secure request identifier is unavailable in this browser.';bePlateRender(view);return;}
  const req={id:identity,serial:view.serial,sample:view.readySample,retired:false,cancelRequested:false,userCancelled:false};
- bePlateDiscardRegion(view);p.request=req;p.rows=[];p.selected=-1;p.sample=null;p.message='Searching this frame…';bePlateRender(view);beDraw();
+ bePlateDiscardRegion(view);p.request=req;p.rows=[];p.selected=-1;p.sample=null;p.batch=null;
+ p.message=sampled?'Searching up to four video samples…':'Searching this frame…';bePlateRender(view);beDraw();
  try{
   const response=await fetch(`api/jobs/${view.id}/plate_search`,{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({request_id:req.id,seed:copyEdit(req.sample.precondition),query,mode})});
+   body:JSON.stringify({request_id:req.id,seed:copyEdit(req.sample.precondition),query,mode,...(sampled?{scope:'sampled'}:{})})});
   let result;try{result=await response.json();}catch(_){throw Error('invalid search response');}
   if(!view.current()||p.request!==req||req.retired||!beSampleCurrent(view,req.serial)||view.readySample!==req.sample)return;
   if(!response.ok){
-   if(result?.state==='timeout')p.message='Search timed out; this frame was not fully searched.';
+   if(result?.state==='timeout')p.message=sampled?'Sample search timed out; no sample results were returned.':'Search timed out; this frame was not fully searched.';
    else if(result?.state==='cancelled')p.message='Search cancelled; no suggestions were applied.';
    else if(result?.error==='search_busy')p.message='Another search is running. Try again when it finishes.';
    else if(response.status===409)p.message='The inspected frame changed. Inspect it again and retry.';
    else p.message='Search unavailable. Check the local Tesseract installation and supported runtime.';
    return;
   }
-  p.rows=bePlateValidate(result,req.sample.sample,mode);p.selected=-1;p.sample=req.sample;
-  p.message=p.rows.length?`Found ${p.rows.length} ${p.rows.length===1?'suggestion':'suggestions'} on this frame. Select one to inspect and adjust a region for tracking.`:
-   'No matching text found in this frame. OCR can miss text.';
-  if(result.truncated)p.message+=' Results were truncated.';
+  if(sampled){
+   const frames=bePlateValidateSamples(result);p.batch={frames,sample:req.sample};
+   p.message=`Searched ${frames.length} of ${result.frame_count} frames; only the listed samples were searched. OCR can miss text. Select a frame to inspect it.`;
+   if(frames.some(frame=>frame.truncated))p.message+=' Some sample results were truncated.';
+  }else{
+   p.rows=bePlateValidate(result,req.sample.sample,mode);p.selected=-1;p.sample=req.sample;
+   p.message=p.rows.length?`Found ${p.rows.length} ${p.rows.length===1?'suggestion':'suggestions'} on this frame. Select one to inspect and adjust a region for tracking.`:
+    'No matching text found in this frame. OCR can miss text.';
+   if(result.truncated)p.message+=' Results were truncated.';
+  }
  }catch(_){
   if(view.current()&&p.request===req&&!req.retired)p.message='Search failed. Try again.';
  }finally{
@@ -5779,7 +5846,7 @@ function beUnmountIn(root){
 function beMount(img,vid,cv,id,gen,editor){
  beUnmount();
  const view={img,vid,cv,id,gen,editor,transform:null,serial:0,playbackSerial:0,trackLaunch:null,readySample:null,imageURL:null,loading:false,
-  plate:{request:null,rows:[],selected:-1,sample:null,region:null,message:'Search only the current frame. Suggestions do not blur anything.'}};
+  plate:{request:null,rows:[],selected:-1,sample:null,region:null,batch:null,inspect:null,message:'Choose a frame search or video samples. Suggestions do not blur anything.'}};
  view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
   document.getElementById("beCv")===cv;
  view.sync=()=>{
@@ -5858,8 +5925,8 @@ async function loadBoxEdit(fromReview){
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
   <details id="bePlate" style="margin-top:8px" ontoggle="bePlateToggle()">
-   <summary onclick="bePlateSummary()">Find plate text in this frame</summary>
-   <p style="font-size:12px;color:#94a3b8;margin:5px 0">Searches only this inspected frame with local OCR. Results are approximate suggestions, not redactions.</p>
+   <summary onclick="bePlateSummary()">Find plate text</summary>
+   <p style="font-size:12px;color:#94a3b8;margin:5px 0">Search this frame or up to four evenly spaced video samples with local OCR. Results are approximate suggestions, not redactions.</p>
    <div class="row" style="gap:6px;align-items:end">
     <div style="flex:1 1 145px;min-width:0">
      <label for="bePlateQuery" style="display:block">Plate text</label>
@@ -5873,11 +5940,13 @@ async function loadBoxEdit(fromReview){
      </select>
     </div>
     <button class="sec" id="bePlateRun" type="button" onclick="bePlateGo()" disabled>Search this frame</button>
+    <button class="sec" id="bePlateSampleRun" type="button" onclick="bePlateGo('sampled')" disabled>Search up to four video samples</button>
     <button class="sec" id="bePlateCancel" type="button" onclick="bePlateCancel()" hidden>Cancel search</button>
    </div>
-   <div id="bePlateStatus" role="status" aria-live="polite" style="font-size:12px;color:#cbd5e1;margin-top:5px">Search only the current frame. Suggestions do not blur anything.</div>
+   <div id="bePlateStatus" role="status" aria-live="polite" style="font-size:12px;color:#cbd5e1;margin-top:5px">Choose a frame search or video samples. Suggestions do not blur anything.</div>
    <div id="bePlateResults" class="row" style="gap:5px;margin-top:5px"></div>
    <div id="bePlateActions" class="row" style="gap:5px;margin-top:5px"></div>
+   <div id="bePlateSamples" class="row" style="gap:5px;margin-top:5px"></div>
   </details>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>

@@ -1,4 +1,4 @@
-"""Short-lived, job-owned subprocess for one exact-frame OCR lookup.
+"""Short-lived, job-owned subprocess for bounded exact-frame OCR lookups.
 
 The query travels only through stdin. The child never imports the web app and
 returns geometry/match kinds, not recognized text or the supplied query.
@@ -51,6 +51,25 @@ def validate_result(value, width, height, mode):
             raise WorkerFailed()
         suggestions.append({'box': list(box), 'match': row['match'], 'boundary': 'unknown'})
     return suggestions
+
+
+def validate_sampled_result(value, width, height, mode, indices):
+    """Accept only complete, ordered results for the requested exact samples."""
+    if (not isinstance(indices, list) or not 1 <= len(indices) <= 4
+            or any(type(i) is not int or i < 0 for i in indices)
+            or any(a >= b for a, b in zip(indices, indices[1:]))
+            or not isinstance(value, dict) or value.get('complete') is not True
+            or not isinstance(value.get('frames'), list) or len(value['frames']) != len(indices)):
+        raise WorkerFailed()
+    frames = []
+    for index, frame in zip(indices, value['frames']):
+        if (not isinstance(frame, dict) or set(frame) != {'index','truncated','suggestions'}
+                or type(frame['index']) is not int or frame['index'] != index):
+            raise WorkerFailed()
+        suggestions = validate_result({'complete': True, 'truncated': frame['truncated'],
+                                       'suggestions': frame['suggestions']}, width, height, mode)
+        frames.append({'index': index, 'truncated': frame['truncated'], 'suggestions': suggestions})
+    return frames
 
 
 def _group_live(group):
@@ -187,7 +206,10 @@ def run(payload, job_directory, cancelled, timeout=SEARCH_DEADLINE):
                 raise WorkerCancelled()
             try:
                 value = json.loads(output)
-                validate_result(value, payload['width'], payload['height'], payload['mode'])
+                if 'indices' in payload:
+                    validate_sampled_result(value, payload['width'], payload['height'], payload['mode'], payload['indices'])
+                else:
+                    validate_result(value, payload['width'], payload['height'], payload['mode'])
             except (KeyError, TypeError, ValueError, UnicodeError):
                 raise WorkerFailed() from None
             if _group_live(process.pid):
@@ -211,6 +233,7 @@ def _child(payload):
     from openscrub_internal import exact_samples
     from .matching import normalize_queries
     from .search import search_frame
+    from .samples import search_capture
 
     cv2.setNumThreads(1)
     queries = normalize_queries(payload['query'], mode=payload['mode'])
@@ -220,6 +243,17 @@ def _child(payload):
             raise WorkerFailed()
         capture = cv2.VideoCapture(path)
         try:
+            if 'indices' in payload:
+                result = search_capture(capture, queries, payload['indices'], fps=payload['fps'],
+                    count=payload['count'], width=payload['width'], height=payload['height'],
+                    tolerance_s=payload['tolerance_s'])
+                if _stamp(os.fstat(source.fileno())) != expected or _stamp(os.stat(path)) != expected:
+                    raise WorkerFailed()
+                return {'complete': not result.cancelled, 'frames': [
+                    dict(index=frame.index, truncated=frame.truncated,
+                         suggestions=[dict(box=list(hit.suggested_box), match=hit.matches[0].match_kind,
+                                           boundary=hit.boundary) for hit in frame.hits])
+                    for frame in result.frames]}
             frame = exact_samples.read_indexed_capture(capture, payload['index'],
                 fps=payload['fps'], count=payload['count'], width=payload['width'],
                 height=payload['height'], tolerance_s=payload['tolerance_s'])
