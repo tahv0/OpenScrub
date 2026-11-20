@@ -24,9 +24,10 @@ start tracking or make a Blur or Keep decision. You can also use the ordinary
 **Add box** or **Track object** tools to draw a region yourself.
 
 **Search up to four video samples** instead checks up to four evenly spaced frame
-indices, including the first and last frame, and lists the number of suggestions
-at each sampled frame. For videos with fewer than four frames it checks each
-frame once. Frames between the listed indices are not searched. Select a listed
+indices, including the first and last indexed scan-timeline frames, and lists the
+number of suggestions at each sampled frame. For scan timelines with fewer than
+four frames it checks each frame once. Frames between the listed indices are not
+searched. Select a listed
 frame to inspect it, then search that frame to see and adjust its suggestions.
 The list remains available while you inspect and search another listed frame.
 The editor checks each newly inspected frame against the sampled source and

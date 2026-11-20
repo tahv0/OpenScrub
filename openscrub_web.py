@@ -6447,7 +6447,7 @@ async function bePlateGo(scope='frame'){
   }
   if(sampled){
    const frames=bePlateValidateSamples(result);p.batch={frames,sample:req.sample,index:req.sample.sample.index};
-   p.message=`Searched ${frames.length} of ${result.frame_count} frames; only the listed samples were searched. OCR can miss text. Select a frame to inspect it.`;
+   p.message=`Searched ${frames.length} of ${result.frame_count} scan-timeline frames; only the listed samples were searched. OCR can miss text. Select a frame to inspect it.`;
    if(frames.some(frame=>frame.truncated))p.message+=' Some sample results were truncated.';
   }else{
    p.rows=bePlateValidate(result,req.sample.sample,mode);p.selected=-1;p.sample=req.sample;

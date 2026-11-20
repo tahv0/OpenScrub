@@ -27,7 +27,7 @@ const [url,root]=process.argv.slice(2);
    await page.waitForFunction(()=>document.querySelectorAll('#bePlateSamples button').length===4);
    assert.equal(searches.length,1);assert.equal(searches[0].scope,'sampled');
    const status=await page.locator('#bePlateStatus').innerText();
-   assert(status.includes('4')&&status.includes('30')&&status.includes('only'),status);
+   assert(status.includes('4')&&status.includes('30')&&status.includes('scan-timeline')&&status.includes('only'),status);
    assert.deepEqual(await page.locator('#bePlateSamples button').count(),4);
    const labels=await page.locator('#bePlateSamples button').allTextContents();
    assert(labels[0].includes('frame 0')&&labels[1].includes('frame 9')&&
