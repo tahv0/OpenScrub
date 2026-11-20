@@ -235,7 +235,7 @@ HDR_TAGS = {'-color_primaries': 'bt2020', '-color_trc': 'smpte2084',
             '-colorspace': 'bt2020nc'}
 
 
-def make_hdr_video(tmp_path):
+def make_hdr_video(tmp_path, n=12):
     if not (shutil.which('ffmpeg') and shutil.which('ffprobe')):
         pytest.skip('ffmpeg and ffprobe are required')
     encoders = subprocess.run(['ffmpeg', '-hide_banner', '-encoders'], capture_output=True,
@@ -246,7 +246,7 @@ def make_hdr_video(tmp_path):
                             np.full(48 * 32, 512, np.uint16),
                             np.full(48 * 32, 512, np.uint16)])
     raw, video = tmp_path / 'source.yuv', tmp_path / 'hdr.mp4'
-    raw.write_bytes(frame.tobytes() * 12)
+    raw.write_bytes(frame.tobytes() * n)
     color = [part for pair in HDR_TAGS.items() for part in pair]
     subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
         '-f', 'rawvideo', '-pix_fmt', 'yuv420p10le', '-s', '96x64', '-r', '120',
@@ -518,3 +518,216 @@ def test_bounded_render_state_must_match_retained_report_timeline(tmp_path, monk
     monkeypatch.setattr(core, '_RenderDelivery', no_acquisition)
     with pytest.raises(ValueError, match='timeline|frame'):
         core.run_render(args, state, Quiet())
+
+
+def counted_report(video, claimed, *, enabled=True):
+    digest = hashlib.sha256(video.read_bytes()).hexdigest()
+    doc = report([row([5, 10, 25, 30], end=(claimed - 1) / 120,
+                      enabled=enabled, scan_frame_start=0, scan_frame_end=claimed)],
+                 count=claimed)
+    doc['provenance'].update(input_sha256=digest, checkpoint_identity=identity(digest, claimed))
+    return doc
+
+
+def report_render_args(video, path, dst, extra=()):
+    return core.build_parser().parse_args([str(video), '--from-report', str(path),
+        '--report', str(path), '--output', str(dst), '--encoder', 'x264',
+        '--mode', 'box', '--pad', '0', '--no-vfr-fix', *extra])
+
+
+@pytest.mark.parametrize('actual,claimed', [(12, 11), (11, 12)])
+@pytest.mark.parametrize('enabled', [True, False])
+def test_sdr_contradictory_real_frame_count_preserves_prior_outputs(tmp_path, actual, claimed, enabled):
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg required')
+    video = make_video(tmp_path, n=actual)
+    doc = counted_report(video, claimed, enabled=enabled)
+    path, dst = tmp_path / 'report.json', tmp_path / 'output.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    with pytest.raises(ValueError, match='frame|timeline'):
+        core.run_pipeline(report_render_args(video, path, dst), Quiet())
+    assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+def test_transient_sdr_decoder_stop_rejects_valid_attested_source(tmp_path, monkeypatch):
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg required')
+    video = make_video(tmp_path, n=12)
+    doc = completed_report(video)
+    path, dst = tmp_path / 'report.json', tmp_path / 'output.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    real_capture = cv2.VideoCapture
+    seen = []
+    class InterruptedCapture:
+        def __init__(self, *args, **kwargs):
+            self.cap = real_capture(*args, **kwargs)
+            self.count = 0
+            self.closed = False
+            seen.append(self)
+        def read(self):
+            if self.count == 6:
+                return False, None
+            ok, frame = self.cap.read()
+            if ok:
+                self.count += 1
+            return ok, frame
+        def release(self):
+            self.closed = True
+            self.cap.release()
+        def __getattr__(self, name):
+            return getattr(self.cap, name)
+    monkeypatch.setattr(core.cv2, 'VideoCapture', InterruptedCapture)
+    with pytest.raises(ValueError, match='frame|timeline'):
+        core.run_pipeline(report_render_args(video, path, dst), Quiet())
+    assert seen and seen[-1].count == 6 and seen[-1].closed
+    assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+@pytest.mark.parametrize('actual,claimed', [(12, 11), (11, 12)])
+@pytest.mark.parametrize('enabled', [True, False])
+def test_hdr_contradictory_real_frame_count_preserves_prior_outputs(tmp_path, actual, claimed, enabled):
+    video = make_hdr_video(tmp_path, n=actual)
+    doc = counted_report(video, claimed, enabled=enabled)
+    dets, rs, _ = core._decode_report(doc)
+    path, dst = tmp_path / 'report.json', tmp_path / 'output.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    args = core.build_parser().parse_args([str(video), '--output', str(dst),
+        '--report', str(path), '--encoder', 'x264', '--mode', 'box', '--pad', '0'])
+    args.hdr_source, args.hdr_encoder, args.hdr_tags = str(video), 'libx265', HDR_TAGS
+    state = dict(rs, detections=dets, input_sha256=doc['provenance']['input_sha256'],
+                 stats={}, source_report=doc)
+    with pytest.raises(ValueError, match='frame|timeline'):
+        core.run_render(args, state, Quiet())
+    assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+@pytest.mark.parametrize('actual,claimed,last_frame,should_succeed', [
+    (12, 11, 8, True),   # the contradictory extra frame is not observed
+    (12, 11, 10, False), # frame 11 is read while looking past the trim end
+    (8, 12, 6, True),    # requested range is complete despite an unknown tail
+    (8, 12, 9, False),   # decoder stops within the required range
+])
+def test_bounded_trim_checks_only_observed_and_required_frames(
+        tmp_path, actual, claimed, last_frame, should_succeed):
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg required')
+    video = make_video(tmp_path, n=actual)
+    doc = counted_report(video, claimed)
+    path, dst = tmp_path / 'trim.json', tmp_path / 'trim.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    args = report_render_args(video, path, dst, extra=('--clip-end', str(last_frame / 120)))
+    if should_succeed:
+        core.run_pipeline(args, Quiet())
+        assert len(decode_bgr(dst)) == last_frame + 1
+        assert json.loads(path.read_text())['detections'] == doc['detections']
+    else:
+        with pytest.raises(ValueError, match='frame|timeline'):
+            core.run_pipeline(args, Quiet())
+        assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+@pytest.mark.parametrize('mode', ['partial_tail', 'nonzero_exit'])
+def test_bounded_hdr_rejects_partial_tail_and_failed_decoder_after_n_frames(
+        tmp_path, monkeypatch, mode):
+    video = make_hdr_video(tmp_path)
+    doc = completed_report(video)
+    dets, rs, _ = core._decode_report(doc)
+    path, dst = tmp_path / 'report.json', tmp_path / 'output.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    args = core.build_parser().parse_args([str(video), '--output', str(dst),
+        '--report', str(path), '--encoder', 'x264', '--mode', 'box', '--pad', '0'])
+    args.hdr_source, args.hdr_encoder, args.hdr_tags = str(video), 'libx265', HDR_TAGS
+    state = dict(rs, detections=dets, input_sha256=doc['provenance']['input_sha256'],
+                 stats={}, source_report=doc)
+    actual_popen = subprocess.Popen
+    decoders = []
+    class PartialTail:
+        def __init__(self, stream):
+            self.stream, self.injected = stream, False
+        def read(self, size):
+            data = self.stream.read(size)
+            if not data and not self.injected:
+                self.injected = True
+                return b'\x00' * (size // 2)
+            return data
+        def __getattr__(self, name):
+            return getattr(self.stream, name)
+    class Popen(actual_popen):
+        def __init__(self, command, *a, **kw):
+            super().__init__(command, *a, **kw)
+            self.decoder = 'pipe:1' in command and '-pix_fmt' in command
+            if self.decoder:
+                decoders.append(self)
+                if mode == 'partial_tail':
+                    self.stdout = PartialTail(self.stdout)
+        def wait(self, *a, **kw):
+            result = super().wait(*a, **kw)
+            return 17 if self.decoder and mode == 'nonzero_exit' else result
+    monkeypatch.setattr(core.subprocess, 'Popen', Popen)
+    with pytest.raises(ValueError, match='HDR decoder|partial frame'):
+        core.run_render(args, state, Quiet())
+    assert decoders and all(p.returncode is not None for p in decoders)
+    assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+def test_bounded_sdr_fallback_writer_preserves_existing_output_on_extra_frame(tmp_path, monkeypatch):
+    video = make_video(tmp_path, n=12)
+    doc = counted_report(video, 11)
+    path, dst = tmp_path / 'fallback.json', tmp_path / 'fallback.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    before = path.read_bytes()
+    dst.write_bytes(b'prior video bytes')
+    monkeypatch.setattr(core, 'nvenc_available', lambda *a, **kw: None)
+    with pytest.raises(ValueError, match='frame|timeline'):
+        core.run_pipeline(report_render_args(video, path, dst), Quiet())
+    assert path.read_bytes() == before and dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))
+
+
+def test_disabled_bounded_rows_still_prevent_unverified_trim_seek(tmp_path, monkeypatch):
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg required')
+    video = make_video(tmp_path, n=96)
+    doc = counted_report(video, 96, enabled=False)
+    path, dst = tmp_path / 'disabled.json', tmp_path / 'disabled.mp4'
+    path.write_text(json.dumps(doc), encoding='utf-8')
+    def no_seek(*a, **kw):
+        pytest.fail('disabled authority must still use exact original frame indices')
+    monkeypatch.setattr(core, '_seek_cap', no_seek)
+    args = report_render_args(video, path, dst,
+                              extra=('--clip-start', '0.55', '--clip-end', '0.65'))
+    core.run_pipeline(args, Quiet())
+    frames = decode_bgr(dst)
+    assert len(frames) == 13
+    assert all(frame[20, 15].mean() > 150 for frame in frames)
+
+
+def test_nonfinite_bounded_trim_does_not_hide_a_short_decoder(tmp_path):
+    if not shutil.which('ffmpeg'):
+        pytest.skip('ffmpeg required')
+    video = make_video(tmp_path, n=8)
+    dst = tmp_path / 'prior.mp4'
+    dst.write_bytes(b'prior video bytes')
+    det = core.FrameBoundedDetection(0, 1, (5, 10, 25, 30), 'email', '', 1.,
+                                     scan_frame_start=0, scan_frame_end=12)
+    with pytest.raises(ValueError, match='clip|frame|timeline'):
+        core.render(str(video), str(dst), [det], [(0, 0)] * 12, [(0, 0)] * 12,
+                    120., 0, 'box', False, encoder='x264', clip=(0, float('nan')),
+                    cb=Quiet())
+    assert dst.read_bytes() == b'prior video bytes'
+    assert not list(tmp_path.glob('.render-*'))

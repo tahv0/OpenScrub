@@ -4341,7 +4341,8 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
 def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
-               mute_tracks=(), out_quality="archival", audio_lanes=None):
+               mute_tracks=(), out_quality="archival", audio_lanes=None,
+               frame_domain=None):
     """render(), but 10-bit end to end: decode the HDR source to raw
     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
@@ -4427,6 +4428,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
 
         ysz, csz = w * h, (w // 2) * (h // 2)
         fbytes = (ysz + 2 * csz) * 2
+        if frame_domain is None and any(_frame_authority(d) is not None for d in detections):
+            frame_domain = len(cum)
 
         idx = 0
         while True:
@@ -4435,7 +4438,15 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 raise PipelineCancelled()
             raw = dec.stdout.read(fbytes)
             if len(raw) < fbytes:
+                if frame_domain is not None:
+                    if raw:
+                        raise ValueError(f"HDR decoder produced a partial frame at index {idx}")
+                    if idx != frame_domain:
+                        raise ValueError(f"HDR decoder stopped at frame {idx}; "
+                                         f"expected {frame_domain} frames")
                 break
+            if frame_domain is not None and idx >= frame_domain:
+                raise ValueError(f"HDR decoder produced frame {idx} beyond the verified timeline")
             buf = np.frombuffer(raw, dtype=np.uint16).copy()
             y = buf[:ysz].reshape(h, w)
             u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
@@ -4484,7 +4495,9 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 cb.log(f"  rendering… {idx}/{max(total, idx)}")
 
         dec.stdout.close()
-        dec.wait()
+        decoder_rc = dec.wait()
+        if frame_domain is not None and decoder_rc != 0:
+            raise ValueError(f"HDR decoder failed after frame {idx} (exit {decoder_rc})")
         cb.progress("render", max(total, idx), max(total, idx))
         try:
             enc.stdin.close()
@@ -4546,12 +4559,25 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
-           mute_tracks=(), out_quality="archival", audio_lanes=None):
+           mute_tracks=(), out_quality="archival", audio_lanes=None,
+           frame_domain=None):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
     # Public entry checks source extents before the single delivery stage.
     # Coverage may legally round a positive source box to an empty integer box.
+    if frame_domain is None and any(_frame_authority(d) is not None for d in detections):
+        frame_domain = len(cum)
+    has_frame_authority = frame_domain is not None
+    if has_frame_authority and clip is not None:
+        try:
+            if len(clip) != 2:
+                raise ValueError()
+            _geometry_finite((clip[0],), 1, "SDR", "clip start")
+            if clip[1] is not None:
+                _geometry_finite((clip[1],), 1, "SDR", "clip end")
+        except (TypeError, ValueError, IndexError):
+            raise ValueError("invalid bounded clip interval") from None
     mode_map = mode_map or {}
     def _mode_for(cat):
         return mode_map.get(cat, mode)
@@ -4656,7 +4682,6 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
         idx = 0
         # The seek fallback may accept a position without reliable PTS. A
         # bounded row needs an exact original index, so decode that prefix.
-        has_frame_authority = any(_frame_authority(d) is not None for d in detections)
         if clip and clip[0] > 0.5 and not has_frame_authority:
             tgt = int(clip[0] * fps)
             if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
@@ -4669,7 +4694,14 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 raise PipelineCancelled()
             ok, frame = cap.read()
             if not ok:
+                if (frame_domain is not None and idx < frame_domain and
+                        (not clip or clip[1] is None or idx / fps <= clip[1] + 1e-6)):
+                    raise ValueError(f"SDR decoder stopped before required frame {idx}")
                 break
+            if frame_domain is not None and frame is None:
+                raise ValueError(f"SDR decoder produced an invalid frame at index {idx}")
+            if frame_domain is not None and idx >= frame_domain:
+                raise ValueError(f"SDR decoder produced frame {idx} beyond the verified timeline")
             t = idx / fps
             _geometry_finite((t,), 1, f"frame {idx}", "time")
             if clip:
@@ -9208,6 +9240,7 @@ def run_render(args, state, cb=None):
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     summary = dict(state["stats"], output=dst)
+    frame_domain_args = {"frame_domain": len(state["cum"])} if has_report_bounds else {}
     with _RenderDelivery(dst, args.report) as delivery:
         if getattr(args, "hdr_source", None) and not args.preview:
             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
@@ -9218,7 +9251,8 @@ def run_render(args, state, cb=None):
                        mode_map=getattr(args, "mode_map", None),
                        audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
                        out_quality=out_q,
-                       audio_lanes=getattr(args, "audio_lane_count", None))
+                       audio_lanes=getattr(args, "audio_lane_count", None),
+                       **frame_domain_args)
         else:
             _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
                    state["bands"],
@@ -9229,7 +9263,8 @@ def run_render(args, state, cb=None):
                    face_shape=getattr(args, "face_shape", "ellipse"),
                    encoder=args.encoder, audio_spans=aspans, clip=clip,
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-                   audio_lanes=getattr(args, "audio_lane_count", None))
+                   audio_lanes=getattr(args, "audio_lane_count", None),
+                   **frame_domain_args)
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)

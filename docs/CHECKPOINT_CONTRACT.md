@@ -241,3 +241,15 @@ scan hash; `run_pipeline` computes it from the selected scan file. A source
 can change after hashing unless the caller maintains its existing source lease
 and stability rules. Distinct normalized scan and HDR render files require a
 future source-frame correspondence contract before bounded replay is supported.
+
+A bounded completed-report render checks the attested frame domain during its
+existing decode pass. Full SDR and HDR output must receive exactly N complete
+frames; any observed frame at or beyond N, a missing required frame, or an HDR
+partial frame prevents publication. Bounded HDR also requires the decoder to
+exit successfully. This applies even when every bounded row is disabled. A
+trimmed SDR render checks the requested range and any extra decoded frame it
+actually observes, without scanning the unrequested tail or claiming to verify
+it. A contradictory decode leaves the previous report and video intact under
+the existing render staging contract. OpenCV's false read does not by itself
+distinguish a clean EOF from failure; the count check relies on the separately
+attested N and the frames observed in this render.
