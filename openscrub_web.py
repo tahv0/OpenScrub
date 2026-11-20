@@ -1033,7 +1033,10 @@ def build_args(job, for_render=False):
     server_allow = os.path.join(JOBS_DIR, "allowlist.txt")
     for kind in ("allow_names", "extra_names"):
         text = (o.get(kind) or "").strip()
-        if kind == "allow_names" and os.path.exists(server_allow):
+        # Checkpoint scans support only QR/no categories, so the name
+        # detector and its global allowlist are irrelevant to that scan.
+        if (kind == "allow_names" and o.get('checkpoint_review') is not True
+                and os.path.exists(server_allow)):
             text = (text + "\n" + open(server_allow, encoding="utf-8").read()).strip()
         if text:
             p = os.path.join(jdir, kind + ".txt")

@@ -106,6 +106,27 @@ def test_natural_eof_publishes_verified_complete_review(checkpoint_web, socket_a
     assert output.read_bytes() == b'older output must remain intact'
 
 
+@pytest.mark.parametrize('category', ['qrcode', 'none'])
+def test_checkpoint_scan_with_permanent_name_allowlist(checkpoint_web, category):
+    store, _ = checkpoint_web
+    (store.jobs / 'allowlist.txt').write_text('Alice Example\n')
+    store.job['options']['categories'] = category
+    web.enqueue(store.job, 'scan')
+    join(run_worker())
+    assert store.job['phase'] == 'review', store.job['error']
+    doc = json.loads(store.path.read_text())
+    assert doc['provenance']['checkpoint_identity']['timeline']['count_verified'] is True
+
+
+def test_ordinary_scan_keeps_permanent_name_allowlist(checkpoint_web):
+    store, _ = checkpoint_web
+    (store.jobs / 'allowlist.txt').write_text('Alice Example\n')
+    store.job['options'].update(checkpoint_review=False, categories='name')
+    args = web.build_args(store.job)
+    with open(args.allow_names, encoding='utf-8') as stream:
+        assert stream.read().strip() == 'Alice Example'
+
+
 def test_cancel_acknowledged_before_staged_commit_wins(checkpoint_web, socket_api, monkeypatch):
     store, output = checkpoint_web
     ready, release = threading.Event(), threading.Event()
