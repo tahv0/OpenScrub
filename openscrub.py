@@ -757,6 +757,13 @@ class Detection:
                                # category); empty = plain box redaction
 
 
+@dataclass
+class FrameBoundedDetection(Detection):
+    """A detection whose original source-frame authority is half-open."""
+    scan_frame_start: int = None
+    scan_frame_end: int = None
+
+
 class PhiMemory:
     """Remembers every string ever confirmed as PII in this video. At each
     scan, all OCR'd words are checked against memory, so a name identified
@@ -3227,9 +3234,111 @@ def _geometry_finite(values, size, stage, field):
         raise ValueError(f"render geometry {stage}: invalid {field}") from None
 
 
+_NO_FRAME_BOUND = object()
+
+
+def _frame_authority(value, total=None, where="detection"):
+    """Validate paired strict source-frame bounds from a raw row or object."""
+    if isinstance(value, dict):
+        start = value.get("scan_frame_start", _NO_FRAME_BOUND)
+        end = value.get("scan_frame_end", _NO_FRAME_BOUND)
+    else:
+        start = getattr(value, "scan_frame_start", _NO_FRAME_BOUND)
+        end = getattr(value, "scan_frame_end", _NO_FRAME_BOUND)
+    if start is _NO_FRAME_BOUND and end is _NO_FRAME_BOUND:
+        return None
+    if (type(start) is not int or type(end) is not int or
+            start < 0 or start >= end or end > (1 << 53) - 1 or
+            (total is not None and end > total)):
+        raise ValueError(f"invalid scan frame authority for {where}")
+    return start, end
+
+
+def _report_frame_authorities(doc):
+    """Validate every raw row, including disabled rows, before render use."""
+    if isinstance(doc, list):
+        rows, state = doc, None
+    else:
+        if "stop_review" in doc:
+            raise ValueError("paused checkpoint rendering is not supported")
+        rows, state = doc.get("detections", []), doc.get("render_state")
+    bounds = [_frame_authority(row, where=f"report detection {i}")
+              for i, row in enumerate(rows, 1)]
+    if any(bound is not None for bound in bounds):
+        if not isinstance(state, dict):
+            raise ValueError("scan frame authority requires a complete render timeline")
+        try:
+            cum, bands = state["cum"], state["bands"]
+            total = len(cum)
+            valid = (isinstance(cum, (list, tuple)) and
+                     isinstance(bands, (list, tuple)) and
+                     total > 0 and total == len(bands))
+        except (TypeError, KeyError):
+            valid = False
+        if not valid:
+            raise ValueError("scan frame authority requires aligned complete render timelines")
+        for i, row in enumerate(rows, 1):
+            _frame_authority(row, total=total, where=f"report detection {i}")
+    return bounds
+
+
+def _validate_bounded_report_identity(doc, input_sha256, render_state):
+    """Check the existing source hash and verified frame domain for replay."""
+    provenance = doc.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("bounded report is missing source provenance")
+    expected = provenance.get("input_sha256")
+    if (type(expected) is not str or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+            or expected != input_sha256):
+        raise ValueError("bounded report input source SHA-256 is missing or mismatched")
+    identity = provenance.get("checkpoint_identity")
+    if not isinstance(identity, dict):
+        raise ValueError("bounded report requires verified source timeline identity")
+    timeline, sources = identity.get("timeline"), identity.get("sources")
+    if not isinstance(timeline, dict) or not isinstance(sources, dict):
+        raise ValueError("bounded report requires verified source timeline identity")
+    scan = sources.get("scan")
+    if not isinstance(scan, dict) or scan.get("sha256") != expected:
+        raise ValueError("bounded report scan source identity mismatch")
+    state = doc["render_state"]
+    fps = timeline.get("fps")
+    source_fps, render_fps = scan.get("fps"), state.get("fps")
+    frame_count = timeline.get("total_frames")
+    try:
+        valid = (timeline.get("count_verified") is True and
+                 type(frame_count) is int and frame_count == len(state["cum"]) and
+                 type(fps) in (int, float) and math.isfinite(fps) and fps > 0 and
+                 type(source_fps) in (int, float) and source_fps == fps and
+                 type(render_fps) in (int, float) and render_fps == fps and
+                 type(scan.get("width")) is int and 0 < scan["width"] <= (1 << 53) - 1 and
+                 type(scan.get("height")) is int and 0 < scan["height"] <= (1 << 53) - 1)
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        raise ValueError("bounded report requires a verified matching frame timeline")
+    try:
+        same = render_state["fps"] == fps
+        for field in ("cum", "bands"):
+            actual, saved = render_state[field], state[field]
+            same = (same and len(actual) == len(saved) and
+                    all(len(a) == len(b) == 2 and a[0] == b[0] and a[1] == b[1]
+                        for a, b in zip(actual, saved)))
+    except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+        same = False
+    if not same:
+        raise ValueError("bounded render state differs from the report timeline")
+
+
+def _frame_authorized(d, index):
+    """Use after preflight; legacy detections have no frame restriction."""
+    start = getattr(d, "scan_frame_start", _NO_FRAME_BOUND)
+    return start is _NO_FRAME_BOUND or start <= index < d.scan_frame_end
+
+
 def _geometry_detections(detections, stage):
     for ordinal, d in enumerate(detections, 1):
         where = f"{stage} detection {ordinal}"
+        _frame_authority(d, where=where)
         _geometry_finite(d.cbox, 4, where, "cbox")
         if d.cbox[2] <= d.cbox[0] or d.cbox[3] <= d.cbox[1]:
             raise ValueError(f"render geometry {where}: invalid cbox extents")
@@ -3256,6 +3365,11 @@ def _geometry_preflight(detections, cum, bands, fps, pad, band_margin, stage):
             raise ValueError(f"render geometry {stage}: invalid {field}")
         for i in range(length):
             _geometry_finite(trajectory[i], 2, stage, f"{field} entry {i}")
+    for ordinal, detection in enumerate(detections, 1):
+        authority = _frame_authority(detection, total=len(cum),
+                                     where=f"{stage} detection {ordinal}")
+        if authority is not None and len(cum) != len(bands):
+            raise ValueError("scan frame authority requires aligned complete render timelines")
 
 
 def _geometry_box(d, ox, oy, pad, stage):
@@ -4024,7 +4138,10 @@ def apply_coverage(dets, coverage, cb=None):
             c.poly = ()
             out.append(c)
             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
-                per_track.setdefault(c.track, []).append((ordinal, c))
+                # A sample outside a frame-authority segment must not expand
+                # the active segment's box through concealed coverage.
+                key = (c.track, _frame_authority(c, where=f"coverage detection {ordinal}"))
+                per_track.setdefault(key, []).append((ordinal, c))
         else:
             out.append(d)
     for entries in per_track.values():
@@ -4329,7 +4446,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             _geometry_finite((ox, oy), 2, f"frame {idx}", "cum")
 
             act = [d for d in buckets.get(int(t), [])
-                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+                   if d.t_start - 0.01 <= t <= d.t_end + 0.01
+                   and _frame_authorized(d, idx)]
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
@@ -4536,7 +4654,10 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 buckets.setdefault(s, []).append(d)
 
         idx = 0
-        if clip and clip[0] > 0.5:
+        # The seek fallback may accept a position without reliable PTS. A
+        # bounded row needs an exact original index, so decode that prefix.
+        has_frame_authority = any(_frame_authority(d) is not None for d in detections)
+        if clip and clip[0] > 0.5 and not has_frame_authority:
             tgt = int(clip[0] * fps)
             if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
                 idx = tgt                    # shift the whole trimmed render
@@ -4562,7 +4683,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
 
             # 1. tracked PII boxes, translated by scroll offset
             act = [d for d in buckets.get(int(t), [])
-                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+                   if d.t_start - 0.01 <= t <= d.t_end + 0.01
+                   and _frame_authorized(d, idx)]
             for d in _dedupe_dense(act):
                 # drift allowance: residual tracking error grows (slowly) with
                 # distance scrolled since detection — expand the box to cover it
@@ -6737,6 +6859,7 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
     # Construction and output hashing precede an optional caller-owned final
     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+    _report_frame_authorities(doc)
     return doc
 
 
@@ -6760,11 +6883,15 @@ def _decode_report(doc):
     else:
         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
             doc.get("provenance", {})
+    authorities = _report_frame_authorities(doc)
     dets = []
-    for r in rows:
+    for r, authority in zip(rows, authorities):
         if not r.get("enabled", True):
             continue
-        dets.append(Detection(
+        detection_type = FrameBoundedDetection if authority is not None else Detection
+        bounds = ({"scan_frame_start": authority[0], "scan_frame_end": authority[1]}
+                  if authority is not None else {})
+        dets.append(detection_type(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
             confidence=float(r.get("confidence", 1.0)),
@@ -6774,7 +6901,7 @@ def _decode_report(doc):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+            poly=tuple(copy.deepcopy(r.get("poly") or ())), **bounds))
     return dets, state, prov
 
 
@@ -9018,6 +9145,24 @@ def _run_scan_impl(args, cb, stop_requested, main_capture):
 def run_render(args, state, cb=None):
     if "scan_boundary" in state:
         raise RuntimeError("unverified scan boundary cannot be rendered")
+    source_report = state.get("source_report")
+    report_bounds = (_report_frame_authorities(source_report)
+                     if source_report is not None else [])
+    has_report_bounds = any(bound is not None for bound in report_bounds)
+    has_detection_bounds = any(_frame_authority(d) is not None for d in state["detections"])
+    if has_report_bounds:
+        _validate_bounded_report_identity(source_report, state.get("input_sha256"), state)
+    elif has_detection_bounds:
+        raise ValueError("bounded detections require a completed source report identity")
+    if ((has_report_bounds or has_detection_bounds) and
+            getattr(args, "hdr_source", None) and not args.preview):
+        try:
+            same_source = os.path.samefile(args.video, args.hdr_source)
+        except (OSError, TypeError, ValueError):
+            same_source = False
+        if not same_source:
+            raise ValueError("bounded HDR render source differs from scan source; "
+                             "frame mapping is not verified")
     cb = cb or Callbacks()
     _geometry_preflight(state["detections"], state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")
@@ -9145,6 +9290,9 @@ def run_pipeline(args, cb=None):
         cb.log(f"      {len(dets)} enabled detections")
         in_sha = sha256_file(args.video)
         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+            rows = source if isinstance(source, list) else source.get("detections", [])
+            if any(_frame_authority(row) is not None for row in rows):
+                raise ValueError("bounded report input source SHA-256 mismatch")
             cb.log("      WARNING: input file differs from the one this report "
                    "was made from (sha256 mismatch) — blur positions may be wrong")
         state = {"fps": rstate["fps"],

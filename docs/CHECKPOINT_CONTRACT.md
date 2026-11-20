@@ -1,9 +1,11 @@
 # Portable checkpoint data contract
 
-This is the data-only first part of Stop & Review. It does not implement scan
-stopping, resume, partial rendering, publishing, restart, or user controls.
-Existing OpenScrub renderers do **not** honor checkpoint frame authority and
-must not be used to render these reports as if they did.
+The checkpoint helper is a data contract, not a complete Stop & Review feature.
+This branch also has a monitored scanner boundary and completed-report frame
+authority in its renderers. Resume, partial rendering, checkpoint publication,
+restart, and user controls remain unimplemented. Older OpenScrub renderers do
+not honor checkpoint frame authority and must not render bounded reports as if
+they did.
 
 The three functions in `openscrub_internal.checkpoints` consume and return
 plain JSON documents. They do not mutate arguments or write a file. Publish a
@@ -194,3 +196,48 @@ refused rather than followed into unknown future frames with a fabricated
 offset. This slice does not add context overlap, scroll-origin reconciliation,
 checkpoint publication,
 resume, a CLI or web action, or a verified completion proof.
+
+## Completed-report frame authority in rendering
+
+For a complete report, `scan_frame_start` and exclusive `scan_frame_end` are
+optional **paired** strict integers satisfying `0 <= start < end <= N`, where N
+is the length of the aligned full render timelines. Missing both fields keeps
+legacy time-only behavior; missing one, nulls, booleans, nonintegers, reversed
+or out-of-range bounds fail validation. This includes disabled raw rows. A
+report carrying any `stop_review` marker is refused before rendering because
+partial timeline, source identity, and geometry handling are not yet integrated.
+This does not change the separate unverified engine-state guard.
+
+The report decoder uses `FrameBoundedDetection`, a `Detection` subclass, only
+for bounded rows. Ordinary `Detection` construction and `asdict` output retain
+their previous shape; the bounded subclass serializes both fields explicitly.
+Both renderers first intersect the existing time test with the original source
+frame index and its half-open authority, then apply dense-sample deduplication.
+A trimmed SDR render uses the original source index, not the output index, and
+sequentially decodes the trimmed prefix because the existing seek fallback can
+accept a position without reliable PTS. Ordinary unbounded trims retain their
+seek optimization. Concealed coverage groups same-track samples only within
+identical frame authority, preventing geometry from another segment from expanding an active
+box. Other coverage modes retain the original bounds on their copies.
+
+The raw report remains the authority for publication: rendering preserves its
+row order, enabled choices, bounds and unknown fields. This engine slice does
+not add bound-aware review overlays, time-edit semantics, partial rendering,
+or the source/timeline proof needed to turn a scanner candidate into a report.
+A renderer that ignores these frame bounds is not compatible with bounded rows.
+High-level replay of a bounded report requires the already-computed scan-file
+SHA-256 to match both report provenance and the saved scan participant, and the
+P18A verified count and FPS to match the aligned report timeline. Missing or
+mismatched evidence is refused before rendering. Legacy unbounded reports retain
+their existing source-mismatch warning. For bounded HDR replay, scan and render
+sources must resolve to the same underlying file; other mappings are refused
+without a second full-file hash. Low-level `render`/`render_hdr` callers supply
+and own their source/timeline compatibility themselves.
+
+These checks trust the producer's hash-bound count attestation and do not
+independently establish full normalization, source-participant, or cross-decoder
+correspondence. Direct `run_render` callers must supply the actual precomputed
+scan hash; `run_pipeline` computes it from the selected scan file. A source
+can change after hashing unless the caller maintains its existing source lease
+and stability rules. Distinct normalized scan and HDR render files require a
+future source-frame correspondence contract before bounded replay is supported.
