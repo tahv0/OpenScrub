@@ -2056,11 +2056,11 @@ def _snapshot_exact_source_owner(job, lease):
             lease.exact_source_epoch = foreign.output_epoch
 
 
-def _prepare_observed_source(job, path):
+def _prepare_observed_source(job, path, thumbnail_recovery=False):
     """Reserve containing lifetime before first stat/probe; never under report_lock."""
     with VAULT_LOCK:
         _validate_files_locked(job)
-        lease = _reserve_files_locked(job, source=path)
+        lease = _reserve_files_locked(job, source=path, thumbnail_recovery=thumbnail_recovery)
     try:
         canonical = lease.source
         _snapshot_exact_source_owner(job, lease)
@@ -2832,7 +2832,8 @@ def _thumbnail_image(job, index, kind, requested_version=None, *, operation_owne
                 observation = (files.incarnation, files.current_source, files.source_epoch,
                                files.source_status, files.source_pair)
             try:
-                prepared, lease = _prepare_observed_source(job, generation.source_path)
+                prepared, lease = _prepare_observed_source(
+                    job, generation.source_path, requested_version is not None)
                 with _thumbnail_owner_guard(job, lease, generation):
                     if state.current is not generation:
                         raise _ThumbnailError('thumbnail_obsolete', 409, 'Thumbnail generation changed')

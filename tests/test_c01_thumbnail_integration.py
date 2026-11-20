@@ -172,3 +172,87 @@ def test_versioned_thumbnail_preserves_own_job_recovery_gate(foreign_review):
     finally:
         with owner.report_lock:
             owner.recovery_required = False
+
+
+@pytest.mark.parametrize('kind', ['thumb', 'detframe'])
+def test_foreign_recovery_between_thumbnail_reservations_returns_obsolete(foreign_review, monkeypatch, kind):
+    exact, source = foreign_review
+    version = thumbnail_version(exact)
+    url = exact.url + '/' + kind + '/0?v=' + version
+    image = request('get', url)
+    assert image.status_code == 200
+    owner = web.FILES.initialize(source)
+    reserve = web._reserve_files_locked
+    transitions = []
+    def recover_on_source_reservation(*args, **kwargs):
+        if kwargs.get('source') is not None:
+            with owner.report_lock:
+                owner.recovery_required = True
+            transitions.append(True)
+        return reserve(*args, **kwargs)
+    monkeypatch.setattr(web, '_reserve_files_locked', recover_on_source_reservation)
+    try:
+        response = request('get', url, headers={'If-None-Match': image.headers['ETag']})
+        assert transitions == [True]
+        assert response.status_code == 409
+        assert response.is_json
+        assert response.json['error'] == 'thumbnail_obsolete'
+        assert response.json['refresh'] == 'detections'
+        assert 'no-store' in response.headers['Cache-Control']
+        assert web.FILES.count == 0
+    finally:
+        with owner.report_lock:
+            owner.recovery_required = False
+
+
+@pytest.mark.parametrize('mode', ['legacy_thumb', 'legacy_detframe', 'edit'])
+def test_foreign_recovery_between_reservations_keeps_other_gates(foreign_review, monkeypatch, mode):
+    exact, source = foreign_review
+    thumbnail_version(exact)
+    owner = web.FILES.initialize(source)
+    reserve = web._reserve_files_locked
+    transitions = []
+    def recover_on_source_reservation(*args, **kwargs):
+        if kwargs.get('source') is not None:
+            with owner.report_lock:
+                owner.recovery_required = True
+            transitions.append(True)
+        return reserve(*args, **kwargs)
+    monkeypatch.setattr(web, '_reserve_files_locked', recover_on_source_reservation)
+    endpoint = {'legacy_thumb': '/thumb/0', 'legacy_detframe': '/detframe/0',
+                'edit': '/edit_sample?t=0.2'}[mode]
+    try:
+        response = request('get', exact.url + endpoint)
+        assert transitions == [True]
+        assert response.status_code == 409
+        assert not response.is_json
+        assert web.FILES.count == 0
+    finally:
+        with owner.report_lock:
+            owner.recovery_required = False
+
+
+def test_own_recovery_between_reservations_keeps_recovery_gate(exact, monkeypatch):
+    version = thumbnail_version(exact)
+    url = exact.url + '/thumb/0?v=' + version
+    image = request('get', url)
+    assert image.status_code == 200
+    owner = web.FILES.initialize(exact.job)
+    reserve = web._reserve_files_locked
+    transitions = []
+    def recover_on_source_reservation(*args, **kwargs):
+        if kwargs.get('source') is not None:
+            with owner.report_lock:
+                owner.recovery_required = True
+            transitions.append(True)
+        return reserve(*args, **kwargs)
+    monkeypatch.setattr(web, '_reserve_files_locked', recover_on_source_reservation)
+    try:
+        response = request('get', url, headers={'If-None-Match': image.headers['ETag']})
+        assert transitions == [True]
+        assert response.status_code == 409
+        assert not response.is_json
+        assert web.FILES.count == 0
+    finally:
+        with owner.report_lock:
+            owner.recovery_required = False
