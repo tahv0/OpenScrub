@@ -140,6 +140,14 @@ def test_switching_from_plate_corners_to_add_mode_keeps_add_usable():
     """)
 
 
+def test_corner_editor_and_suggestion_region_retire_each_other():
+    run_js(PLATE+r"""const m=await plateDraft();selectPlate(m);beQuadMode();assert(m.view.quadEdit);
+    const p=m.view.plate;p.rows=[{box:[150,100,250,150],match:'fragment'}];p.selected=0;p.sample=m.view.readySample;
+    bePlatePrepare();assert.equal(m.view.quadEdit,null);assert(p.region);
+    BE.sel=0;beQuadMode();assert(m.view.quadEdit);assert.equal(p.region,null);
+    """)
+
+
 def test_lost_quad_ack_replays_identically_then_retains_newer_quad():
     run_js(PLATE+r"""const m=await plateDraft();selectPlate(m);beQuadMode();const tr=m.view.transform,p=m.view.quadEdit.points[0];
     event(m,'pointerdown',p[0]*tr.sx,p[1]*tr.sy);event(m,'pointermove',(p[0]+10)*tr.sx,(p[1]+5)*tr.sy);event(m,'pointerup',0,0);
