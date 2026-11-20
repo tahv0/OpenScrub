@@ -2,7 +2,7 @@
 
 The clean local application candidate is `integration/upstream-focused-candidate` at `9db95db`. The [scan-options candidate](evidence/delivery/scan-options-current-readiness.md) and the [dense-smoothing candidate](evidence/delivery/dense-smoothing-current-readiness.md) have individual PR drafts. Separate local topics cover plate text search, optional confidence and lettering, verified HDR corners, and the checkpoint engine and publication prerequisites.
 
-The local `integration/current-work` branch is at `9453832`. It includes the sampled plate search and confirmed tracker, optional plate controls, and Stop & Review through native restart and resume. [Combined branch, testing and preview](evidence/delivery/current-work-composition.md)
+The combined `integration/current-work` branch on the fork is at `88724db`. It includes the sampled plate search and confirmed tracker, optional plate controls, and Stop & Review through native restart and resume. [Combined branch, testing and preview](evidence/delivery/current-work-composition.md)
 
 [Save As PR #24](https://github.com/austinmabry/OpenScrub/pull/24) was last observed open at 0da66d1 on Austin 50c5a9e. The submitted source passed 161 tests on Python 3.12, 24 Save As tests on Python 3.9, and the offline package and installed-export checks. Chromium verified layout at three widths and exercised the save lifecycle and direct-download fallback. [Evidence](evidence/delivery/save-as-pr-readiness.md). [HDR PR #23 is merged](submissions/hdr-decoder-cleanup.md). [Scan-options PR #25](https://github.com/austinmabry/OpenScrub/pull/25) is now submitted. [Submission](submissions/scan-options-validation.md).
 
