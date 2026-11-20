@@ -5657,6 +5657,116 @@ def _decode_db(prob, w, h, nw, nh, thresh=0.3, box_thresh=0.5, pad_frac=0.55):
     return out
 
 
+def _narrow_from_probability(crop, prob):
+    """Decode detector kernels to separate restored quadrilaterals, or fail closed."""
+    if crop.ndim != 3 or min(crop.shape[:2]) < 8:
+        return [], "invalid_crop"
+    if prob.ndim != 2 or not prob.size or not np.isfinite(prob).all():
+        return [], "inference_error"
+    h, w = crop.shape[:2]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    if int(gray.max()) - int(gray.min()) < 25:
+        return [], "unverifiable_contrast"
+    contours, _ = cv2.findContours((prob > .3).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    polys = []
+    for contour in contours:
+        if cv2.contourArea(contour) < 9:
+            continue
+        m = np.zeros(prob.shape, np.uint8)
+        cv2.drawContours(m, [contour], -1, 1, -1)
+        if float(prob[m != 0].mean()) < .5:
+            continue
+        rect = cv2.minAreaRect(contour)
+        if min(rect[1]) < 2:
+            return [], "invalid_geometry"
+        points = cv2.boxPoints(rect).astype(np.float64)
+        area = cv2.contourArea(points.astype(np.float32))
+        perimeter = cv2.arcLength(points.astype(np.float32), True)
+        if perimeter <= 0:
+            return [], "invalid_geometry"
+        distance = 1.5 * area / perimeter
+        center = points.mean(axis=0)
+        normals, constants = [], []
+        for a, b in zip(points, np.roll(points, -1, axis=0)):
+            delta = b - a
+            norm = np.linalg.norm(delta)
+            if norm < 1e-8:
+                return [], "invalid_geometry"
+            normal = np.array([delta[1], -delta[0]]) / norm
+            if np.dot(normal, center - a) > 0:
+                normal = -normal
+            normals.append(normal)
+            constants.append(np.dot(normal, a) + distance)
+        restored = []
+        for i in range(4):
+            matrix = np.array([normals[i-1], normals[i]])
+            if abs(np.linalg.det(matrix)) < 1e-8:
+                return [], "invalid_geometry"
+            restored.append(np.linalg.solve(matrix, [constants[i-1], constants[i]]))
+        poly = np.asarray(restored) * (w / prob.shape[1], h / prob.shape[0])
+        if not np.isfinite(poly).all() or np.any(poly[:, 0] <= 0) or np.any(poly[:, 0] >= w - 1) or np.any(poly[:, 1] <= 0) or np.any(poly[:, 1] >= h - 1):
+            return [], "invalid_geometry"
+        polys.append(poly)
+    if not polys:
+        return [], "no_text_detected"
+    covered = np.zeros((h, w), np.uint8)
+    cv2.fillPoly(covered, [np.rint(p).astype(np.int32) for p in polys], 1)
+    for poly in polys:
+        region = np.zeros((h, w), np.uint8)
+        cv2.fillPoly(region, [np.rint(poly).astype(np.int32)], 1)
+        values = gray[region != 0]
+        ring = cv2.dilate(region, np.ones((7, 7), np.uint8)) & (1 - region)
+        nearby = gray[ring != 0]
+        if len(values) < 8 or len(nearby) < 8:
+            return [], "unverifiable_contrast"
+        spread = np.percentile(values, 75) - np.percentile(values, 25)
+        separation = abs(float(np.median(values)) - float(np.median(nearby)))
+        local_variation = np.percentile(nearby, 75) - np.percentile(nearby, 25)
+        sparse_contrast = np.percentile(values, 90) - np.percentile(values, 10)
+        if max(spread, separation) < 25 and not (local_variation < 25 and sparse_contrast >= 25):
+            return [], "unverifiable_contrast"
+    pixels = gray[covered != 0]
+    threshold, _ = cv2.threshold(pixels[:, None], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ring = cv2.dilate(covered, np.ones((9, 9), np.uint8)) & (1 - covered)
+    surrounding = gray[ring != 0]
+    if len(surrounding) < 8:
+        return [], "unverifiable_contrast"
+    dark = float(np.median(surrounding)) > threshold
+    rows = [cv2.minAreaRect(np.asarray(p, np.float32)) for p in polys]
+    nominal = float(np.median([min(r[1]) for r in rows]))
+    k = max(3, int(.3 * nominal) | 1)
+    contrast = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT if dark else cv2.MORPH_TOPHAT,
+                                np.ones((k, k), np.uint8))
+    ink = (gray <= threshold if dark else gray > threshold).astype(np.uint8)
+    # Inspect both raw polarity components and local strokes. Components that
+    # join a detected region to an occluder cannot be assessed reliably.
+    for evidence in (ink, (contrast > 20).astype(np.uint8)):
+        n, labels, stats, centers = cv2.connectedComponentsWithStats(evidence, 8)
+        # Count covered pixels for every component in one pass. Comparing
+        # the full crop separately for each tiny noise component is quadratic.
+        overlaps = np.bincount(labels[covered != 0], minlength=n)
+        for i in range(1, n):
+            x, y, cw, ch, area = stats[i]
+            overlap = int(overlaps[i])
+            missing = area - overlap
+            if overlap and missing >= 8 and missing > area * .10:
+                return [], "ambiguous_text"
+            if (missing >= 8 and cw < .5 * w and (cw > 1.5 * nominal or ch > 1.4 * nominal)
+                    and any(y <= center[1] <= y + ch for center, _, _ in rows)):
+                return [], "ambiguous_text"
+            if not (2 <= cw < .5 * w and 2 <= ch < .8 * h and area >= 8):
+                continue
+            if missing < 8 or missing <= area * .15:
+                continue
+            if x == 0 or y == 0 or x + cw >= w or y + ch >= h:
+                return [], "invalid_crop"
+            # A character-sized uncovered component anywhere in the plate
+            # can be an independent row; alignment to known rows is not proof.
+            return [], "residual_text_evidence"
+    return polys, ""
+
+
+
 class TextRegionDetector:
     """Scene-text region detector — the "anytext" category. Finds text
     REGIONS in the wild (street signs, name badges, papers on a desk,
@@ -5666,7 +5776,7 @@ class TextRegionDetector:
     ONNX export (Apache-2.0), auto-downloaded (~4.8MB) and sha256-pinned
     exactly like YuNet — zero setup."""
 
-    def __init__(self, cb=None, thresh=0.3, box_thresh=0.5):
+    def __init__(self, cb=None, thresh=0.3, box_thresh=0.5, verify_hash=False):
         self.log = (cb.log if cb else print)
         self.thresh, self.box_thresh = float(thresh), float(box_thresh)
         self.sess = None
@@ -5679,6 +5789,8 @@ class TextRegionDetector:
                          "(~4.8 MB, one time)…")
                 _fetch_model(PPDET_URL, path, sha256=PPDET_SHA256,
                              log_fn=self.log)
+            if verify_hash and _sha256_file(path) != PPDET_SHA256:
+                raise ValueError("text detector hash mismatch")
             self.sess = _ort_session(path)
             self._in = self.sess.get_inputs()[0].name
             self.log("      all-text detector: PP-OCRv5 det loaded "
@@ -5687,6 +5799,32 @@ class TextRegionDetector:
             self.log("      all-text detector unavailable (%s) — the "
                      "anytext category is INACTIVE this run" % e)
             self.sess = None
+
+    def find_plate(self, frame, box):
+        try:
+            x1, y1, x2, y2 = (int(v) for v in box)
+        except (TypeError, ValueError, OverflowError):
+            return [], "invalid_crop"
+        h, w = frame.shape[:2]
+        if x1 < 0 or y1 < 0 or x2 > w or y2 > h or x2-x1 < 8 or y2-y1 < 8:
+            return [], "invalid_crop"
+        if self.sess is None:
+            return [], "model_unavailable"
+        crop = frame[y1:y2, x1:x2]
+        ch, cw = crop.shape[:2]
+        scale = 640.0 / max(ch, cw)
+        nh = max(32, int(round(ch * scale / 32)) * 32)
+        nw = max(32, int(round(cw * scale / 32)) * 32)
+        image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
+        image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
+        blob = image.transpose(2, 0, 1)[None].astype(np.float32)
+        try:
+            prob = self.sess.run(None, {self._in: blob})[0][0, 0]
+            polys, reason = _narrow_from_probability(crop, prob)
+        except Exception:
+            return [], "inference_error"
+        return [p + (x1, y1) for p in polys], reason
+
 
     def available(self):
         return self.sess is not None
