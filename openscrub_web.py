@@ -2664,6 +2664,7 @@ def _exact_snapshot(job):
     if not isinstance(doc, dict):
         raise exact.ExactError('legacy list report has no exact timeline')
     marker = _checkpoint_marker(doc)
+    evidence = marker or _completed_checkpoint(doc)
     candidate = doc.get('provenance', {}).get('input')
     if not isinstance(candidate, str) or not candidate:
         raise exact.ExactError('report has no selected scan input')
@@ -2693,11 +2694,11 @@ def _exact_snapshot(job):
         raise exact.ExactError('scan adoption was cancelled or replaced')
     lease = None
     try:
-        if marker is None:
+        if evidence is None:
             prepared, lease = _prepare_observed_source(job, canonical)
         else:
             prepared, lease = _prepare_observed_source(job, canonical,
-                checkpoint_sha256=marker['input_sha256'])
+                checkpoint_sha256=evidence['input_sha256'])
         with _exact_owner_guard(job, lease):
             _report_current(job)
             if ((files.committed_report_epoch, files.operation) != fence
@@ -2710,8 +2711,8 @@ def _exact_snapshot(job):
                     or recovery[3] != report_stamp
                     or prepared['path'] != os.path.realpath(recovery[2])):
                 raise exact.ExactError('scan recovery authority changed', 409, 'sample_conflict')
-            if marker is not None:
-                _checkpoint_source_policy(marker, prepared)
+            if evidence is not None:
+                _checkpoint_source_policy(evidence, prepared)
             selected = _select_observed_locked(job, prepared, authoritative=recovery is not None)
             if recovery:
                 job['video'] = selected['path']
@@ -2998,6 +2999,7 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
             _ThumbnailError('thumbnail_invalid_report', 500, 'Report invalid'))
     try:
         marker = _checkpoint_marker(doc)
+        evidence = marker or _completed_checkpoint(doc)
     except exact.ExactError as error:
         raise _ThumbnailError('thumbnail_source_conflict', error.status, str(error)) from None
     provenance = doc.get('provenance', {})
@@ -3036,11 +3038,11 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
             _ThumbnailError('thumbnail_source_conflict', 409, 'Source recovery unavailable'))
     lease = None
     try:
-        if marker is None:
+        if evidence is None:
             prepared, lease = _prepare_observed_source(job, canonical)
         else:
             prepared, lease = _prepare_observed_source(job, canonical,
-                checkpoint_sha256=marker['input_sha256'])
+                checkpoint_sha256=evidence['input_sha256'])
         source_stat = os.stat(canonical)
         if not stat.S_ISREG(source_stat.st_mode) or _file_stamp(source_stat) != prepared['stamp']:
             raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source changed')
@@ -3065,8 +3067,8 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
                             or files.source_retired or files.source_status == 'unavailable'):
                 raise _ThumbnailError('thumbnail_source_conflict', 409, 'Source association unavailable')
             try:
-                if marker is not None:
-                    _checkpoint_source_policy(marker, prepared)
+                if evidence is not None:
+                    _checkpoint_source_policy(evidence, prepared)
                 selected = _select_observed_locked(job, prepared, authoritative=recovery is not None,
                                                    report_bound=not missing)
             except exact.ExactError:
@@ -3660,6 +3662,29 @@ def _checkpoint_marker(doc):
     return marker
 
 
+def _completed_checkpoint(doc):
+    """Qualify only a fully decoded checkpoint, including its empty-row case."""
+    if 'stop_review' in doc or not openscrub._has_checkpoint_identity(doc):
+        return None
+    try:
+        provenance = doc['provenance']
+        state = doc['render_state']
+        cum, bands, fps = state['cum'], state['bands'], state['fps']
+        if (not isinstance(cum, list) or not cum or not isinstance(bands, list) or
+                len(bands) != len(cum) or not isinstance(doc['detections'], list)):
+            raise ValueError('completed checkpoint timeline is invalid')
+        total = len(cum)
+        identity = checkpoints._identity(provenance['checkpoint_identity'], total, fps,
+                                         provenance['input_sha256'])
+        openscrub._report_frame_authorities(doc)
+        openscrub._validate_bounded_report_identity(doc, provenance['input_sha256'], state)
+    except (KeyError, TypeError, ValueError, RecursionError) as error:
+        raise exact.ExactError('invalid completed checkpoint: ' + str(error),
+                               409, 'sample_conflict') from None
+    return dict(input_sha256=provenance['input_sha256'], fps=fps,
+                total_frames=total, next_frame=total, options=identity)
+
+
 def _checkpoint_source_policy(marker, selected):
     """Tie a parsed prefix to the same bytes and stream described by its owner."""
     facts = selected.get('facts')
@@ -3695,14 +3720,15 @@ def _exact_policy(doc, selected):
     if selected['policy_error']:
         raise exact.ExactError(selected['policy_error'])
     marker = _checkpoint_marker(doc)
+    evidence = marker or _completed_checkpoint(doc)
     provenance = doc.get('provenance', {})
     settings = provenance.get('settings', {})
     normalized = (provenance.get('vfr_normalized') and provenance.get('original_input')
                   and os.path.realpath(provenance['original_input']) != selected['path'])
-    if marker is None and not normalized and (settings.get('no_vfr_fix') or settings.get('vfr') == 'ignore'):
+    if evidence is None and not normalized and (settings.get('no_vfr_fix') or settings.get('vfr') == 'ignore'):
         raise exact.ExactError('known raw timing bypass is unsupported')
     fps, cum, timeline_eq = exact.timeline(doc, selected['facts'])
-    tolerance = (_checkpoint_source_policy(marker, selected) if marker is not None else
+    tolerance = (_checkpoint_source_policy(evidence, selected) if evidence is not None else
                  exact.precision_bound(selected['facts'], fps, len(cum)))
     return fps, cum, timeline_eq, tolerance
 
@@ -3836,10 +3862,11 @@ def job_edit_sample(jid):
         doc, selected, fence, lease = _exact_snapshot(job)
         fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
         marker = _checkpoint_marker(doc)
+        evidence = marker or _completed_checkpoint(doc)
         if marker is not None and requested >= marker['next_frame'] / fps:
             raise exact.ExactError('time outside inspected checkpoint prefix', 400, 'invalid_sample_request')
         index = exact.resolve_time(requested, fps, len(cum))
-        if marker is not None:
+        if evidence is not None:
             # A JSON representation of index/fps can multiply back just below
             # its integer (for example 123/120). Preserve exact grid roundtrips
             # without rounding a request that is actually before the frame.
@@ -3884,7 +3911,7 @@ def job_edit_sample(jid):
                         row, doc, selected, index, fps, len(cum), timeline_eq)
                     if 'manual_plate_quad' in row:
                         item['manual_plate_quad'] = row['manual_plate_quad']
-                if marker is not None:
+                if evidence is not None:
                     item['scan_frame_bounds'] = list(authority) if authority is not None else None
                 boxes.append(item)
         with _exact_owner_guard(job, lease):
@@ -4674,7 +4701,7 @@ def _checkpoint_edit_preflight(doc, edits, preconditions, marker):
     """Require an inspected sample for geometry and disallow future spans."""
     boundary = marker['next_frame'] / marker['fps']
     if edits.get('manual_plate_quads'):
-        raise exact.ExactError('plate corners require a completed scan', 409, 'geometry_conflict')
+        raise exact.ExactError('plate corners are unavailable in this scan mode', 409, 'geometry_conflict')
     for field in ('box_overrides', 'time_overrides'):
         values = edits.get(field) or {}
         if not isinstance(values, dict) or any(key not in preconditions for key in values):
@@ -4753,7 +4780,7 @@ def _checkpoint_audio_rows(previous, submitted, boundary):
     return result
 
 
-def _load_checkpoint_edit_report(path):
+def _load_checkpoint_edit_report(path, *, paused=True):
     """Open and parse the same regular report generation that will be fenced."""
     try:
         with open(path, encoding='utf-8', opener=_thumbnail_nonblocking_opener) as stream:
@@ -4769,7 +4796,9 @@ def _load_checkpoint_edit_report(path):
                 raise OSError('report changed')
     except (OSError, ValueError, RecursionError):
         raise exact.ExactError('checkpoint report is unavailable or changed', 409, 'geometry_conflict') from None
-    if not isinstance(doc, dict) or 'stop_review' not in doc:
+    if (not isinstance(doc, dict) or
+            (paused and 'stop_review' not in doc) or
+            (not paused and ('stop_review' in doc or not openscrub._has_checkpoint_identity(doc)))):
         raise exact.ExactError('checkpoint report changed', 409, 'geometry_conflict')
     return doc, stamp
 
@@ -4799,13 +4828,16 @@ def job_save_edits(jid):
                         report_stamp = None
                         if isinstance(doc, dict) and 'stop_review' in doc:
                             doc, report_stamp = _load_checkpoint_edit_report(path)
+                        elif openscrub._has_checkpoint_identity(doc):
+                            doc, report_stamp = _load_checkpoint_edit_report(path, paused=False)
                 except FileNotFoundError:
                     abort(404, 'job report not found')
                 marker = _checkpoint_marker(doc)
-                if marker is not None:
-                    _checkpoint_edit_preflight(doc, edits, preconditions, marker)
+                evidence = marker or _completed_checkpoint(doc)
+                if evidence is not None:
+                    _checkpoint_edit_preflight(doc, edits, preconditions, evidence)
                 additions, strict_manual = _manual_candidates(doc, edits)
-                needs_source = bool(marker is not None or preconditions or strict_manual)
+                needs_source = bool(evidence is not None or preconditions or strict_manual)
                 if needs_source and prepared is None:
                     candidate = doc.get('provenance', {}).get('input')
                     if not isinstance(candidate,str) or not candidate:
@@ -4814,8 +4846,8 @@ def job_save_edits(jid):
                     preparation_authority = (files.current_source, files.source_epoch, files.operation)
                     if edits.get('manual_plate_quads'):
                         preparation_report = (files.committed_report_epoch, _file_stamp(os.stat(path)))
-                    if marker is not None:
-                        checkpoint_preparation = (marker['input_sha256'], files.committed_report_epoch,
+                    if evidence is not None:
+                        checkpoint_preparation = (evidence['input_sha256'], files.committed_report_epoch,
                                                   report_stamp)
                 else:
                     selected = targets = None
@@ -4842,16 +4874,17 @@ def job_save_edits(jid):
                                 report_current = stat.S_ISREG(named.st_mode) and _file_stamp(named) == stamp
                             except OSError:
                                 report_current = False
-                            if (marker is None or marker['input_sha256'] != checkpoint_digest or
+                            if (evidence is None or evidence['input_sha256'] != checkpoint_digest or
                                     files.committed_report_epoch != epoch or not report_current):
                                 raise exact.ExactError('checkpoint changed while preparing save', 409, 'geometry_conflict')
-                            _checkpoint_source_policy(marker, prepared)
-                        elif marker is not None:
+                            _checkpoint_source_policy(evidence, prepared)
+                        elif evidence is not None:
                             raise exact.ExactError('checkpoint appeared while preparing save', 409, 'geometry_conflict')
                         selected = _select_observed_locked(job, prepared)
                         _exact_current_locked(job, selected)
                         fps,cum,timeline_eq,_ = _exact_policy(doc,selected)
-                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq,digest,marker)
+                        targets = _validate_strict_rows(
+                            doc, edits, preconditions, selected, fps, cum, timeline_eq, digest, evidence)
                         for manual,pc in strict_manual:
                             _check_sample_precondition(pc,selected,fps,cum,timeline_eq)
                             t0,t1,tref = manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])
@@ -4928,7 +4961,7 @@ def job_save_edits(jid):
                             if not targets[key][1]:
                                 t0,t1,last = targets[key][0]['span']
                                 row = doc['detections'][i]
-                                if marker is not None and (row['t_start'], row['t_end']) != (t0, t1):
+                                if evidence is not None and (row['t_start'], row['t_end']) != (t0, t1):
                                     remove(row, 'scan_frame_start')
                                     remove(row, 'scan_frame_end')
                                 assign(row, 't_start', t0); assign(row, 't_end', t1); assign(row, 'last_seen', last)
@@ -4962,9 +4995,9 @@ def job_save_edits(jid):
                             if row.get('category') == 'plate' and not row.get('zone_dropped'):
                                 assign(row, 'enabled', decision.enabled)
                     if 'audio' in edits:
-                        if marker is not None:
+                        if evidence is not None:
                             audio = _checkpoint_audio_rows(doc.get('audio_redactions'), edits.get('audio'),
-                                                          marker['next_frame'] / marker['fps'])
+                                                          evidence['next_frame'] / evidence['fps'])
                         else:
                             audio = [dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
                                      for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0]
@@ -4972,7 +5005,7 @@ def job_save_edits(jid):
                     if (len(doc['detections']) != original_count or
                             any(original is missing or key not in target or not _same_json_value(original, target[key])
                                 for target, key, original in touched.values())):
-                        if marker is not None:
+                        if evidence is not None:
                             acknowledged_stamp = _publish_job_report_locked(
                                 job, path, doc, expected_stamp=report_stamp, expected_source=selected)
                             published = True
@@ -4984,13 +5017,14 @@ def job_save_edits(jid):
                         if row['category'] in ('name',):
                             per.setdefault(row['text'],[]).append(row.get('enabled',True))
                     result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
-                    if marker is not None:
-                        try:
-                            token = _checkpoint_resume_token_locked(job)
-                        except Conflict:
-                            if published:
-                                raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain') from None
-                            raise
+                    if evidence is not None:
+                        if marker is not None:
+                            try:
+                                token = _checkpoint_resume_token_locked(job)
+                            except Conflict:
+                                if published:
+                                    raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain') from None
+                                raise
                         try:
                             observed = os.stat(path, follow_symlinks=False)
                             same_report = (stat.S_ISREG(observed.st_mode) and
@@ -5002,7 +5036,8 @@ def job_save_edits(jid):
                                 raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain')
                             raise exact.ExactError('checkpoint report changed before save acknowledgement',
                                                    409, 'geometry_conflict')
-                        result['resume_token'] = token
+                        if marker is not None:
+                            result['resume_token'] = token
                     if preconditions:
                         result['geometry_rows'] = {}
                         for key, pc in preconditions.items():
@@ -5012,7 +5047,7 @@ def job_save_edits(jid):
                             if row.get('category') == 'plate':
                                 accepted['manual_plate_quad'] = row.get('manual_plate_quad')
                                 accepted['quad_baseline'] = _quad_baseline_token(row)
-                            if marker is not None:
+                            if evidence is not None:
                                 authority = openscrub._frame_authority(row, total=len(cum))
                                 accepted['scan_frame_bounds'] = list(authority) if authority is not None else None
                             result['geometry_rows'][key] = accepted

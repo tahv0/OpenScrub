@@ -60,6 +60,10 @@ def test_pause_restart_save_resume_and_render_native_source(checkpoint_web, sock
     assert done['audio_redactions'] == [audio]
     assert any(row.get('manual_id') == manual['manual_id'] for row in done['detections'])
     assert json.loads(socket_api('GET', state.url)[2])['phase'] == 'review'
+    sample_code, _, sample = socket_api('GET', state.url + '/edit_sample?t=3')
+    assert sample_code == 200, sample
+    exact_sample = json.loads(sample)['sample']
+    assert exact_sample['index'] / done['render_state']['fps'] == 3
     code, _, body = socket_api('POST', state.url + '/render')
     assert code in (200, 202), body
     join(run_worker())
