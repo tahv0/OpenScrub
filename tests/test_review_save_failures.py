@@ -901,3 +901,120 @@ def test_older_track_status_cannot_preempt_newer_pending_intent(newer):
     }
     await poll;
     """.replace('NEWER',json.dumps(newer)))
+
+
+@pytest.mark.parametrize('navigation', ['remount', 'away-return'])
+@pytest.mark.parametrize('result', ['success', 'failure'])
+@pytest.mark.parametrize('timing', ['timer', 'body'])
+def test_admitted_track_survives_view_change_and_offers_current_report(navigation, result, timing):
+    run_js(EXACT + r"""const old=strictDraft();await inspected(old);const owner=EDITS;
+    owner.enabled[17]=false;MAN.push({manual_id:'keep'});
+    const trackStatus=el(),trackActions=el();elements.set('reviewTrackStatus',trackStatus);elements.set('reviewTrackActions',trackActions);
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const start=beTrackGo([10,20,40,60]);await reply();await start;
+    assert.equal(timers.size,1,'admitted Track did not schedule status');
+    let poll,otherStatus;
+    if(TIMING==='body'){poll=[...timers.values()][0]();timers.clear();}
+    if(NAV==='remount'){showPanel('boxedit_rev');exactMount();}
+    else {openJob('B');otherStatus=trackStatus.textContent;}
+    if(TIMING==='timer'){
+      assert.equal(timers.size,1,'view retirement cancelled the only admitted Track status poll');
+      poll=[...timers.values()][0]();timers.clear();
+    }
+    await reply(RESULT==='success'?{state:'done',added:2}:{state:'done',added:0,error:'synthetic tracking failure'});await poll;
+    if(NAV==='away-return'){assert.equal(CUR,'B');assert.equal(trackStatus.textContent,otherStatus,'Track result changed another job UI');openJob('A');exactMount();}
+    assert.equal(EDITS,owner);assert.equal(EDITS.enabled[17],false);assert.equal(MAN[0].manual_id,'keep');
+    assert(trackStatus.textContent.includes(RESULT==='success'?'2':'synthetic tracking failure'),trackStatus.textContent);
+    if(RESULT==='success'){
+      const button=trackActions.children.findLast(x=>x.textContent==='Review tracked positions');
+      assert(button,'missing deliberate tracked-result review');
+      const review=button.onclick();await reply({duration:3,detections:[{i:7,category:'manual',text:'tracked object',
+       enabled:true,t_start:0,t_end:2,person:-1,track:-1}]});await review;
+      assert(REVIEW_META.byId.has(7),'current tracked row missing from refreshed report');
+      assert.equal(EDITS.enabled[17],false);assert.equal(MAN[0].manual_id,'keep');
+    }
+    """.replace('NAV',json.dumps(navigation)).replace('RESULT',json.dumps(result)).replace('TIMING',json.dumps(timing)))
+
+
+def test_track_admission_ack_after_newer_view_still_monitors_status():
+    run_js(EXACT + r"""const old=strictDraft();await inspected(old);
+    const trackStatus=el();elements.set('reviewTrackStatus',trackStatus);elements.set('reviewTrackActions',el());
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const start=beTrackGo([10,20,40,60]);showPanel('boxedit_rev');const newer=exactMount();
+    await reply();await start;assert.equal(BE_VIEW,newer.view);
+    assert.equal(timers.size,1,'late admission ACK lost the job-owned status poll');
+    const poll=[...timers.values()][0]();timers.clear();await reply({state:'done',added:1});await poll;
+    assert.equal(BE_VIEW,newer.view);assert(trackStatus.textContent.includes('1'));
+    """)
+
+
+
+def test_detached_track_status_failure_can_be_checked_again_without_new_track():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);
+    const status=el(),actions=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',actions);
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const started=beTrackGo([10,20,40,60]);await reply();await started;
+    showPanel('boxedit_rev');const newer=exactMount();
+    const first=[...timers.values()][0]();timers.clear();queue.shift().reject(Error('offline'));await tick();await first;
+    assert(status.textContent.includes('offline'));assert.equal(BE_VIEW,newer.view);
+    const check=actions.children.findLast(x=>x.textContent==='Check tracking status');assert(check);
+    const retry=check.onclick();await reply({state:'running',added:0});await retry;
+    assert.equal(timers.size,1);const final=[...timers.values()][0]();timers.clear();await reply({state:'done',added:3});await final;
+    assert(status.textContent.includes('3'));assert.equal(calls.filter(c=>c.url.endsWith('/track_object')).length,1);
+    assert(actions.children.some(x=>x.textContent==='Review tracked positions'));
+    """)
+
+
+def test_deleted_job_cannot_publish_late_track_status_into_reopened_job():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);
+    const status=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',el());
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const started=beTrackGo([10,20,40,60]);await reply();await started;
+    const polling=[...timers.values()][0]();timers.clear();const oldStatus=queue.shift();
+    confirm=()=>true;const deleting=delJob('A');await reply();await deleting;
+    openJob('A');const fresh=EDITS;oldStatus.resolve(response({state:'done',added:9}));await tick();await polling;
+    assert.equal(EDITS,fresh);assert(!status.textContent.includes('9'));assert.equal(fresh.track,undefined);
+    """)
+
+
+def test_uncertain_track_ack_exposes_status_check_and_preserves_job_drafts():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);const owner=EDITS;
+    const status=el(),actions=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',actions);
+    owner.enabled[2]=false;MAN.push({manual_id:'kept'});
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const start=beTrackGo([10,20,40,60]);showPanel('boxedit_rev');const next=exactMount();
+    queue.shift().reject(Error('lost acknowledgement'));await tick();await start;
+    assert(status.textContent.includes('may have started'));assert.equal(BE_VIEW,next.view);
+    const check=actions.children.findLast(x=>x.textContent==='Check tracking status');assert(check);
+    const retry=check.onclick();await reply({state:'running',added:0});await retry;
+    const poll=[...timers.values()][0]();timers.clear();await reply({state:'done',added:1});await poll;
+    assert(status.textContent.includes('1'));assert.equal(EDITS,owner);assert.equal(EDITS.enabled[2],false);assert.equal(MAN[0].manual_id,'kept');
+    assert.equal(calls.filter(c=>c.url.endsWith('/track_object')).length,1);
+    """)
+
+
+def test_review_while_track_status_uncertain_does_not_lose_status_owner():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);const owner=EDITS;
+    const status=el(),actions=el();elements.set('reviewTrackStatus',status);elements.set('reviewTrackActions',actions);
+    const start=beTrackGo([10,20,40,60]);showPanel('boxedit_rev');exactMount();
+    queue.shift().reject(Error('lost acknowledgement'));await tick();await start;
+    const button=actions.children.findLast(x=>x.textContent==='Review tracked positions');assert(button);
+    const review=button.onclick();await reply({duration:3,detections:[]});await review;
+    assert.equal(EDITS,owner);assert(owner.track,'reviewing before Track settled discarded its status owner');
+    assert(status.textContent.includes('may have started'));
+    """)
+
+
+def test_stale_tracking_action_cannot_discard_restarted_status_check():
+    run_js(EXACT+r"""const old=strictDraft();await inspected(old);const owner=EDITS;
+    const actions=el();elements.set('reviewTrackStatus',el());elements.set('reviewTrackActions',actions);
+    var timers=new Map(),timerId=0;setTimeout=f=>{const n=++timerId;timers.set(n,f);return n};clearTimeout=n=>timers.delete(n);
+    const started=beTrackGo([10,20,40,60]);await reply();await started;showPanel('boxedit_rev');exactMount();
+    const first=[...timers.values()][0]();timers.clear();queue.shift().reject(Error('offline'));await tick();await first;
+    const check=actions.children.findLast(x=>x.textContent==='Check tracking status');
+    const dismiss=actions.children.findLast(x=>x.textContent==='Dismiss tracking notice');assert(check&&dismiss);
+    const retry=check.onclick();dismiss.onclick();assert(owner.track,'stale dismiss dropped an active status check');
+    await reply({state:'running',added:0});await retry;const finish=[...timers.values()][0]();timers.clear();
+    await reply({state:'done',added:2});await finish;const count=calls.length;await check.onclick();
+    assert.equal(calls.length,count,'stale check replaced completed Track result');
+    """)

@@ -16,7 +16,7 @@ from test_review_save_failures import HARNESS, app_js
 # map and tiny DOM below adapt browser primitives only, never reconciliation.
 LIFECYCLE_HARNESS = HARNESS.replace(
     'const elements=new Map();', 'const elements=new Map(),windowEvents=new Map();'
-).replace('({elements,console,', '({elements,windowEvents,console,').replace(
+).replace('({elements,el,console,', '({elements,el,windowEvents,console,').replace(
     'window:{addEventListener(){}},',
     'window:{addEventListener:(name,fn)=>windowEvents.set(name,fn),'
     'removeEventListener:(name,fn)=>{if(windowEvents.get(name)===fn)windowEvents.delete(name)}},'

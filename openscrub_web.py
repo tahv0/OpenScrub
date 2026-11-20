@@ -4885,6 +4885,8 @@ async function delJob(id){
   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
   alert(m);return;
  }
+ const track=REVIEW_DRAFTS.get(id)?.track;
+ if(track?.timer)clearTimeout(track.timer);
  REVIEW_DRAFTS.delete(id);
  if(CUR===id){BE_OPEN_INTENT++;disposeReview();beUnmount();stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
  JOBSJSON="";loadJobs();
@@ -4908,8 +4910,8 @@ async function openJob(id){
   REVIEW_DRAFTS.set(id,EDITS);}
  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
  PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;SHELLPH=null;
- detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewResolveActions"></div>';
- saveStatus(EDITS,EDITS.status);
+ detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewAccess"></div><div id="reviewTrackStatus" role="status" aria-live="polite"></div><div id="reviewTrackActions"></div><div id="reviewResolveActions"></div>';
+ saveStatus(EDITS,EDITS.status);renderTrackStatus(EDITS);
 
  refresh();
 }
@@ -5212,7 +5214,10 @@ async function refreshCycle(cycle){
   PHIST=[];PHPH=j.phase;
   // Phase eligibility is separate from view identity. Leave-and-return creates
   // a new token; slow same-phase review requests remain eligible.
-  AUTO_REVIEW=j.phase==="review"?{id,gen,state:"idle"}:null;
+  const pendingManual=REVIEW_REQUEST?.pending&&REVIEW_REQUEST.manual;
+  AUTO_REVIEW=j.phase==="review"?{id,gen,state:pendingManual?"loading":
+   EDITS?.reviewEditorGen===gen?"deferred":"idle"}:null;
+  renderReviewAccess();
  }
  PHIST.push([Date.now(),j.progress]); if(PHIST.length>40)PHIST.shift();
  let sec=null;
@@ -5308,7 +5313,8 @@ async function refreshCycle(cycle){
   const auto=AUTO_REVIEW;auto.state="loading";
   const pending=loadReview(auto),request=REVIEW_REQUEST;
   pending.catch(()=>{
-   if(AUTO_REVIEW===auto&&REVIEW_REQUEST===request&&ownsView(id,gen)){
+   if(AUTO_REVIEW===auto&&REVIEW_REQUEST===request&&ownsView(id,gen)&&
+      auto.state==="loading"&&EDITS?.reviewEditorGen!==gen){
     auto.state="idle";pollStatus("Review could not load — retrying job updates.");
    }
   });
@@ -5446,14 +5452,13 @@ function beEndGesture(editor,cv){
 }
 function beUnmount(){
  const view=BE_VIEW;if(!view)return;
- BE_VIEW=null;view.serial++;view.playbackSerial++;view.trackLaunch=null;
+ beRetireTrack(view);BE_VIEW=null;view.serial++;view.playbackSerial++;
  const gesture=view.tlGesture;
  if(gesture){
   if(view.editor.tlDrag===gesture.drag)view.editor.tlDrag=null;
   try{view.tl.releasePointerCapture(gesture.pointerId);}catch(_){}
   view.tlGesture=null;
  }
- if(view.trackTimer)clearTimeout(view.trackTimer);
  if(view.imageURL)URL.revokeObjectURL(view.imageURL);view.imageURL=null;view.readySample=null;
  view.observer.disconnect();
  beEndGesture(view.editor,view.cv);
@@ -5786,61 +5791,131 @@ function beAudioRm(){
   renderTranscript();renderAudioSugg();beTLDraw();}
 }
 function beTrackMode(){
- if(!beReady()||BE_VIEW.trackLaunch)return;
+ if(!beReady()||BE_VIEW.trackLaunch||EDITS?.track)return;
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
  document.getElementById("beTrk").classList.toggle("on",BE.trk);
  document.getElementById("beAdd").classList.remove("on");
  document.getElementById("beMute").classList.remove("on");
 }
+// A Track operation belongs to the existing job draft, not its transient editor.
+function trackOwned(track){return REVIEW_DRAFTS.get(track.id)===track.draft&&track.draft.track===track;}
+function renderTrackStatus(d){
+ if(d!==EDITS)return;
+ const status=document.getElementById('reviewTrackStatus'),actions=document.getElementById('reviewTrackActions');
+ if(!status||!actions)return;
+ status.textContent='';actions.innerHTML='';const track=d.track;if(!track)return;
+ if(track.state==='starting'||track.state==='running'){
+  status.textContent='Tracking is in progress. Results will be available to review.';return;
+ }
+ if(track.state==='done'&&!track.error)status.textContent=track.uncertain?
+  `Latest tracking status reports ${track.added} position(s). The request was unconfirmed; review the report.`:
+  `Tracked ${track.added} position(s). Review the updated report.`;
+ else status.textContent=track.state==='uncertain'?'Tracking may have started; check its status and review the report.':
+  'Tracking status: '+track.error;
+ if(track.state==='done'&&!track.error||track.state==='uncertain'||track.state==='status_error'){
+  const review=document.createElement('button');review.textContent='Review tracked positions';
+  review.onclick=()=>reviewTracked(d,track);actions.appendChild(review);
+ }
+ if(track.state==='uncertain'||track.state==='status_error'){
+  const retry=document.createElement('button');retry.textContent='Check tracking status';
+  retry.onclick=()=>checkTrackStatus(d,track);actions.appendChild(retry);
+ }
+ if(track.state!=='done'||track.error){
+  const dismiss=document.createElement('button'),state=track.state;dismiss.textContent='Dismiss tracking notice';
+  dismiss.onclick=()=>{if(track.state===state)clearTrack(d,track);};actions.appendChild(dismiss);
+ }
+}
+function clearTrack(d,track){
+ if(EDITS!==d||d.track!==track)return;
+ if(track.timer)clearTimeout(track.timer);track.timer=null;d.track=null;renderTrackStatus(d);
+}
+async function reviewTracked(d,track){
+ if(EDITS!==d||d.track!==track||CUR!==track.id||
+  !(track.state==='done'&&!track.error||track.state==='uncertain'||track.state==='status_error'))return;
+ const id=CUR,gen=VIEW_GEN,intent=await loadReview();
+ if(ownsView(id,gen)&&EDITS===d&&d.track===track&&track.state==='done'&&intent!==undefined&&intent===BE_OPEN_INTENT)clearTrack(d,track);
+}
 function beRetireTrack(view=BE_VIEW){
  const launch=view?.trackLaunch;if(!launch)return;
  view.trackLaunch=null;
- if(view.trackTimer)clearTimeout(view.trackTimer);view.trackTimer=null;
- if(view.current()&&document.getElementById('beTrkSt')===launch.st)launch.st.textContent='';
+ if(view.current()){
+  if(document.getElementById('beTrkSt')===launch.st)launch.st.textContent='';
+  view.editor.trk=false;view.editor.addAnchor=null;view.editor.addFloat=null;
+  document.getElementById('beTrk')?.classList.remove('on');
+ }
+ if(launch.view===view){launch.view=null;launch.editor=null;launch.st=null;}
 }
 function beTrackCurrent(launch){
  const view=launch.view;
- const current=view.current()&&BE_VIEW===view&&ownsView(launch.id,launch.gen)&&BE===launch.editor&&
+ const current=!!view&&view.current()&&BE_VIEW===view&&ownsView(launch.id,launch.gen)&&BE===launch.editor&&
   view.trackLaunch===launch&&BE_OPEN_INTENT===launch.intent&&REVIEW_REQUEST===launch.reviewRequest;
- if(!current&&view.trackLaunch===launch)beRetireTrack(view);
+ if(!current&&view?.trackLaunch===launch)beRetireTrack(view);
  return current;
 }
+function scheduleTrackStatus(track){
+ if(!trackOwned(track)||track.timer)return;
+ track.timer=setTimeout(()=>{track.timer=null;return pollTrackStatus(track);},1500);
+}
+async function checkTrackStatus(d,track){
+ if(EDITS!==d||d.track!==track||track.polling||!['uncertain','status_error'].includes(track.state))return;
+ track.state='running';renderTrackStatus(d);return pollTrackStatus(track);
+}
+async function pollTrackStatus(track){
+ if(!trackOwned(track)||track.polling)return;
+ track.polling=true;
+ try{
+  const response=await fetch(`api/jobs/${track.id}/track_status`);
+  if(!response.ok)throw Error(`Track status unavailable (HTTP ${response.status})`);
+  const result=await response.json();if(!trackOwned(track))return;
+  if(result.state==='running'){
+   track.state='running';renderTrackStatus(track.draft);scheduleTrackStatus(track);return;
+  }
+  if(result.state!=='done'||!Number.isSafeInteger(result.added)||result.added<0)
+   throw Error('Tracking status is unavailable; inspect the report or check again.');
+  track.state='done';track.added=result.added;track.error=result.error||null;renderTrackStatus(track.draft);
+  if(!beTrackCurrent(track))return;
+  const view=track.view,editor=track.editor,st=track.st;
+  if(track.error){st.textContent='⚠ '+track.error;view.trackLaunch=null;track.view=null;track.editor=null;track.st=null;return;}
+  st.textContent=`tracked ✓ ${track.added} position(s) — inspect and review`;
+  saveStatus(track.draft,'Tracked positions added. Inspect and review them; pending edits are retained.');
+  beInvalidateSample(view,'Inspecting tracked result…');
+  await tlInit();if(!trackOwned(track)||!beTrackCurrent(track))return;
+  view.trackLaunch=null;track.view=null;track.editor=null;track.st=null;
+  if(document.getElementById("review")){
+   const intent=await loadReview();
+   if(!trackOwned(track)||!ownsView(track.id,track.gen)||BE!==editor||intent===undefined||intent!==BE_OPEN_INTENT)return;
+   clearTrack(track.draft,track);await loadBoxEdit(1);
+  }else{
+   const sample=beScrub();
+   if(sample)sample.then(()=>{if(trackOwned(track)&&BE_VIEW===view&&beReady(view))clearTrack(track.draft,track);});
+  }
+ }catch(error){
+  if(!trackOwned(track))return;
+  track.state='status_error';track.error=String(error.message||error);renderTrackStatus(track.draft);
+  if(beTrackCurrent(track))beRetireTrack(track.view);
+ }finally{track.polling=false;}
+}
 async function beTrackGo(box){
- const view=BE_VIEW;if(!beReady(view)||view.trackLaunch)return;
+ const view=BE_VIEW,draft=EDITS;if(!beReady(view)||view.trackLaunch||!draft||draft.track)return;
  const editor=view.editor,[t0,t1]=editor.win||[];
- if(!beNewBox(view,box,t0,t1)){saveStatus(EDITS,"Track requires an in-frame box and a window containing the canonical frame time.");return;}
- const st=document.getElementById("beTrkSt"),launch={view,editor,id:view.id,gen:view.gen,st,
-  intent:BE_OPEN_INTENT,reviewRequest:REVIEW_REQUEST};
+ if(!beNewBox(view,box,t0,t1)){saveStatus(draft,"Track requires an in-frame box and a window containing the canonical frame time.");return;}
+ const st=document.getElementById("beTrkSt"),launch={view,editor,draft,id:view.id,gen:view.gen,st,
+  intent:BE_OPEN_INTENT,reviewRequest:REVIEW_REQUEST,state:'starting',timer:null,polling:false};
  const payload={box:copyEdit(box),t_ref:view.readySample.sample.canonical_s,t0,t1,seed:copyEdit(view.readySample.precondition)};
- view.trackLaunch=launch;st.style.display="inline";st.textContent=`tracking ${t0.toFixed(1)}–${t1.toFixed(1)}s…`;
+ draft.track=launch;view.trackLaunch=launch;renderTrackStatus(draft);
+ st.style.display="inline";st.textContent=`tracking ${t0.toFixed(1)}–${t1.toFixed(1)}s…`;
  try{
   await reviewPost(`api/jobs/${launch.id}/track_object`,payload);
-  if(!beTrackCurrent(launch))return;
-  const poll=async()=>{
-   if(!beTrackCurrent(launch))return;
-   try{
-    const response=await fetch(`api/jobs/${launch.id}/track_status`);
-    if(!response.ok)throw Error(`Track status unavailable (HTTP ${response.status})`);
-    const d=await response.json();if(!beTrackCurrent(launch))return;
-    if(d.state==='running'){view.trackTimer=setTimeout(poll,1500);return;}
-    if(d.error){st.textContent='⚠ '+d.error;view.trackLaunch=null;return;}
-    st.textContent=`tracked ✓ ${d.added} position(s) — inspect and review`;
-    saveStatus(EDITS,'Tracked positions added. Inspect and review them; pending edits are retained.');
-    beInvalidateSample(view,'Inspecting tracked result…');
-    await tlInit();if(!beTrackCurrent(launch))return;
-    view.trackLaunch=null;
-    if(document.getElementById("review")){
-     // This owned refresh intentionally removes the old mount. A newer panel
-     // or open intention while the review response waits owns the next UI.
-     const intent=await loadReview();
-     if(!ownsView(launch.id,launch.gen)||BE!==editor||intent===undefined||intent!==BE_OPEN_INTENT)return;
-     await loadBoxEdit(1);
-    }else beScrub();
-   }catch(error){if(beTrackCurrent(launch)){st.textContent=String(error.message||error);view.trackLaunch=null;}}
-  };
-  view.trackTimer=setTimeout(poll,1500);
- }catch(error){if(beTrackCurrent(launch)){st.textContent='Tracking failed: '+error.message;view.trackLaunch=null;}}
+  if(!trackOwned(launch))return;
+  launch.state='running';renderTrackStatus(draft);scheduleTrackStatus(launch);
+ }catch(error){
+  if(!trackOwned(launch))return;
+  launch.uncertain=!Number.isInteger(error.status);
+  launch.state=launch.uncertain?'uncertain':'failed';launch.error=String(error.message||error);
+  renderTrackStatus(draft);if(beTrackCurrent(launch))beRetireTrack(launch.view);
+ }
 }
+
 function beScrub(){
  const view=BE_VIEW,sl=document.getElementById("beT");if(!sl||!view||!view.current())return;
  const t=+sl.value;if(!Number.isFinite(t))return;
@@ -6033,6 +6108,12 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
+ if(which!=="review"&&EDITS){
+  EDITS.reviewEditorGen=VIEW_GEN;
+  if(AUTO_REVIEW&&(AUTO_REVIEW.state!=="ready"||which!=="boxedit_rev"||!document.getElementById("review")))
+   AUTO_REVIEW.state="deferred";
+  renderReviewAccess();
+ }
  beRetireTrack();BE_OPEN_INTENT++;
  const clear=element=>{if(element){beUnmountIn(element);element.innerHTML="";}};
  // boxedit_rev keeps the review, its scheduler and its in-review editor slot.
@@ -6150,30 +6231,42 @@ function reviewLoadFailure(id,gen){
  retry.onclick=()=>{if(ownsView(id,gen)&&document.getElementById(box.id)===box)loadReview();};
  box.appendChild(message);box.appendChild(retry);detail.appendChild(box);
 }
+function renderReviewAccess(){
+ const el=document.getElementById('reviewAccess');if(!el)return;
+ el.innerHTML='';
+ if(AUTO_REVIEW?.state!=="deferred")return;
+ const button=document.createElement('button');button.textContent='Open review';
+ button.onclick=()=>loadReview();el.appendChild(button);
+}
 async function loadReview(auto=null){
  beRetireTrack();
- const id=CUR,gen=VIEW_GEN,intent=BE_OPEN_INTENT,request={};REVIEW_REQUEST=request;
+ if(!auto&&EDITS)EDITS.reviewEditorGen=null;
+ const id=CUR,gen=VIEW_GEN,intent=BE_OPEN_INTENT,request={pending:true,manual:!auto};REVIEW_REQUEST=request;
  const manualAuto=!auto&&AUTO_REVIEW?.state!=="ready"?AUTO_REVIEW:null;
  if(manualAuto)manualAuto.state="loading";
+ renderReviewAccess();
  const current=()=>ownsView(id,gen)&&REVIEW_REQUEST===request&&intent===BE_OPEN_INTENT&&
   (!auto||(AUTO_REVIEW===auto&&PHPH==="review"));
  let d,thumbnails;
  try{
   const r=await fetch(`api/jobs/${id}/detections`);
-  if(!current())return;
+  if(!current()){request.pending=false;return;}
   if(!r.ok)throw new Error("Review HTTP "+r.status);
   d=await r.json();
-  if(!current())return;
+  if(!current()){request.pending=false;return;}
   thumbnails=reviewMetadata(d);
   if(!thumbnails)throw new Error('Invalid review metadata');
  }catch(e){
+  request.pending=false;
   if(current()){
-   if(manualAuto&&AUTO_REVIEW===manualAuto)manualAuto.state="idle";
-   reviewLoadFailure(id,gen);if(auto)throw e;
+   if(!auto&&AUTO_REVIEW&&AUTO_REVIEW.state==="loading")AUTO_REVIEW.state="idle";
+   renderReviewAccess();reviewLoadFailure(id,gen);if(auto)throw e;
   }
   return;
  }
+ request.pending=false;
  if(AUTO_REVIEW)AUTO_REVIEW.state="ready";
+ renderReviewAccess();
  disposeReview();showPanel('review');
  document.getElementById('review-load-error')?.remove();
  DUR=d.duration;

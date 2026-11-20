@@ -40,7 +40,7 @@ Object.assign(ctx,{elements,events,timers,assert});
 vm.runInContext(`
 // Scheduling/layout is covered by its own complete owner suite and browser.
 ReviewScheduler.prototype.start=function(){};
-loadJobs=()=>{};showPanel=()=>{};initMarquee=()=>{};
+const realShowPanel=showPanel;loadJobs=()=>{};showPanel=()=>{};initMarquee=()=>{};
 var calls=[],queue=[];
 fetch=(url,options={})=>{const r={url,options};calls.push(r);return new Promise((resolve,reject)=>{
  Object.assign(r,{resolve,reject});queue.push(r)});};
@@ -258,4 +258,79 @@ def test_failed_auto_completion_cannot_release_manual_retry_claim():
     await advance(900);await cycle('review');
     assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'old auto completion released manual claim');
     request.resolve(response({duration:11,detections:[]}));await tick();await manual;assert.equal(DUR,11);
+    """)
+
+
+@pytest.mark.parametrize('old_outcome', ['success', 'failure'])
+def test_superseded_automatic_review_keeps_editor_and_offers_deliberate_review(old_outcome):
+    run_js("""openJob('A');await cycle('review');const old=queue.shift();
+    showPanel=realShowPanel;BE.ov[0]=[1,2,30,40];confirm=()=>true;
+    const inspect=reviewDiscard('row:0'),metadata=queue.shift();
+    assert.ok(metadata.url.endsWith('/mediainfo'));
+    if(OUTCOME==='success')old.resolve(response({duration:9,detections:[]}));
+    else old.reject(Error('old automatic review failed'));
+    await tick();assert.notEqual(AUTO_REVIEW.state,'loading','superseded automatic review left a stuck loading claim');
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'poll preempted the explicit editor');
+    const access=elements.get('reviewAccess');assert(access,'missing deliberate review control');
+    const button=access.childNodes.find(e=>e.textContent==='Open review');assert(button,'missing Open review button');
+    const reopen=button.onclick(),fresh=queue.shift();assert.ok(fresh.url.endsWith('/detections'));
+    fresh.resolve(response({duration:3,detections:[]}));await tick();await reopen;
+    assert.equal(DUR,3);assert.equal(AUTO_REVIEW.state,'ready');
+    metadata.resolve(response({duration:3}));await tick();await inspect;
+    """.replace('OUTCOME', json.dumps(old_outcome)))
+
+
+def test_old_automatic_review_cannot_release_new_manual_claim_after_editor_intent():
+    run_js("""openJob('A');await cycle('review');const old=queue.shift();
+    showPanel=realShowPanel;BE.ov[0]=[1,2,30,40];confirm=()=>true;
+    const inspect=reviewDiscard('row:0'),metadata=queue.shift();
+    const manual=loadReview(),newer=queue.shift();const claim=REVIEW_REQUEST;
+    old.reject(Error('old automatic review failed'));await tick();
+    assert.equal(REVIEW_REQUEST,claim);assert.equal(AUTO_REVIEW.state,'loading');
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'old request released the newer manual claim');
+    newer.resolve(response({duration:7,detections:[]}));await tick();await manual;
+    assert.equal(DUR,7);assert.equal(AUTO_REVIEW.state,'ready');
+    metadata.resolve(response({duration:3}));await tick();await inspect;
+    """)
+
+
+@pytest.mark.parametrize('intent', ['editor', 'manual'])
+def test_explicit_action_before_first_review_poll_keeps_automatic_request_deferred(intent):
+    run_js("""openJob('A');const jobRequest=queue.shift();showPanel=realShowPanel;
+    let action,request;
+    if(INTENT==='editor'){
+      BE.ov[0]=[1,2,30,40];confirm=()=>true;action=reviewDiscard('row:0');request=queue.shift();
+    }else{action=loadReview();request=queue.shift();}
+    jobRequest.resolve(response(job('review')));await tick();await reply(log([]));
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'first poll preempted explicit intent');
+    if(INTENT==='editor'){
+      assert.notEqual(AUTO_REVIEW.state,'loading');request.resolve(response({error:'media unavailable'},503));await tick();await action;
+      assert(elements.get('reviewAccess').childNodes.some(e=>e.textContent==='Open review'));
+    }else{
+      assert.equal(AUTO_REVIEW.state,'loading');request.resolve(response({duration:4,detections:[]}));await tick();await action;
+      assert.equal(AUTO_REVIEW.state,'ready');assert.equal(DUR,4);
+    }
+    """.replace('INTENT',json.dumps(intent)))
+
+
+def test_synchronous_editor_intent_during_review_failure_keeps_deferred_claim():
+    run_js("""openJob('A');await cycle('review');const old=queue.shift();showPanel=realShowPanel;
+    reviewLoadFailure=()=>showPanel('boxedit_rev');
+    old.reject(Error('old automatic review failed'));await tick();
+    assert.equal(AUTO_REVIEW.state,'deferred','old rejection reset the newer editor intent');
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'poll preempted the newer editor intent');
+    """)
+
+
+def test_editor_that_replaces_ready_review_keeps_explicit_review_access():
+    run_js("""openJob('A');await cycle('review');await reply({duration:3,detections:[]});
+    assert.equal(AUTO_REVIEW.state,'ready');showPanel=realShowPanel;showPanel('boxedit');
+    assert.equal(AUTO_REVIEW.state,'deferred');
+    const button=elements.get('reviewAccess').childNodes.find(e=>e.textContent==='Open review');
+    assert(button,'editor replaced review without a way back');
+    await advance(900);await cycle('review');
+    assert.equal(queue.filter(r=>r.url.endsWith('/detections')).length,0,'poll preempted current editor');
     """)

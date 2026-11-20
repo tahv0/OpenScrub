@@ -27,8 +27,10 @@ if(mode==='reopen'){
  return;
 }
 for(const dpr of [1,2]){const context=await browser.newContext({viewport:{width:1100,height:950},deviceScaleFactor:dpr});
-try{let page;try{page=await context.newPage();}catch(e){throw e;}const errors=[],warnings=[],expectedConsole=[],posts=[],samples=[];
-page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['warning','error'].includes(m.type())){if(m.location().url.endsWith('/api/jobs/cfr24/render')&&m.text().includes('409'))expectedConsole.push({text:m.text(),url:m.location().url});else warnings.push(m.text())}});
+try{let page;try{page=await context.newPage();}catch(e){throw e;}const errors=[],warnings=[],expectedConsole=[],posts=[],samples=[],thumbnailConflicts=[];
+page.on('response',r=>{if(r.status()===409&&/\/(thumb|detframe)\/\d+\?v=/.test(r.url()))
+ thumbnailConflicts.push(r.json().then(body=>({url:r.url(),error:body.error})).catch(()=>({url:r.url(),error:null})));});
+page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['warning','error'].includes(m.type())){if(m.location().url.endsWith('/api/jobs/cfr24/render')&&m.text().includes('409'))expectedConsole.push({text:m.text(),url:m.location().url});else warnings.push({text:m.text(),url:m.location().url})}});
 page.on('request',r=>{if(r.method()==='POST')posts.push({url:r.url(),body:r.postDataJSON()});if(r.url().includes('/edit_sample?'))samples.push(r.url())});
 page.on('response',async r=>{if(r.url().includes('/edit_sample?')){try{const b=await r.json();if(b.image)b.image={mime:b.image.mime,prefix:b.image.base64.slice(0,24),length:b.image.base64.length};fs.writeFileSync(root+`/wire-${dpr}.json`,JSON.stringify(b,null,2))}catch(_){}}});
 page.on('dialog',d=>d.accept(d.defaultValue()));
@@ -93,8 +95,17 @@ await page.route('**/api/jobs/cfr24/track_status',async route=>{const response=a
 await page.locator('#beTrk').click();await click(10,20);await click(45,60);await statusStart;
 const launch=posts.findLast(p=>p.url.endsWith('/track_object'));assert.equal(launch.body.t_ref,4/24);assert.equal(launch.body.seed.index,4);assert.equal(Object.keys(launch.body.seed).length,8);
 await page.evaluate(()=>{window.retiredTrackView=BE_VIEW;loadBoxEdit(1)});await page.waitForFunction(()=>BE_VIEW!==retiredTrackView&&beReady());
-const ownedSerial=await page.evaluate(()=>BE_VIEW.serial);releaseStatus();await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>BE_VIEW.serial),ownedSerial);
+const ownedSerial=await page.evaluate(()=>BE_VIEW.serial);releaseStatus();
+await page.waitForFunction(()=>document.getElementById('reviewTrackStatus')?.textContent.includes('Tracked 1 position'));
+assert.equal(await page.evaluate(()=>BE_VIEW.serial),ownedSerial);
 assert.equal(await page.evaluate(()=>BE.adds[0].manual_id),addition.manual_id);await page.unroute('**/api/jobs/cfr24/track_status');result.staleTrackInert=true;
+// Detached completion is visible outside the old editor; review it deliberately.
+await page.getByRole('button',{name:'Review tracked positions',exact:true}).click();
+await page.waitForFunction(()=>REVIEW_SCHED?.owns()&&!EDITS.track);
+assert((await page.locator('#review').innerText()).includes('tracked object'));
+assert.equal(await page.evaluate(()=>BE.adds[0].manual_id),addition.manual_id);
+await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>beReady());
+result.detachedTrackReview=true;
 // Owned success refreshes review and obtains a new inspected exact sample.
 await scrub(.2);await page.evaluate(()=>window.ownedTrackView=BE_VIEW);await page.locator('#beTrk').click();await click(50,20);await click(85,60);
 await page.waitForFunction(()=>BE_VIEW!==ownedTrackView&&beReady());assert((await page.locator('#review').innerText()).includes('tracked object'));result.ownedTrackRefresh=true;
@@ -130,7 +141,10 @@ if(dpr===2){
  await page.reload();await page.getByRole('link',{name:'exact-cfr24.mp4',exact:true}).click();await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>beReady());await scrub(.2);
  assert.deepEqual(await page.evaluate(()=>BE.raw.find(r=>r.i===0).base.span.slice(0,2)),[.1,1]);assert.equal(await page.evaluate(()=>BE.audio.length),1);
 }
-await page.screenshot({path:root+`/exact-${dpr}-final.png`,fullPage:true});result.errors=errors;result.warnings=warnings;result.expectedConsole=expectedConsole;result.posts=posts;result.samples=samples;
-fs.writeFileSync(root+`/exact-results-${dpr}.json`,JSON.stringify(result,null,2));assert.deepEqual(errors,[]);assert.deepEqual(warnings,[]);
+await page.screenshot({path:root+`/exact-${dpr}-final.png`,fullPage:true});
+const conflicts=await Promise.all(thumbnailConflicts);
+const unexpected=warnings.filter(w=>!w.text.includes('409')||!conflicts.some(c=>c.url===w.url&&c.error==='thumbnail_obsolete'));
+result.errors=errors;result.warnings=warnings;result.thumbnailConflicts=conflicts;result.expectedConsole=expectedConsole;result.posts=posts;result.samples=samples;
+fs.writeFileSync(root+`/exact-results-${dpr}.json`,JSON.stringify(result,null,2));assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[],JSON.stringify({warnings,conflicts}));
 console.log(JSON.stringify({dpr,media:result.media.map(x=>({label:x.label,index:x.got.sample.index,marker:x.got.marker})),coalescing:result.coalescing,staleTrackInert:true,ownedTrackRefresh:true,persistence:!!result.persistence}));
 }finally{await context.close()}}}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

@@ -109,9 +109,10 @@ async function lightboxTeardown(context, kind) {
   await page.locator('#lb').click();
   // A lost save acknowledgement must not discard newer drafts, including
   // when a stale preview causes the user to reopen the review during the save.
-  let releaseAck, committed;
+  let releaseAck, committed, originalSubmission;
   const ackGate=new Promise(r=>releaseAck=r), commitDone=new Promise(r=>committed=r);
   const held=async route=>{if(route.request().method()!=='POST')return route.continue();
+   originalSubmission=route.request().postDataJSON();
    await route.fetch();committed();await ackGate;await route.abort('failed');};
   await page.route('**/api/jobs/'+job+'/detections',held);
   await page.evaluate(()=>{applyDet(2,false);BE.audio=[{t0:.1,t1:.4,mode:'mute'}];BE.audioLoaded=true;
@@ -130,8 +131,21 @@ async function lightboxTeardown(context, kind) {
    BE.audio===heldRefs.audio&&BE.audioSaved===null&&BE.audio.length===2&&EN[2]===true&&
    MAN[0].manual_id==='page-newer'&&BE.ov[2][0]===2),true);
   await page.unroute('**/api/jobs/'+job+'/detections',held);
-  await page.route('**/api/jobs/'+job+'/render',route=>route.fulfill({status:409,contentType:'application/json',body:'{"error":"test render held"}'}));
+  const retries=[];let renderCalls=0;
+  await page.route('**/api/jobs/'+job+'/detections',route=>{
+   if(route.request().method()==='POST')retries.push(route.request().postDataJSON());return route.continue();});
+  await page.route('**/api/jobs/'+job+'/render',route=>{renderCalls++;
+   return route.fulfill({status:409,contentType:'application/json',body:'{"error":"test render held"}'});});
   await page.evaluate(()=>saveAndRender());
+  assert.deepEqual(retries[0],originalSubmission,'first retry changed the unconfirmed submission');
+  assert.equal(renderCalls,0,'retry rendered while newer edits remained pending');
+  assert.equal(await page.evaluate(()=>EDITS.enabled[2]===true&&BE.ov[2][0]===2&&
+   MAN.some(x=>x.manual_id==='page-newer')&&BE.audio.length===2),true);
+  const retryRaw=await context.request.get(base+'api/jobs/'+job+'/detections');
+  const retryRows=(await retryRaw.json()).detections;assert.equal(retryRows.length,4);assert.equal(retryRows[2].enabled,false);
+  await page.evaluate(()=>saveAndRender());
+  assert.equal(retries.length,2);assert.equal(renderCalls,1);
+  assert.equal(retries[1].enabled['2'],true);assert.equal(retries[1].manual[0].manual_id,'page-newer');
   const raw=await context.request.get(base+'api/jobs/'+job+'/detections');
   const rows=(await raw.json()).detections;assert.equal(rows.length,5);assert.equal(rows[2].enabled,true);
   assert.ok(rows.some(row=>row.text==='user-drawn'));

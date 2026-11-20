@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def launch_editor_page(tmp_path,script,render=False,reopen=None):
+def launch_editor_page(tmp_path,script,render=False,reopen=None,restart=True):
     if not os.environ.get("OPENSCRUB_PLAYWRIGHT_MODULE") or not os.environ.get("OPENSCRUB_CHROMIUM") or not shutil.which("node"):
         pytest.skip("Set OPENSCRUB_PLAYWRIGHT_MODULE and OPENSCRUB_CHROMIUM for real-page QA")
     artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path))) / script.removesuffix(".cjs")
@@ -61,7 +61,7 @@ def launch_editor_page(tmp_path,script,render=False,reopen=None):
                 server.kill()
                 server.wait()
 
-    if not reopen:
+    if not reopen and restart:
         # The original server is terminated and reaped before a separate actual
         # Python process restores the UI-saved raw report and opens a fresh PAGE.
         job = "resize" if render else "cfr24"
@@ -77,6 +77,12 @@ def test_exact_editor_samples_and_track(tmp_path):
     if not os.environ.get("OPENSCRUB_EXACT_MEDIA"):
         pytest.skip("Set OPENSCRUB_EXACT_MEDIA for the retained-media PAGE gate")
     launch_editor_page(tmp_path, "exact_editor_browser.cjs")
+
+
+def test_editor_supersedes_auto_review_and_reopens_deliberately(tmp_path):
+    if not os.environ.get("OPENSCRUB_EXACT_MEDIA"):
+        pytest.skip("Set OPENSCRUB_EXACT_MEDIA for the retained-media PAGE gate")
+    launch_editor_page(tmp_path, "editor_recovery_browser.cjs", restart=False)
 
 
 def verify_render(artifacts):
