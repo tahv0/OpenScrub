@@ -32,7 +32,7 @@ const [url,root]=process.argv.slice(2);
     }
     await route.fulfill({response,json:body});
    });
-   let holdSave=null,rejectSave=false,processedFrames=8,processedDuration=.8;
+   let holdSave=null,rejectSave=false,loseSaveAck=false,processedFrames=8,processedDuration=.8;
    await page.route('**/api/jobs/resize/detections',async route=>{
     if(route.request().method()==='POST'&&rejectSave){
      rejectSave=false;return route.fulfill({status:400,json:{error:'invalid_sample_request'}});
@@ -43,6 +43,7 @@ const [url,root]=process.argv.slice(2);
      if(body.geometry_rows?.['0']&&saves.at(-1).time_overrides?.['0']){
       body.geometry_rows['0'].row_context_eq='b'.repeat(64);body.geometry_rows['0'].scan_frame_bounds=null;releasedBounds=true;
      }
+     if(loseSaveAck){loseSaveAck=false;return route.fulfill({status:200,contentType:'text/plain',body:'lost acknowledgement'});}
      if(holdSave){const held=holdSave;holdSave=null;held.start();await held.gate;}}
     await route.fulfill({response,json:body});
    });
@@ -104,12 +105,18 @@ const [url,root]=process.argv.slice(2);
    assert.equal(await page.evaluate(()=>EDITS.submitted),null);
    assert.equal(await page.evaluate(()=>BE.adds.length),1);assert.deepEqual(await page.evaluate(()=>BE.times[0]),[.1,.8]);
    assert.equal(resumes.length,0);
+   // A committed save with an unreadable ACK remains uncertain and must be
+   // retried identically before newer edits can trigger another action.
+   loseSaveAck=true;await page.getByRole('button',{name:'Save & Resume',exact:true}).first().click();
+   await page.waitForFunction(()=>!EDITS.busy&&EDITS.submitted?.everUncertain);
+   assert.equal(resumes.length,0);assert.equal(await page.evaluate(()=>BE.adds.length),1);
    // Edits arriving while a save is in flight cancel this resume attempt.
    holdSave=hold();const firstSave=holdSave;
    await page.getByRole('button',{name:'Save & Resume',exact:true}).first().click();await firstSave.started;
    await page.evaluate(()=>applyDet(0,false));firstSave.release();
    await page.waitForFunction(()=>!EDITS.busy&&hasReviewEdits(EDITS));
    assert.equal(resumes.length,0);assert.equal(await page.evaluate(()=>EDITS.enabled[0]),false);
+   assert.deepEqual(saves[1],saves[0]);
    assert.equal(saves[0].manual[0].t_end,.8);
    assert.deepEqual(saves[0].geometry_preconditions['0'].scan_frame_bounds,[0,8]);
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.rows.find(r=>r.i===0)?.scan_frame_bounds===null);
