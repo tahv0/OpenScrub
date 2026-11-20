@@ -41,6 +41,7 @@ import numpy as np
 
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
+from openscrub_internal import hdr_quad_pairs
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.render_delivery import _RenderDelivery
 
@@ -6554,8 +6555,8 @@ def _settings_dict(args):
     skip = {"video", "output", "report", "from_report", "batch", "config",
             "_report_input"}
     out = {k: v for k, v in vars(args).items()
-           if k not in skip and isinstance(v, (str, int, float, bool, list,
-                                               tuple, type(None)))}
+           if k not in skip and not (k == 'verify_hdr_plate_frames' and not v)
+           and isinstance(v, (str, int, float, bool, list, tuple, type(None)))}
     mm = getattr(args, "mode_map", None)
     if isinstance(mm, dict) and mm:
         out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
@@ -6988,9 +6989,7 @@ def _ffmpeg_has(filter_name):
 
 # proper PQ/HLG -> BT.709 tone mapping (linearize, gamut-map, hable curve),
 # instead of the flat washed-out colors a naive 8-bit decode produces
-_TONEMAP_VF = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
-               "tonemap=tonemap=hable:desat=0,"
-               "zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+_TONEMAP_VF = hdr_quad_pairs.TONEMAP_VF
 
 
 def _count_video_frames(path):
@@ -7156,11 +7155,27 @@ def normalize_vfr(args, cb):
            + ("" if want_hdr else "; output will be SDR"))
     if _cached(sdr):
         cb.log(f"      reusing existing {os.path.basename(sdr)}")
+        if getattr(args, "verify_hdr_plate_frames", False):
+            cb.log("      cached scan copy has no fresh HDR frame evidence; "
+                   "the ordinary plate mask remains in use for HDR output")
     else:
         sdr_ref = hdr_src or src0
         sdr_cfr = is_vfr and hdr_src is None
-        _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
-        if not sdr_cfr:
+        pair_candidate = None
+        if (getattr(args, "verify_hdr_plate_frames", False) and want_hdr and not is_vfr
+                and sdr_ref == src0):
+            pair_candidate = hdr_quad_pairs.fresh_tonemap(
+                sdr_ref, sdr, cb, PipelineCancelled)
+            if pair_candidate is not None:
+                args._hdr_quad_candidate = pair_candidate
+                cb.log("      captured fresh HDR frame correspondence; "
+                       "source identity will be checked after scanning")
+            else:
+                cb.log("      HDR frame correspondence unavailable; "
+                       "the ordinary plate mask remains in use for HDR output")
+        if pair_candidate is None:
+            _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
+        if not sdr_cfr and pair_candidate is None:
             # fail closed: the scan trusts this copy's frame indexes as
             # timestamps. A GPU encode that drops or duplicates even a few
             # frames shifts every later detection onto the wrong output
@@ -7237,6 +7252,9 @@ def build_parser():
     ap.add_argument("--pad", "--blur-buffer", type=int, default=8, dest="pad",
                     help="blur buffer: pixels of blur beyond the tightly-"
                          "cropped word/face (default 8)")
+    ap.add_argument("--verify-hdr-plate-frames", action="store_true",
+                    help="capture fresh CFR HDR frame evidence for plate corners (optional; "
+                         "HDR corner rendering is not yet enabled)")
     ap.add_argument("--no-vfr-fix", action="store_true",
                     help="skip automatic CFR normalization of VFR input")
     ap.add_argument("--out-quality", choices=["archival", "balanced", "share"],
@@ -7719,6 +7737,19 @@ def text_scan_stride(small, scan_small, step):
     if np.count_nonzero(cells >= 12) >= 2:
         return max(2, step // 2)
     return step * 2
+
+
+def _quad_scan_digest(args):
+    candidate = getattr(args, '_hdr_quad_candidate', None)
+    if candidate is not None:
+        if hasattr(args, '_hdr_quad_proof'):
+            del args._hdr_quad_proof
+        if os.path.realpath(args.video) == candidate.get('scan_path'):
+            proof = hdr_quad_pairs.bind_scan(candidate)
+            if proof is not None:
+                args._hdr_quad_proof = proof
+                return proof['scan_sha256']
+    return sha256_file(args.video)
 
 
 def run_scan(args, cb=None):
@@ -8995,7 +9026,7 @@ def run_scan(args, cb=None):
     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
-            "input_sha256": sha256_file(args.video),
+            "input_sha256": _quad_scan_digest(args),
             "stats": {"scans": n_scans, "raw_hits": len(raw),
                       "regions": len(detections), "recalls": n_recalled,
                       "remembered": len(memory.items) if memory else 0,
