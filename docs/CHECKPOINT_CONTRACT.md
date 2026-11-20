@@ -11,6 +11,17 @@ not available in this slice; they require a separate bounded-review owner.
 Older OpenScrub renderers do not honor checkpoint frame authority and must not
 render bounded reports as if they did.
 
+The publication marker contains only a version, the old report's byte count
+and SHA-256 (or its absence), and the staged report's byte count, SHA-256 and
+paused/completed state. Before rename, the publisher checks that the observed
+old report and staged inode still match those recorded while making the marker.
+On restart it clears the marker only when the canonical report matches a
+recorded outcome and any present report passes the corresponding checkpoint
+structure checks. It syncs the report and directory before retiring the
+marker. Unknown versions, malformed markers, symlinks and mismatches remain
+fenced. These checks do not replace the existing requirement to exclude
+external writers while a scan or restart recovery owns the files.
+
 The three functions in `openscrub_internal.checkpoints` consume and return
 plain JSON documents. They do not mutate arguments or write a file. Publish a
 successful result through `openscrub_internal.reports.atomic_report` under the

@@ -297,7 +297,7 @@ def test_stop_before_first_frame_preserves_prior_output(checkpoint_web, socket_a
     assert not (store.path.parent / web._CHECKPOINT_RECOVERY_NAME).exists()
 
 
-def test_post_replace_failure_stays_fenced_after_restart(checkpoint_web, monkeypatch):
+def test_post_replace_failure_recovers_verified_report_after_restart(checkpoint_web, monkeypatch):
     store, output = checkpoint_web
     def fail_after_replace(*args, **kwargs):
         raise OSError('controlled post-replace notification failure')
@@ -310,8 +310,9 @@ def test_post_replace_failure_stays_fenced_after_restart(checkpoint_web, monkeyp
     web.JOBS.clear()
     web._rehydrate_jobs()
     recovered = web.JOBS[store.job['id']]
-    assert recovered['phase'] == 'error' and recovered['output'] is None
-    assert web.FILES.initialize(recovered).recovery_required
+    assert recovered['phase'] == 'review' and recovered['output'] is None
+    assert not web.FILES.initialize(recovered).recovery_required
+    assert not marker.exists()
     assert output.read_bytes() == b'older output must remain intact'
 
 
