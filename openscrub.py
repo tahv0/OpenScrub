@@ -7232,8 +7232,11 @@ def normalize_vfr(args, cb):
     if _cached(sdr):
         cb.log(f"      reusing existing {os.path.basename(sdr)}")
         if getattr(args, "verify_hdr_plate_frames", False):
-            cb.log("      cached scan copy has no fresh HDR frame evidence; "
-                   "the ordinary plate mask remains in use for HDR output")
+            if getattr(args, '_hdr_quad_render_proof', None) is not None:
+                cb.log("      checking live HDR frame evidence for this scan copy")
+            else:
+                cb.log("      cached scan copy has no fresh HDR frame evidence; "
+                       "the ordinary plate mask remains in use for HDR output")
     else:
         sdr_ref = hdr_src or src0
         sdr_cfr = is_vfr and hdr_src is None
@@ -7329,8 +7332,7 @@ def build_parser():
                     help="blur buffer: pixels of blur beyond the tightly-"
                          "cropped word/face (default 8)")
     ap.add_argument("--verify-hdr-plate-frames", action="store_true",
-                    help="capture fresh CFR HDR frame evidence for plate corners (optional; "
-                         "HDR corner rendering is not yet enabled)")
+                    help="verify fresh CFR HDR frames for plate corners during this live job")
     ap.add_argument("--no-vfr-fix", action="store_true",
                     help="skip automatic CFR normalization of VFR input")
     ap.add_argument("--out-quality", choices=["archival", "balanced", "share"],
@@ -9151,6 +9153,10 @@ def run_render(args, state, cb=None):
     dets_r = apply_coverage(state["detections"],
                             getattr(args, "coverage", "tight"), cb)
     quad_context = _quad_render_context(args, state, dets_r)
+    if (getattr(args, 'hdr_source', None) and quad_context is None
+            and any(d.category == 'plate' and plate_quad.valid_record(d.manual_plate_quad)
+                    for d in dets_r)):
+        cb.log('      HDR frame evidence unavailable; the ordinary plate mask remains in use for HDR output')
     quad_guard = state.get('_quad_source_guard')
     hdr_guard = state.get('_quad_hdr_guard')
     def require_quad_sources():

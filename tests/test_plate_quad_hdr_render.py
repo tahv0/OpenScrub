@@ -92,6 +92,8 @@ def test_actual_hdr_plate_scan_editor_and_10bit_render(verified_job, monkeypatch
     with _observe_encoder(monkeypatch, openscrub._render_hdr_into) as (captured, _):
         web._run_job(store.job, 'render')
     assert store.job['phase'] == 'done', store.job.get('error')
+    assert not any('ordinary plate mask remains in use for HDR output' in line
+                   for line in store.job['log'].snapshot()['lines'])
     output = Path(store.job['output'])
     metadata = json.loads(subprocess.check_output([
         'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
