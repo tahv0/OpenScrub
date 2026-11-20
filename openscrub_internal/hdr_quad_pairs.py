@@ -218,3 +218,25 @@ def bind_scan(candidate):
             return dict(candidate, scan_sha256=digest.hexdigest())
     except (KeyError, OSError, TypeError):
         return None
+
+
+def usable(proof, doc, selected, hdr_path=None):
+    """Only an owned, live pair for these exact report and input files qualifies."""
+    try:
+        prov, state, facts = doc['provenance'], doc['render_state'], selected['facts']
+        if (not isinstance(proof, dict) or prov.get('vfr_normalized') is not True
+                or prov.get('hdr_tonemapped') is not True or prov.get('hdr_output') is not True
+                or os.path.realpath(prov['input']) != proof['scan_path']
+                or os.path.realpath(prov['original_input']) != proof['source_path']
+                or selected['path'] != proof['scan_path']
+                or selected['stamp'] != proof['scan_stamp']
+                or prov.get('input_sha256') != proof['scan_sha256']
+                or state['fps'] != proof['fps'] or len(state['cum']) != proof['count']
+                or facts['stream'] != proof['scan_stream']
+                or facts['width'] != proof['width'] or facts['height'] != proof['height']
+                or hdr_path is not None and os.path.realpath(hdr_path) != proof['source_path']):
+            return False
+        return (_current(proof['source_path'], proof['source_stamp'])
+                and _current(proof['scan_path'], proof['scan_stamp']))
+    except (AttributeError, KeyError, TypeError, ValueError, OSError):
+        return False

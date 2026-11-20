@@ -4216,7 +4216,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
 def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
-               mute_tracks=(), out_quality="archival", audio_lanes=None):
+               mute_tracks=(), out_quality="archival", audio_lanes=None, quad_context=None):
     """render(), but 10-bit end to end: decode the HDR source to raw
     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
@@ -4242,7 +4242,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
 
         dec = subprocess.Popen(
             ["ffmpeg", "-loglevel", "error", "-i", src,
-             "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+             "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
+             *(["-fps_mode", "passthrough"] if quad_context else []), "pipe:1"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             bufsize=w * h * 6)
         q = _out_q(encoder, out_quality)
@@ -4325,7 +4326,10 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
             for d in _dedupe_dense(act):
                 box, pbox, px = _geometry_box(
                     d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
-                if d.poly:
+                quad = _quad_at_hdr_frame(quad_context, d, y, idx)
+                if quad is not None:
+                    _paint_plate_quad_yuv10(y, u, v, quad, _mode_for(d.category), px)
+                elif d.poly:
                     _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
                                            d.poly, pbox, pad_px=px)
                 else:
@@ -4358,7 +4362,9 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 cb.log(f"  rendering… {idx}/{max(total, idx)}")
 
         dec.stdout.close()
-        dec.wait()
+        decoder_status = dec.wait()
+        if quad_context and (decoder_status != 0 or idx != quad_context['count']):
+            raise RuntimeError('verified HDR frame decoding did not complete')
         cb.progress("render", max(total, idx), max(total, idx))
         try:
             enc.stdin.close()
@@ -4434,17 +4440,58 @@ def _require_quad_source_current(guard):
         raise RuntimeError('quad input changed during rendering')
 
 
+def _quad_hdr_source_guard(args, scan_guard):
+    proof = getattr(args, '_hdr_quad_render_proof', None)
+    source = getattr(args, 'hdr_source', None)
+    if not isinstance(proof, dict) or not source or scan_guard is None:
+        return None
+    opened = None
+    try:
+        if (os.path.realpath(source) != proof['source_path']
+                or os.path.realpath(scan_guard['path']) != proof['scan_path']
+                or scan_guard['stamp'] != proof['scan_stamp']
+                or scan_guard['digest'] != proof['scan_sha256']):
+            return None
+        opened = open(source, 'rb')
+        stamp = _quad_stamp(os.fstat(opened.fileno()))
+        guard = {'file': opened, 'path': source, 'stamp': stamp}
+        if stamp != proof['source_stamp'] or not _quad_source_current(guard):
+            return None
+        digest = hashlib.sha256()
+        for block in iter(lambda: opened.read(1 << 20), b''):
+            digest.update(block)
+        if not _quad_source_current(guard) or digest.hexdigest() != proof['source_sha256']:
+            return None
+        guard['digest'] = digest.hexdigest()
+        opened = None  # the returned guard owns the descriptor
+        return guard
+    except (KeyError, OSError, TypeError, ValueError):
+        return None
+    finally:
+        if opened is not None:
+            opened.close()
+
+
 def _quad_render_context(args, state, detections):
     guard = state.get('_quad_source_guard')
     doc = state.get('source_report')
     if (not guard or not isinstance(doc, dict) or not _quad_source_current(guard)
-            or getattr(args, 'hdr_source', None)
             or getattr(args, 'coverage', 'tight') in ('box', 'concealed')):
         return None
     prov = doc.get('provenance', {})
     try:
         facts = exact.probe_source(args.video)
-        if (not _quad_source_current(guard) or not plate_quad.same_sdr_scan(prov, facts)
+        hdr_guard = state.get('_quad_hdr_guard')
+        if getattr(args, 'hdr_source', None):
+            proof = getattr(args, '_hdr_quad_render_proof', None)
+            selected = {'path': os.path.realpath(guard['path']), 'stamp': guard['stamp'],
+                        'facts': facts}
+            supported = (hdr_guard is not None and _quad_source_current(hdr_guard)
+                         and hdr_guard['digest'] == proof['source_sha256']
+                         and hdr_quad_pairs.usable(proof, doc, selected, args.hdr_source))
+        else:
+            supported = plate_quad.same_sdr_scan(prov, facts)
+        if (not _quad_source_current(guard) or not supported
                 or prov.get('input_sha256') != guard['digest']):
             return None
         fps, cum, timeline = exact.timeline(doc, facts)
@@ -4463,7 +4510,8 @@ def _quad_render_context(args, state, detections):
                     and frame['timeline_eq'] == timeline):
                 records[id(d)] = q
         return {'records': records, 'facts': facts, 'fps': fps,
-                'count': len(cum), 'tolerance': tolerance, 'guard': guard} if records else None
+                'count': len(cum), 'tolerance': tolerance, 'guard': guard,
+                'hdr_guard': hdr_guard} if records else None
     except (exact.ExactError, KeyError, TypeError, ValueError, OSError):
         return None
 
@@ -4490,6 +4538,29 @@ def _quad_at_frame(context, d, cap, frame, idx):
     except (AttributeError, cv2.error, ValueError, TypeError):
         return None
     return q
+
+
+def _quad_at_hdr_frame(context, detection, y, index):
+    if not context or not context.get('hdr_guard'):
+        return None
+    quad = context['records'].get(id(detection))
+    facts = context['facts']
+    if (quad is None or quad['frame']['index'] != index
+            or y.shape != (facts['height'], facts['width'])
+            or not _quad_source_current(context['guard'])
+            or not _quad_source_current(context['hdr_guard'])):
+        return None
+    return quad
+
+
+def _paint_plate_quad_yuv10(y, u, v, quad, mode, pad_px):
+    height, width = y.shape
+    if pad_px >= max(width, height):
+        _blur_yuv10(y, u, v, 0, 0, width, height, mode)
+        return
+    x1, y1, x2, y2 = _quad_roi(y, quad, pad_px)
+    _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode,
+                           [quad['points']], (0, 0, width, height), pad_px=pad_px)
 
 
 def _quad_roi(frame, quad, pad_px):
@@ -9081,7 +9152,11 @@ def run_render(args, state, cb=None):
                             getattr(args, "coverage", "tight"), cb)
     quad_context = _quad_render_context(args, state, dets_r)
     quad_guard = state.get('_quad_source_guard')
-    _require_quad_source_current(quad_guard)
+    hdr_guard = state.get('_quad_hdr_guard')
+    def require_quad_sources():
+        _require_quad_source_current(quad_guard)
+        _require_quad_source_current(hdr_guard)
+    require_quad_sources()
     if quad_guard is not None:
         sources = (quad_guard['path'], getattr(args, 'original_video', None),
                    getattr(args, 'hdr_source', None))
@@ -9104,7 +9179,7 @@ def run_render(args, state, cb=None):
     summary = dict(state["stats"], output=dst)
     with _RenderDelivery(dst, args.report) as delivery:
         if quad_guard is not None:
-            delivery.validate_before_publication = lambda: _require_quad_source_current(quad_guard)
+            delivery.validate_before_publication = require_quad_sources
         if getattr(args, "hdr_source", None) and not args.preview:
             _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
                        state["bands"], state["fps"], pad=args.pad, mode=args.mode,
@@ -9114,7 +9189,8 @@ def run_render(args, state, cb=None):
                        mode_map=getattr(args, "mode_map", None),
                        audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
                        out_quality=out_q,
-                       audio_lanes=getattr(args, "audio_lane_count", None))
+                       audio_lanes=getattr(args, "audio_lane_count", None),
+                       quad_context=quad_context)
         else:
             _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
                    state["bands"],
@@ -9127,7 +9203,7 @@ def run_render(args, state, cb=None):
                    mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None),
                    quad_context=quad_context)
-        _require_quad_source_current(quad_guard)
+        require_quad_sources()
         if args.report:
             delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
                                     legacy_publisher=(None if getattr(cb, "publish_render", None)
@@ -9208,7 +9284,9 @@ def run_pipeline(args, cb=None):
                 raise
         else:
             in_sha = sha256_file(args.video)
+        hdr_guard = None
         try:
+            hdr_guard = _quad_hdr_source_guard(args, guard)
             if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
                 cb.log("      WARNING: input file differs from the one this report "
                        "was made from (sha256 mismatch) — blur positions may be wrong")
@@ -9218,12 +9296,15 @@ def run_pipeline(args, cb=None):
                      "detections": dets, "input_sha256": in_sha,
                      "source_report": source,
                      "_quad_source_guard": guard,
+                     "_quad_hdr_guard": hdr_guard,
                      "audio_redactions_overridden": audio_overridden,
                      "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
                      "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                                "recalls": 0, "remembered": 0}}
             return run_render(args, state, cb)
         finally:
+            if hdr_guard is not None:
+                hdr_guard['file'].close()
             if guard is not None:
                 guard['file'].close()
     state = run_scan(args, cb)

@@ -947,6 +947,8 @@ def build_args(job, for_render=False):
             p = find_model_file("%s.onnx" % mid)
             if p:
                 argv += [flag, p]
+    if o.get("verify_hdr_plate_frames") is True:
+        argv.append("--verify-hdr-plate-frames")
     if o.get("no_memory"):
         argv.append("--no-memory")
     if o.get("no_ner"):
@@ -1335,7 +1337,8 @@ def _run_job(job, action, owner=None):
                 if not _operation_valid(job, owner):
                     return
                 job["stats"] = state["stats"]
-            coherent = _adopt_scan_source(job, owner)
+            coherent = _adopt_scan_source(job, owner, getattr(args, '_hdr_quad_proof', None),
+                                            state.get('input_sha256'))
             if owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
             if coherent:
@@ -1411,6 +1414,10 @@ def _run_job(job, action, owner=None):
                 _select_render_input(job, owner)
             args = build_args(dict(job, video=owner.source), for_render=True)
             args._report_input = owner.source
+            with files.report_lock:
+                selected = files.current_source
+                if selected is not None:
+                    args._hdr_quad_render_proof = selected.get('hdr_quad_proof')
             res = openscrub.run_pipeline(args, cb)
             # Compatibility for substituted pipelines which do not use the new
             # hook. Actual renders publish their terminal fields inside it.
@@ -2079,7 +2086,10 @@ def _prepare_observed_source(job, path, thumbnail_recovery=False):
                 raise exact.ExactError('source changed during preparation', 409, 'sample_conflict')
         with _exact_owner_guard(job, lease):
             pass  # Foreign owner must still match the pre-I/O snapshot.
-        return dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error), lease
+        prepared = dict(path=canonical, stamp=stamp, facts=facts, policy_error=policy_error)
+        if cached is not None and cached.get('hdr_quad_proof') is not None:
+            prepared['hdr_quad_proof'] = cached['hdr_quad_proof']
+        return prepared, lease
     except _ThumbnailArtifactPending:
         _thumbnail_release_lease(job, lease, primary_pending=True)
         if has_request_context() and request.endpoint in {'job_detections', 'job_thumb', 'job_detframe'}:
@@ -2121,7 +2131,7 @@ def _select_observed_locked(job, prepared, authoritative=False, *, report_bound=
     return files.current_source
 
 
-def _adopt_scan_source(job, owner):
+def _adopt_scan_source(job, owner, hdr_proof=None, scan_digest=None):
     files = FILES.initialize(job)
     with files.report_lock:
         pair = files.source_pair
@@ -2140,6 +2150,11 @@ def _adopt_scan_source(job, owner):
             if _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != pair[3]:
                 raise exact.ExactError('committed scan report changed during adoption', 409, 'sample_conflict')
             selected = _select_observed_locked(job, prepared, authoritative=True)
+            selected.pop('hdr_quad_proof', None)
+            doc = _load_job_report(job)
+            if (hdr_proof is not None and hdr_proof.get('scan_sha256') == scan_digest
+                    and openscrub.hdr_quad_pairs.usable(hdr_proof, doc, selected)):
+                selected['hdr_quad_proof'] = hdr_proof
             job['video'] = selected['path']
             return True
     except Exception as error:
@@ -3228,10 +3243,15 @@ def _quad_baseline_value(token):
     return quad if plate_quad.valid_record(quad) else None
 
 
+def _quad_scan_supported(doc, selected):
+    return (plate_quad.same_sdr_scan(doc.get('provenance', {}), selected['facts'])
+            or openscrub.hdr_quad_pairs.usable(selected.get('hdr_quad_proof'), doc, selected))
+
+
 def _quad_edit_eligibility(doc, selected):
     provenance = doc.get('provenance', {})
     expected = provenance.get('input_sha256') if isinstance(provenance, dict) else None
-    if (not plate_quad.same_sdr_scan(provenance, selected['facts'])
+    if (not _quad_scan_supported(doc, selected)
             or not isinstance(expected, str) or re.fullmatch('[0-9a-f]{64}', expected) is None):
         return 'unavailable'
     verified = selected.get('quad_sha256')
@@ -3247,7 +3267,7 @@ def _quad_sample_eligibility(row, doc, selected, index, fps, count, timeline_eq)
     if not plate_quad.valid_record(quad):
         return 'unsupported'
     facts, source, frame = selected['facts'], quad['source'], quad['frame']
-    if (not plate_quad.same_sdr_scan(doc.get('provenance', {}), facts)
+    if (not _quad_scan_supported(doc, selected)
             or source['width'] != facts['width'] or source['height'] != facts['height']
             or source['stream'] != facts['stream'] or frame['fps'] != fps
             or frame['count'] != count or frame['timeline_eq'] != timeline_eq
@@ -3785,7 +3805,7 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
                     or not baseline['span'][0]-.01 <= pc['index']/fps <= baseline['span'][1]+.01):
                 raise exact.ExactError('sample does not inspect this plate row', 409, 'geometry_conflict')
             prov = doc.get('provenance', {})
-            if (not plate_quad.same_sdr_scan(prov, selected['facts'])
+            if (not _quad_scan_supported(doc, selected)
                     or not digest or prov.get('input_sha256') != digest):
                 raise exact.ExactError('verified SDR scan identity unavailable', 409, 'geometry_conflict')
             if _quad_context_eq(row) != pc['quad_context_eq']:
@@ -3979,7 +3999,7 @@ def job_save_edits(jid):
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.
             prepared, lease = _prepare_observed_source(job,candidate)
             if edits.get('manual_plate_quads'):
-                if not plate_quad.same_sdr_scan(doc.get('provenance', {}), prepared['facts']):
+                if not _quad_scan_supported(doc, prepared):
                     raise exact.ExactError('SDR scan identity unavailable', 409, 'geometry_conflict')
                 fps, cum, _, tolerance = _exact_policy(doc, prepared)
                 digest = _quad_source_digest(job, prepared)
