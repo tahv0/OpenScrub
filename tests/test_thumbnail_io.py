@@ -1019,6 +1019,9 @@ def test_competing_discovery_after_generation_retirement_is_pending(exact, monke
             competing.append(web.thumbs.begin_discovery_locked(state))
         return current, None
     monkeypatch.setattr(web, '_thumbnail_reserve_discovery', retire_after_observation)
+    # Exercise discovery after validation, rather than fresh-proof reuse.
+    snapshot = web._thumbnail_snapshot
+    monkeypatch.setattr(web, '_thumbnail_snapshot', lambda *a, **kw: tuple(snapshot(*a, **kw)))
     try:
         response = request('get', exact.url + '/detections')
         assert response.status_code == 409
