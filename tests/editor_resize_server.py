@@ -19,6 +19,9 @@ openscrub._fetch_model=deny_fetch
 import openscrub_web as web
 assert Path(web.__file__).resolve()==source/'openscrub_web.py'
 assert Path(openscrub.__file__).resolve()==source/'openscrub.py'
+if os.environ.get('OPENSCRUB_LETTERING_WEB_FIXTURE') == '1':
+ # Exercise real multipart admission without starting the model worker.
+ web.enqueue=lambda *args,**kwargs:None
 web._data_root=lambda:str(runtime)
 for name in ('JOBS_DIR','ZONES_PATH','MODEL_SELECT_PATH','CERT_DIR','WEB_SETTINGS_PATH','CUSTOM_CATS_PATH'):
  setattr(web,name,str(runtime/Path(getattr(web,name)).name))

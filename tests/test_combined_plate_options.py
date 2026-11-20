@@ -1,0 +1,99 @@
+"""Confidence decisions and pixel-bound lettering must compose."""
+
+import json
+
+import cv2
+import numpy as np
+import pytest
+
+import openscrub as core
+
+
+class Quiet(core.Callbacks):
+    def log(self, message):
+        pass
+
+
+def samples(path):
+    cap = cv2.VideoCapture(str(path))
+    found = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        # The first point lies within the plate but outside the lettering.
+        found.append((int(frame[15, 15].mean()), int(frame[30, 45].mean())))
+    cap.release()
+    return found
+
+
+@pytest.mark.parametrize("policy,enabled", [
+    ("manual_review", [False, False, True, False]),
+    ("blur_candidates", [True, True, True, True]),
+])
+def test_confidence_and_lettering_scan_render_and_reopen(tmp_path, monkeypatch, policy, enabled):
+    path = tmp_path / "input.mp4"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 4, (96, 64))
+    assert writer.isOpened()
+    for _ in range(4):
+        writer.write(np.full((64, 96, 3), 220, np.uint8))
+    writer.release()
+
+    class Plate:
+        INPUT = 640
+        def __init__(self, *args, **kwargs):
+            self.scores = iter((.3, .9, .9, .3))
+        def available(self):
+            return True
+        def find(self, frame, scale):
+            return [(10, 10, 80, 50, next(self.scores))]
+
+    class Text:
+        def __init__(self, *args, **kwargs):
+            pass
+        def available(self):
+            return True
+        def find_plate(self, frame, box):
+            return [np.array([[30, 20], [60, 20], [60, 40], [30, 40]], np.float32)], ""
+
+    monkeypatch.setattr(core, "PlateDetector", Plate)
+    monkeypatch.setattr(core, "TextRegionDetector", Text)
+    parser = core.build_parser()
+    args = core._prep_args(parser.parse_args([
+        str(path), "--categories", "plate", "--tile", "off", "--no-backtrack",
+        "--plate-threshold", ".1", "--uncertain-policy", policy,
+        "--plate-auto-cutoff", ".8", "--plate-coverage", "narrow",
+        "--encoder", "x264", "--mode", "box", "--pad", "0",
+        "--output", str(tmp_path / "initial.mp4"), "--report", str(tmp_path / "report.json"),
+    ]), parser)
+    state = core.run_scan(args, Quiet())
+    core.run_render(args, state, Quiet())
+    doc = json.loads((tmp_path / "report.json").read_text())
+    direct = sorted((r for r in doc["detections"]
+                     if r.get("policy_evidence", {}).get("origin") == "detection"),
+                    key=lambda row: row["policy_evidence"]["frame"])
+    assert [r["policy_evidence"]["frame"] for r in direct] == list(range(4))
+    assert [r["enabled"] for r in direct] == enabled
+    assert all(r["narrow_plate"]["frame_index"] == i for i, r in enumerate(direct))
+    initial = samples(args.output)
+    assert len(initial) == 4
+    assert [inside < 50 for _, inside in initial] == enabled
+    assert all(outside > 150 for outside, _ in initial)
+
+    # Explicit choices supersede the policy, while a stale lettering proof
+    # falls back to the full box only on the explicitly enabled source frame.
+    direct[0]["output_choice"] = "blur"
+    direct[2]["output_choice"] = "keep"
+    direct[0]["narrow_plate"]["frame_sha256"] = "0" * 64
+    (tmp_path / "report.json").write_text(json.dumps(doc))
+    reopened = core._prep_args(parser.parse_args([
+        str(path), "--from-report", args.report, "--encoder", "x264",
+        "--mode", "box", "--pad", "0", "--output", str(tmp_path / "reopened.mp4"),
+    ]), parser)
+    core.run_pipeline(reopened, Quiet())
+    actual = samples(reopened.output)
+    expected = list(enabled)
+    expected[0], expected[2] = True, False
+    assert [inside < 50 for _, inside in actual] == expected
+    assert actual[0][0] < 50
+    assert actual[2][0] > 150

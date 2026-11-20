@@ -84,6 +84,8 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
 # site-packages beside the registries, so it gets a project-prefixed name
 # that can't collide with another package's notices file.
 "THIRD_PARTY_NOTICES.md" = "openscrub_THIRD_PARTY_NOTICES.md"
+# Plate coverage guidance for installed web and CLI users.
+"PLATES.md" = "openscrub_internal/PLATES.md"
 # branded icon for the Start Menu shortcut openscrub-setup creates
 "assets/openscrub.ico" = "openscrub.ico"
 "docs/PLATE_SEARCH.md" = "openscrub_internal/plate_search/PLATE_SEARCH.md"
@@ -116,6 +118,7 @@ include = [
     "install.py",
     "requirements.txt",
     "README.md",
+    "PLATES.md",
     "LICENSE",
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",

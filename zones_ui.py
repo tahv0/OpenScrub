@@ -192,6 +192,8 @@ details .inner .full{grid-column:1/-1}
    <div class="mutd">Choose a cutoff at least as high as the plate threshold. No cutoff is preset.</div>
   </div>
   <div class="full" id="plate-policy-error" role="alert" hidden style="color:#fca5a5"></div>
+  <div class="full"><label style="display:inline"><input type="checkbox" id="plateletters"> Plate lettering only (experimental)</label>
+   <div id="platelettersNote" class="mutd">For the plate category. Text detection can miss letters; the plate background and character positions remain visible and may identify someone. Checks every frame and can be slow. Unsupported sources or uncertain text use the full detected plate box when available; review the output.</div></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
    <option>rect</option></select></div>
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
@@ -1255,6 +1257,7 @@ async function startScan(){
   ignore_zones:S.ignore,
  };
  if(platePolicy){o.uncertain_policy=platePolicy.policy;o.plate_auto_cutoff=platePolicy.cutoff;}
+ if($("plateletters").checked)o.plate_coverage="narrow";
  const fd=new FormData();
  if(S.file)fd.append("video",S.file);
  fd.append("server_path",$("spath").value.trim());
