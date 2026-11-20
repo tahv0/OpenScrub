@@ -744,7 +744,7 @@ def export_filenames(job) -> tuple[str, str]:
 def job_public(job):
     video_name, report_name = export_filenames(job)
     logs = job["log"].snapshot(tail=30)
-    return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+    result = {k: job[k] for k in ("id", "name", "phase", "progress", "error",
                                 "stats")} | {
         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
         # input size: lets the editor warn before re-uploading a file that
@@ -765,6 +765,11 @@ def job_public(job):
         "download_name": video_name,
         "report_name": report_name,
     }
+    if job.get('options', {}).get('checkpoint_review') is True:
+        stop = getattr(FILES.initialize(job).active, 'checkpoint_stop', None)
+        result['checkpoint_enabled'] = True
+        result['checkpoint_stopping'] = bool(stop is not None and stop.is_set())
+    return result
 
 
 def _publish_preview_jpeg(path, image, quality) -> bool:
@@ -963,6 +968,9 @@ def build_args(job, for_render=False):
     if optional:
         policy, _, cutoff = optional
         argv += ["--uncertain-policy", policy, "--plate-auto-cutoff", str(cutoff)]
+    if o.get('checkpoint_review') is True:
+        # The checkpoint producer has one conservative native source domain.
+        argv += ['--no-vfr-fix', '--scroll-track', 'off', '--no-backtrack']
     # user-defined regex categories ride along on every job; the engine only
     # activates the ones whose id is in --categories
     for c in load_custom_cats():
@@ -970,7 +978,8 @@ def build_args(job, for_render=False):
     # selected detection models (Detection models panel). A selected id
     # whose file is missing falls back to the engine default silently-safe
     # ladder (YuNet / plate auto-search).
-    sel = load_model_select()
+    # The checkpoint subset does not run face, plate or person inference.
+    sel = {} if o.get('checkpoint_review') is True else load_model_select()
     for kind, flag in (("face", "--face-model"), ("plate", "--plate-model"),
                        ("person", "--person-model")):
         mid = sel.get(kind)
@@ -1146,6 +1155,7 @@ def _publish_job_report_locked(job, path, doc):
 
 
 _CHECKPOINT_FD_PUBLICATION = os.name == 'posix'
+_CHECKPOINT_RECOVERY_NAME = '.checkpoint-publication-recovery.json'
 
 
 class _CheckpointPublicationCommittedError(RuntimeError):
@@ -1232,6 +1242,61 @@ def _publish_checkpoint_locked(job, owner, generation, operation, staged, path, 
             raise _CheckpointPublicationCommittedError(files.source_reason) from error
 
 
+def _publish_checkpoint_job_locked(job, owner, generation, operation, staged, path, doc):
+    """Fence one report replacement with a durable same-directory marker."""
+    files = FILES.initialize(job)
+    directory = os.path.abspath(job['dir'])
+    marker = os.path.join(directory, _CHECKPOINT_RECOVERY_NAME)
+    flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_CLOEXEC', 0)
+    dirfd = os.open(directory, flags)
+    created = replaced = False
+    try:
+        marker_flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                        getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_CLOEXEC', 0))
+        descriptor = os.open(marker, marker_flags, 0o600)
+        created = True
+        try:
+            opened_marker = os.fdopen(descriptor, 'wb')
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with opened_marker as stream:
+            stream.write(b'{"version":1,"kind":"checkpoint-publication"}\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.fsync(dirfd)
+        _publish_checkpoint_locked(job, owner, generation, operation, staged, path, doc)
+        replaced = True
+        os.fsync(dirfd)  # the report rename is durable before marker retirement
+        unfinished = 'stop_review' in doc
+        job.update(phase='paused' if unfinished else 'review',
+                   _checkpoint_unfinished=unfinished, output=None,
+                   progress=0.5, eta=None, error=None)
+        os.unlink(marker)
+        created = False
+        os.fsync(dirfd)
+    except BaseException as error:
+        # A surviving staged path proves the rename did not happen. A lost
+        # stage or explicit committed error must remain fenced on restart.
+        uncertain = (replaced or getattr(error, 'committed', False)
+                     or not os.path.exists(staged) or (not created and os.path.lexists(marker)))
+        if created and not uncertain:
+            try:
+                os.unlink(marker)
+                created = False
+                os.fsync(dirfd)
+            except OSError:
+                uncertain = True
+        if uncertain:
+            files.recovery_required = True
+            files.recovery_diagnostics = ('checkpoint publication requires recovery',)
+            job.update(phase='error', error='checkpoint publication requires recovery',
+                       output=None, eta=None)
+        raise
+    finally:
+        os.close(dirfd)
+
+
 def _edit_gate(job):
     _recovery_gate(job)
     _report_current(job)
@@ -1270,6 +1335,25 @@ def _unfinished_checkpoint_locked(job):
     result = isinstance(doc, dict) and 'stop_review' in doc
     job['_checkpoint_observation'] = (stamp, result)
     return result
+
+
+def _checkpoint_resume_token_locked(job):
+    """Identify the current report generation while the report lock is held."""
+    _report_current(job)
+    _recovery_gate(job)
+    files = FILES.initialize(job)
+    path = os.path.join(job['dir'], 'report.json')
+    try:
+        with open(path, 'rb', opener=_thumbnail_nonblocking_opener) as stream:
+            opened = os.fstat(stream.fileno())
+            named = os.stat(path, follow_symlinks=False)
+            if (not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode)
+                    or _file_stamp(opened) != _file_stamp(named)):
+                raise OSError('report changed')
+    except (OSError, ValueError):
+        raise Conflict('checkpoint report is unavailable or changed') from None
+    value = (files.incarnation, files.committed_report_epoch, *_file_stamp(opened))
+    return hashlib.sha256(json.dumps(value, separators=(',', ':')).encode('ascii')).hexdigest()
 
 
 def _operation_valid(job, owner):
@@ -1434,9 +1518,13 @@ def _run_job(job, action, owner=None):
             _begin_operation(job, owner)
         if not _operation_valid(job, owner):
             return
-        job["phase"] = "scanning" if action == "scan" else "rendering"
+        job["phase"] = "scanning" if action in ('scan', 'resume') else "rendering"
+        checkpoint_stop = (threading.Event() if action in ('scan', 'resume')
+                           and job['options'].get('checkpoint_review') is True else None)
+        owner.checkpoint_stop = checkpoint_stop
+        generation = job.get('qgen', 0)
     sink = DIAGNOSTICS
-    diagnostic_ref = sink.start(action) if sink is not None else None
+    diagnostic_ref = sink.start("scan" if action == "resume" else action) if sink is not None else None
     outcome, diagnostic_error = "superseded", None
     escaped = False
     try:
@@ -1494,9 +1582,49 @@ def _run_job(job, action, owner=None):
         cb.publish_render = publish_render
         source = owner.source if owner is not None else job["video"]
         try:
-            if action == "scan":
+            if action in ('scan', 'resume'):
                 job["log"].append("— scan started —")
                 args = build_args(dict(job, video=source))
+                if action == 'resume' and checkpoint_stop is None:
+                    raise ValueError('resume requires an opted-in checkpoint scan')
+                if checkpoint_stop is not None:
+                    if not _CHECKPOINT_FD_PUBLICATION:
+                        raise ValueError('checkpoint publication requires POSIX support')
+                    if owner.source_state is not None and owner.source_state is not files:
+                        raise ValueError('checkpoint source owned by another job is not supported')
+                    from openscrub_internal import checkpoint_runtime
+                    published = False
+                    def commit_checkpoint(staged, path, doc):
+                        nonlocal published
+                        if (getattr(owner, 'checkpoint_stop', None) is not checkpoint_stop
+                                or ('stop_review' in doc and not checkpoint_stop.is_set())):
+                            raise openscrub.PipelineCancelled()
+                        _publish_checkpoint_job_locked(job, owner, generation, owner.operation,
+                                                       staged, path, doc)
+                        published = True
+                    result = checkpoint_runtime.scan_to_report(
+                        args, os.path.join(job['dir'], 'report.json'), cb=cb,
+                        stop_requested=checkpoint_stop.is_set,
+                        publication_lock=files.report_lock, resume=(action == 'resume'),
+                        _commit_staged=commit_checkpoint)
+                    if result is None:
+                        raise ValueError('Stop occurred before any complete frame was available')
+                    if not published:
+                        with files.report_lock:
+                            if not _operation_valid(job, owner) or owner.operation.is_set():
+                                raise openscrub.PipelineCancelled()
+                            current = _checkpoint_resume_token_locked(job)
+                            if current != getattr(owner, 'checkpoint_resume_token', None):
+                                raise ValueError('checkpoint report changed during a no-progress resume')
+                            stamp = _file_stamp(os.stat(os.path.join(job['dir'], 'report.json')))
+                            files.source_pair = (owner.operation, files.committed_report_epoch,
+                                                 owner.source, stamp)
+                            files.source_status, files.source_reason = 'pending', None
+                            job.update(phase='paused', _checkpoint_unfinished=True, output=None,
+                                       progress=0.5, eta=None, error=None)
+                    _adopt_scan_source(job, owner)
+                    outcome = "review"
+                    return
                 state = openscrub.run_scan(args, cb)
                 openscrub.write_report(os.path.join(job["dir"], "report.json"),
                                       args, state, publisher=cb.publish_report)
@@ -1852,6 +1980,22 @@ def create_job():
         _optional_plate_settings(options)
     except ValueError:
         return jsonify({"error": "Invalid optional plate policy settings."}), 400
+    checkpoint = options.get('checkpoint_review', False)
+    if type(checkpoint) is not bool:
+        return jsonify({"error": "checkpoint_review must be a boolean."}), 400
+    if checkpoint:
+        categories = options.get('categories')
+        selected = ({part.strip() for part in categories.split(',') if part.strip()}
+                    if isinstance(categories, str) else None)
+        unsupported = ('windows', 'ignore_zones', 'skip_review', 'skip_start',
+                       'skip_end', 'detect_windows_frac', 'audio_pii', 'dense_faces',
+                       'face_heads', 'phrases', 'allow_names', 'extra_names')
+        if (selected not in ({'qrcode'}, {'none'}, set())
+                or any(options.get(key) for key in unsupported)
+                or options.get('scroll_track', 'off') != 'off'
+                or options.get('no_backtrack', True) is not True
+                or options.get('no_vfr_fix', True) is not True):
+            return jsonify({"error": "Checkpoint scans support only QR or no categories without windows, scrolling, backtracking, or normalization."}), 400
     jobs = []
     files = request.files.getlist("video")
     if files and files[0].filename:
@@ -2058,6 +2202,40 @@ def job_retry(jid):
     return jsonify({"ok": True})
 
 
+@app.route('/api/jobs/<jid>/resume', methods=['POST'])
+def job_resume(jid):
+    """Queue a resume only for the exact saved report generation."""
+    job = JOBS.get(jid) or abort(404)
+    body = request.get_json(silent=True)
+    token = body.get('resume_token') if isinstance(body, dict) else None
+    if (not isinstance(body, dict) or set(body) != {'resume_token'}
+            or not isinstance(token, str) or re.fullmatch('[0-9a-f]{64}', token) is None):
+        return jsonify(error='a current resume token is required'), 400
+    prepared = _prepare_work(job, 'scan')
+    ticket = None
+    try:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            _report_current(job)
+            _recovery_gate(job)
+            if (job.get('phase') != 'paused' or not job.get('_checkpoint_unfinished')
+                    or job.get('options', {}).get('checkpoint_review') is not True
+                    or files.active is not None or files.work > 1):
+                return jsonify(error='checkpoint is not ready to resume'), 409
+            current = _checkpoint_resume_token_locked(job)
+            if not secrets.compare_digest(token, current):
+                return jsonify(error='checkpoint changed; save again before resuming'), 409
+            if prepared.source_state is not None and prepared.source_state is not files:
+                return jsonify(error='checkpoint source is owned by another job'), 409
+            prepared.checkpoint_resume_token = current
+            ticket = _reserve_queue_locked(job, 'resume', prepared)
+    finally:
+        if ticket is None:
+            prepared.release()
+    enqueue(job, 'resume', ticket)
+    return jsonify(ok=True, state='queued'), 202
+
+
 @app.route("/api/jobs/<jid>")
 def job_status(jid):
     job = JOBS.get(jid) or abort(404)
@@ -2098,6 +2276,24 @@ def job_preview(jid):
                      etag=hashlib.sha256(snapshot).hexdigest())
 
 
+@app.route('/api/jobs/<jid>/stop', methods=['POST'])
+def job_stop(jid):
+    """Request an owned scan to stop after its current whole frame."""
+    job = JOBS.get(jid) or abort(404)
+    files = FILES.initialize(job)
+    with files.report_lock:
+        _report_current(job)
+        _recovery_gate(job)
+        owner = files.active
+        stop = getattr(owner, 'checkpoint_stop', None)
+        if (job.get('phase') != 'scanning' or job['options'].get('checkpoint_review') is not True
+                or owner is None or stop is None or not _operation_valid(job, owner)
+                or owner.operation.is_set()):
+            return jsonify(error='no active checkpoint scan to stop'), 409
+        stop.set()
+    return jsonify(state='stopping'), 202
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     """Cancel a job. The job the worker is RUNNING stops cooperatively at
@@ -2131,7 +2327,17 @@ def job_cancel(jid):
             job["qgen"] = job.get("qgen", 0) + 1
         if files.active in released:
             files.active = None
-        if job.get("phase") in _ACTIVE_PHASES:
+        if job.get('_checkpoint_unfinished') and not files.recovery_required:
+            # Cancel a resume without losing the already-published checkpoint.
+            # The still-active owner keeps edit admission closed until cleanup;
+            # the next reader must rediscover and verify the source afresh.
+            files.current_source = files.source_pair = None
+            files.source_retired = False
+            files.source_status, files.source_reason = 'undiscovered', None
+            files.source_report_bound = False
+            job.update(phase='paused', error=None, output=None, eta=None)
+            job['log'].append('— resume cancelled; saved checkpoint retained —')
+        elif job.get("phase") in _ACTIVE_PHASES:
             job.update(phase="cancelled", error="cancelled by user", eta=None)
             job["log"].append("— cancelled —")
         if job.get("trackbg", {}).get("state") == "running":
@@ -6080,11 +6286,14 @@ async function refreshCycle(cycle){
  else wb.style.display="none";
 
  // action buttons rebuilt ONLY when the phase changes
- if(SHELLPH!==j.phase){
-  SHELLPH=j.phase;
+ const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'');
+ if(SHELLPH!==shellPhase){
+  SHELLPH=shellPhase;
   let a="";
   if(j.phase=="scanning"||j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase==="scanning"&&j.checkpoint_enabled)
+   a+=`<button id="checkpointStop" class="sec" onclick="stopCheckpoint()" ${j.checkpoint_stopping?'disabled':''}>${j.checkpoint_stopping?'Stopping…':'Stop &amp; Review'}</button>`;
   if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
@@ -7346,6 +7555,17 @@ function beRemove(){
 }
 async function beSave(){return saveAndRender();}
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
+async function stopCheckpoint(){
+ const id=CUR,button=document.getElementById('checkpointStop');if(!id||!button)return;
+ button.disabled=true;button.textContent='Stopping…';
+ try{
+  const response=await fetch('api/jobs/'+id+'/stop',{method:'POST'});
+  if(!response.ok)throw Error('Stop request was not accepted');
+  if(CUR===id)refresh();
+ }catch(error){
+  if(CUR===id){button.disabled=false;button.textContent='Stop & Review';alert(error.message);}
+ }
+}
 
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
@@ -9515,7 +9735,8 @@ def _rehydrate_jobs():
             continue
         if jid in JOBS:
             continue
-        if _has_render_recovery(jdir):
+        checkpoint_recovery = os.path.lexists(os.path.join(jdir, _CHECKPOINT_RECOVERY_NAME))
+        if _has_render_recovery(jdir) or checkpoint_recovery:
             # Do not follow descriptor paths or infer validity from final names.
             up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
                        if os.path.isfile(os.path.join(jdir, "input" + e))), None)
@@ -9527,11 +9748,13 @@ def _rehydrate_jobs():
                     opts = {}
             except (OSError, ValueError):
                 pass
+            reason = ('checkpoint publication requires recovery' if checkpoint_recovery
+                      else 'render delivery requires recovery')
             job = dict(id=jid, dir=jdir, video=up, name=os.path.basename(up) if up else jid,
                        options=opts, phase="error", progress=0.0, size=0,
-                       log=JobLog(["render delivery requires recovery"]),
-                       error="render delivery requires recovery", output=None,
-                       created=os.path.getmtime(jdir), cancel=threading.Event(), stats={})
+                       log=JobLog([reason]), error=reason, output=None,
+                       created=os.path.getmtime(jdir), cancel=threading.Event(), stats={},
+                       _checkpoint_unfinished=checkpoint_recovery)
             FILES.initialize(job).recovery_required = True
             with JOBS_LOCK:
                 JOBS[jid] = job

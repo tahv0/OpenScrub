@@ -1,11 +1,15 @@
 # Portable checkpoint data contract
 
 The checkpoint helper is a data contract, not a complete Stop & Review feature.
-This branch also has a monitored scanner boundary and completed-report frame
-authority in its renderers. Resume, partial rendering, checkpoint publication,
-restart, and user controls remain unimplemented. Older OpenScrub renderers do
-not honor checkpoint frame authority and must not render bounded reports as if
-they did.
+This branch also has a monitored scanner boundary, completed-report frame
+authority, and an opt-in web scan worker. A supported native progressive
+8-bit H.264 MP4 scan with QR codes or no detection categories can stop at a
+verified frame boundary. The worker fences report publication to its job and
+persists a recovery marker before replacing the report. The Resume API requires
+the exact current report-generation token. Partial rendering and editing are
+not available in this slice; they require a separate bounded-review owner.
+Older OpenScrub renderers do not honor checkpoint frame authority and must not
+render bounded reports as if they did.
 
 The three functions in `openscrub_internal.checkpoints` consume and return
 plain JSON documents. They do not mutate arguments or write a file. Publish a

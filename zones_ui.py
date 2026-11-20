@@ -221,6 +221,7 @@ details .inner .full{grid-column:1/-1}
    <label style="display:inline"><input type="checkbox" id="nomem"> disable memory <span class="qm" data-tip="Turn off text memory. Normally, once a name or number is found it's blurred everywhere it reappears in the video, even where the reader alone would miss it. Turning it off means less is blurred; only use it if memory is spreading a false detection around.">?</span></label>
    <label style="display:inline"><input type="checkbox" id="pmode"> preview mode <span class="qm" data-tip="Draw colored outlines around what was detected instead of blurring it - for checking detection on test footage. The output is NOT redacted. Never share a preview-mode video.">?</span></label>
    <label style="display:inline"><input type="checkbox" id="drawscores"> face scores <span class="qm" data-tip="With preview mode on, label each face outline with the detector's confidence score - use it to pick a good Face threshold for your footage.">?</span></label>
+   <label style="display:inline"><input type="checkbox" id="checkpointreview"> Enable Stop &amp; Review (experimental) <span class="qm" data-tip="Save a verified partial scan when you choose Stop &amp; Review. Currently this supports native progressive H.264 MP4 video with only QR codes or no detection categories, and no scan windows, zones, scrolling or backtracking.">?</span></label>
   </div>
  </div></details>
 
@@ -1201,6 +1202,15 @@ async function startScan(){
    +"words or phrases to blur (one per line), or uncheck the category.");
   $("phrases").focus();return;}
  const nTrk=S.wins.reduce((a,w)=>a+((w.track||[]).length),0);
+ const checkpoint=$('checkpointreview').checked;
+ if(checkpoint){
+  const w=S.wins[0],zoned=S.wins.some(x=>Object.values(x.zones||{}).some(v=>Array.isArray(v)&&v.length));
+  if(cats.some(c=>c!=='qrcode')||S.wins.length!==1||!w||w.t0>0.001||w.t1<S.dur-0.001||
+     zoned||S.ignore.length||nTrk||$('skiprev').checked||$('audiopii').checked||$('faceheads').checked||
+     $('allow').value.trim()||$('extra').value.trim()){
+   alert('Stop & Review currently supports only QR codes or no categories across the whole video, without zones, tracking, audio detection, or skip review.');return;
+  }
+ }
  if(!cats.length&&!nTrk
    &&!confirm("No categories are enabled and no objects are marked for "
    +"tracking — nothing will be detected. Start anyway?"))return;
@@ -1261,6 +1271,7 @@ async function startScan(){
  if(platePolicy){o.uncertain_policy=platePolicy.policy;o.plate_auto_cutoff=platePolicy.cutoff;}
  if($("plateletters").checked)o.plate_coverage="narrow";
  if($("verifyhdrplates").checked)o.verify_hdr_plate_frames=true;
+ if(checkpoint){o.checkpoint_review=true;delete o.windows;delete o.ignore_zones;}
  const fd=new FormData();
  if(S.file)fd.append("video",S.file);
  fd.append("server_path",$("spath").value.trim());
