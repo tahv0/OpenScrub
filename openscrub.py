@@ -8343,13 +8343,7 @@ def _narrow_source_policy(args, cap, fps, count, width, height):
     if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
         return None, "VFR normalization was bypassed"
     try:
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries",
-             "stream=index,width,height,r_frame_rate,avg_frame_rate,time_base,start_pts,start_time,nb_frames:stream_tags=rotate:stream_side_data",
-             "-of", "json", args.video], capture_output=True, timeout=15, check=True)
-        if len(probe.stdout) > 65536:
-            raise ValueError("metadata response too large")
-        facts = exact.metadata_facts(json.loads(probe.stdout))
+        facts = exact.probe_source(args.video)
         tolerance = exact.precision_bound(facts, fps, count)
         if (not cap.isOpened() or cap.getBackendName() != "FFMPEG"
                 or (facts["width"], facts["height"]) != (width, height)):
