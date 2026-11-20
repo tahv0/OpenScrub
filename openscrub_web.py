@@ -9310,7 +9310,12 @@ def main():
                          "0 = unlimited; env OPENSCRUB_MAX_UPLOAD_GB works "
                          "too). Very large files are better served in place "
                          "via the 'path on the server' box than uploaded.")
+    ap.add_argument("--preview-decode-threads", type=int, choices=(0, 1, 2, 4),
+                    default=0, help="preview decoder threads (default 0: ordinary decoder); "
+                    "fewer threads may reduce memory but slow seeking; unsupported "
+                    "builds use the ordinary decoder")
     args = ap.parse_args()
+    app.config["PREVIEW_DECODE_THREADS"] = args.preview_decode_threads
     TOKEN = args.token or None
     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
     os.makedirs(JOBS_DIR, exist_ok=True)

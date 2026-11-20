@@ -6,6 +6,10 @@ from unittest.mock import Mock
 import pytest
 
 import openscrub_web as web
+from test_job_lifecycle import request, store
+from test_exact_samples import exact
+from test_exact_adoption import scan
+from test_report_transactions import join
 
 
 @pytest.fixture(autouse=True)
@@ -179,16 +183,6 @@ def test_real_consumers_keep_pixels_metadata_and_jpegs(tmp_path, monkeypatch):
     job = {"id": "decoder-test", "video": video, "output": video,
            "dir": str(tmp_path), "log": [], "options": {"skip_review": False}}
     monkeypatch.setitem(web.JOBS, job["id"], job)
-    monkeypatch.setattr(web, "build_args", lambda job: None)
-    monkeypatch.setattr(web.openscrub, "run_scan", lambda args, cb: {"stats": {}})
-    monkeypatch.setattr(web.openscrub, "write_report", lambda *args: None)
-    monkeypatch.setattr(web, "_load_job_report", lambda job: doc)
-    class InlineThread:
-        def __init__(self, target, daemon):
-            self.target = target
-        def start(self):
-            self.target()
-    monkeypatch.setattr(web.threading, "Thread", InlineThread)
     real_open = web._open_preview_capture
     calls = []
 
@@ -218,12 +212,49 @@ def test_real_consumers_keep_pixels_metadata_and_jpegs(tmp_path, monkeypatch):
                 calls.clear()
         assert info.status_code == 200
         assert all(response.status_code == 200 for response in previews)
-        thumb = tmp_path / 'thumb2_0.jpg'
-        if thumb.exists():
-            thumb.unlink()
-        web._run_job(job, 'scan')
-        assert calls == [(video, mode)]
-        calls.clear()
-        assert thumb.exists(), job['log']
-        results.append((pixels, info.get_json(), [p.data for p in previews], thumb.read_bytes()))
+        results.append((pixels, info.get_json(), [p.data for p in previews]))
     assert all(result == results[0] for result in results[1:])
+
+
+@pytest.mark.parametrize("mode", [0, 2])
+def test_thread_selection_reaches_current_thumbnail_owners(scan, monkeypatch, mode):
+    import json
+    import numpy as np
+    fixture, threads = scan
+    writer = web.cv2.VideoWriter(fixture.job['video'], web.cv2.VideoWriter_fourcc(*'MJPG'), 5, (160, 120))
+    assert writer.isOpened()
+    for _ in range(10):
+        frame = np.zeros((120, 160, 3), np.uint8)
+        frame[:, ::8] = (20, 180, 230)
+        writer.write(frame)
+    writer.release()
+    doc = json.loads(fixture.path.read_text())
+    for row in doc['detections']:
+        row['cbox'] = [55, 45, 105, 75]
+    monkeypatch.setattr(web.openscrub, 'run_scan', lambda args, cb: dict(source_report=doc, stats={}))
+    real_open = web._open_preview_capture
+    calls = []
+    def recording_open(path):
+        calls.append((path, web.app.config['PREVIEW_DECODE_THREADS']))
+        return real_open(path)
+    monkeypatch.setattr(web, '_open_preview_capture', recording_open)
+    web.app.config['PREVIEW_DECODE_THREADS'] = mode
+    web._run_job(fixture.job, 'scan')
+    assert len(threads) == 1
+    join(threads[0])
+    assert (fixture.job['video'], mode) in calls
+    assert ('crop', 0) in web.FILES.initialize(fixture.job).thumbnail.entries
+
+
+@pytest.mark.parametrize("mode", [0, 2])
+def test_thread_selection_reaches_on_demand_thumbnail(exact, monkeypatch, mode):
+    real_open = web._open_preview_capture
+    calls = []
+    def recording_open(path):
+        calls.append((path, web.app.config['PREVIEW_DECODE_THREADS']))
+        return real_open(path)
+    monkeypatch.setattr(web, '_open_preview_capture', recording_open)
+    web.app.config['PREVIEW_DECODE_THREADS'] = mode
+    response = request('get', exact.url + '/thumb/0')
+    assert response.status_code == 200
+    assert (exact.job['video'], mode) in calls
