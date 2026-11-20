@@ -116,9 +116,10 @@ preserves explicit Blur and Keep decisions across policy changes; ordinary and
 legacy reports retain their existing choices and are not converted. Unhandled
 suggestions do not prevent export.
 
-The options are available through the CLI and job API; the existing web setup
-and review screens do not yet label all optional suggestions or provide policy
-controls. An API client can submit `uncertain_policy`, `plate_threshold` and
+The options are available through the CLI, job API and the web Scan Setup's
+advanced settings. The existing review screens do not yet label all optional
+suggestions or provide post-scan policy controls. An API client can submit
+`uncertain_policy`, `plate_threshold` and
 `plate_auto_cutoff` in the scan options. On a capable report, a
 `POST /api/jobs/<id>/detections` request may include, for example,
 `{"plate_policy":{"uncertain_policy":"blur_candidates"}}`; `manual_review`
