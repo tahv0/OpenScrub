@@ -15,6 +15,7 @@ from openscrub_internal import checkpoint_runtime as runtime
 from test_checkpoint_bounded_review_web import recovered
 from test_checkpoint_restart_web import paused_job
 from test_checkpoint_web_owner import checkpoint_job, commit_for
+from test_exact_samples import precondition
 from test_job_lifecycle import store
 
 
@@ -32,9 +33,11 @@ def serving():
         assert not thread.is_alive()
 
 
-def http(url, method='GET'):
+def http(url, method='GET', payload=None):
+    data = json.dumps(payload).encode() if payload is not None else None
+    headers = {'Content-Type': 'application/json'} if data is not None else {}
     try:
-        with urlopen(Request(url, method=method), timeout=15) as response:
+        with urlopen(Request(url, data=data, headers=headers, method=method), timeout=15) as response:
             return response.status, response.read()
     except HTTPError as error:
         return error.code, error.read()
@@ -52,6 +55,27 @@ def test_real_http_prefix_sample_and_changed_source(recovered):
         with Path(web.JOBS[store.job['id']]['video']).open('ab') as stream:
             stream.write(b'changed after checkpoint')
         assert http(base + store.url + '/detections')[0] == 409
+
+
+def test_real_http_save_returns_ack_for_reviewed_prefix(recovered):
+    store, _ = recovered
+    with serving() as base:
+        status, body = http(base + store.url + '/edit_sample?t=0')
+        assert status == 200
+        sample = json.loads(body)
+        manual = {'manual_id': 'http:manual', 't_start': 0.0, 't_end': 1.0,
+                  't_ref': 0.0, 'screen_box': [20, 20, 50, 50],
+                  'sample_precondition': precondition(sample, None)}
+        status, body = http(base + store.url + '/detections', method='POST',
+                            payload={'enabled': {'0': False}, 'manual': [manual]})
+        assert status == 200
+        ack = json.loads(body)
+        assert ack['ok'] is True and len(ack['resume_token']) == 64
+        status, body = http(base + store.url + '/report')
+        assert status == 200
+        report = json.loads(body)
+        assert report['detections'][0]['enabled'] is False
+        assert any(row.get('manual_id') == 'http:manual' for row in report['detections'])
 
 
 @pytest.mark.parametrize('cause', ['cancel', 'stale_generation'])

@@ -81,7 +81,7 @@ def test_recovered_checkpoint_cannot_use_unbounded_review_api(paused_job):
     before = store.path.read_bytes()
     web.JOBS.clear()
     web._rehydrate_jobs()
-    assert request('post', store.url + '/detections', json={'time_overrides': {'0': [0, 3]}}).status_code == 409
+    assert request('post', store.url + '/detections', json={'time_overrides': {'0': [0, 3]}}).status_code == 400
     assert request('get', store.url + '/boxes_at?t=3').status_code == 409
     assert store.path.read_bytes() == before
 

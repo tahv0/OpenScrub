@@ -1100,11 +1100,40 @@ def _recovery_gate(job):
         abort(409, "render delivery requires recovery")
 
 
-def _publish_job_report_locked(job, path, doc):
+def _checkpoint_source_unchanged(selected):
+    try:
+        current = os.stat(selected['path'])
+        return stat.S_ISREG(current.st_mode) and _file_stamp(current) == selected['stamp']
+    except (OSError, KeyError, TypeError):
+        return False
+
+
+def _publish_job_report_locked(job, path, doc, *, expected_stamp=None, expected_source=None):
     """Caller owns this job's report transaction and file lifetime."""
     with _staged_report(path, doc) as staged:
+        if expected_stamp is not None:
+            try:
+                staged_stat = os.stat(staged, follow_symlinks=False)
+                named = os.stat(path, follow_symlinks=False)
+                if (not stat.S_ISREG(staged_stat.st_mode) or not stat.S_ISREG(named.st_mode) or
+                        _file_stamp(named) != expected_stamp or
+                        not _checkpoint_source_unchanged(expected_source)):
+                    raise OSError('report changed')
+            except OSError:
+                raise exact.ExactError('checkpoint report changed during save',
+                                       409, 'geometry_conflict') from None
         FILES.initialize(job).output_epoch += 1
         os.replace(staged, os.path.abspath(path))
+        if expected_stamp is not None:
+            try:
+                installed = os.stat(path, follow_symlinks=False)
+                if (not stat.S_ISREG(installed.st_mode) or
+                        (installed.st_dev, installed.st_ino, installed.st_size, installed.st_mtime_ns) !=
+                        (staged_stat.st_dev, staged_stat.st_ino, staged_stat.st_size, staged_stat.st_mtime_ns)):
+                    raise OSError('report changed')
+            except OSError:
+                raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain') from None
+            return _file_stamp(installed)
 
 
 _CHECKPOINT_FD_PUBLICATION = os.name == 'posix'
@@ -1671,7 +1700,7 @@ def enforce_vault_lock():
                 _recovery_gate(job)
             if (job is not None and job.get('_checkpoint_unfinished') and
                     request.endpoint in {'job_frame_at', 'job_video_stream', 'job_boxes_at',
-                        'job_save_edits', 'job_track_object'}):
+                        'job_track_object'}):
                 abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
@@ -3506,10 +3535,13 @@ def job_edit_sample(jid):
                 continue
             if start-.01 <= decoded.canonical_s <= end+.01:
                 box = baseline['cbox']
-                boxes.append(dict(i=i, category=row['category'], text=row.get('text',''),
+                item = dict(i=i, category=row['category'], text=row.get('text',''),
                     enabled=row.get('enabled',True), t_start=start, t_end=end,
                     box=[box[0]+offset[0], box[1]+offset[1], box[2]+offset[0], box[3]+offset[1]],
-                    row_context_eq=exact.row_context_eq(row), base=baseline))
+                    row_context_eq=exact.row_context_eq(row), base=baseline)
+                if marker is not None:
+                    item['scan_frame_bounds'] = list(authority) if authority is not None else None
+                boxes.append(item)
         with _exact_owner_guard(job, lease):
             _exact_current_locked(job, selected, fence)
         return jsonify(version=1, sample=dict(source_ref=selected['source_ref'],
@@ -3924,7 +3956,7 @@ def _check_sample_precondition(pc, selected, fps, cum, timeline_eq):
         raise exact.ExactError('sample source/timeline differs', 409, 'geometry_conflict')
 
 
-def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq):
+def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timeline_eq, marker=None):
     targets = {}
     for key, pc in preconditions.items():
         _check_sample_precondition(pc, selected, fps, cum, timeline_eq)
@@ -3932,8 +3964,6 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
         if index >= len(doc['detections']):
             raise exact.ExactError('raw row no longer exists', 409, 'geometry_conflict')
         row = doc['detections'][index]
-        if exact.row_context_eq(row) != pc['row_context_eq']:
-            raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
         baseline = pc['base']
         desired_box = list((edits.get('box_overrides') or {}).get(key, baseline['cbox']))
         span = (edits.get('time_overrides') or {}).get(key)
@@ -3943,8 +3973,145 @@ def _validate_strict_rows(doc, edits, preconditions, selected, fps, cum, timelin
         current = exact.row_base(row)
         if current != baseline and current != intended:
             raise exact.ExactError('geometry baseline/intended tuple differs', 409, 'geometry_conflict')
+        if marker is None:
+            if exact.row_context_eq(row) != pc['row_context_eq']:
+                raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+        else:
+            prior = pc['scan_frame_bounds']
+            authority = openscrub._frame_authority(row, total=len(cum))
+            actual = list(authority) if authority is not None else None
+            changed_time = span is not None and list(span) != baseline['span'][:2]
+            if actual == prior:
+                if (exact.row_context_eq(row) != pc['row_context_eq'] or
+                        changed_time and current == intended and current != baseline and prior is not None):
+                    raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            elif prior is not None and actual is None and changed_time and current == intended:
+                # A committed time edit deliberately removed the old bounds.
+                # Reconstruct only those immutable fields to verify a replay.
+                restored = dict(row, scan_frame_start=prior[0], scan_frame_end=prior[1])
+                if exact.row_context_eq(restored) != pc['row_context_eq']:
+                    raise exact.ExactError('raw row context differs', 409, 'geometry_conflict')
+            else:
+                raise exact.ExactError('row frame authority differs', 409, 'geometry_conflict')
         targets[key] = intended, current == intended
     return targets
+
+
+def _checkpoint_audio_key(row):
+    if not isinstance(row, dict):
+        return None
+    try:
+        if isinstance(row.get('t0'), bool) or isinstance(row.get('t1'), bool):
+            return None
+        start, end = float(row['t0']), float(row['t1'])
+        if not math.isfinite(start) or not math.isfinite(end) or not 0 <= start < end:
+            return None
+        mode = row.get('mode') if row.get('mode') in ('mute', 'bleep') else 'mute'
+        return start, end, mode
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def _checkpoint_edit_preflight(doc, edits, preconditions, marker):
+    """Require an inspected sample for geometry and disallow future spans."""
+    boundary = marker['next_frame'] / marker['fps']
+    for field in ('box_overrides', 'time_overrides'):
+        values = edits.get(field) or {}
+        if not isinstance(values, dict) or any(key not in preconditions for key in values):
+            raise exact.ExactError('checkpoint geometry requires an inspected sample', 400, 'invalid_sample_request')
+    for key, pc in preconditions.items():
+        if 'scan_frame_bounds' not in pc:
+            raise exact.ExactError('row %s requires frame authority' % key, 400, 'invalid_sample_request')
+        bounds = pc['scan_frame_bounds']
+        if bounds is not None and (not isinstance(bounds, list) or len(bounds) != 2 or
+                any(type(value) is not int for value in bounds) or
+                not 0 <= bounds[0] <= pc['index'] < bounds[1] <= marker['next_frame']):
+            raise exact.ExactError('row %s has invalid frame authority' % key, 400, 'invalid_sample_request')
+    for key, span in (edits.get('time_overrides') or {}).items():
+        exact.vector(span, 2)
+        if not 0 <= span[0] < span[1] <= boundary:
+            raise exact.ExactError('row %s span %s exceeds inspected boundary %s' %
+                                   (key, span, boundary), 400, 'invalid_sample_request')
+    for index, manual in enumerate(edits.get('manual', [])):
+        if not isinstance(manual, dict) or 'sample_precondition' not in manual:
+            raise exact.ExactError('manual row %s requires an inspected sample' % index,
+                                   400, 'invalid_sample_request')
+        span = exact.vector([manual.get('t_start'), manual.get('t_end')], 2)
+        if not 0 <= span[0] < span[1] <= boundary:
+            raise exact.ExactError('manual row %s span %s exceeds inspected boundary %s' %
+                                   (index, span, boundary), 400, 'invalid_sample_request')
+    audio = edits.get('audio')
+    if audio is not None:
+        if not isinstance(audio, list):
+            raise exact.ExactError('audio spans must be a list', 400, 'invalid_sample_request')
+        allowed_tail = {}
+        previous_audio = doc.get('audio_redactions')
+        for old in previous_audio if isinstance(previous_audio, list) else ():
+            key = _checkpoint_audio_key(old)
+            if key is not None and key[1] > boundary:
+                allowed_tail[key] = allowed_tail.get(key, 0) + 1
+        for index, span in enumerate(audio):
+            if (not isinstance(span, dict) or not exact.finite(span.get('t0')) or
+                    not exact.finite(span.get('t1')) or
+                    not 0 <= span['t0'] < span['t1'] or
+                    span.get('mode', 'mute') not in ('mute', 'bleep')):
+                raise exact.ExactError('audio span %s exceeds the inspected boundary or is invalid' % index,
+                                       400, 'invalid_sample_request')
+            if span['t1'] > boundary:
+                key = _checkpoint_audio_key(span)
+                if not allowed_tail.get(key):
+                    raise exact.ExactError('audio span %s exceeds the inspected boundary' % index,
+                                           400, 'invalid_sample_request')
+                allowed_tail[key] -= 1
+
+
+def _checkpoint_audio_rows(previous, submitted, boundary):
+    """Keep complete raw values for audio spans the reviewer did not alter."""
+    by_span, used = {}, {}
+    for row in previous if isinstance(previous, list) else ():
+        key = _checkpoint_audio_key(row)
+        if key is not None:
+            by_span.setdefault(key, []).append(row)
+    result = []
+    for row in submitted or []:
+        key = (float(row['t0']), float(row['t1']), row.get('mode', 'mute'))
+        offset = used.get(key, 0)
+        matching = by_span.get(key, ())
+        result.append(matching[offset] if offset < len(matching) else
+                      dict(t0=key[0], t1=key[1], mode=key[2]))
+        used[key] = offset + 1
+    seen = {}
+    for row in previous if isinstance(previous, list) else ():
+        key = _checkpoint_audio_key(row)
+        if key is None:
+            result.append(row)
+        elif key[1] > boundary:
+            offset = seen.get(key, 0)
+            seen[key] = offset + 1
+            if offset >= used.get(key, 0):
+                result.append(row)
+    return result
+
+
+def _load_checkpoint_edit_report(path):
+    """Open and parse the same regular report generation that will be fenced."""
+    try:
+        with open(path, encoding='utf-8', opener=_thumbnail_nonblocking_opener) as stream:
+            opened = os.fstat(stream.fileno())
+            named = os.stat(path, follow_symlinks=False)
+            if (not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode) or
+                    _file_stamp(opened) != _file_stamp(named)):
+                raise OSError('report changed')
+            stamp = _file_stamp(opened)
+            doc = json.load(stream)
+            if (_file_stamp(os.fstat(stream.fileno())) != stamp or
+                    _file_stamp(os.stat(path, follow_symlinks=False)) != stamp):
+                raise OSError('report changed')
+    except (OSError, ValueError, RecursionError):
+        raise exact.ExactError('checkpoint report is unavailable or changed', 409, 'geometry_conflict') from None
+    if not isinstance(doc, dict) or 'stop_review' not in doc:
+        raise exact.ExactError('checkpoint report changed', 409, 'geometry_conflict')
+    return doc, stamp
 
 
 @app.route('/api/jobs/<jid>/detections', methods=['POST'])
@@ -3955,6 +4122,7 @@ def job_save_edits(jid):
     prepared = lease = None
     needs_source = False
     preparation_authority = None
+    checkpoint_preparation = None
     try:
         preconditions = _strict_geometry(edits)
         while True:
@@ -3962,17 +4130,29 @@ def job_save_edits(jid):
             with _exact_owner_guard(job, lease):
                 _edit_gate(job)
                 try:
-                    doc = _load_job_report(job)
+                    if job.get('_checkpoint_unfinished'):
+                        doc, report_stamp = _load_checkpoint_edit_report(path)
+                    else:
+                        doc = _load_job_report(job)
+                        report_stamp = None
+                        if isinstance(doc, dict) and 'stop_review' in doc:
+                            doc, report_stamp = _load_checkpoint_edit_report(path)
                 except FileNotFoundError:
                     abort(404, 'job report not found')
+                marker = _checkpoint_marker(doc)
+                if marker is not None:
+                    _checkpoint_edit_preflight(doc, edits, preconditions, marker)
                 additions, strict_manual = _manual_candidates(doc, edits)
-                needs_source = bool(preconditions or strict_manual)
+                needs_source = bool(marker is not None or preconditions or strict_manual)
                 if needs_source and prepared is None:
                     candidate = doc.get('provenance', {}).get('input')
                     if not isinstance(candidate,str) or not candidate:
                         raise exact.ExactError('report has no selected scan input')
                     files = FILES.initialize(job)
                     preparation_authority = (files.current_source, files.source_epoch, files.operation)
+                    if marker is not None:
+                        checkpoint_preparation = (marker['input_sha256'], files.committed_report_epoch,
+                                                  report_stamp)
                 else:
                     selected = targets = None
                     if needs_source:
@@ -3988,10 +4168,23 @@ def job_save_edits(jid):
                         if (os.path.realpath(doc.get('provenance', {}).get('input','')) != prepared['path']
                                 or os.path.realpath(job['video']) != prepared['path']):
                             raise exact.ExactError('source changed while preparing save', 409, 'geometry_conflict')
+                        if checkpoint_preparation is not None:
+                            digest, epoch, stamp = checkpoint_preparation
+                            try:
+                                named = os.stat(path, follow_symlinks=False)
+                                report_current = stat.S_ISREG(named.st_mode) and _file_stamp(named) == stamp
+                            except OSError:
+                                report_current = False
+                            if (marker is None or marker['input_sha256'] != digest or
+                                    files.committed_report_epoch != epoch or not report_current):
+                                raise exact.ExactError('checkpoint changed while preparing save', 409, 'geometry_conflict')
+                            _checkpoint_source_policy(marker, prepared)
+                        elif marker is not None:
+                            raise exact.ExactError('checkpoint appeared while preparing save', 409, 'geometry_conflict')
                         selected = _select_observed_locked(job, prepared)
                         _exact_current_locked(job, selected)
                         fps,cum,timeline_eq,_ = _exact_policy(doc,selected)
-                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq)
+                        targets = _validate_strict_rows(doc,edits,preconditions,selected,fps,cum,timeline_eq,marker)
                         for manual,pc in strict_manual:
                             _check_sample_precondition(pc,selected,fps,cum,timeline_eq)
                             t0,t1,tref = manual['t_start'],manual['t_end'],manual.get('t_ref',manual['t_start'])
@@ -4008,6 +4201,8 @@ def job_save_edits(jid):
                             touched[destination] = (target, key, target.get(key, missing))
                         target[key] = value
                     original_count = len(doc['detections'])
+                    published = False
+                    acknowledged_stamp = report_stamp
                     enabled = edits.get('enabled',{})
                     for i,row in enumerate(doc['detections']):
                         if str(i) in enabled:
@@ -4025,6 +4220,9 @@ def job_save_edits(jid):
                             if not targets[key][1]:
                                 t0,t1,last = targets[key][0]['span']
                                 row = doc['detections'][i]
+                                if marker is not None and (row['t_start'], row['t_end']) != (t0, t1):
+                                    row.pop('scan_frame_start', None)
+                                    row.pop('scan_frame_end', None)
                                 assign(row, 't_start', t0); assign(row, 't_end', t1); assign(row, 'last_seen', last)
                         elif 0 <= i < len(doc['detections']) and len(span) == 2:
                             t0,t1 = float(span[0]),float(span[1])
@@ -4034,28 +4232,66 @@ def job_save_edits(jid):
                                 assign(row, 'last_seen', min(max(row.get('last_seen',t0),t0),t1))
                     doc['detections'].extend(additions)
                     if 'audio' in edits:
-                        assign(doc, 'audio_redactions', [
-                            dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
-                            for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0])
+                        if marker is not None:
+                            audio = _checkpoint_audio_rows(doc.get('audio_redactions'), edits.get('audio'),
+                                                          marker['next_frame'] / marker['fps'])
+                        else:
+                            audio = [dict(t0=float(s['t0']),t1=float(s['t1']),mode=s.get('mode') if s.get('mode') in ('mute','bleep') else 'mute')
+                                     for s in (edits.get('audio') or []) if float(s.get('t1',0)) > float(s.get('t0',0)) >= 0]
+                        assign(doc, 'audio_redactions', audio)
                     if (len(doc['detections']) != original_count or
                             any(original is missing or not _same_json_value(original, target[key])
                                 for target, key, original in touched.values())):
-                        _publish_job_report_locked(job, path, doc)
+                        if marker is not None:
+                            acknowledged_stamp = _publish_job_report_locked(
+                                job, path, doc, expected_stamp=report_stamp, expected_source=selected)
+                            published = True
+                        else:
+                            _publish_job_report_locked(job, path, doc)
                         _report_committed_locked(job, doc)
                     per = {}
                     for row in doc['detections']:
                         if row['category'] in ('name',):
                             per.setdefault(row['text'],[]).append(row.get('enabled',True))
                     result = dict(ok=True,total=len(doc['detections']),suggest_allowlist=sorted(t for t,states in per.items() if len(states)>=2 and not any(states)))
+                    if marker is not None:
+                        try:
+                            token = _checkpoint_resume_token_locked(job)
+                        except Conflict:
+                            if published:
+                                raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain') from None
+                            raise
+                        try:
+                            observed = os.stat(path, follow_symlinks=False)
+                            same_report = (stat.S_ISREG(observed.st_mode) and
+                                           _file_stamp(observed) == acknowledged_stamp)
+                        except OSError:
+                            same_report = False
+                        if not same_report or not _checkpoint_source_unchanged(selected):
+                            if published:
+                                raise RuntimeError('checkpoint save committed but its acknowledgement is uncertain')
+                            raise exact.ExactError('checkpoint report changed before save acknowledgement',
+                                                   409, 'geometry_conflict')
+                        result['resume_token'] = token
                     if preconditions:
                         result['geometry_rows'] = {key:{**pc,'row_context_eq':exact.row_context_eq(doc['detections'][int(key)]),
                             'base':exact.row_base(doc['detections'][int(key)])} for key,pc in preconditions.items()}
+                        if marker is not None:
+                            for key, ack in result['geometry_rows'].items():
+                                authority = openscrub._frame_authority(doc['detections'][int(key)], total=len(cum))
+                                ack['scan_frame_bounds'] = list(authority) if authority is not None else None
                     return jsonify(result)
             # A genuinely new strict mutation was found, before any mutation.
             # Reserve/probe outside report_lock, then reload/reclassify latest raw.
-            prepared, lease = _prepare_observed_source(job,candidate)
+            if checkpoint_preparation is None:
+                prepared, lease = _prepare_observed_source(job,candidate)
+            else:
+                prepared, lease = _prepare_observed_source(job, candidate,
+                    checkpoint_sha256=checkpoint_preparation[0])
     except exact.ExactError as error:
-        if needs_source and error.status in (409, 422) and FILES.initialize(job).source_retired:
+        if checkpoint_preparation is not None and error.status in (409, 422):
+            error = exact.ExactError(str(error), 409, 'geometry_conflict')
+        elif needs_source and error.status in (409, 422) and FILES.initialize(job).source_retired:
             error = exact.ExactError('sample source has changed; rescan required', 409, 'geometry_conflict')
         return _exact_error(error)
     except FileNotFoundError:
