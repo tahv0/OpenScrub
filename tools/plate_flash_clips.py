@@ -252,8 +252,21 @@ def tile_check(engine, report, frames, out_dir, video=None):
     video = video or prov.get("input")
     if not video or not os.path.exists(video):
         sys.exit("scanned video not found (%r); pass --scan-video" % video)
-    det = engine.PlateDetector(None, model_path=settings.get("plate_model"),
+    model = settings.get("plate_model")
+    # an engine imported from a source folder searches only that folder's
+    # registry paths, so a model in the data dir would load at 640; take
+    # the declared input size from the registry entry with the same id
+    size = 640
+    try:
+        stem = os.path.splitext(os.path.basename(model or ""))[0]
+        for m in engine.load_model_registry("plate"):
+            if m.get("id") == stem:
+                size = int(m.get("input_size") or 640)
+    except Exception as e:
+        print("registry lookup failed (%s); using input size 640" % e)
+    det = engine.PlateDetector(None, model_path=model, input_size=size,
                                thresh=settings.get("plate_threshold") or 0.35)
+    print("plate model %s, input %d" % (det.model_path, det.INPUT))
     if not det.available():
         sys.exit("plate model did not load (%r)" % settings.get("plate_model"))
     narrow = settings.get("plate_coverage") == "narrow"
