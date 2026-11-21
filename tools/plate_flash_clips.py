@@ -11,6 +11,9 @@ this report. Run it inside the container (openscrub + ffmpeg are there):
   --dry-run      analyse only, cut nothing
   --crops N      instead of clips: save N plate crops per lettering-mode
                  fallback reason (from the scanned video) for diagnosis
+  --tile-check F,F,...  instead of clips: re-run the plate model on these
+                 frames and show full-frame vs per-tile boxes vs what the
+                 scan keeps (4K tiling diagnosis)
   --top N        number of clips (default 5)
   --category C   default plate
 """
@@ -236,6 +239,107 @@ def export_crops(engine, report, per_reason, out_dir, video=None, margin=1.0):
     print("wrote %d crop(s) to %s" % (len(meta), out_dir))
 
 
+def tile_check(engine, report, frames, out_dir, video=None):
+    """Re-run the job's plate detector on `frames` the way run_scan does and
+    report full-frame boxes, per-tile boxes and the merged result, so a box
+    cut off at a tile seam can be traced to the pass that produced it."""
+    import cv2
+    with open(report, encoding="utf-8") as f:
+        doc = json.load(f)
+    fps = float((doc.get("render_state") or {}).get("fps") or 30.0)
+    prov = doc.get("provenance") or {}
+    settings = prov.get("settings") or {}
+    video = video or prov.get("input")
+    if not video or not os.path.exists(video):
+        sys.exit("scanned video not found (%r); pass --scan-video" % video)
+    det = engine.PlateDetector(None, model_path=settings.get("plate_model"),
+                               thresh=settings.get("plate_threshold") or 0.35)
+    if not det.available():
+        sys.exit("plate model did not load (%r)" % settings.get("plate_model"))
+    narrow = settings.get("plate_coverage") == "narrow"
+    scale = 1.0 if narrow else float(settings.get("detect_scale") or 1.0)
+    find = lambda f: det.find(f, scale)
+    tile_mode = settings.get("tile") or "auto"
+    stored = collections.defaultdict(list)
+    for r in doc.get("detections", []):
+        ev = r.get("policy_evidence") or {}
+        if r.get("category") == "plate" and ev.get("origin") == "detection":
+            if type(ev.get("frame")) is int:
+                stored[ev["frame"]].append(r)
+    cap = cv2.VideoCapture(video)
+    out = []
+    for idx in frames:
+        frame = engine._grab_frame(cap, idx / fps, fps)
+        if frame is None:
+            print("frame %d unreadable" % idx)
+            continue
+        h, w = frame.shape[:2]
+        ratio = max(w, h) / max(1, det.INPUT)
+        n = 3 if ratio >= 5.2 else 2
+        th, tw = h // n, w // n
+        oy, ox = int(th * 0.15), int(tw * 0.15)
+        full = [tuple(map(float, r[:5])) for r in find(frame)]
+        tiles = []
+        for gy in range(n):
+            for gx in range(n):
+                x1, y1 = max(0, gx * tw - ox), max(0, gy * th - oy)
+                x2, y2 = min(w, (gx + 1) * tw + ox), min(h, (gy + 1) * th + oy)
+                for r in find(frame[y1:y2, x1:x2]):
+                    b = (r[0] + x1, r[1] + y1, r[2] + x1, r[3] + y1)
+                    cut = ((b[0] - x1 < 2 and x1 > 0) or (x2 - b[2] < 2 and x2 < w)
+                           or (b[1] - y1 < 2 and y1 > 0) or (y2 - b[3] < 2 and y2 < h))
+                    tiles.append({"tile": [gx, gy], "box": [round(v, 1) for v in b],
+                                  "score": round(float(r[4]), 3), "cut_at_seam": cut})
+        kept = [tuple(map(float, r[:5])) for r in
+                engine._maybe_tiled(find, frame, det.INPUT, tile_mode)]
+        rec = {"frame": idx, "size": [w, h], "grid": n, "tile_mode": tile_mode,
+               "full_frame": [{"box": [round(v, 1) for v in r[:4]], "score": round(r[4], 3)}
+                              for r in full],
+               "tiles": tiles,
+               "kept": [{"box": [round(v, 1) for v in r[:4]], "score": round(r[4], 3)}
+                        for r in kept],
+               "report_rows": [{"box": [r["cbox"][0] + r.get("aoff", (0, 0))[0],
+                                        r["cbox"][1] + r.get("aoff", (0, 0))[1],
+                                        r["cbox"][2] + r.get("aoff", (0, 0))[0],
+                                        r["cbox"][3] + r.get("aoff", (0, 0))[1]],
+                                "score": r.get("confidence"), "track": r.get("track")}
+                               for r in stored.get(idx, [])]}
+        out.append(rec)
+        print("frame %d (%dx%d, %dx%d tiles)" % (idx, w, h, n, n))
+        for label, rows in (("full", rec["full_frame"]), ("kept", rec["kept"]),
+                            ("report", rec["report_rows"])):
+            for r in rows:
+                print("  %-7s %s  %s" % (label, r["box"], r["score"]))
+        for t in tiles:
+            print("  tile%s %s  %s%s" % (tuple(t["tile"]), t["box"], t["score"],
+                                         "  CUT AT SEAM" if t["cut_at_seam"] else ""))
+        view = frame.copy()
+        for gy in range(1, n):
+            for yy in (gy * th - oy, gy * th + oy):
+                cv2.line(view, (0, yy), (w, yy), (128, 128, 128), 2)
+        for gx in range(1, n):
+            for xx in (gx * tw - ox, gx * tw + ox):
+                cv2.line(view, (xx, 0), (xx, h), (128, 128, 128), 2)
+        for t in tiles:
+            b = [int(v) for v in t["box"]]
+            cv2.rectangle(view, (b[0], b[1]), (b[2], b[3]),
+                          (0, 0, 255) if t["cut_at_seam"] else (0, 255, 255), 3)
+        for r in rec["full_frame"]:
+            b = [int(v) for v in r["box"]]
+            cv2.rectangle(view, (b[0], b[1]), (b[2], b[3]), (0, 255, 0), 6)
+        for r in rec["kept"]:
+            b = [int(v) for v in r["box"]]
+            cv2.rectangle(view, (b[0] - 8, b[1] - 8), (b[2] + 8, b[3] + 8), (255, 0, 255), 3)
+        s = 1600.0 / max(w, h)
+        cv2.imwrite(os.path.join(out_dir, "tiles_f%07d.jpg" % idx),
+                    cv2.resize(view, None, fx=s, fy=s, interpolation=cv2.INTER_AREA))
+    cap.release()
+    with open(os.path.join(out_dir, "tile_check.json"), "w", encoding="utf-8") as f:
+        json.dump({"report": os.path.abspath(report), "video": video, "frames": out}, f, indent=1)
+    print("wrote tile_check.json + tiles_f*.jpg to %s "
+          "(green=full frame, yellow=tile, red=tile box cut at a seam, magenta=kept)" % out_dir)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -259,9 +363,17 @@ def main():
     ap.add_argument("--crops", type=int, default=0, metavar="N",
                     help="save N plate crops per lettering-mode outcome instead of clips")
     ap.add_argument("--scan-video", help="video the scan read (default: report provenance input)")
+    ap.add_argument("--tile-check", metavar="F,F,...",
+                    help="re-run the plate model on these frame indexes and compare "
+                         "full-frame vs tile detections")
     a = ap.parse_args()
 
     engine = load_engine(a.engine_path)
+    if a.tile_check:
+        os.makedirs(a.out_dir, exist_ok=True)
+        tile_check(engine, a.report, [int(v) for v in a.tile_check.split(",") if v.strip()],
+                   a.out_dir, a.scan_video)
+        return
     if a.crops:
         os.makedirs(a.out_dir, exist_ok=True)
         export_crops(engine, a.report, a.crops, a.out_dir, a.scan_video)
