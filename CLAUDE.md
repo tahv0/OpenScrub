@@ -946,6 +946,16 @@ defined — there was a real UnboundLocalError from ordering once.
   in v1.0.93 (a no-op: faces are always per-frame when selected);
   build_args still honours `dense_faces` in old saved job options and
   the CLI keeps `--dense-faces`.
+- REVIEW CARD STATE: plate-policy cards carry a one-word label (`#dl<id>`,
+  `setDetLabel`) above the detail sentence (`#ds<id>`): "Needs review" for
+  any uncertain/unknown/not-fully-covered card without an explicit choice
+  (fail closed), "Kept visible", "Blurred", "Blurred — has gaps", "Mixed
+  choices", "Blurred automatically"; the card border takes the same colour.
+  A card decided since the last filter change is HELD in the list
+  (`REVIEW_FILTER.held`) even if the Output filter no longer matches it —
+  dropping it re-flowed every row below and the virtual layout re-estimated
+  their heights (the "rows flash on Keep visible" bug). The scheduler also
+  remembers measured card heights per section width (`cardHeights`).
 - HDR render cleanup (PR #23 by Tuomas Aho, v1.0.97): on cancel or an
   encoder failure `_render_hdr_into` uses `_stop_render_children` to stop
   and reap the children and close BOTH pipes (decoder stdout and encoder

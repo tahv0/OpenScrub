@@ -89,8 +89,11 @@ def test_blur_choice_is_visible_on_later_mixed_plate_cards_without_overstating_c
       if(!elements.get('ds'+i).textContent.includes('1 of 2 samples will be blurred'))throw Error('unsupported sample hidden');
       if(!elements.get('ds'+i).textContent.includes('cannot be blurred without mask geometry'))throw Error('gap warning hidden');
     }
-    click('kb4');eq(REVIEW_SCHED.matching.has(4),false);
+    // A just-decided card stays in place until the filter changes, so the
+    // grid never re-flows under the pointer; a filter change then drops it.
+    click('kb4');eq(REVIEW_SCHED.matching.has(4),true);
     eq([EN[4],EN[5]],[false,false]);
+    setReviewFilter(null,'blur');eq(REVIEW_SCHED.matching.has(4),false);
     """)
 
 

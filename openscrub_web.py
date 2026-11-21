@@ -5951,6 +5951,15 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .detchoices{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px}
 .detstate{margin-top:6px;font-weight:600;min-height:2.5em}
+.detlabel{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;
+ font-size:12px;font-weight:700;background:#334155;color:#e2e8f0}
+.detlabel[data-state="review"]{background:#f59e0b;color:#1f2937}
+.detlabel[data-state="blur"]{background:#dc2626;color:#fff}
+.detlabel[data-state="keep"]{background:#15803d;color:#fff}
+.detlabel:not([hidden])+.detstate{margin-top:3px;font-weight:400;font-size:11px;color:#94a3b8}
+.det[data-state="review"]{border-color:#f59e0b}
+.det[data-state="blur"]{border-color:#dc2626}
+.det[data-state="keep"]{border-color:#15803d}
 .detscope{margin-top:4px;font-size:11px;color:#94a3b8}
 #appzone .blurbtn{width:100%;padding:8px 3px;font-weight:700;
  font-size:13px;border-radius:8px;letter-spacing:.3px;
@@ -8173,10 +8182,12 @@ const THUMB_FLIGHTS=new Set(); // unsettled fetch + body operations, across view
 // Compressed, verified preview blobs only. Offscreen DOM and decoded images
 // still retire; the cache is scoped to this Review view, never localStorage.
 const REVIEW_THUMB_CACHE_MAX_BYTES=64*1024*1024,REVIEW_THUMB_CACHE_MAX_ITEMS=4096;
-let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
+// held: cards decided since the last filter change stay in place, so a
+// Keep/Blur click never makes the card vanish and re-flow every row below it.
+let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all",held:new Set()};
 function resetReviewView(){
  REVIEW_SCHED?.selectionCleanup?.();clearSel();TRKMEM={};ROWCARD={};REVIEW_META=null;
- REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all"};
+ REVIEW_FILTER={jobId:CUR,viewGen:VIEW_GEN,type:null,output:"all",held:new Set()};
 }
 function reviewGroupKey(row){
  return row.zone_dropped?null:row.person>=0?'p'+row.person:row.track>=0?'t'+row.track:null;
@@ -8390,7 +8401,7 @@ class ReviewScheduler{
   this.listeners.push(()=>target.removeEventListener(event,fn,options));}
  start(){
   this.sections=this.meta.sections.map((data,n)=>({data,el:this.root.querySelector(`[data-review-section="${n}"]`),
-   ids:[],columns:0,width:0,heights:[],prefix:[0],rows:new Map(),spacers:[]}));
+   ids:[],columns:0,width:0,heights:[],prefix:[0],rows:new Map(),spacers:[],cardHeights:new Map()}));
   this.observer=new ResizeObserver(()=>this.schedule());
   this.observer.observe(this.root);
   this.listen(window,'scroll',()=>this.schedule(),{passive:true});
@@ -8446,11 +8457,16 @@ class ReviewScheduler{
    const columns=tracks&&tracks!=='none'?tracks.split(' ').length:1;
    if(section.width!==width||section.columns!==columns||ids.length!==section.ids.length||ids.some((id,n)=>id!==section.ids[n])){
     if(section.width&&section.width!==width&&this.lastAnchor)anchor=this.lastAnchor;
+    // Card heights depend on the column width only; a filter change reuses them
+    // so rows below the first do not jump to the estimate and back (flash).
+    if(section.width!==width||section.columns!==columns)section.cardHeights=new Map();
     section.width=width;section.columns=columns;section.ids=ids;
-    section.heights=Array(Math.ceil(ids.length/columns)).fill(260);changed=true;
+    section.heights=Array.from({length:Math.ceil(ids.length/columns)},(_,n)=>
+     Math.max(0,...ids.slice(n*columns,(n+1)*columns).map(id=>section.cardHeights.get(id)||0))||260);changed=true;
    }else for(const [n,row] of section.rows){
     if(row.dataset.pin==='1')continue;
     const h=row.getBoundingClientRect().height/section.scale;
+    if(h){for(const id of section.ids.slice(n*section.columns,(n+1)*section.columns))section.cardHeights.set(id,h);}
     if(h&&Math.abs(section.heights[n]-h)>.5){section.heights[n]=h;changed=true;}
    }
    this.prefix(section);
@@ -8822,6 +8838,7 @@ function reviewMatches(card,type,output){
 function setReviewFilter(type,output){
  if(!ownsView(REVIEW_FILTER.jobId,REVIEW_FILTER.viewGen))return;
  REVIEW_SCHED?.selectionCleanup?.();clearSel();REVIEW_FILTER.type=type;REVIEW_FILTER.output=output;
+ REVIEW_FILTER.held.clear();
  refreshReviewFilters();
 }
 function reviewSelectable(i){
@@ -8849,7 +8866,7 @@ function refreshReviewFilters(){
  const types=[...new Set([...[...REVIEW_META.byId.values()].filter(c=>!c.zone),...[...REVIEW_META.byId.values()].filter(c=>c.zone)].map(c=>c.realCategory))];
  if(REVIEW_FILTER.type!==null&&!types.includes(REVIEW_FILTER.type))REVIEW_FILTER.type=null;
  const {type,output}=REVIEW_FILTER,typeCounts=new Map(types.map(t=>[t,0])),outputCounts={all:0,blur:0,visible:0};
- let count=0,ordinary=0,zones=0,otherTypeCount=0;
+ let count=0,ordinary=0,zones=0,otherTypeCount=0,held=0;
  const sectionCounts=new Map(REVIEW_META.sections.map(s=>[s.index,0]));
  const matching=[];
  const active=document.activeElement,focusedCard=active?.closest?.(".det");
@@ -8863,8 +8880,10 @@ function refreshReviewFilters(){
   if(outputMatch){typeCounts.set(c.realCategory,typeCounts.get(c.realCategory)+1);otherTypeCount++;}
   if(typeMatch){outputCounts.all++;if(blurred)outputCounts.blur++;if(kept)outputCounts.visible++;}
   if(match){matching.push(c.id);count++;if(c.zone)zones++;else ordinary++;sectionCounts.set(s.index,sectionCounts.get(s.index)+1);}
+  const shown=match||typeMatch&&REVIEW_FILTER.held.has(c.id);
+  if(!match&&shown){matching.push(c.id);held++;sectionCounts.set(s.index,sectionCounts.get(s.index)+1);}
   const node=document.getElementById("det"+c.id);
-  if(node&&!match&&focusedCard===node)lostFocus=true;
+  if(node&&!shown&&focusedCard===node)lostFocus=true;
  }
  typeControl.innerHTML=`<option value="">All detected types (${otherTypeCount})</option>`+types.map(t=>`<option value="${detLabel(t)}">${detLabel(reviewCategoryName(t))} (${typeCounts.get(t)})</option>`).join("");
  typeControl.value=type??"";
@@ -8877,8 +8896,9 @@ function refreshReviewFilters(){
   const badge=document.getElementById(s.zone?"reviewZoneCount":"reviewCount"+s.index);
   if(badge)badge.textContent=s.zone?`${n} of ${s.cards.length}`:String(n);
  }
- document.getElementById("reviewFilterStatus").textContent=`${count} of ${[...REVIEW_META.byId.values()].length} cards match`;
- const empty=document.getElementById("reviewFilterEmpty");empty.hidden=count>0;
+ document.getElementById("reviewFilterStatus").textContent=`${count} of ${[...REVIEW_META.byId.values()].length} cards match`+
+  (held?` · ${held} just reviewed shown until filters change`:"");
+ const empty=document.getElementById("reviewFilterEmpty");empty.hidden=count+held>0;
  empty.textContent=[...REVIEW_META.byId.values()].length?"No cards match these filters.":"No detections in this job.";
  document.getElementById("reviewFilterHint").textContent=count>0&&!ordinary&&zones&&!zoneDetails?.open?
   `${zones} matching card${zones===1?" is":"s are"} outside your zones; open that section to inspect them.`:"";
@@ -8891,7 +8911,7 @@ function detLabel(s){return String(s).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"
 function detChoices(i,category,samples=false){
  const count=(TRKMEM[i]||[i]).length;
  const unit=samples?'sample':'appearance';
- return `<div class="detstate" id="ds${i}"></div>
+ return `<div class="detlabel" id="dl${i}" role="status" hidden></div><div class="detstate" id="ds${i}"></div>
  <div class="detchoices" id="dc${i}" role="group"
   aria-label="${detLabel(category)} output, ${unit} ${i+1}, ${count} ${unit}${count===1?"":"s"}"
   aria-describedby="ds${i}">
@@ -8899,6 +8919,11 @@ function detChoices(i,category,samples=false){
    onclick="applyDet(${i},true)">Blur</button>
   <button class="blurbtn keep" id="kb${i}" aria-pressed="false"
    onclick="applyDet(${i},false)">Keep visible</button></div>`;
+}
+function setDetLabel(i,card,state,text){
+ const label=document.getElementById("dl"+i);
+ if(label){label.hidden=false;label.dataset.state=state;label.textContent=text;}
+ if(card)card.dataset.state=state;
 }
 function refreshDet(i){
  const members=TRKMEM[i]||[i],meta=REVIEW_META?.byId.get(i);
@@ -8921,6 +8946,16 @@ function refreshDet(i){
   if(gaps)text+=` · ${gaps} unsupported sample${gaps===1?'':'s'} cannot be blurred without mask geometry`;
   if(automatic)text+=` · ${automatic} automatic mask${automatic===1?'':'s'}`;
   if(state)state.textContent=text;
+  // One glanceable word per card; the sentence above stays as the detail line.
+  const allKeep=choices.every(x=>x==='keep'),allBlur=choices.every(x=>x==='blur');
+  // Fail closed: anything not fully covered and not explicitly kept asks for review.
+  const [decision,label]=unknown?['review','Needs review']:
+   allKeep?['keep','Kept visible']:
+   allBlur?(gaps?['review','Blurred — has gaps']:['blur','Blurred']):
+   uncertain?['review','Needs review']:
+   choices.some(x=>x)?['mixed','Mixed choices']:
+   blurred===members.length?['blur','Blurred automatically']:['review','Needs review'];
+  setDetLabel(i,card,decision,label);
   const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
   // The button records an explicit choice, not the availability of mask geometry.
   // Output counts above and reviewOn() still exclude unsupported samples.
@@ -8934,7 +8969,8 @@ function refreshDet(i){
  const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
  if(blur)blur.setAttribute("aria-pressed",String(kept===0));
  if(keep)keep.setAttribute("aria-pressed",String(blurred===0));
- if(card)card.classList.toggle("off",blurred===0);
+ if(card){card.classList.toggle("off",blurred===0);
+  card.dataset.state=kept===0?'blur':blurred===0?'keep':'mixed';}
 }
 let DET_BATCH=0,DET_DIRTY=new Set();
 function finishDetChoices(){
@@ -8944,6 +8980,7 @@ function finishDetChoices(){
  refreshReviewFilters();
 }
 function applyDet(i,blur){
+ if(!DET_BATCH)REVIEW_FILTER.held.add(i);  // single-card clicks only; bulk actions re-filter
  for(const m of (TRKMEM[i]||[i])){
   EN[m]=blur;EDITS.enabled[m]=blur;DET_DIRTY.add(ROWCARD[m]??m);
  }
