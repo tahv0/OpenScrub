@@ -8170,6 +8170,9 @@ function cmpShow(){
 // Complete metadata stays authoritative even when its cards are unmounted.
 let TRKMEM={},ROWCARD={},REVIEW_META=null,REVIEW_SCHED=null;
 const THUMB_FLIGHTS=new Set(); // unsettled fetch + body operations, across views
+// Compressed, verified preview blobs only. Offscreen DOM and decoded images
+// still retire; the cache is scoped to this Review view, never localStorage.
+const REVIEW_THUMB_CACHE_MAX_BYTES=64*1024*1024,REVIEW_THUMB_CACHE_MAX_ITEMS=4096;
 let REVIEW_FILTER={jobId:null,viewGen:0,type:null,output:"all"};
 function resetReviewView(){
  REVIEW_SCHED?.selectionCleanup?.();clearSel();TRKMEM={};ROWCARD={};REVIEW_META=null;
@@ -8370,6 +8373,7 @@ class ReviewScheduler{
  constructor(jobId,viewGen,root,meta){
   Object.assign(this,{jobId,viewGen,root,meta});
   if(!meta.lightboxFailures)meta.lightboxFailures=new Set();
+   this.thumbCache=meta.thumbCache||(meta.thumbCache={entries:new Map(),bytes:0});
   this.token={};this.disposed=false;this.frame=0;this.bindings=new Map();
   this.retries=new Map();this.eligible=new Map();this.queue=[];this.listeners=[];
   this.matching=new Set(meta.byId.keys());this.sections=[];this.normalIds=[];
@@ -8552,6 +8556,48 @@ class ReviewScheduler{
  }
  retryState(id){if(!this.retries.has(id))this.retries.set(id,{failures:0,pending:0,readyAt:0,timer:0});return this.retries.get(id);}
  retryFor(b){return b.retry||this.retryState(b.id);}
+ rememberThumb(b,blob){
+  if(b.overlay||!Number.isSafeInteger(blob?.size)||blob.size<=0||
+     blob.size>REVIEW_THUMB_CACHE_MAX_BYTES)return;
+  const cache=this.thumbCache,old=cache.entries.get(b.id);
+  if(old){cache.bytes-=old.size;cache.entries.delete(b.id);}
+  cache.entries.set(b.id,{blob,size:blob.size});cache.bytes+=blob.size;
+  while(cache.bytes>REVIEW_THUMB_CACHE_MAX_BYTES||cache.entries.size>REVIEW_THUMB_CACHE_MAX_ITEMS){
+   const id=cache.entries.keys().next().value,entry=cache.entries.get(id);
+   cache.entries.delete(id);cache.bytes-=entry.size;
+  }
+ }
+ forgetThumb(id){
+  const cache=this.thumbCache,entry=cache.entries.get(id);
+  if(entry){cache.entries.delete(id);cache.bytes-=entry.size;}
+ }
+ clearThumbCache(){this.thumbCache.entries.clear();this.thumbCache.bytes=0;}
+ displayThumb(b,blob,current){
+  const urlValue=URL.createObjectURL(blob);
+  if(!current()){URL.revokeObjectURL(urlValue);return false;}
+  b.url=urlValue;
+  b.img.onload=()=>{if(current()&&b.url===urlValue){
+   const r=this.retryFor(b);this.clearRetryTimer(r);
+   r.failures=0;r.pending=0;r.readyAt=0;
+   this.rememberThumb(b,blob);this.previewStatus(b,false);
+  }};
+  b.img.onerror=()=>{if(current()&&b.url===urlValue){
+   if(!b.overlay)this.forgetThumb(b.id);
+   this.fail(b);
+  }};
+  b.img.src=urlValue;
+  return true;
+ }
+ reuseThumb(b){
+  if(b.overlay||this.meta.thumbnails?.incompatible.has(b.id))return false;
+  const cache=this.thumbCache,entry=cache.entries.get(b.id);
+  if(!entry)return false;
+  // Refresh LRU order, but do not start a fetch or consume a network slot.
+  cache.entries.delete(b.id);cache.entries.set(b.id,entry);
+  const version=this.meta.thumbnails?.version;
+  const current=()=>this.valid(b)&&this.meta.thumbnails?.version===version;
+  return this.displayThumb(b,entry.blob,current);
+ }
  clearURL(b){
   b.img.onload=null;b.img.onerror=null;b.img.removeAttribute('src');
   if(b.url){URL.revokeObjectURL(b.url);b.url=null;}
@@ -8649,6 +8695,8 @@ class ReviewScheduler{
     if(!sameGroup||card.members.some(id=>state.rows.get(id)!==next.rows.get(id)))state.incompatible.add(card.id);
    }
    state.version=next.version;
+   // Cached blobs belong to the old generation even if row IDs still match.
+   this.clearThumbCache();
    // Compatible descriptors may remount later. Only the current scheduler
    // can cancel old reads, revoke URLs, or publish to connected bindings.
    for(const r of this.retries.values())this.clearRetryTimer(r);
@@ -8685,6 +8733,7 @@ class ReviewScheduler{
    this.previewStatus(b,true);return;
   }
   if(!priority||b.url||b.op||this.thumbnailRefresh)return;
+  if(this.reuseThumb(b))return;
   if(r.readyAt>Date.now()){
    if(!r.timer){const token=b.token;
     r.timer=setTimeout(()=>{r.timer=0;if(this.valid(b)&&b.token===token)this.updateQueue();},r.readyAt-Date.now());}
@@ -8720,18 +8769,7 @@ class ReviewScheduler{
    const blob=await response.blob();
    if(!response.ok)throw Error('Thumbnail HTTP '+response.status);
    if(!current())return;
-   const urlValue=URL.createObjectURL(blob);
-   if(!current()){URL.revokeObjectURL(urlValue);return;}
-   b.url=urlValue;
-   b.img.onload=()=>{if(current()&&b.url===urlValue){
-    // A completed image load ends its retry episode. Returning to an
-    // unmounted card should not continue adding unique r= query values.
-    const r=this.retryFor(b);this.clearRetryTimer(r);
-    r.failures=0;r.pending=0;r.readyAt=0;
-    this.previewStatus(b,false);
-   }};
-   b.img.onerror=()=>{if(current()&&b.url===urlValue)this.fail(b);};
-   b.img.src=urlValue;
+   this.displayThumb(b,blob,current);
   }catch(error){if(current())this.fail(b);}
   finally{
    if(b.op===op)b.op=null;THUMB_FLIGHTS.delete(op);
@@ -8740,7 +8778,7 @@ class ReviewScheduler{
   }
  }
  dispose({suspend=false}={}){
-  if(this.disposed){if(!suspend){this.retries.clear();this.suspended=false;}return;}
+  if(this.disposed){if(!suspend){this.retries.clear();this.clearThumbCache();this.suspended=false;}return;}
   this.disposed=true;this.suspended=suspend;
   this.thumbnailRefresh?.abort();this.closeLightbox();
   if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
@@ -8753,6 +8791,7 @@ class ReviewScheduler{
    for(const spacer of section.spacers)spacer.remove();section.spacers=[];
   }
   for(const r of this.retries.values())if(r.timer)clearTimeout(r.timer);
+  if(!suspend)this.clearThumbCache();
   // A hidden page keeps only numeric retry history for this exact view.
   // Timers/bindings/controllers belong to the retired scheduler, never resume.
   this.retries=suspend?new Map([...this.retries].map(([id,r])=>
