@@ -319,6 +319,21 @@ def test_pagehide_pageshow_releases_all_owned_rows_and_spacers():
     """)
 
 
+def test_back_forward_cache_restores_thumbnail_blobs_without_network():
+    run(NETWORK + STRUCTURE + """gridTop=100;const s=structure(1),b=s.bindings.get(1);
+    await headers(tasks[0]);await body(tasks[0],{size:2048});
+    b.img.onload();eq(s.thumbCache.bytes,2048);
+    windowEvents.get('pagehide')();
+    eq(s.thumbCache.bytes,2048);
+    windowEvents.get('pageshow')();
+    const restored=REVIEW_SCHED;
+    eq(restored.thumbCache,s.thumbCache);
+    eq(tasks.length,1);
+    restored.bindings.get(1).img.onload();
+    disposeReview();eq(s.thumbCache.entries.size,0);eq(s.thumbCache.bytes,0);
+    """)
+
+
 def test_pagehide_pageshow_preserves_exhausted_view_budget_without_old_bindings():
     run(NETWORK + STRUCTURE + """gridTop=100;const s=structure(1);
     for(const delay of [600,1200,1800]){tasks.at(-1).reject(Error('network'));await tick();advance(delay);await tick();}
