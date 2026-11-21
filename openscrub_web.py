@@ -8824,7 +8824,7 @@ function refreshReviewFilters(){
  document.getElementById("reviewFilterHint").textContent=count>0&&!ordinary&&zones&&!zoneDetails?.open?
   `${zones} matching card${zones===1?" is":"s are"} outside your zones; open that section to inspect them.`:"";
  pruneReviewSelection();
- if(lostFocus)outputControl.focus();
+ if(lostFocus)outputControl.focus({preventScroll:true});
  refreshReviewVisibleSet({jobId:REVIEW_META.jobId,viewGen:REVIEW_META.viewGen,matchingCardIds:matching});
 }
 
@@ -8859,11 +8859,13 @@ function refreshDet(i){
   let text=unknown?'Plate policy unavailable; inspect before rendering':
    `${blurred} of ${members.length} samples will be blurred`;
   if(uncertain)text+=` · ${uncertain} uncertain observation${uncertain===1?' remains':'s remain'} unmasked`;
-  if(gaps)text+=` · ${gaps} unsupported sample${gaps===1?'':'s'}`;
+  if(gaps)text+=` · ${gaps} unsupported sample${gaps===1?'':'s'} cannot be blurred without mask geometry`;
   if(automatic)text+=` · ${automatic} automatic mask${automatic===1?'':'s'}`;
   if(state)state.textContent=text;
   const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
-  if(blur)blur.setAttribute("aria-pressed",String(!gaps&&choices.every(x=>x==='blur')));
+  // The button records an explicit choice, not the availability of mask geometry.
+  // Output counts above and reviewOn() still exclude unsupported samples.
+  if(blur)blur.setAttribute("aria-pressed",String(choices.every(x=>x==='blur')));
   if(keep)keep.setAttribute("aria-pressed",String(choices.every(x=>x==='keep')));
   if(card)card.classList.toggle("off",blurred===0&&!uncertain&&!unknown);
   return;

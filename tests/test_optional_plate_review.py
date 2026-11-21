@@ -66,8 +66,31 @@ def test_review_card_keeps_automatic_suggestions_distinct_from_explicit_choices(
     eq(elements.get('kb1').getAttribute('aria-pressed'),'true');
     if(text().includes('uncertain observation'))throw Error('explicit Keep still called unhandled');
     click('bb1');eq(EDITS.enabled,{0:true,1:true,2:true});
-    eq(elements.get('bb1').getAttribute('aria-pressed'),'false');
+    eq(elements.get('bb1').getAttribute('aria-pressed'),'true');
+    if(!text().includes('unsupported sample cannot be blurred without mask geometry'))throw Error('missing honest gap warning: '+text());
     if(!text().includes('2 of 3 samples will be blurred'))throw Error('unsupported position counted as output: '+text());
+    """)
+
+
+def test_blur_choice_is_visible_on_later_mixed_plate_cards_without_overstating_coverage():
+    run("""const mixed=Array.from({length:8},(_,i)=>{
+      const valid=i%2===0;
+      return {...row(i,valid,'plate',-1,40+Math.floor(i/2),valid?.9:.1),
+        policy_status:valid?'automatic':'gap',policy_geometry_supported:valid};
+    });
+    await review(mixed);setReviewFilter(null,'blur');
+    eq([...REVIEW_SCHED.matching].sort((a,b)=>a-b),[0,2,4,6]);
+    for(const i of [0,2,4,6]){
+      click('bb'+i);
+      eq(elements.get('bb'+i).getAttribute('aria-pressed'),'true');
+      eq(REVIEW_META.byId.get(i).members,[i,i+1]);
+      const c=REVIEW_META.byId.get(i);
+      eq(reviewOn(c,i),true);eq(reviewOn(c,i+1),false);
+      if(!elements.get('ds'+i).textContent.includes('1 of 2 samples will be blurred'))throw Error('unsupported sample hidden');
+      if(!elements.get('ds'+i).textContent.includes('cannot be blurred without mask geometry'))throw Error('gap warning hidden');
+    }
+    click('kb4');eq(REVIEW_SCHED.matching.has(4),false);
+    eq([EN[4],EN[5]],[false,false]);
     """)
 
 
@@ -110,10 +133,12 @@ def test_unsupported_blur_intent_never_counts_as_rendered_output():
     run("""const optional=[{...row(0,false,'plate',-1,-1,.4),
       policy_status:'gap',policy_geometry_supported:false}];
     await review(optional);click('bb0');
+    eq(elements.get('bb0').getAttribute('aria-pressed'),'true');
     const card=REVIEW_META.byId.get(0);
     eq(reviewMatches(card,null,'blur'),false);
     eq(reviewMatches(card,null,'visible'),true);
     if(!elements.get('ds0').textContent.includes('0 of 1 samples will be blurred'))throw Error('gap counted as output');
+    if(!elements.get('ds0').textContent.includes('cannot be blurred without mask geometry'))throw Error('missing unsupported geometry notice');
     """)
 
 

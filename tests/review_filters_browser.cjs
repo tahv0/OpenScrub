@@ -102,6 +102,21 @@ await page.locator('[data-review-next]').click();await page.waitForFunction(()=>
 await page.evaluate(()=>{window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
 await page.waitForFunction(()=>REVIEW_SCHED.owns());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),32);
 // Category actions affect every unmounted/hidden ordinary member, independently of zones.
+// A removed card must not make the focused Output selector scroll this long
+// filtered list back to its beginning. Repeat on later rows, not only the first.
+for(const id of [148,154]){
+ await placeCard(id);
+ const before=await page.evaluate(()=>scrollY);
+ assert.ok(before>500,'fixture did not reach a deep review card: '+id+' at '+before);
+ await page.locator('#kb'+id).click();
+ await page.waitForFunction(id=>!REVIEW_SCHED.matching.has(id),id);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const after=await page.evaluate(()=>scrollY);
+ assert.equal(await page.evaluate(()=>document.activeElement.id),'reviewOutput');
+ assert.ok(after>300&&Math.abs(after-before)<700,
+  'Keep visible jumped the filtered review list: card '+id+' before '+before+' after '+after);
+}
+results.scenarios.push('multiple deep filtered Keep visible choices preserve scroll position and fallback focus');
 await page.evaluate(()=>setAll('face',false));assert.equal(await page.evaluate(()=>Array.from({length:48},(_,i)=>EN[100+i*2]).every(v=>v===false)),true);assert.equal(await page.evaluate(()=>EN[221]),true);await status('0 of 98 cards match');
 await page.evaluate(()=>setAllZd(false));assert.equal(await page.evaluate(()=>EN[221]),false);
 await filter('plate','all');await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen,matchingCardIds:[]})});await page.waitForFunction(()=>REVIEW_SCHED.bindings.size===0);await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(()=>REVIEW_SCHED.matching.size),49);
