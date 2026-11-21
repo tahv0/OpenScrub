@@ -8550,7 +8550,7 @@ class ReviewScheduler{
    window.scrollTo(0,Math.max(0,top-55));this.layout();
    this.bindings.get(id)?.card.querySelector('button')?.focus({preventScroll:true});break;}
  }
- retryState(id){if(!this.retries.has(id))this.retries.set(id,{failures:0,readyAt:0,timer:0});return this.retries.get(id);}
+ retryState(id){if(!this.retries.has(id))this.retries.set(id,{failures:0,pending:0,readyAt:0,timer:0});return this.retries.get(id);}
  retryFor(b){return b.retry||this.retryState(b.id);}
  clearURL(b){
   b.img.onload=null;b.img.onerror=null;b.img.removeAttribute('src');
@@ -8604,11 +8604,22 @@ class ReviewScheduler{
  fail(b,obsolete=false){
   if(!this.valid(b))return;
   this.clearURL(b);const r=this.retryFor(b);
-  r.failures=obsolete?4:r.failures+1;
+  r.pending=0;r.failures=obsolete?4:r.failures+1;
   if(r.failures>=4){
    this.previewStatus(b,true);
    this.recoverThumbnails();
   }else r.readyAt=Date.now()+600*r.failures;
+  this.updateQueue();
+ }
+ // A scan/fill owner may still be preparing this card. Delay pending work
+ // without exhausting the normal network/decoder failure budget.
+ deferPending(b){
+  if(!this.valid(b))return;
+  this.clearURL(b);const r=this.retryFor(b);
+  r.pending=(r.pending||0)+1;
+  if(r.pending>=6){
+   r.failures=4;this.previewStatus(b,true);
+  }else r.readyAt=Date.now()+Math.min(8000,1000*2**(r.pending-1));
   this.updateQueue();
  }
  async recoverThumbnails(){
@@ -8698,9 +8709,12 @@ class ReviewScheduler{
    if(version)url.searchParams.set('v',version);
    if(this.retryFor(b).failures)url.searchParams.set('r',String(Date.now()));
    const response=await fetch(url.href,{signal:controller.signal});
-   if(version&&response.status===409){
+   if(response.status===409){
     const problem=await response.json().catch(()=>null);
-    if(current())this.fail(b,problem?.error==='thumbnail_obsolete');
+    if(current()){
+     if(problem?.error==='thumbnail_pending')this.deferPending(b);
+     else this.fail(b,!!version&&problem?.error==='thumbnail_obsolete');
+    }
     return;
    }
    const blob=await response.blob();
@@ -8709,7 +8723,13 @@ class ReviewScheduler{
    const urlValue=URL.createObjectURL(blob);
    if(!current()){URL.revokeObjectURL(urlValue);return;}
    b.url=urlValue;
-   b.img.onload=()=>{if(current()&&b.url===urlValue)this.previewStatus(b,false);};
+   b.img.onload=()=>{if(current()&&b.url===urlValue){
+    // A completed image load ends its retry episode. Returning to an
+    // unmounted card should not continue adding unique r= query values.
+    const r=this.retryFor(b);this.clearRetryTimer(r);
+    r.failures=0;r.pending=0;r.readyAt=0;
+    this.previewStatus(b,false);
+   }};
    b.img.onerror=()=>{if(current()&&b.url===urlValue)this.fail(b);};
    b.img.src=urlValue;
   }catch(error){if(current())this.fail(b);}
@@ -8736,7 +8756,7 @@ class ReviewScheduler{
   // A hidden page keeps only numeric retry history for this exact view.
   // Timers/bindings/controllers belong to the retired scheduler, never resume.
   this.retries=suspend?new Map([...this.retries].map(([id,r])=>
-   [id,{failures:r.failures,readyAt:r.readyAt,timer:0}])):new Map();
+   [id,{failures:r.failures,pending:r.pending||0,readyAt:r.readyAt,timer:0}])):new Map();
   this.eligible.clear();this.queue=[];
   clearSel();if(marqEl){marqEl.remove();marqEl=null;}mStart=null;
  }

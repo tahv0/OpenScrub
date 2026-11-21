@@ -101,6 +101,51 @@ def test_switch_job_discards_old_thumbnail_results_and_drains():
     """)
 
 
+def test_succeeded_thumbnail_clears_retry_budget_before_virtual_remount():
+    run(NETWORK + """const s=scheduler(),b=bind(s,1);eligible(s,[1]);
+    tasks[0].reject(Error('temporary network failure'));await tick();
+    eq(s.retries.get(1).failures,1);
+    advance(600);await tick();eq(tasks.length,2);
+    if(!tasks[1].url.includes('r='))throw Error('retry did not bypass failed cached request');
+    await headers(tasks[1]);await body(tasks[1],{good:true});
+    b.img.onload();eq(s.retries.get(1).failures,0);
+    eq(s.retries.get(1).readyAt,0);
+    s.retire(b);bind(s,1);eligible(s,[1]);eq(tasks.length,3);
+    if(tasks[2].url.includes('r='))throw Error('successful preview kept adding retry cache busters');
+    """)
+
+
+def test_pending_generation_retries_slowly_without_spending_error_budget():
+    run(NETWORK + """const s=scheduler(),b=bind(s,0);eligible(s,[0]);
+    for(let i=0;i<3;i++){
+     const t=tasks.at(-1);
+     t.resolve({status:409,ok:false,json:async()=>({error:'thumbnail_pending'})});await tick();
+     eq(s.retries.get(0).failures,0);eq(s.retries.get(0).pending,i+1);
+     const delay=1000*2**i;
+     eq([...timers.values()].map(t=>t.ms),[delay]);
+     advance(delay);await tick();
+    }
+    eq(tasks.length,4);
+    if(tasks.some(t=>t.url.includes('r=')))throw Error('pending state incorrectly spent failure budget');
+    await headers(tasks[3]);await body(tasks[3],{good:true});
+    b.img.onload();
+    eq(s.retries.get(0).pending,0);eq(s.retries.get(0).failures,0);
+    """)
+
+
+def test_perpetually_pending_thumbnail_expires_bounded_budget():
+    run(NETWORK + """const s=scheduler();bind(s,0);eligible(s,[0]);
+    for(let i=0;i<6;i++){
+     tasks.at(-1).resolve({status:409,ok:false,json:async()=>({error:'thumbnail_pending'})});
+     await tick();
+     if(i<5){advance(Math.min(8000,1000*2**i));await tick();}
+    }
+    eq(tasks.length,6);eq(s.retries.get(0).pending,6);
+    eq(s.retries.get(0).failures,4);eq(timers.size,0);
+    eligible(s,[0]);eq(tasks.length,6);
+    """)
+
+
 def test_retry_budget_survives_unmount_and_stale_timers_are_fenced():
     run(NETWORK + """const s=scheduler();bind(s,1);eligible(s,[1]);
     for(const delay of [600,1200,1800]){
