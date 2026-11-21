@@ -96,3 +96,4 @@ def test_idle_parsed_report_expires(exact):
     assert web._REPORT_PARSES  # just used
     web._expire_idle_report_parses(time.monotonic() + web._REPORT_PARSE_IDLE_S)
     assert not web._REPORT_PARSES
+

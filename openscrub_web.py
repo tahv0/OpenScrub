@@ -1899,7 +1899,7 @@ def _run_job(job, action, owner=None):
                             generation = _thumbnail_select(jb, doc, selected, fence, lease, operation_owner=owner, validated=(rows, rs))
                             cap = _open_preview_capture(video)
                             generated = 0
-                            for index in range(len(rows)):
+                            for index in _review_card_rows(rows):
                                 try:
                                     _thumbnail_image(jb, index, 'crop', generation.version, operation_owner=owner,
                                                      capture=cap, snapshot=(doc, selected, fence, rows, rs))
@@ -3401,6 +3401,34 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
         if lease is not None:
             _thumbnail_release_lease(job, lease, primary_pending=True)
         raise
+
+
+def _review_card_rows(rows):
+    """Row index of each Review card's thumbnail, in time order.
+
+    Mirrors reviewDescriptors in APP_JS: rows sharing (category, person or
+    track) form one card shown by its highest-confidence member (earliest on
+    a tie); zone-dropped and ungrouped rows are their own cards. Pre-rendering
+    every dense sample instead wrote one JPEG per row (100k+ on big plate
+    jobs) while the user was already reviewing.
+    """
+    best = {}
+    singles = []
+    for index, row in enumerate(rows):
+        key = None
+        if not row.get('zone_dropped'):
+            if row.get('person', -1) >= 0:
+                key = (row['category'], 'p', row['person'])
+            elif row.get('track', -1) >= 0:
+                key = (row['category'], 't', row['track'])
+        if key is None:
+            singles.append(index)
+            continue
+        rank = (-(row.get('confidence') or 0), row['t_start'], index)
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, index)
+    chosen = singles + [index for _, index in best.values()]
+    return sorted(chosen, key=lambda i: (rows[i]['t_start'], i))
 
 
 def _thumbnail_validate_report(doc):
