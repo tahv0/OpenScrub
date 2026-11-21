@@ -280,7 +280,15 @@ Key classes/functions (locate with grep, line numbers drift):
   frame long side >= 2.6x the YOLO input (4K vs 640), plates/person/
   screen ALSO scan an overlapping 2x2 (3x3 at >=5.2x) tile grid; boxes
   offset back, tail-preserving NMS (polys are box-normalized so they
-  survive). Full-frame pass always runs — tiling only ADDS. Faces skip
+  survive). Full-frame pass always runs — tiling only ADDS. SEAM PIECES:
+  a plain (tail-less) tile box ending on an interior tile edge is CUT —
+  it skips NMS and `_merge_seam_pieces` unions it into the box it mostly
+  overlaps (max score), joining pieces across a seam. A real 4K plate job
+  had 46% of plate boxes ending exactly on a seam: a higher-scoring piece
+  suppressed the full-frame box and the rest became extra partial
+  detections (every one failed the lettering check). Rows with poly/cls
+  tails keep plain NMS (polys are box-normalized); tail-less person/
+  screen rows from box-only models merge the same way. Faces skip
   it (YuNet runs at native res). Person tracking (`_track_person_dense`)
   does NOT tile — per-frame cost.
 - Head blur (`--face-heads`, web Advanced "cover turned heads"):

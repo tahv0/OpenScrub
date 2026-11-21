@@ -1911,10 +1911,13 @@ def _maybe_tiled(find_fn, frame, input_size, mode):
     boxes back, and NMS-merge preserving row tails (poly/cls — polys
     are box-normalized so they survive the offset untouched). The
     full-frame pass always runs first: tiling can only ADD detections,
-    never lose one."""
+    never lose one. Plain boxes cut off at a tile seam never take part
+    in NMS; `_merge_seam_pieces` unions them into the box they belong
+    to (a 4K plate otherwise came back as several partial boxes)."""
     h, w = frame.shape[:2]
     ratio = max(w, h) / max(1, input_size)
     rows = [tuple(r) for r in find_fn(frame)]
+    cut = []
     if mode == "off" or (mode == "auto" and ratio < 2.6) or ratio < 1.2:
         return rows
     n = 3 if ratio >= 5.2 else 2
@@ -1926,14 +1929,87 @@ def _maybe_tiled(find_fn, frame, input_size, mode):
             x2 = min(w, (gx + 1) * tw + ox)
             y2 = min(h, (gy + 1) * th + oy)
             for r in find_fn(frame[y1:y2, x1:x2]):
-                rows.append((r[0] + x1, r[1] + y1,
-                             r[2] + x1, r[3] + y1) + tuple(r[4:]))
+                row = (r[0] + x1, r[1] + y1,
+                       r[2] + x1, r[3] + y1) + tuple(r[4:])
+                if len(row) == 5 and _cut_at_seam(row, (x1, y1, x2, y2), w, h):
+                    cut.append(row)
+                else:
+                    rows.append(row)
     rows.sort(key=lambda r: -float(r[4]))
     keep = []
     for r in rows:
         if all(_iou(r[:4], k[:4]) < 0.55 for k in keep):
             keep.append(r)
-    return keep
+    return _merge_seam_pieces(keep, cut)
+
+
+def _cut_at_seam(row, tile, w, h, tol=2.0):
+    """True when a tile detection touches a tile edge that is not the
+    frame border: the object continues into the neighbouring tile and
+    the box stops where the slice did."""
+    x1, y1, x2, y2 = tile
+    return ((x1 > 0 and row[0] - x1 < tol) or (y1 > 0 and row[1] - y1 < tol)
+            or (x2 < w and x2 - row[2] < tol) or (y2 < h and y2 - row[3] < tol))
+
+
+def _merge_seam_pieces(keep, cut):
+    """Fold tile boxes cut at a seam into the box they belong to.
+
+    A plate larger than the tile overlap comes back from each tile as a
+    partial box ending on the seam, often scoring HIGHER than the full-
+    frame box (the tile sees it larger). Plain NMS let such a piece
+    suppress the full box, and the pieces that survived became extra
+    detections. A real 4K job had 46% of its plate boxes ending exactly
+    on a seam, each one too short for the lettering check and some
+    leaving a sliver of the plate outside every box. Here a piece never
+    suppresses anything: it is unioned into any box it mostly overlaps
+    (score = the max), pieces of one object across a seam join up, and
+    a piece overlapping nothing stays as it is. Union only — coverage
+    can grow, never shrink. Rows with tails (silhouette polys are
+    normalized to their box) are never merged."""
+    out = [list(r) for r in keep]
+    pend = [list(r) for r in sorted(cut, key=lambda r: -float(r[4]))]
+
+    def mostly(a, b):
+        iw = min(a[2], b[2]) - max(a[0], b[0])
+        ih = min(a[3], b[3]) - max(a[1], b[1])
+        if iw <= 0 or ih <= 0:
+            return False
+        small = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+        return iw * ih >= 0.5 * max(small, 1e-9)
+
+    def absorb(k, r):
+        k[0], k[1] = min(k[0], r[0]), min(k[1], r[1])
+        k[2], k[3] = max(k[2], r[2]), max(k[3], r[3])
+        k[4] = max(float(k[4]), float(r[4]))
+
+    seam = set()   # ids of boxes that are, or absorbed, a seam piece
+    for r in pend:
+        hit = next((k for k in out if len(k) == 5 and mostly(k, r)), None)
+        if hit is None:
+            out.append(r)
+            hit = r
+        else:
+            absorb(hit, r)
+        seam.add(id(hit))
+    # a grown box can now overlap another plain box: repeat to a fixpoint.
+    # Only seam-touched boxes join, so ordinary detections NMS kept apart
+    # stay apart.
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(out)):
+            for j in range(len(out) - 1, i, -1):
+                if ((id(out[i]) in seam or id(out[j]) in seam)
+                        and len(out[i]) == 5 and len(out[j]) == 5
+                        and mostly(out[i], out[j])):
+                    absorb(out[i], out.pop(j))
+                    seam.add(id(out[i]))
+                    changed = True
+                    break
+            if changed:
+                break
+    return [tuple(k) for k in out]
 
 
 def _head_box(row):
