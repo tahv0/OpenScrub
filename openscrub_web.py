@@ -8864,8 +8864,8 @@ function refreshDet(i){
   if(state)state.textContent=text;
   const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
   // The button records an explicit choice, not the availability of mask geometry.
-   // Output counts above and reviewOn() still exclude unsupported samples.
-   if(blur)blur.setAttribute("aria-pressed",String(choices.every(x=>x==='blur')));
+  // Output counts above and reviewOn() still exclude unsupported samples.
+  if(blur)blur.setAttribute("aria-pressed",String(choices.every(x=>x==='blur')));
   if(keep)keep.setAttribute("aria-pressed",String(choices.every(x=>x==='keep')));
   if(card)card.classList.toggle("off",blurred===0&&!uncertain&&!unknown);
   return;
