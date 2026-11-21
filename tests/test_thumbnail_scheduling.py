@@ -101,6 +101,46 @@ def test_switch_job_discards_old_thumbnail_results_and_drains():
     """)
 
 
+def test_scrolling_back_restores_successful_thumbnail_without_second_fetch():
+    run(NETWORK + """const s=scheduler(),b=bind(s,1);eligible(s,[1]);
+    await headers(tasks[0]);await body(tasks[0],{size:4096,source:'cached'});
+    b.img.onload();eq(s.thumbCache.bytes,4096);
+    s.retire(b);eq(revoked,['blob:1']);
+    bind(s,1);eligible(s,[1]);
+    eq(tasks.length,1);eq(created.length,2);
+    const returned=s.bindings.get(1);
+    if(!returned.img.src||returned.img.src==='blob:1')throw Error('cached remount did not display a fresh local URL');
+    returned.img.onload();eq(s.thumbCache.bytes,4096);
+    s.retire(returned);bind(s,1);eligible(s,[1]);
+    eq(tasks.length,1);
+    """)
+
+
+def test_thumbnail_blob_cache_lru_is_bounded_and_cleared_on_job_exit():
+    run(NETWORK + """const s=scheduler(),size=24*1024*1024;
+    for(const id of [0,1])s.rememberThumb({id},{size});
+    eq(s.thumbCache.bytes,2*size);
+    const b=bind(s,0);eligible(s,[0]);eq(tasks.length,0);
+    b.img.onload();s.rememberThumb({id:2},{size});
+    eq([...s.thumbCache.entries.keys()],[0,2]);
+    eq(s.thumbCache.bytes,2*size);
+    s.rememberThumb({id:3},{size:70*1024*1024});
+    eq(s.thumbCache.entries.has(3),false);
+    s.dispose();eq(s.thumbCache.bytes,0);eq(s.thumbCache.entries.size,0);
+    eq(revoked,['blob:1']);
+    """)
+
+
+def test_invalid_cached_preview_is_evicted_before_network_retry():
+    run(NETWORK + """const s=scheduler(),b=bind(s,4);
+    s.rememberThumb(b,{size:4096});eligible(s,[4]);eq(tasks.length,0);
+    b.img.onerror();eq(s.thumbCache.entries.has(4),false);
+    eq(s.retries.get(4).failures,1);
+    advance(600);await tick();eq(tasks.length,1);
+    if(!tasks[0].url.includes('r='))throw Error('bad cached image did not recover via network');
+    """)
+
+
 def test_succeeded_thumbnail_clears_retry_budget_before_virtual_remount():
     run(NETWORK + """const s=scheduler(),b=bind(s,1);eligible(s,[1]);
     tasks[0].reject(Error('temporary network failure'));await tick();
@@ -276,6 +316,21 @@ def test_pagehide_pageshow_releases_all_owned_rows_and_spacers():
      eq([old.sections[0].rows.size,old.sections[0].spacers.length,old.bindings.size,old.listeners.length],[0,0,0,0]);
      windowEvents.get('pageshow')();eq(structureCounts(),{rows:1,spacers:2,cards:1});
     }
+    """)
+
+
+def test_back_forward_cache_restores_thumbnail_blobs_without_network():
+    run(NETWORK + STRUCTURE + """gridTop=100;const s=structure(1),b=s.bindings.get(1);
+    await headers(tasks[0]);await body(tasks[0],{size:2048});
+    b.img.onload();eq(s.thumbCache.bytes,2048);
+    windowEvents.get('pagehide')();
+    eq(s.thumbCache.bytes,2048);
+    windowEvents.get('pageshow')();
+    const restored=REVIEW_SCHED;
+    if(restored.thumbCache!==s.thumbCache)throw Error('restored scheduler lost the shared view-local cache');
+    eq(tasks.length,1);
+    restored.bindings.get(1).img.onload();
+    disposeReview();eq(s.thumbCache.entries.size,0);eq(s.thumbCache.bytes,0);
     """)
 
 
