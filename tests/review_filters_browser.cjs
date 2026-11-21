@@ -94,6 +94,18 @@ await page.evaluate(()=>{openJob('B');openJob('A')});await page.locator('#review
 await page.locator('#reviewFilterReset').click();await placeCard(100);
 await page.waitForFunction(()=>REVIEW_SCHED.bindings.size>0);assert.equal(await page.evaluate(()=>REVIEW_META.byId.size),98);assert.ok(await page.evaluate(()=>REVIEW_SCHED.bindings.size<REVIEW_META.byId.size));
 await page.waitForFunction(()=>THUMB_FLIGHTS.size===4);await page.evaluate(()=>window.filteredFlights=[...THUMB_FLIGHTS]);await filter('face','blur');await status('32 of 98 cards match');await page.waitForFunction(()=>filteredFlights.some(op=>op.cancelled));assert.ok(await page.evaluate(()=>THUMB_FLIGHTS.size<=4));holdThumbs=false;heldThumbs.splice(0).forEach(release=>release());await page.waitForFunction(()=>THUMB_FLIGHTS.size===0);await placeCard(102);
+// Once a compressed thumbnail loads, virtualization may discard the card but
+// revisiting it must use the view-local blob instead of another HTTP request.
+await page.waitForFunction(()=>REVIEW_SCHED.thumbCache.entries.has(102));
+const warmRequestCount=requests.filter(r=>r.path.endsWith('/thumb/102')).length;
+assert.ok(warmRequestCount>0,'first thumbnail never fetched');
+await placeCard(194);
+await page.waitForFunction(()=>!document.getElementById('det102'));
+await placeCard(102);
+await page.waitForFunction(()=>document.querySelector('#det102 img')?.naturalWidth>0);
+assert.equal(requests.filter(r=>r.path.endsWith('/thumb/102')).length,warmRequestCount,
+ 'scrolling back requested a previously loaded thumbnail again');
+results.scenarios.push('virtualized Review card scroll-back reuses bounded in-page thumbnail cache without HTTP');
 const focusId=await page.evaluate(()=>{const b=[...REVIEW_SCHED.bindings.values()].find(b=>REVIEW_SCHED.matching.has(b.id));b.card.querySelector('button').focus();window.retainedFilterNode=b.card;return b.id});
 await page.evaluate(()=>refreshReviewFilters());assert.equal(await page.evaluate(id=>document.getElementById('det'+id)===window.retainedFilterNode,focusId),true);
 await page.evaluate(()=>{const s=REVIEW_SCHED;refreshReviewVisibleSet({jobId:s.jobId,viewGen:s.viewGen});refreshReviewVisibleSet();});
