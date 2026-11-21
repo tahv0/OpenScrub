@@ -66,7 +66,9 @@ def test_render_intersects_checkpoint_bounds_with_explicit_plate_choice(tmp_path
 
     assert render("allowed.mp4") == [i == 5 for i in range(12)]
     row["scan_frame_start"], row["scan_frame_end"] = 6, 7
-    assert render("outside-bound.mp4") == [False] * 12
+    # A Blur-decided sample renders over its span, limited to its verified
+    # frame bound; the lettering polygon is not used off its inspected frame.
+    assert render("outside-bound.mp4") == [i == 6 for i in range(12)]
     row["scan_frame_start"], row["scan_frame_end"] = 5, 6
     row["output_choice"] = "keep"
     assert render("keep.mp4") == [False] * 12

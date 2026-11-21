@@ -27,7 +27,7 @@ def optional_report(exact):
     exact.path.write_text(json.dumps(doc))
 
 
-def test_optional_review_metadata_reports_unhandled_observations_and_gaps(exact):
+def test_optional_review_metadata_reports_track_masks_and_keeps(exact):
     optional_report(exact)
     response = request('get', exact.url + '/detections')
     assert response.status_code == 200
@@ -35,8 +35,10 @@ def test_optional_review_metadata_reports_unhandled_observations_and_gaps(exact)
     assert value['plate_policy'] == {'uncertain_policy':'manual_review',
                                      'plate_threshold':.1, 'plate_auto_cutoff':.8}
     rows = value['detections']
-    assert [row['policy_status'] for row in rows] == ['suggestion','automatic','gap','keep']
-    assert [row['policy_geometry_supported'] for row in rows] == [True,True,False,True]
+    # Frames 1-2 support an automatic mask, which covers the whole track
+    # including its interpolated sample; Keep still wins on frame 3.
+    assert [row['policy_status'] for row in rows] == ['automatic','automatic','automatic','keep']
+    assert [row['policy_geometry_supported'] for row in rows] == [True,True,True,True]
     assert all('output_choice' not in row for row in rows[:3])
     assert rows[3]['output_choice'] == 'keep'
 

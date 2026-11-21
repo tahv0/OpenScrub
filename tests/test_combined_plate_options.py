@@ -28,7 +28,8 @@ def samples(path):
 
 
 @pytest.mark.parametrize("policy,enabled", [
-    ("manual_review", [False, False, True, False]),
+    # Frames 1-2 support an automatic mask, which covers the whole track.
+    ("manual_review", [True, True, True, True]),
     ("blur_candidates", [True, True, True, True]),
 ])
 def test_confidence_and_lettering_scan_render_and_reopen(tmp_path, monkeypatch, policy, enabled):
@@ -106,8 +107,10 @@ def test_confidence_and_lettering_scan_render_and_reopen(tmp_path, monkeypatch, 
     assert quad_frames[2][25, 70].mean() < 50
     assert quad_frames[2][30, 45].mean() > 150
 
-    # Explicit choices supersede the policy, while a stale lettering proof
-    # falls back to the full box only on the explicitly enabled source frame.
+    # Explicit choices supersede the policy, and a stale lettering proof falls
+    # back to the full box. A Keep on one sample inside a masked track does not
+    # uncover its frame: the previous sample's span still reaches it (as with
+    # standard plates), and off its inspected frame that sample is a full box.
     direct[0]["output_choice"] = "blur"
     direct[2]["output_choice"] = "keep"
     direct[2].pop("manual_plate_quad")
@@ -119,8 +122,6 @@ def test_confidence_and_lettering_scan_render_and_reopen(tmp_path, monkeypatch, 
     ]), parser)
     core.run_pipeline(reopened, Quiet())
     actual = samples(reopened.output)
-    expected = list(enabled)
-    expected[0], expected[2] = True, False
-    assert [inside < 50 for _, inside in actual] == expected
+    assert [inside < 50 for _, inside in actual] == [True, True, True, True]
     assert actual[0][0] < 50
-    assert actual[2][0] > 150
+    assert actual[2][0] < 50

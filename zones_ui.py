@@ -1135,9 +1135,9 @@ function platePolicyChanged(){
  const policy=$("plate-policy").value,cutoff=$("plate-auto-cutoff");
  $("plate-auto-cutoff-wrap").hidden=!policy;cutoff.disabled=!policy;
  $("plate-policy-help").textContent=policy==="manual_review"
-  ?"Uncertain observations remain visible for manual review. Automatic blur starts after two associated high-score observations. Unsupported frames can remain visible."
+  ?"Uncertain plates remain visible for manual review. A plate track with two associated high-score observations is blurred automatically on every frame of the track. Choosing Blur in review also covers the whole track."
   :policy==="blur_candidates"
-   ?"Blur retained candidates at the plate threshold, including single observations. Extra short masks can appear; unsupported frames can remain visible. The automatic cutoff is saved for Review uncertain."
+   ?"Blur retained candidates at the plate threshold, including single observations, on every frame of their plate track. Extra short masks can appear. The automatic cutoff is saved for Review uncertain."
    :"";
  clearPlatePolicyError();
 }
