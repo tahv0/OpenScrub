@@ -327,7 +327,7 @@ def test_back_forward_cache_restores_thumbnail_blobs_without_network():
     eq(s.thumbCache.bytes,2048);
     windowEvents.get('pageshow')();
     const restored=REVIEW_SCHED;
-    eq(restored.thumbCache,s.thumbCache);
+    if(restored.thumbCache!==s.thumbCache)throw Error('restored scheduler lost the shared view-local cache');
     eq(tasks.length,1);
     restored.bindings.get(1).img.onload();
     disposeReview();eq(s.thumbCache.entries.size,0);eq(s.thumbCache.bytes,0);
