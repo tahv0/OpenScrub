@@ -62,6 +62,20 @@ def test_failed_recovery_spends_budget_and_keeps_old_generation(failure):
     """.replace('FAIL', json.dumps(failure)))
 
 
+def test_generation_recovery_discards_cached_original_thumbnail():
+    run(NETWORK + GENERATION + """const s=scheduler(),rows=[hashed(0)];versioned(s,rows);
+    const b=bind(s,0);eligible(s,[0]);
+    await headers(tasks[0]);await body(tasks[0],{size:4096,kind:'old'});
+    b.img.onload();eq(s.thumbCache.bytes,4096);
+    const recovery=s.recoverThumbnails();
+    tasks[1].resolve({ok:true,json:async()=>({duration:10,detections:rows,thumbnail_version:'b'.repeat(32)})});
+    await tick();await recovery;
+    eq(s.meta.thumbnails.version,'b'.repeat(32));
+    eq(s.thumbCache.bytes,0);eq(s.thumbCache.entries.size,0);
+    if(!tasks[2]?.url.includes('v='+('b'.repeat(32))))throw Error('new generation was not requested');
+    """)
+
+
 def test_replaced_lightbox_cannot_be_mutated_by_old_response():
     run(NETWORK + GENERATION + LIGHTBOX + """
     const s=scheduler(),rows=[hashed(0),hashed(1)];versioned(s,rows);
