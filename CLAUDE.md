@@ -958,6 +958,16 @@ defined — there was a real UnboundLocalError from ordering once.
   samples exist and never adopt the 2.7x look-alike box), not the
   "refused a … size jump" log line — that line is only emitted when the
   track is not `held`, so it is frame-timing dependent (PR #23).
+- REPORT PARSE CACHE (`_parse_report_once`): `_thumbnail_snapshot` parses
+  report.json at most once per `_file_stamp` identity (posix only — Windows
+  ctime is creation time, same rule as validation reuse). ONE report is kept;
+  the shared doc is READ-ONLY for every caller. It is dropped on vault lock
+  (`_evict_thumbnails_for_store_transition`), on job delete, and after 120s
+  idle (the worker watchdog — a 176MB/100k-row report holds ~1.5GB parsed).
+  Without it every cold Review thumbnail re-read and re-parsed the whole
+  report (~2s and ~1.5GB transient each at 100k rows) — suspected cause of a
+  Docker Desktop `D:/`-bind-mount job pinning CPU+disk until the server
+  stopped answering (reproduced as request starvation on synthetic data).
 - Progress ETA is computed SERVER-side per STAGE
   (`WebCallbacks.progress`): whole-stage average rate + a light EMA on
   the published seconds (`eta` in the job JSON; cleared on stage change,

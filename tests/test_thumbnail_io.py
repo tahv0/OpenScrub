@@ -1111,6 +1111,7 @@ def test_stale_report_read_cannot_retire_managed_scan_adoption(scan, monkeypatch
     def read_old():
         try: result.append(request('get', fixture.url + '/detections'))
         except BaseException as exc: errors.append(exc)
+    web._forget_report_parses()  # the held read must parse (its json.load is the hook)
     worker = threading.Thread(name='held-old-report', target=read_old)
     worker.start()
     try:

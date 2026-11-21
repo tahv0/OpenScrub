@@ -2055,6 +2055,7 @@ def _worker_watchdog():
             check_worker()
         except Exception as e:
             print(f"[web] worker watchdog: {e}", flush=True)
+        _expire_idle_report_parses()
 
 
 # ----------------------------------------------------------------------------
@@ -2406,6 +2407,7 @@ def _delete_job(job):
                 break
         with state.report_lock:
             state.operation = None
+        _forget_report_parses()  # the deleted report's parse leaves memory too
         if _reap_job_dir(job["dir"], jid):
             with JOBS_LOCK:
                 JOBS.pop(jid, None)
@@ -3193,6 +3195,68 @@ class _FreshThumbnailSnapshot(tuple):
     """The four values returned by a successful private fresh report parse."""
 
 
+# Parsed report.json, at most one parse per file identity (_file_stamp: inode,
+# size, mtime, ctime — an atomic replace changes it). Every uncached Review
+# thumbnail takes a snapshot; re-reading a 100k-row report per thumbnail over a
+# Docker Desktop bind mount pinned CPU and disk and starved every request.
+# Callers treat the shared doc as READ-ONLY. Cleared when the vault locks.
+_REPORT_PARSES = {}          # realpath -> (stamp, doc)
+_REPORT_PARSE_USED = {}      # realpath -> monotonic last use
+_REPORT_PARSE_IDLE_S = 120   # a 100k-row parse holds ~1.5 GB; the watchdog drops it when Review goes quiet
+_REPORT_PARSE_LOCKS = {}     # realpath -> Lock serializing a cold parse
+_REPORT_PARSE_GUARD = threading.Lock()
+_REPORT_PARSE_EPOCH = [0]
+_REPORT_PARSE_MAX = 1        # a 100k-row parse can be GBs; keep one
+
+
+def _parse_report_once(path, stamp, opened):
+    # Windows ctime is creation time; like validation reuse, only a posix
+    # stamp may stand in for the bytes.
+    if os.name != 'posix':
+        return json.load(opened)
+    key = os.path.realpath(path)
+    with _REPORT_PARSE_GUARD:
+        cached = _REPORT_PARSES.get(key)
+        if cached is not None and cached[0] == stamp:
+            _REPORT_PARSE_USED[key] = time.monotonic()
+            return cached[1]
+        lock = _REPORT_PARSE_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        with _REPORT_PARSE_GUARD:
+            cached = _REPORT_PARSES.get(key)
+            if cached is not None and cached[0] == stamp:
+                return cached[1]
+            epoch = _REPORT_PARSE_EPOCH[0]
+        doc = json.load(opened)
+        with _REPORT_PARSE_GUARD:
+            # A vault lock during the parse must not repopulate the cache.
+            if epoch == _REPORT_PARSE_EPOCH[0]:
+                _REPORT_PARSES.pop(key, None)
+                while len(_REPORT_PARSES) >= _REPORT_PARSE_MAX:
+                    _REPORT_PARSE_USED.pop(next(iter(_REPORT_PARSES)), None)
+                    _REPORT_PARSES.pop(next(iter(_REPORT_PARSES)))
+                _REPORT_PARSES[key] = (stamp, doc)
+                _REPORT_PARSE_USED[key] = time.monotonic()
+        return doc
+
+
+def _expire_idle_report_parses(now=None):
+    now = time.monotonic() if now is None else now
+    with _REPORT_PARSE_GUARD:
+        for key in [k for k, used in _REPORT_PARSE_USED.items()
+                    if now - used >= _REPORT_PARSE_IDLE_S]:
+            _REPORT_PARSES.pop(key, None)
+            _REPORT_PARSE_USED.pop(key, None)
+
+
+def _forget_report_parses():
+    with _REPORT_PARSE_GUARD:
+        _REPORT_PARSE_EPOCH[0] += 1
+        _REPORT_PARSES.clear()
+        _REPORT_PARSE_USED.clear()
+        _REPORT_PARSE_LOCKS.clear()
+
+
 def _thumbnail_snapshot(job, *, operation_owner=None):
     """Read one private report and associate its source under existing authority."""
     files = FILES.initialize(job)
@@ -3224,7 +3288,7 @@ def _thumbnail_snapshot(job, *, operation_owner=None):
             if not stat.S_ISREG(report_stat.st_mode):
                 raise OSError('report is not regular')
             report_stamp = _file_stamp(report_stat)
-            doc = json.load(opened)
+            doc = _parse_report_once(report_path, report_stamp, opened)
             if (report_stamp != _file_stamp(os.fstat(opened.fileno()))
                     or report_stamp != _file_stamp(os.stat(report_path))):
                 raise _ThumbnailError('thumbnail_obsolete', 409, 'Report changed')
@@ -9793,6 +9857,7 @@ def _vault_finalize(owners, affected):
 
 def _evict_thumbnails_for_store_transition(blocking=True):
     """Invalidate after admission closes and all job lifetimes have drained."""
+    _forget_report_parses()
     if not JOBS_LOCK.acquire(blocking=blocking):
         raise FilesBusy('job registry is in use')
     try:
