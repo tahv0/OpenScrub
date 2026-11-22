@@ -7166,14 +7166,15 @@ def sha256_file(path, chunk=1 << 20):
 
 def _settings_dict(args):
     skip = {"video", "output", "report", "from_report", "batch", "config",
-            "_report_input", "_plate_coverage_explicit"}
+            "_report_input", "_plate_coverage_explicit", "no_box_fallback"}
     if getattr(args, "uncertain_policy", None) in (None, "off"):
         skip.update(("uncertain_policy", "plate_auto_cutoff"))
     out = {k: v for k, v in vars(args).items()
            if k not in skip and not (k == 'verify_hdr_plate_frames' and not v)
            and isinstance(v, (str, int, float, bool, list, tuple, type(None)))}
-    if getattr(args, "plate_coverage", "full") != "narrow":
+    if getattr(args, "plate_coverage", "full") not in ("narrow", "assisted"):
         out.pop("plate_coverage", None)
+    if getattr(args, "plate_coverage", "full") != "narrow":
         out.pop("plate_narrow_margin", None)
     mm = getattr(args, "mode_map", None)
     if isinstance(mm, dict) and mm:
@@ -7996,8 +7997,13 @@ def build_parser():
                          "faces — close-ups only). Never slower than "
                          "explicit --dense-face-stride/--detect-scale. "
                          "Always review the output.")
-    ap.add_argument("--plate-coverage", choices=["full", "narrow"], default=None,
-                    help="plate coverage: full (default) or opt-in lettering-only")
+    ap.add_argument("--plate-coverage", choices=["full", "narrow", "assisted"], default=None,
+                    help="plate coverage: full (default), opt-in lettering-only, or "
+                         "assisted (letters only, no box fallback; needs --no-box-fallback)")
+    ap.add_argument("--no-box-fallback", action="store_true",
+                    help="with --plate-coverage assisted: where letters are not found "
+                         "clearly, draw nothing instead of the full plate box; such "
+                         "spots are listed as gaps in Review")
     ap.add_argument("--plate-narrow-margin", type=float, default=0,
                     help="nonnegative source-pixel margin around lettering (default 0)")
     ap.add_argument("--plate-model", default=None,
@@ -8254,8 +8260,12 @@ def _prep_args(args, parser):
                                    getattr(args, "plate_auto_cutoff", None))
     args._plate_coverage_explicit = getattr(args, "plate_coverage", None) is not None
     args.plate_coverage = getattr(args, "plate_coverage", None) or "full"
-    if args.plate_coverage not in ("full", "narrow"):
-        parser.error("--plate-coverage must be full or narrow")
+    if args.plate_coverage not in ("full", "narrow", "assisted"):
+        parser.error("--plate-coverage must be full, narrow or assisted")
+    if (args.plate_coverage == "assisted" and args._plate_coverage_explicit
+            and not getattr(args, "no_box_fallback", False)):
+        parser.error("--plate-coverage assisted never falls back to the full plate box; "
+                     "add --no-box-fallback to confirm")
     try:
         args.plate_narrow_margin = float(getattr(args, "plate_narrow_margin", 0))
         if not math.isfinite(args.plate_narrow_margin) or args.plate_narrow_margin < 0:
@@ -10193,7 +10203,7 @@ def run_pipeline(args, cb=None):
         if not getattr(args, "_plate_coverage_explicit", False):
             settings = prov.get("settings") or {}
             saved_coverage = settings.get("plate_coverage", "full")
-            if saved_coverage not in ("full", "narrow"):
+            if saved_coverage not in ("full", "narrow", "assisted"):
                 saved_coverage = "full"
             args.plate_coverage = saved_coverage
         audio_overridden = getattr(args, "audio_spans", None) is not None
