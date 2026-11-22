@@ -41,6 +41,7 @@ import cv2
 import numpy as np
 
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_letters
 from openscrub_internal import plate_policy
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import hdr_quad_pairs
@@ -802,6 +803,23 @@ def _record_narrow_plate(d, frame_index, frame_digest, poly, margin, reason):
     evidence["geometry_sha256"] = _narrow_evidence_digest(row, evidence)
     row.narrow_plate = evidence
     return row
+
+
+def _box_normalized_letters(row, cx, cy, polygons):
+    """Frame-pixel letter polygons -> polygons normalized to the row's box, clipped to [0, 1]."""
+    bx1, by1 = row.cbox[0] + cx, row.cbox[1] + cy
+    bw, bh = row.cbox[2] - row.cbox[0], row.cbox[3] - row.cbox[1]
+    if bw <= 0 or bh <= 0:
+        return ()
+    out = []
+    for polygon in polygons or ():
+        try:
+            points = [((float(x) - bx1) / bw, (float(y) - by1) / bh) for x, y in polygon]
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if len(points) >= 3 and all(math.isfinite(v) for point in points for v in point):
+            out.append(tuple((min(1.0, max(0.0, x)), min(1.0, max(0.0, y))) for x, y in points))
+    return tuple(out)
 
 
 def _plausible_lettering(polygons):
@@ -6251,16 +6269,18 @@ def _decode_db(prob, w, h, nw, nh, thresh=0.3, box_thresh=0.5, pad_frac=0.55):
     return out
 
 
-def _narrow_from_probability(crop, prob):
-    """Decode detector kernels to separate restored quadrilaterals, or fail closed."""
+def _restored_quads(crop, prob, clip=False):
+    """Decode detector kernels to separate restored quadrilaterals in crop pixels.
+
+    Returns (polygons, reason). A restored point outside the crop fails the
+    whole decode with "invalid_geometry", unless clip=True, which clips it
+    into the crop instead.
+    """
     if crop.ndim != 3 or min(crop.shape[:2]) < 8:
         return [], "invalid_crop"
     if prob.ndim != 2 or not prob.size or not np.isfinite(prob).all():
         return [], "inference_error"
     h, w = crop.shape[:2]
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    if int(gray.max()) - int(gray.min()) < 25:
-        return [], "unverifiable_contrast"
     contours, _ = cv2.findContours((prob > .3).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     polys = []
     for contour in contours:
@@ -6298,11 +6318,29 @@ def _narrow_from_probability(crop, prob):
                 return [], "invalid_geometry"
             restored.append(np.linalg.solve(matrix, [constants[i-1], constants[i]]))
         poly = np.asarray(restored) * (w / prob.shape[1], h / prob.shape[0])
-        if not np.isfinite(poly).all() or np.any(poly[:, 0] <= 0) or np.any(poly[:, 0] >= w - 1) or np.any(poly[:, 1] <= 0) or np.any(poly[:, 1] >= h - 1):
+        if clip and np.isfinite(poly).all():
+            poly = np.column_stack((np.clip(poly[:, 0], 0, w - 1), np.clip(poly[:, 1], 0, h - 1)))
+        elif not np.isfinite(poly).all() or np.any(poly[:, 0] <= 0) or np.any(poly[:, 0] >= w - 1) or np.any(poly[:, 1] <= 0) or np.any(poly[:, 1] >= h - 1):
             return [], "invalid_geometry"
         polys.append(poly)
     if not polys:
         return [], "no_text_detected"
+    return polys, ""
+
+
+def _narrow_from_probability(crop, prob):
+    """Decode detector kernels to separate restored quadrilaterals, or fail closed."""
+    if crop.ndim != 3 or min(crop.shape[:2]) < 8:
+        return [], "invalid_crop"
+    if prob.ndim != 2 or not prob.size or not np.isfinite(prob).all():
+        return [], "inference_error"
+    h, w = crop.shape[:2]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    if int(gray.max()) - int(gray.min()) < 25:
+        return [], "unverifiable_contrast"
+    polys, reason = _restored_quads(crop, prob, clip=False)
+    if reason:
+        return [], reason
     covered = np.zeros((h, w), np.uint8)
     cv2.fillPoly(covered, [np.rint(p).astype(np.int32) for p in polys], 1)
     for poly in polys:
@@ -6361,6 +6399,11 @@ def _narrow_from_probability(crop, prob):
 
 
 
+# Plate-crop sizes (long side, px) for the assisted letter cover: the first
+# runs alone; the rest only when its outline is empty or implausible.
+LETTER_SIZES = (320, 640, 224)
+
+
 class TextRegionDetector:
     """Scene-text region detector — the "anytext" category. Finds text
     REGIONS in the wild (street signs, name badges, papers on a desk,
@@ -6406,14 +6449,8 @@ class TextRegionDetector:
             return [], "model_unavailable"
         crop = frame[y1:y2, x1:x2]
         ch, cw = crop.shape[:2]
-        scale = 640.0 / max(ch, cw)
-        nh = max(32, int(round(ch * scale / 32)) * 32)
-        nw = max(32, int(round(cw * scale / 32)) * 32)
-        image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
-        image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
-        blob = image.transpose(2, 0, 1)[None].astype(np.float32)
         try:
-            prob = self.sess.run(None, {self._in: blob})[0][0, 0]
+            prob = self._crop_probability(crop, 640)
             polys, reason = _narrow_from_probability(crop, prob)
             if polys and not reason and not _plausible_lettering(
                     [p / (cw, ch) for p in polys]):
@@ -6422,6 +6459,60 @@ class TextRegionDetector:
             return [], "inference_error"
         return [p + (x1, y1) for p in polys], reason
 
+    def _crop_probability(self, crop, size):
+        """Text probability map of a crop resized to `size` px long side, /32-aligned."""
+        ch, cw = crop.shape[:2]
+        scale = float(size) / max(ch, cw)
+        nh = max(32, int(round(ch * scale / 32)) * 32)
+        nw = max(32, int(round(cw * scale / 32)) * 32)
+        image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
+        image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
+        blob = image.transpose(2, 0, 1)[None].astype(np.float32)
+        return self.sess.run(None, {self._in: blob})[0][0, 0]
+
+    def find_letters(self, frame, box, sizes=LETTER_SIZES):
+        """Plate lettering outline for the assisted cover, in frame pixels.
+
+        No strict check: only the plausibility rule discards specks. The
+        first size runs alone; when its outline is empty or implausible, the
+        other sizes run and every outline plausible on its own is unioned (a
+        union only adds cover). `last_sizes` names the sizes that contributed.
+        """
+        self.last_sizes = ()
+        if self.sess is None:
+            return []
+        try:
+            h, w = frame.shape[:2]
+            x1, y1, x2, y2 = (int(v) for v in box)
+        except (TypeError, ValueError, OverflowError, AttributeError):
+            return []
+        # A plate at the frame edge still gets letters: use its visible part.
+        x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+        if x2 - x1 < 8 or y2 - y1 < 8:
+            return []
+        crop = frame[y1:y2, x1:x2]
+        ch, cw = crop.shape[:2]
+
+        def outline(size):
+            try:
+                polys, reason = _restored_quads(crop, self._crop_probability(crop, size), clip=True)
+            except Exception:
+                return []
+            if reason or not polys or not _plausible_lettering([p / (cw, ch) for p in polys]):
+                return []
+            return polys
+
+        sizes = tuple(sizes)
+        found, used = [], []
+        for i, size in enumerate(sizes):
+            polys = outline(size)
+            if polys:
+                found += polys
+                used.append(size)
+            if i == 0 and polys:
+                break
+        self.last_sizes = tuple(used)
+        return [p + (x1, y1) for p in found]
 
     def available(self):
         return self.sess is not None
@@ -7499,6 +7590,8 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
             doc["audio_transcript"] = state["audio_transcript"]
     if getattr(args, "plate_coverage", "full") == "narrow" and state.get("plate_coverage_limitation"):
         doc["plate_coverage_limitation"] = state["plate_coverage_limitation"]
+    if "scene_cuts" in state:
+        doc["scene_cuts"] = [int(i) for i in state["scene_cuts"]]
     aspans = getattr(args, "audio_spans", None)
     if ((source is None and aspans)
             or (source is not None and state.get("audio_redactions_overridden"))):
@@ -8629,10 +8722,23 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                         and "face" in cats)) else None)
     qrer = QRDetector(cb) if "qrcode" in cats else None
     narrow_plate = getattr(args, "plate_coverage", "full") == "narrow" and "plate" in cats
-    texter = (TextRegionDetector(cb, verify_hash=True) if narrow_plate
+    # Assisted: letters only, no box fallback. Plates are located on every
+    # frame at full resolution like narrow, but without its strict check;
+    # frames without a letter mask become gaps for review.
+    assisted = getattr(args, "plate_coverage", "full") == "assisted" and "plate" in cats
+    texter = (TextRegionDetector(cb, verify_hash=True) if narrow_plate or assisted
               else TextRegionDetector(cb) if "anytext" in cats else None)
     if narrow_plate:
         cb.log("      narrow plates: locating plates and lettering on every frame at full resolution; review fallbacks")
+    letters_on = assisted and texter is not None and texter.available()
+    if assisted:
+        cb.log("      assisted letters: locating plates and their letters on every frame at full resolution")
+        if not letters_on:
+            cb.log("      assisted letters: text model unavailable — NO plate gets a letter "
+                   "mask this run, so every plate frame is a gap. Review all of them.")
+    letter_stats = {"plates": 0, "masked": 0, "seconds": 0.0,
+                    "sizes": {size: 0 for size in LETTER_SIZES}}
+    scene_cuts, cut_sig, cut_idx = [], None, -1
     detect_scale = float(getattr(args, "detect_scale", 1.0) or 1.0)
     if args.ignore_regions:
         cb.log(f"      ignore regions: {len(args.ignore_regions)}")
@@ -9056,6 +9162,14 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             break
         if monitor_stop and frame.shape[:2] != (vh, vw):
             dimensions_match = False
+        if assisted:
+            # Scene cuts bound mask borrowing and track joining. A frame read
+            # after a jump (seek, resumed range) follows frames never seen,
+            # which counts as a cut too.
+            sig = plate_letters.frame_signature(frame)
+            if idx > 0 and (cut_idx != idx - 1 or plate_letters.is_cut(cut_sig, sig)):
+                scene_cuts.append(idx)
+            cut_sig, cut_idx = sig, idx
         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
         cum.append((cx, cy))
 
@@ -9143,8 +9257,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         # fast, so (like dense faces) we re-detect every frame at the true
         # position rather than tracking. Only runs if a plate model is loaded.
         if (plater is not None and plater.available() and "plate" in cats
-                and (narrow_plate or idx % max(1, dense_stride) == 0)):
-            phold = 0.3 * (1 if narrow_plate else max(1, dense_stride)) / fps
+                and (narrow_plate or assisted or idx % max(1, dense_stride) == 0)):
+            phold = 0.3 * (1 if narrow_plate or assisted else max(1, dense_stride)) / fps
             _psc = _scope_at(t_now)
             _pzr = _psc.get("plate")
 
@@ -9154,7 +9268,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
 
             # zones are applied inside _maybe_tiled, before seam merging
             for (px1, py1, px2, py2, pconf) in (
-                    _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate else detect_scale),
+                    _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate or assisted
+                                                       else detect_scale),
                                  frame, plater.INPUT, tile_mode,
                                  seam_allow=plate_allowed)
                     if "plate" in _psc else []):
@@ -9192,6 +9307,20 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                     row = _record_narrow_plate(row, idx,
                                                narrow_frame_digest if normalized else None,
                                                normalized, getattr(args, "plate_narrow_margin", 0), reason)
+                elif assisted:
+                    letter_stats["plates"] += 1
+                    if letters_on:
+                        started = time.perf_counter()
+                        try:
+                            polygons = texter.find_letters(frame, (px1, py1, px2, py2))
+                        except Exception:
+                            polygons = []
+                        letter_stats["seconds"] += time.perf_counter() - started
+                        row.poly = _box_normalized_letters(row, cx, cy, polygons)
+                        if row.poly:
+                            letter_stats["masked"] += 1
+                            for size in getattr(texter, "last_sizes", ()) or ():
+                                letter_stats["sizes"][size] = letter_stats["sizes"].get(size, 0) + 1
                 if optional_policy:
                     row._plate_policy_evidence = MappingProxyType({
                         "origin": "detection", "frame": idx,
@@ -9967,6 +10096,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if reasons:
             cb.log("      narrow plate full-box fallbacks: "
                    + ", ".join("%s=%s" % item for item in sorted(reasons.items())))
+    if assisted:
+        cb.log("      assisted letters: masks on %d of %d plate detections; sizes used %s; "
+               "text model %.1f s" % (
+                   letter_stats["masked"], letter_stats["plates"],
+                   " ".join("%s:%d" % item for item in letter_stats["sizes"].items()),
+                   letter_stats["seconds"]))
     if monitor_stop and cb.cancelled():
         raise PipelineCancelled()
     state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
@@ -9982,6 +10117,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     if optional_policy:
         state["plate_policy"] = (optional_policy, args.plate_threshold,
                                  args.plate_auto_cutoff)
+    if assisted:
+        state["scene_cuts"] = scene_cuts
     if monitor_stop:
         if cb.cancelled():
             raise PipelineCancelled()
@@ -10278,6 +10415,8 @@ def run_pipeline(args, cb=None):
                      "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
                      "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                                "recalls": 0, "remembered": 0}}
+            if "scene_cuts" in source:
+                state["scene_cuts"] = list(source.get("scene_cuts", []))
             if optional:
                 state["plate_policy"] = optional
             return run_render(args, state, cb)
