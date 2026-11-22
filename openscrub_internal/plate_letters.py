@@ -9,9 +9,13 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 
+import cv2
+
 BORROW_S = 1.0
 JOIN_S = 1.0
 MERGE_FRAMES = 3
+CUT_CORREL = 0.5
+JOIN_AREA = (0.5, 2.0)
 _EPS = 1e-9
 
 
@@ -53,6 +57,19 @@ class CoverPlan:
     stats: dict = field(default_factory=dict)
 
 
+def frame_signature(frame):
+    """Normalized hue/saturation histogram of a copy 64 px wide."""
+    h, w = frame.shape[:2]
+    small = cv2.resize(frame, (64, max(1, round(h * 64 / w))), interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1], None, [16, 16], [0, 180, 0, 256])
+    return cv2.normalize(hist, hist, 1.0, 0.0, cv2.NORM_L1).astype("float32")
+
+
+def is_cut(previous, current):
+    return cv2.compareHist(previous, current, cv2.HISTCMP_CORREL) < CUT_CORREL
+
+
 def _frames(s, fps):
     return range(round(s.t0 * fps), round(s.t1 * fps) + 1)
 
@@ -72,6 +89,50 @@ def _merge_runs(frames):
     return runs
 
 
+def _join(plan, ends, starts, state, fps, cuts, join_s):
+    """Bridge short dropouts between the end of one track and the start of another."""
+    order = sorted(starts, key=lambda tr: starts[tr].t0)
+    t0s = [starts[tr].t0 for tr in order]
+    pairs = []
+    for ta, a in ends.items():
+        af = round(a.t1 * fps)
+        ax = (a.box[0] + a.box[2]) / 2
+        ay = (a.box[1] + a.box[3]) / 2
+        aw = a.box[2] - a.box[0]
+        aarea = aw * (a.box[3] - a.box[1])
+        i = bisect_right(t0s, a.t1)
+        while i < len(order) and t0s[i] - a.t1 <= join_s + _EPS:
+            tb = order[i]
+            i += 1
+            if tb == ta:
+                continue
+            b = starts[tb]
+            bf = round(b.t0 * fps)
+            if bisect_right(cuts, bf) != bisect_right(cuts, af):
+                continue
+            dist = ((((b.box[0] + b.box[2]) / 2 - ax) ** 2 + ((b.box[1] + b.box[3]) / 2 - ay) ** 2)) ** 0.5
+            barea = (b.box[2] - b.box[0]) * (b.box[3] - b.box[1])
+            if dist > aw or aarea <= 0 or not JOIN_AREA[0] <= barea / aarea <= JOIN_AREA[1]:
+                continue
+            pairs.append((dist, ta, tb))
+    pairs.sort()
+    used_a, used_b = set(), set()
+    for _, ta, tb in pairs:
+        if ta in used_a or tb in used_b:
+            continue
+        used_a.add(ta)
+        used_b.add(tb)
+        a, b = ends[ta], starts[tb]
+        af, bf = round(a.t1 * fps), round(b.t0 * fps)
+        for f in range(af + 1, bf):
+            u = (f - af) / (bf - af)
+            box = tuple(x + (y - x) * u for x, y in zip(a.box, b.box))
+            plan.bridges.append(Bridge(ta, f, box, plan.polys[a.key]))
+            state[ta][0].add(f)
+            state[tb][0].add(f)
+    plan.bridges.sort(key=lambda br: (br.frame, br.track))
+
+
 def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S):
     cuts = sorted(cuts)
     plan = CoverPlan()
@@ -84,6 +145,9 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S):
     def shot(s):
         return bisect_right(cuts, round(s.t0 * fps))
 
+    state = {}
+    ends = {}
+    starts_ = {}
     for track, lst in by_track.items():
         lst.sort(key=lambda s: (s.t0, s.key))
         maxdur = max(s.t1 - s.t0 for s in lst)
@@ -125,6 +189,15 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S):
                 plan.drop.add(s.key)
                 dropped.append(s)
         masked_total += len(covered)
+        masked = [s for s in lst if s.key in plan.polys]
+        state[track] = (covered, dropped)
+        if masked:
+            ends[track] = max(masked, key=lambda s: (s.t1, s.key))
+            starts_[track] = min(masked, key=lambda s: (s.t0, s.key))
+
+    _join(plan, ends, starts_, state, fps, cuts, join_s)
+
+    for track, (covered, dropped) in state.items():
         if not dropped:
             continue
         gap_frames = set()
@@ -144,5 +217,5 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S):
             plan.gaps.append(Gap(track, run[0] / fps, run[-1] / fps, len(run), mid, box))
             gap_total += len(run)
     plan.gaps.sort(key=lambda g: (g.t0, g.track))
-    plan.stats = {"masked_frames": masked_total, "bridged_frames": 0, "gap_frames": gap_total}
+    plan.stats = {"masked_frames": masked_total, "bridged_frames": len(plan.bridges), "gap_frames": gap_total}
     return plan
