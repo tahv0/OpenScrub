@@ -1902,7 +1902,7 @@ def _grab_frame(cap, t, fps):
     return None
 
 
-def _maybe_tiled(find_fn, frame, input_size, mode):
+def _maybe_tiled(find_fn, frame, input_size, mode, seam_allow=None):
     """SAHI-style slicing for small objects. A 640-input model squeezes
     a 4K frame down 6x, so a 40px face/plate becomes a 7px smudge it
     cannot see. When the frame's long side is >=2.6x the model input
@@ -1911,15 +1911,22 @@ def _maybe_tiled(find_fn, frame, input_size, mode):
     boxes back, and NMS-merge preserving row tails (poly/cls — polys
     are box-normalized so they survive the offset untouched). The
     full-frame pass always runs first: tiling can only ADD detections,
-    never lose one. Plain boxes cut off at a tile seam never take part
-    in NMS; `_merge_seam_pieces` unions them into the box they belong
-    to (a 4K plate otherwise came back as several partial boxes)."""
+    never lose one.
+
+    `seam_allow` (plates only) turns on seam merging and is the caller's
+    zone/ignore test. Those tests look at a box's CENTER, so they run on
+    each box BEFORE merging: a union's center can land outside the zone
+    and would drop every box in it. The caller must not test again.
+    Every allowed box plain NMS keeps ends up inside an output box.
+    Other categories keep plain NMS: head blur is sliced from a person
+    box, so growing that box moves the blur off the head."""
     h, w = frame.shape[:2]
     ratio = max(w, h) / max(1, input_size)
     rows = [tuple(r) for r in find_fn(frame)]
     cut = []
     if mode == "off" or (mode == "auto" and ratio < 2.6) or ratio < 1.2:
-        return rows
+        return rows if seam_allow is None else [
+            r for r in rows if seam_allow(r[:4])]
     n = 3 if ratio >= 5.2 else 2
     th, tw = h // n, w // n
     oy, ox = int(th * 0.15), int(tw * 0.15)
@@ -1931,16 +1938,29 @@ def _maybe_tiled(find_fn, frame, input_size, mode):
             for r in find_fn(frame[y1:y2, x1:x2]):
                 row = (r[0] + x1, r[1] + y1,
                        r[2] + x1, r[3] + y1) + tuple(r[4:])
-                if len(row) == 5 and _cut_at_seam(row, (x1, y1, x2, y2), w, h):
+                rows.append(row)
+                if (seam_allow is not None and len(row) == 5
+                        and _cut_at_seam(row, (x1, y1, x2, y2), w, h)):
                     cut.append(row)
-                else:
-                    rows.append(row)
-    rows.sort(key=lambda r: -float(r[4]))
-    keep = []
-    for r in rows:
-        if all(_iou(r[:4], k[:4]) < 0.55 for k in keep):
-            keep.append(r)
-    return _merge_seam_pieces(keep, cut)
+
+    def nms(boxes):
+        keep = []
+        for r in sorted(boxes, key=lambda r: -float(r[4])):
+            if all(_iou(r[:4], k[:4]) < 0.55 for k in keep):
+                keep.append(r)
+        return keep
+
+    plain = nms(rows)
+    if seam_allow is None:
+        return plain
+    keep = nms([r for r in rows if r not in cut])
+    # with the pieces out of NMS a different box can win and suppress one
+    # plain NMS kept, so those boxes are merged back like pieces
+    for r in plain:
+        if r not in keep and r not in cut:
+            (cut if len(r) == 5 else keep).append(r)
+    return _merge_seam_pieces([r for r in keep if seam_allow(r[:4])],
+                              [r for r in cut if seam_allow(r[:4])])
 
 
 def _cut_at_seam(row, tile, w, h, tol=2.0):
@@ -9095,15 +9115,17 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             phold = 0.3 * (1 if narrow_plate else max(1, dense_stride)) / fps
             _psc = _scope_at(t_now)
             _pzr = _psc.get("plate")
+
+            def plate_allowed(box):
+                return ((not _pzr or in_any_zone(box, _pzr))
+                        and not in_ignore_region(box, args.ignore_regions))
+
+            # zones are applied inside _maybe_tiled, before seam merging
             for (px1, py1, px2, py2, pconf) in (
                     _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate else detect_scale),
-                                 frame, plater.INPUT, tile_mode)
+                                 frame, plater.INPUT, tile_mode,
+                                 seam_allow=plate_allowed)
                     if "plate" in _psc else []):
-                if _pzr and not in_any_zone((px1, py1, px2, py2), _pzr):
-                    continue
-                if in_ignore_region((px1, py1, px2, py2),
-                                    args.ignore_regions):
-                    continue
                 row = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),

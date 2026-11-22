@@ -50,6 +50,10 @@ def _covers(boxes, target):
                and b[2] >= target[2] - 0.5 and b[3] >= target[3] - 0.5 for b in boxes)
 
 
+def _everywhere(box):
+    return True
+
+
 def test_seam_pieces_merge_into_one_box_that_covers_the_full_detection():
     full = [(1213.7, 1172.9, 2680.4, 1791.3, 0.875)]
     per_tile = {
@@ -60,7 +64,7 @@ def test_seam_pieces_merge_into_one_box_that_covers_the_full_detection():
         (2, 2): [(2368.0, 1332.0, 2590.0, 1694.1, 0.839)],
     }
     frame = np.zeros((H, W, 3), np.uint8)
-    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto")
+    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto", _everywhere)
     assert len(rows) == 1, rows
     assert _covers(rows, full[0][:4]), "the full-frame box must never be lost"
     for pieces in per_tile.values():
@@ -75,7 +79,7 @@ def test_pieces_from_neighbouring_tiles_join_when_the_full_pass_missed():
         (1, 1): [(1088.0, 766.7, 1844.6, 1359.6, 0.891)],
     }
     frame = np.zeros((H, W, 3), np.uint8)
-    rows = openscrub._maybe_tiled(_finder([], per_tile), frame, 608, "auto")
+    rows = openscrub._maybe_tiled(_finder([], per_tile), frame, 608, "auto", _everywhere)
     assert len(rows) == 1, rows
     assert rows[0][:4] == (852.9, 758.0, 1844.6, 1359.6)
 
@@ -85,7 +89,7 @@ def test_uncut_tile_boxes_and_separate_objects_keep_plain_nms():
     per_tile = {(0, 0): [(102.0, 101.0, 301.0, 161.0, 0.95)],      # duplicate, not cut
                 (2, 2): [(2600.0, 1500.0, 2700.0, 1540.0, 0.7)]}   # separate, not cut
     frame = np.zeros((H, W, 3), np.uint8)
-    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto")
+    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto", _everywhere)
     boxes = sorted(r[:4] for r in rows)
     assert boxes == sorted([(102.0, 101.0, 301.0, 161.0), (3000.0, 1800.0, 3200.0, 1860.0),
                             (2600.0, 1500.0, 2700.0, 1540.0)])
@@ -95,6 +99,47 @@ def test_cut_rows_with_silhouette_tails_are_left_to_plain_nms():
     full = [(1213.7, 1172.9, 2680.4, 1791.3, 0.5, ((0.1, 0.1),), 0)]
     per_tile = {(1, 2): [(1195.1, 1332.0, 2683.1, 1771.4, 0.9, ((0.2, 0.2),), 0)]}
     frame = np.zeros((H, W, 3), np.uint8)
-    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto")
+    rows = openscrub._maybe_tiled(_finder(full, per_tile), frame, 608, "auto", _everywhere)
     assert [r[:4] for r in rows] == [(1195.1, 1332.0, 2683.1, 1771.4)]
     assert rows[0][5] == ((0.2, 0.2),)
+
+
+def test_box_plain_nms_kept_survives_taking_the_piece_out_of_nms():
+    plain_kept = (2493.9, 1557.5, 3023.0, 1902.4, 0.369)
+    per_tile = {(1, 2): [(2438.7, 1617.0, 2752.0, 1885.5, 0.817)],
+                (2, 2): [(2452.6, 1607.2, 2917.2, 1885.7, 0.468)]}
+    frame = np.zeros((H, W, 3), np.uint8)
+    rows = openscrub._maybe_tiled(_finder([plain_kept], per_tile), frame, 608, "auto", _everywhere)
+    assert _covers(rows, plain_kept[:4])
+
+
+SHIFT_FULL = [(700.0, 900.0, 1500.0, 1300.0, 0.9)]
+SHIFT_TILE = {(1, 1): [(1088.0, 900.0, 1900.0, 1300.0, 0.8)]}
+
+
+def test_merge_cannot_move_a_box_out_of_its_detection_zone():
+    frame = np.zeros((H, W, 3), np.uint8)
+    rows = openscrub._maybe_tiled(
+        _finder(SHIFT_FULL, SHIFT_TILE), frame, 608, "auto",
+        lambda b: openscrub.in_any_zone(b, [(0, 0, 1200, H)]))
+    assert _covers(rows, SHIFT_FULL[0][:4])
+
+
+def test_merge_cannot_move_boxes_into_an_ignore_zone():
+    frame = np.zeros((H, W, 3), np.uint8)
+    rows = openscrub._maybe_tiled(
+        _finder(SHIFT_FULL, SHIFT_TILE), frame, 608, "auto",
+        lambda b: not openscrub.in_ignore_region(b, [(1250, 0, 1400, H)]))
+    assert _covers(rows, SHIFT_FULL[0][:4])
+    assert _covers(rows, SHIFT_TILE[(1, 1)][0][:4])
+
+
+def test_untiled_frames_still_apply_the_zone_test():
+    frame = np.zeros((H, W, 3), np.uint8)
+    assert openscrub._maybe_tiled(_finder(SHIFT_FULL, {}), frame, 608, "off", lambda b: False) == []
+
+
+def test_without_seam_merging_person_boxes_keep_plain_nms():
+    frame = np.zeros((H, W, 3), np.uint8)
+    rows = openscrub._maybe_tiled(_finder(SHIFT_FULL, SHIFT_TILE), frame, 608, "auto")
+    assert rows == SHIFT_FULL + SHIFT_TILE[(1, 1)]
