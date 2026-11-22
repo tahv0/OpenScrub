@@ -42,3 +42,9 @@ def test_plan_scales_to_a_full_report():
     s = [S(i, i // 100, i / 60, i / 60, POLY if i % 3 else (), i % 2 == 0) for i in range(300_000)]
     start = time.perf_counter(); plan_cover(s, 60.0, list(range(0, 300_000, 5000)))
     assert time.perf_counter() - start < 20
+
+
+def test_cotemporal_dropped_samples_make_one_gap():
+    s = [S(0, 1, 0.0, 0.0, (), True), S(1, 1, 0.0, 0.0, (), True)]
+    gaps = plan_cover(s, 10.0, []).gaps
+    assert [(g.track, g.frames, g.t0, g.t1) for g in gaps] == [(1, 1, 0.0, 0.0)]

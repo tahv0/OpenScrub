@@ -132,7 +132,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S):
             gap_frames.update(f for f in _frames(s, fps) if f not in covered)
         if not gap_frames:
             continue
-        dropped_frames = sorted((f, s) for s in dropped for f in (round(s.t0 * fps),))
+        dropped_frames = sorted(((round(s.t0 * fps), s) for s in dropped), key=lambda x: x[0])
         starts = [f for f, _ in dropped_frames]
         n = len(dropped_frames)
         for run in _merge_runs(sorted(gap_frames)):
