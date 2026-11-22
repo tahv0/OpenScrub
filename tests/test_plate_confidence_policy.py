@@ -37,9 +37,10 @@ def test_choice_and_geometry_truth_table(policy):
     samples = [row(choice="keep"), row(choice="blur"),
                row(choice="blur", valid=False), row(origin="grace"),
                row(box=(1, 2, 1, 8)), row(box=(1, 2, math.nan, 8))]
+    # The grace sample has a usable box and its track has an explicit Blur.
     assert decisions(samples, policy) == [
         (False, "keep"), (True, "blur"), (False, "gap"),
-        (False, "gap"), (False, "gap"), (False, "gap")]
+        (True, "blur"), (False, "gap"), (False, "gap")]
 
 
 def test_off_preserves_saved_output_even_with_absent_evidence():
@@ -47,20 +48,50 @@ def test_off_preserves_saved_output_even_with_absent_evidence():
     assert decisions(rows, None) == [(False, "saved"), (True, "saved"), (True, "saved")]
 
 
-def test_manual_review_requires_two_distinct_associated_cutoff_frames_without_retroactive_onset():
+def test_manual_review_requires_two_distinct_associated_cutoff_frames():
     rows = [row(10, .8), row(10, .9), row(11, .79), row(12, .8), row(13, .8),
-            row(14, .95, track=4), row(15, .95, track=4)]
+            row(14, .95, track=4), row(15, .95, track=5)]
+    # Track 3 earns support at frame 13, then the whole track is masked.
+    # Tracks 4 and 5 each have only one cutoff observation.
     assert decisions(rows, "manual_review") == [
-        (False, "suggestion"), (False, "suggestion"), (False, "suggestion"),
-        (False, "suggestion"), (True, "automatic"), (False, "suggestion"),
-        (True, "automatic")]
+        (True, "automatic"), (True, "automatic"), (True, "automatic"),
+        (True, "automatic"), (True, "automatic"), (False, "suggestion"),
+        (False, "suggestion")]
+
+
+def test_repeated_same_frame_hits_do_not_create_support():
+    rows = [row(10, .9), row(10, .95), row(11, .5)]
+    assert decisions(rows, "manual_review") == [(False, "suggestion")] * 3
 
 
 def test_synthetic_rows_cannot_promote_detector_support_or_geometry():
     rows = [row(1, .9), row(2, .99, origin="interpolation"),
-            row(3, .99, origin="held"), row(4, .9)]
+            row(3, .99, origin="held"), row(5, .9, track=4)]
+    # Synthetic rows between two hits do not supply the second observation.
     assert decisions(rows, "manual_review") == [(False, "suggestion"),
-        (False, "gap"), (False, "gap"), (True, "automatic")]
+        (False, "suggestion"), (False, "suggestion"), (False, "suggestion")]
+    rows.append(row(6, .9, track=4))
+    assert decisions(rows, "manual_review")[3:] == [(True, "automatic")] * 2
+
+
+def test_a_masked_track_covers_its_synthetic_and_low_score_samples():
+    rows = [row(1, .9), row(2, .99, origin="interpolation", valid=False),
+            row(3, .9), row(4, .2), row(5, .9, origin="visual_continuation", valid=False),
+            row(6, .9, origin="interpolation", box=(1, 2, 1, 8)),
+            row(7, .9, choice="keep"), row(8, .9, track=9)]
+    rows[1]["policy_evidence"]["frame"] = rows[4]["policy_evidence"]["frame"] = None
+    assert decisions(rows, "manual_review") == [
+        (True, "automatic"), (True, "automatic"), (True, "automatic"),
+        (True, "automatic"), (True, "automatic"), (False, "gap"),
+        (False, "keep"), (False, "suggestion")]
+
+
+def test_explicit_blur_on_any_sample_masks_the_whole_track():
+    rows = [row(1, .2), row(2, .2, origin="interpolation", valid=False),
+            row(3, .2, choice="blur"), row(4, .2, track=8)]
+    rows[1]["policy_evidence"]["frame"] = None
+    assert decisions(rows, "manual_review") == [
+        (True, "blur"), (True, "blur"), (True, "blur"), (False, "suggestion")]
 
 
 def test_invalid_evidence_and_untracked_frames_do_not_create_support():
@@ -68,11 +99,11 @@ def test_invalid_evidence_and_untracked_frames_do_not_create_support():
             row(3, .9, valid=False), row(4, .9), row(5, .9)]
     rows[1]["policy_evidence"]["frame"] = None
     assert decisions(rows, "manual_review") == [(False, "suggestion"),
-        (False, "gap"), (False, "gap"), (False, "suggestion"), (True, "automatic")]
+        (False, "gap"), (False, "gap"), (True, "automatic"), (True, "automatic")]
 
 
 def test_candidate_mode_uses_retained_floor_including_equality():
-    assert decisions([row(score=.1), row(score=.099)], "blur_candidates") == [
+    assert decisions([row(score=.1), row(score=.099, track=4)], "blur_candidates") == [
         (True, "automatic"), (False, "suggestion")]
 
 

@@ -37,7 +37,9 @@ def test_same_valued_explicit_keep_survives_policy_switch_and_reopen(store):
     assert request('post', store.url + '/detections',
                    json={'plate_policy': {'uncertain_policy': 'blur_candidates'}}).status_code == 200
     doc = json.loads(store.path.read_text())
-    assert [r['enabled'] for r in doc['detections']] == [False, True, False]
+    # The automatic frame-4 mask covers its track's interpolated sample; the
+    # Keep on frame 2 still wins for that sample.
+    assert [r['enabled'] for r in doc['detections']] == [False, True, True]
     assert doc['detections'][0]['output_choice'] == 'keep'
     assert doc['provenance']['settings']['uncertain_policy'] == 'blur_candidates'
     assert request('post', store.url + '/detections',
@@ -51,8 +53,20 @@ def test_same_valued_explicit_keep_survives_policy_switch_and_reopen(store):
     assert doc['custom'] == {'preserved': True}
 
 
-def test_explicit_blur_without_supported_geometry_is_retained_as_a_gap(store):
+def test_explicit_blur_on_an_interpolated_sample_masks_it(store):
     capable(store)
+    assert request('post', store.url + '/detections',
+                   json={'enabled': {'2': True}}).status_code == 200
+    row = json.loads(store.path.read_text())['detections'][2]
+    assert row['output_choice'] == 'blur'
+    assert row['enabled'] is True
+
+
+def test_explicit_blur_without_supported_geometry_is_retained_as_a_gap(store):
+    doc = capable(store)
+    doc['detections'][2]['policy_evidence'] = {'origin': 'detection', 'frame': None,
+                                               'geometry_valid': False}
+    store.path.write_text(json.dumps(doc))
     assert request('post', store.url + '/detections',
                    json={'enabled': {'2': True}}).status_code == 200
     row = json.loads(store.path.read_text())['detections'][2]
@@ -96,7 +110,10 @@ def test_clean_boxes_follow_actual_supported_frame_not_smoothed_span(store):
 
 
 def test_off_mode_retains_blur_intent_without_inventing_a_gap_location(store):
-    capable(store)
+    doc = capable(store)
+    doc['detections'][2]['policy_evidence'] = {'origin': 'detection', 'frame': None,
+                                               'geometry_valid': False}
+    store.path.write_text(json.dumps(doc))
     assert request('post', store.url + '/detections',
                    json={'plate_policy': {'uncertain_policy': 'off'}}).status_code == 200
     assert request('post', store.url + '/detections',

@@ -4299,12 +4299,10 @@ def _dedupe_dense(act, frame_index=None, frame_digest=None):
 
 
 def _active_on_frame(d, t, index):
-    # Optional plate evidence supports only the actual decoded source frame.
-    # Dense smoothing's spans and 10ms render tolerance are not observations.
+    # Decided plate samples, direct or synthetic, render over their smoothed
+    # span so a blurred track stays covered between direct hits.
     if hasattr(d, "_plate_policy_evidence"):
-        evidence = d._plate_policy_evidence
-        return (plate_policy._valid_geometry(d) and evidence.get("frame") == index
-                and d.t_start - 0.01 <= t <= d.t_end + 0.01)
+        return plate_policy.active_on_frame(d, t, index)
     return d.t_start - 0.01 <= t <= d.t_end + 0.01
 
 

@@ -21,9 +21,12 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
     console.error('PAGE_ERRORS',JSON.stringify({errors,warnings}));throw e;
    }
    const before=await page.locator('#ds1').innerText();
-   assert(before.includes('1 uncertain observation remains unmasked'),before);
-   assert(before.includes('1 unsupported sample'),before);
-   assert(before.includes('1 automatic mask'),before);
+   // Frames 1-2 support an automatic mask that covers the whole track,
+   // including the low-support first hit and the interpolated sample.
+   assert(before.includes('3 of 3 samples will be blurred'),before);
+   assert(before.includes('3 automatic masks'),before);
+   assert(!before.includes('uncertain observation'),before);
+   assert(!before.includes('unsupported sample'),before);
    assert((await page.locator('#review').innerText()).includes('Plate policy: Review uncertain'));
    assert.equal(await page.locator('#bb1').getAttribute('aria-pressed'),'false');
    assert.equal(await page.locator('#kb1').getAttribute('aria-pressed'),'false');
@@ -33,7 +36,8 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
    await page.locator('#beT').fill('0.2');await page.locator('#beT').dispatchEvent('input');
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===1);
    assert.deepEqual(await page.evaluate(()=>BE.raw.map(r=>r.i)),[0]);
-   assert.deepEqual(await page.evaluate(()=>BE.boxes.map(r=>r.i)),[]);
+   // Row 0 belongs to the automatically masked track, so its box is active.
+   assert.deepEqual(await page.evaluate(()=>BE.boxes.map(r=>r.i)),[0]);
    await page.locator('#beT').fill('0.4');await page.locator('#beT').dispatchEvent('input');
    await page.waitForFunction(()=>beReady()&&BE_VIEW.readySample.sample.index===2);
    assert.deepEqual(await page.evaluate(()=>BE.raw.map(r=>r.i)),[1]);
@@ -56,7 +60,7 @@ const [url,root]=process.argv.slice(2),fixture=JSON.parse(fs.readFileSync(path.j
    await page.locator('#reviewSection0').scrollIntoViewIfNeeded();await page.waitForSelector('#ds1');
    const reopened=await page.locator('#ds1').innerText();
    assert(!reopened.includes('uncertain observation'),reopened);
-   assert(reopened.includes('1 unsupported sample'),reopened);
+   assert(!reopened.includes('unsupported sample'),reopened);
    assert.equal(await page.locator('#kb1').getAttribute('aria-pressed'),'true');
    await page.screenshot({path:path.join(root,'review-'+label+'.png'),fullPage:true});
    assert.deepEqual(errors,[]);assert.deepEqual(warnings,[]);

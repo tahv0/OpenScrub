@@ -4,6 +4,12 @@ Track association is supplied by the existing dense-track assignment. Only
 consecutive eligible *direct* observations in that association can activate
 review-mode output; synthetic samples never contribute evidence. No cutoff
 or time window is calibrated here.
+
+Output is decided per TRACK: once any sample of a track is blurred (an
+explicit Blur or an automatic decision), every sample of that track with a
+usable box is blurred too, including synthetic (interpolated, continuation)
+samples and low-score observations. Per-frame decisions left the frames
+between direct hits unblurred, so the mask flashed off a known plate.
 """
 
 from collections.abc import Mapping
@@ -63,13 +69,75 @@ def _valid_geometry(row):
     return box[0] < box[2] and box[1] < box[3]
 
 
+SYNTHETIC_ORIGINS = ("interpolation", "visual_continuation", "grace", "held", "weak", "manual_seed")
+
+
+def _box_ok(row):
+    box = _get(row, "cbox")
+    if not isinstance(box, (list, tuple)) or len(box) != 4:
+        return False
+    if not all(_finite_number(v) for v in box):
+        return False
+    return box[0] < box[2] and box[1] < box[3]
+
+
+def is_direct(row):
+    evidence = _get(row, "policy_evidence")
+    return isinstance(evidence, Mapping) and evidence.get("origin") == "detection"
+
+
+def supported_geometry(row):
+    """A usable box: a direct observation on its frame, or a synthetic sample's span."""
+    if _valid_geometry(row):
+        return True
+    evidence = _get(row, "policy_evidence")
+    return (isinstance(evidence, Mapping) and evidence.get("origin") in SYNTHETIC_ORIGINS
+            and _box_ok(row))
+
+
+def active_on_frame(row, t, index):
+    """Render a decided sample over its smoothed span, like standard plates.
+
+    The span includes smoothing's grace pads and gap bridging; only enabled
+    samples reach the renderer, so this widens coverage, never the decision.
+    """
+    if not supported_geometry(row):
+        return False
+    return _get(row, "t_start") - 0.01 <= t <= _get(row, "t_end") + 0.01
+
+
+def _extend_tracks(rows, results):
+    """Blur every usable sample of a track that has any blurred sample."""
+    on, explicit = set(), set()
+    for row, decision in zip(rows, results):
+        track = _get(row, "track")
+        if _get(row, "category") != "plate" or type(track) is not int or track < 0:
+            continue
+        if decision.enabled:
+            on.add(track)
+        if _get(row, "output_choice") == "blur":
+            explicit.add(track)
+    if not on:
+        return results
+    out = []
+    for row, decision in zip(rows, results):
+        track = _get(row, "track")
+        if (not decision.enabled and decision.status == "suggestion"
+                and _get(row, "category") == "plate" and track in on
+                and _get(row, "output_choice") != "keep" and supported_geometry(row)):
+            decision = Decision(True, "blur" if track in explicit else "automatic")
+        out.append(decision)
+    return out
+
+
 def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
     """Return output decisions in row order without modifying the observations.
 
     A track must have been assigned by the scan's existing association pass.
     Low/invalid direct observations interrupt cutoff support, and same-frame
-    duplicates never count twice. A decision starts at its own source frame.
-    Synthetic and unsupported positions are gaps even for explicit Blur.
+    duplicates never count twice. Automatic support starts at a direct source
+    frame; the resulting blur then covers the whole track (see module doc).
+    Only samples without a usable box are gaps, and Keep always wins.
     """
     validate_settings(policy, candidate_floor, auto_cutoff)
     if policy is None or policy == "off":
@@ -79,7 +147,7 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
             if capable_off and _get(row, "category") == "plate":
                 if choice == "keep":
                     results.append(Decision(False, "keep"))
-                elif not _valid_geometry(row):
+                elif not supported_geometry(row):
                     results.append(Decision(False, "gap"))
                 elif choice == "blur":
                     results.append(Decision(True, "blur"))
@@ -87,7 +155,7 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
                     results.append(Decision(bool(_get(row, "enabled", True)), "saved"))
             else:
                 results.append(Decision(bool(_get(row, "enabled", True)), "saved"))
-        return results
+        return _extend_tracks(rows, results) if capable_off else results
 
     results = [None] * len(rows)
     previous = {}
@@ -138,13 +206,14 @@ def evaluate(rows, policy, candidate_floor, auto_cutoff, *, capable_off=False):
         choice = _get(row, "output_choice")
         if choice == "keep":
             results[index] = Decision(False, "keep")
-        elif not valid or choice not in (None, "blur"):
+        elif choice not in (None, "blur") or not supported_geometry(row):
             results[index] = Decision(False, "gap")
         elif choice == "blur":
             results[index] = Decision(True, "blur")
-        elif (policy == "blur_candidates" and eligible) or (
-                policy == "manual_review" and supported):
+        elif valid and ((policy == "blur_candidates" and eligible) or (
+                policy == "manual_review" and supported)):
             results[index] = Decision(True, "automatic")
         else:
+            # Synthetic samples are never evidence; they follow their track.
             results[index] = Decision(False, "suggestion")
-    return results
+    return _extend_tracks(rows, results)

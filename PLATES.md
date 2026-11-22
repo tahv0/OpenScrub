@@ -100,18 +100,19 @@ The values above only illustrate the interface; they are not calibrated
 recommendations. The values must be finite and satisfy
 `0.05 <= plate-threshold <= plate-auto-cutoff <= 0.95`.
 
-`manual_review` automatically masks a supported frame only after two
-associated direct detector observations meet the cutoff. Earlier or lower-score
-hits remain visible for review. `blur_candidates` masks a supported retained
-candidate after one observation, accepting extra short masks and flashes. It
-still requires the explicit cutoff, even though its candidate output uses the
-lower floor. The association is a spatial/temporal heuristic, not proof of
-identity.
+`manual_review` masks a plate track automatically only after two associated
+direct detector observations meet the cutoff. Tracks without that support
+remain visible for review. `blur_candidates` masks a track after one retained
+candidate observation, accepting extra short masks. It still requires the
+explicit cutoff, even though its candidate output uses the lower floor. The
+association is a spatial/temporal heuristic, not proof of identity.
 
-These experimental policies currently support only the actual source frames
-with valid direct detections. Interpolation, grace padding, held positions and
-unscanned frames are not supported locations and can leave gaps requiring manual
-work. Selecting a lower candidate floor requires a new scan. A capable report
+Output is decided per track. Once a track is masked, automatically or by an
+explicit Blur, every sample of it with a usable box is masked over its smoothed
+span, including interpolation, onset continuation, grace padding and lower-score
+observations, exactly like the default behavior. Synthetic samples never count
+as detector evidence, and Keep on a sample always wins. Only samples without a
+usable box remain gaps. Selecting a lower candidate floor requires a new scan. A capable report
 preserves explicit Blur and Keep decisions across policy changes; ordinary and
 legacy reports retain their existing choices and are not converted. Unhandled
 suggestions do not prevent export.

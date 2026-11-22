@@ -4431,7 +4431,7 @@ def job_detections(jid):
                 if decisions is not None:
                     item['enabled'] = decisions[i].enabled
                 item['policy_status'] = decisions[i].status if decisions is not None else 'unknown'
-                item['policy_geometry_supported'] = openscrub.plate_policy._valid_geometry(d)
+                item['policy_geometry_supported'] = openscrub.plate_policy.supported_geometry(d)
                 if d.get('output_choice') in ('blur', 'keep'):
                     item['output_choice'] = d['output_choice']
             items.append(item)

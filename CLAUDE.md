@@ -936,6 +936,16 @@ defined — there was a real UnboundLocalError from ordering once.
   fail-open), garbage -> 0.35; run_scan logs a loud trade-off NOTE when
   it's above the 0.35 default. Added after a fork user saw hands/labels
   flagged as plates with no web control (issue #21).
+- PLATE POLICY IS PER TRACK (`openscrub_internal/plate_policy.py`): with
+  `--uncertain-policy`, only direct detections are EVIDENCE (cutoff support),
+  but once any sample of a track is masked (automatic or explicit Blur) every
+  sample of that track with a usable box is masked over its smoothed span —
+  interpolation, onset continuation, grace pads, low-score hits — exactly like
+  standard plates. Keep on a sample always wins; only box-less samples are
+  gaps. The old per-frame rule left every non-detection frame unblurred: a
+  real job had 97% of plate-track frames visible and 600 mid-track flashes.
+  `supported_geometry`/`active_on_frame` drive the render and review counts;
+  the exact-frame editor still shows only direct observations.
 - HELP TIPS: every Advanced control has a `<span class="qm" data-tip=…>?`
   (test_every_advanced_setting_has_a_help_tip enforces it — a new
   Advanced setting needs one). data-tip text must contain no double

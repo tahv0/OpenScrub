@@ -26,12 +26,18 @@ def clip(tmp_path):
     return path
 
 
-def scan(tmp_path, monkeypatch, policy):
+SCORES = [None, None, .9, None, .9, .3, .9, .9, None, None]
+# One plate track, masked over every smoothed frame: grace pads cover 1 and 8,
+# interpolation covers 3.
+FULL = [False, True, True, True, True, True, True, True, True, False]
+
+
+def scan(tmp_path, monkeypatch, policy, scores=SCORES):
     class Detector:
         INPUT = 640
 
         def __init__(self, *args, **kwargs):
-            self.scores = iter([None, None, .9, None, .9, .3, .9, .9, None, None])
+            self.scores = iter(scores)
 
         def available(self):
             return True
@@ -70,8 +76,8 @@ def masked_frames(path):
 
 
 @pytest.mark.parametrize("policy,expected", [
-    ("manual_review", [False, False, False, False, True, False, False, True, False, False]),
-    ("blur_candidates", [False, False, True, False, True, True, True, True, False, False]),
+    ("manual_review", FULL),
+    ("blur_candidates", FULL),
 ])
 def test_source_frames_survive_smoothing_and_render_roundtrip(tmp_path, monkeypatch, policy, expected):
     args, state = scan(tmp_path, monkeypatch, policy)
@@ -84,7 +90,8 @@ def test_source_frames_survive_smoothing_and_render_roundtrip(tmp_path, monkeypa
     assert direct[0]["t_start"] < 2 / 4  # smoothing moved its start after evidence capture
     synthetic = [r for r in report["detections"]
                  if r.get("policy_evidence", {}).get("origin") != "detection"]
-    assert synthetic and all(not r["enabled"] for r in synthetic)
+    # The decided track covers its interpolated frame as well.
+    assert synthetic and all(r["enabled"] for r in synthetic)
     assert masked_frames(args.output) == expected
 
     parser = core.build_parser()
@@ -94,6 +101,27 @@ def test_source_frames_survive_smoothing_and_render_roundtrip(tmp_path, monkeypa
         "--output", str(tmp_path / "reopened.mp4")]), parser)
     core.run_pipeline(reopened, Quiet())
     assert masked_frames(reopened.output) == expected
+
+
+def test_unsupported_manual_review_track_stays_visible_and_blur_covers_it(tmp_path, monkeypatch):
+    scores = [None, None, .9, None, .5, .3, .5, .9, None, None]
+    args, state = scan(tmp_path, monkeypatch, "manual_review", scores)
+    core.run_render(args, state, Quiet())
+    assert masked_frames(args.output) == [False] * 10
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert not any(r["enabled"] for r in report["detections"])
+    # An explicit Blur on one observation masks the whole track.
+    row = next(r for r in report["detections"]
+               if r.get("policy_evidence", {}).get("frame") == 5)
+    row["output_choice"] = "blur"
+    (tmp_path / "report.json").write_text(json.dumps(report))
+    parser = core.build_parser()
+    reopened = core._prep_args(parser.parse_args([
+        str(tmp_path / "frames.avi"), "--from-report", str(tmp_path / "report.json"),
+        "--no-vfr-fix", "--encoder", "x264", "--mode", "box", "--pad", "0",
+        "--output", str(tmp_path / "blurred.mp4")]), parser)
+    core.run_pipeline(reopened, Quiet())
+    assert masked_frames(reopened.output) == FULL
 
 
 def test_off_and_absent_produce_identical_stock_report_bytes(tmp_path, monkeypatch):
@@ -109,18 +137,19 @@ def test_edited_span_can_remove_an_observation_from_output(tmp_path, monkeypatch
     args, state = scan(tmp_path, monkeypatch, 'manual_review')
     for detection in state['detections']:
         evidence = getattr(detection, '_plate_policy_evidence', {})
-        if evidence.get('frame') == 4:
+        if evidence.get('frame') == 7:
             detection.t_start, detection.t_end = 1.6, 1.7
     core.run_render(args, state, Quiet())
-    assert masked_frames(args.output) == [False, False, False, False, False,
-                                          False, False, True, False, False]
+    # Frame 7 stays covered by frame 6's span; the trailing grace frame is gone.
+    assert masked_frames(args.output) == [False, True, True, True, True,
+                                          True, True, True, False, False]
 
 
 def test_load_report_returns_only_effective_enabled_detections(tmp_path, monkeypatch):
     args, state = scan(tmp_path, monkeypatch, 'manual_review')
     core.run_render(args, state, Quiet())
     detections, _, _ = core.load_report(args.report)
-    assert [d._plate_policy_evidence['frame'] for d in detections] == [4, 7]
+    assert [d._plate_policy_evidence['frame'] for d in detections] == [2, 4, 5, 6, 7, None, None]
 
 
 def test_invalid_report_confidence_does_not_block_or_create_a_mask(tmp_path, monkeypatch):
@@ -137,8 +166,8 @@ def test_invalid_report_confidence_does_not_block_or_create_a_mask(tmp_path, mon
         '--no-vfr-fix', '--encoder', 'x264', '--mode', 'box', '--pad', '0',
         '--output', str(tmp_path / 'invalid.mp4')]), parser)
     core.run_pipeline(reopened, Quiet())
-    assert masked_frames(reopened.output) == [False, False, False, False, True,
-                                               True, True, True, False, False]
+    # Frame 2 is not evidence any more, but it belongs to the masked track.
+    assert masked_frames(reopened.output) == FULL
 
 
 def test_off_capable_report_cannot_render_an_unsupported_gap(tmp_path, monkeypatch):
@@ -157,8 +186,8 @@ def test_off_capable_report_cannot_render_an_unsupported_gap(tmp_path, monkeypat
         '--no-vfr-fix', '--encoder', 'x264', '--mode', 'box', '--pad', '0',
         '--output', str(tmp_path / 'off-gap.mp4')]), parser)
     core.run_pipeline(reopened, Quiet())
-    assert masked_frames(reopened.output) == [False, False, False, False, False,
-                                               False, False, True, False, False]
+    # The empty box renders nothing; the rest of the saved track stays masked.
+    assert masked_frames(reopened.output) == FULL
 
 
 @pytest.mark.parametrize('change', ['different_source', 'missing_sha'])
@@ -208,7 +237,7 @@ def test_optional_trim_decodes_forward_without_a_guessed_seek(tmp_path, monkeypa
     args.clip_start = 1.5
     monkeypatch.setattr(core, '_seek_cap', lambda *a: pytest.fail('optional trim must decode forward'))
     core.run_render(args, state, Quiet())
-    assert masked_frames(args.output) == [True, True, False, False]
+    assert masked_frames(args.output) == [True, True, True, False]
 
 
 @pytest.mark.parametrize('window,expected', [
@@ -286,5 +315,4 @@ def test_original_input_does_not_replace_optional_scan_source(tmp_path, monkeypa
         '--output', str(tmp_path / 'scanned-out.mp4')]), parser)
     core.run_pipeline(reopened, Quiet())
     assert reopened.video == str(tmp_path / 'frames.avi')
-    assert masked_frames(reopened.output) == [False, False, True, False, True,
-                                               True, True, True, False, False]
+    assert masked_frames(reopened.output) == FULL
