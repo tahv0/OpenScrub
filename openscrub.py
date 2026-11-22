@@ -767,6 +767,11 @@ class Detection:
         self.manual_plate_quad = manual_plate_quad
 
 
+# Least share of the plate box lettering must span before it may replace the
+# full box. Checked at render too, so reports saved before this rule are safe.
+NARROW_MIN_WIDTH, NARROW_MIN_HEIGHT = 0.5, 0.3
+
+
 @dataclass
 class NarrowPlateDetection(Detection):
     # Present only on opt-in plate rows; ordinary report rows stay unchanged.
@@ -799,6 +804,21 @@ def _record_narrow_plate(d, frame_index, frame_digest, poly, margin, reason):
     return row
 
 
+def _plausible_lettering(polygons):
+    """Whether box-normalized polygons are big enough to be a plate's lettering.
+
+    Lettering takes up much of a plate's width and height. A speck, thin line
+    or single stroke is a wrong localization, and masking only that would
+    leave nearly the whole detected box visible.
+    """
+    size = 100
+    mask = np.zeros((size, size), np.uint8)
+    cv2.fillPoly(mask, [np.rint(np.asarray(p, np.float64) * size).astype(np.int32)
+                        for p in polygons], 1)
+    return bool(mask.any(axis=0).mean() >= NARROW_MIN_WIDTH
+                and mask.any(axis=1).mean() >= NARROW_MIN_HEIGHT)
+
+
 def _narrow_plate_eligible(d, frame_index, frame):
     """Use a plate polygon only on its inspected pixels and original geometry."""
     if not isinstance(d, NarrowPlateDetection) or d.category != "plate" or not d.poly:
@@ -821,7 +841,8 @@ def _narrow_plate_eligible(d, frame_index, frame):
         digest = (frame if isinstance(frame, str)
                   else _frame_sha256(frame))
         return (evidence["frame_sha256"] == digest
-                and evidence["geometry_sha256"] == _narrow_evidence_digest(d, evidence))
+                and evidence["geometry_sha256"] == _narrow_evidence_digest(d, evidence)
+                and _plausible_lettering(d.poly))
     except (KeyError, TypeError, ValueError, OverflowError, AttributeError):
         return False
 
@@ -6394,6 +6415,9 @@ class TextRegionDetector:
         try:
             prob = self.sess.run(None, {self._in: blob})[0][0, 0]
             polys, reason = _narrow_from_probability(crop, prob)
+            if polys and not reason and not _plausible_lettering(
+                    [p / (cw, ch) for p in polys]):
+                return [], "implausible_lettering"
         except Exception:
             return [], "inference_error"
         return [p + (x1, y1) for p in polys], reason

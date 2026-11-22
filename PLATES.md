@@ -156,6 +156,10 @@ each plate; it detects regions and does not recognize or save characters.
 plates and text on every frame at full resolution, even when a faster scan
 preset is selected. This may substantially increase scan time.
 
+A lettering mask must span at least half the width and 30% of the height of
+the detected box, otherwise the full box is used. Rendering applies the same
+rule, so older reports get it without a rescan.
+
 Narrow masks are an experimental downstream option. A localization guard
 can miss lettering, particularly with low contrast, clipping, occlusion,
 unusual layouts or motion. Extra margin is no guarantee. A plate missed by

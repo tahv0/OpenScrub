@@ -417,3 +417,51 @@ def test_default_render_preserves_existing_plate_polygon(tmp_path, monkeypatch):
         assert rendered[30, 45].mean() < 50
     finally:
         reader.release()
+
+
+def _lettering_row(polygon):
+    frame = np.full((100, 300, 3), 230, np.uint8)
+    base = openscrub.Detection(0, .04, (20, 20, 280, 80), 'plate', 'plate', 1, dense=True, track=1)
+    return openscrub._record_narrow_plate(
+        base, 0, openscrub._frame_sha256(frame), polygon, 0, ''), frame
+
+
+def test_saved_fragment_mask_renders_as_full_box():
+    fragments = (
+        (((.45, .45), (.56, .45), (.56, .49), (.45, .49)),),  # speck
+        (((.20, .40), (.64, .40), (.64, .53), (.20, .53)),),  # thin line
+        (((.40, .10), (.49, .10), (.49, .90), (.40, .90)),),  # one stroke
+        (((.02, .1), (.07, .1), (.07, .9), (.02, .9)),        # both ends only
+         ((.93, .1), (.98, .1), (.98, .9), (.93, .9))),
+    )
+    for polygon in fragments:
+        row, frame = _lettering_row(polygon)
+        assert not openscrub._narrow_plate_eligible(row, 0, frame), polygon
+
+
+def test_saved_plate_wide_lettering_stays_narrow():
+    row, frame = _lettering_row((((.12, .25), (.88, .25), (.88, .75), (.12, .75)),))
+    assert openscrub._narrow_plate_eligible(row, 0, frame)
+
+
+def test_plate_scan_rejects_fragment_lettering(monkeypatch):
+    class Session:
+        def run(self, outputs, inputs):
+            return [np.zeros((1, 1, 32, 64), np.float32)]
+    detector = openscrub.TextRegionDetector.__new__(openscrub.TextRegionDetector)
+    detector.sess, detector._in = Session(), 'x'
+    speck = [np.array([[40, 30], [60, 30], [60, 36], [40, 36]], float)]
+    monkeypatch.setattr(openscrub, '_narrow_from_probability', lambda crop, prob: (speck, ''))
+    frame = np.full((120, 320, 3), 230, np.uint8)
+    assert detector.find_plate(frame, (10, 10, 310, 110)) == ([], 'implausible_lettering')
+
+
+def test_missed_character_still_rejects():
+    crop = np.full((120, 400, 3), 235, np.uint8)
+    chars = range(40, 350, 45)
+    for x in chars:
+        cv2.rectangle(crop, (x, 22), (x + 26, 98), (130, 40, 15), -1)
+    prob = np.zeros((120, 400), np.float32)
+    # the localizer finds every character except the first
+    prob[43:78, chars[1] + 14:chars[-1] + 14] = .9
+    assert openscrub._narrow_from_probability(crop, prob)[1]
