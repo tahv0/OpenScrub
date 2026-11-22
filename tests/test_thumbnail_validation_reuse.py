@@ -40,7 +40,8 @@ def test_fresh_metadata_and_cold_crop_reuse_validation(exact, monkeypatch):
     assert cold.status_code == warm.status_code == 200
     assert cold.data == warm.data and cold.headers['ETag'] == warm.headers['ETag']
     assert cv2.imdecode(np.frombuffer(cold.data, np.uint8), 1).size > 0
-    assert counts == {'parse': 3, 'validate': 1}
+    # One parse per report identity: metadata, cold and warm crops share it.
+    assert counts == {'parse': 1, 'validate': 1}
 
 
 def test_plain_tuple_snapshot_requires_full_validation(exact, monkeypatch):
