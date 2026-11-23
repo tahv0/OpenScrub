@@ -359,3 +359,14 @@ for(const v of [5423.37,0,0.0333,65.2,59.9996,3600,-1,NaN])console.log(lgOutTime
     assert "lgOutTime(x.out_t0" in page and "x.out_frame" in page
     # the click still seeks the editor on the scan timeline
     assert "openLetterGap(${+x.t0})" in page
+
+
+def test_gap_section_explains_box_edits_do_not_cover_gaps():
+    page = web.PAGE
+    line = ("Moving or resizing a plate box does not cover a gap; "
+            "use Track object on that plate instead.")
+    start = page.index("function renderLetterGaps(")
+    body = page[start:page.index("\n}\n", start)]
+    assert line in body
+    assert body.index("lglist") < body.index(line)        # under the list
+    assert "&#8857; Track object</button>" in page        # the editor's label

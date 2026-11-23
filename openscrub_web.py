@@ -8669,7 +8669,8 @@ function renderLetterGaps(id,g,err){
  el.innerHTML=`<p class="lgnotice" role="status">Letters only, no box fallback: gaps below are not covered. Check the output.</p>
   <div>letters covered on ${pct}% of plate frames (${bridged} bridged), ${g.gaps.length} gaps</div>
   <div class="detscope">Based on the last saved review choices. Times and frame numbers are the time in the rendered video.</div>
-  ${items?`<div class="lglist">${items}</div>`:""}`;
+  ${items?`<div class="lglist">${items}</div>`:""}
+  <div class="detscope">Moving or resizing a plate box does not cover a gap; use Track object on that plate instead.</div>`;
 }
 async function openLetterGap(t0){
  const id=CUR,gen=VIEW_GEN;
