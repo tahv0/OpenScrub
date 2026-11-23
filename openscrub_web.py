@@ -6855,7 +6855,8 @@ async function loadJobs(){
  jobs.innerHTML=js.length?js.map(j=>
   `<div class="row" style="justify-content:space-between;padding:4px 0">
    <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
-   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
+   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase==="stopped"?"stopped "+stoppedPct(j)+"%":j.phase}</span>
+   ${j.phase==="stopped"?`<a href="#" title="Continue scan" style="text-decoration:none;font-size:15px" onclick="continueScan('${j.id}');return false">&#9654;</a>`:""}
    ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?(j.failed_action==="render"?`<a href="#" title="Retry the render — keeps your review choices" style="text-decoration:none;font-size:15px" onclick="retryRender('${j.id}');return false">&#8635;</a>`:`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`):""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
 }
@@ -6865,6 +6866,23 @@ async function retryJob(id,afterRender=false){
  const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
  let j={};try{j=await r.json();}catch(e){}
  if(!r.ok){alert(j.error||"could not retry the job");return;}
+ JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+}
+// Stop and continue: a stopped scan's share done, from its saved frame.
+function stoppedPct(j){
+ return j.stopped_total?Math.floor(100*j.stopped_frame/j.stopped_total):0;
+}
+async function stopScan(){
+ const id=CUR,button=document.getElementById("scanStop");if(!id)return;
+ if(button){button.disabled=true;button.textContent="Stopping…";}
+ const r=await fetch("api/jobs/"+id+"/stop_scan",{method:"POST"});
+ if(!r.ok){let j={};try{j=await r.json();}catch(e){}
+  alert(j.error||"could not stop the scan");if(button){button.disabled=false;button.textContent="Stop";}}
+}
+async function continueScan(id){
+ const r=await fetch("api/jobs/"+id+"/continue",{method:"POST"});
+ let j={};try{j=await r.json();}catch(e){}
+ if(!r.ok){alert(j.error||"could not continue the scan");return;}
  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
 }
 // A failed render keeps the scan and the saved review: render it again.
@@ -7276,13 +7294,24 @@ async function refreshCycle(cycle){
  if(j.error){wb.style.display="block";wb.textContent=j.error;}
  else wb.style.display="none";
 
+ CANCEL_KIND=j.phase==="stopped"?2:(j.phase==="scanning"&&j.progress>0)?1:0;
  // action buttons rebuilt ONLY when the phase changes
- const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'');
+ const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'')
+  +(j.stop_supported?':stoppable':'')+(j.stopping?':stopping-scan':'');
  if(SHELLPH!==shellPhase){
   SHELLPH=shellPhase;
   let a="";
   if(j.phase=="scanning"||j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase==="scanning"&&j.stop_supported)
+   a+=`<button id="scanStop" class="sec" title="Stop the scan and free the GPU. Continue later from this point." onclick="stopScan()" ${j.stopping?'disabled':''}>${j.stopping?'Stopping…':'Stop'}</button>`;
+  if(j.phase==="stopped")
+   a=`<div style="width:100%"><b>Stopped at ${stoppedPct(j)}% (frame ${j.stopped_frame} of ${j.stopped_total})</b></div>
+    <div style="width:100%;font-size:12px;color:#9ca3af">Progress is saved in the
+    job folder. Continue scan carries on from here; the result is the same as an
+    uninterrupted scan.</div>
+    <button onclick="continueScan(CUR)">Continue scan</button>
+    <button class="sec" onclick="cancelJob()">Cancel scan</button>`;
   if(j.phase==="scanning"&&j.checkpoint_enabled)
    a+=`<button id="checkpointStop" class="sec" onclick="stopCheckpoint()" ${j.checkpoint_stopping?'disabled':''}>${j.checkpoint_stopping?'Stopping…':'Stop &amp; Review'}</button>`;
   if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished&&j.failed_action==="render")
@@ -8586,7 +8615,13 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){return saveAndRender();}
-async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
+// 0: nothing scanned yet, 1: a scan with progress, 2: a stopped scan
+let CANCEL_KIND=0;
+async function cancelJob(){
+ if(CANCEL_KIND===2&&!confirm("Cancel throws away the saved progress of this scan."))return;
+ if(CANCEL_KIND===1&&!confirm("Cancel throws away the scanning done so far. Use Stop to continue later."))return;
+ await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"});
+}
 async function stopCheckpoint(){
  const id=CUR,button=document.getElementById('checkpointStop');if(!id||!button)return;
  button.disabled=true;button.textContent='Stopping…';

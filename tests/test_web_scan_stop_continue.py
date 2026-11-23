@@ -225,3 +225,16 @@ def test_retry_deletes_stale_progress(scan_job):
     assert _post(f"/api/jobs/{job['id']}/retry").status_code == 200
     _run_worker()
     assert job["phase"] == "review" and not os.path.exists(_progress(job))
+
+
+def test_page_has_stop_continue_controls():
+    page = web.PAGE
+    for text in ("Stop the scan and free the GPU. Continue later from this point.",
+                 "Stopping…", "Continue scan", "Cancel scan",
+                 "Progress is saved in the\n    job folder. Continue scan carries on from here",
+                 "Cancel throws away the scanning done so far. Use Stop to continue later.",
+                 "Cancel throws away the saved progress of this scan.",
+                 '"/stop_scan"', '"/continue"', 'title="Continue scan"'):
+        assert text in page, text
+    start = page.index("async function cancelJob(")
+    assert "confirm(" in page[start:page.index("\n}\n", start)]
