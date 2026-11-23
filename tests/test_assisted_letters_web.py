@@ -256,3 +256,70 @@ def test_render_reminder_waits_for_the_review_gap_load():
       throw Error('assisted load: '+JSON.stringify(asked));
     LETTER_GAPS_LOAD={jobId:'A',promise:Promise.reject(Error('offline'))};LETTER_GAPS_LOAD.promise.catch(()=>{});
     if(await saveAndRender()!==false||calls.length||asked.length!==2)throw Error('failed load rendered');""")
+
+
+def _set_report(job, **settings):
+    path = Path(job["dir"]) / "report.json"
+    doc = json.loads(path.read_text())
+    hdr = settings.pop("hdr_output", None)
+    doc["provenance"]["settings"].update(settings)
+    if hdr is not None:
+        doc["provenance"]["hdr_output"] = hdr
+    path.write_text(json.dumps(doc))
+    web._forget_report_parses()
+
+
+def test_letter_gaps_carry_output_timeline_fields_untrimmed(store):
+    job = store("assisted")
+    gaps = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()["gaps"]
+    assert [(g["out_t0"], g["out_t1"], g["out_frame"]) for g in gaps] == [
+        (g["t0"], g["t1"], g["frame"]) for g in gaps]
+
+
+def test_letter_gaps_follow_the_output_clip(store):
+    # clip 0.5-0.75 of a 1.0 s timeline keeps frames 5..7: track 0's gap at
+    # frames 3-4 is outside, track 1's gap at 6-8 is trimmed to 6-7.
+    job = store("assisted")
+    _set_report(job, clip_frac="0.5-0.75")
+    body = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()
+    assert [(g["track"], g["t0"], g["t1"], g["frames"]) for g in body["gaps"]] == [(1, .6, .7, 2)]
+    g = body["gaps"][0]
+    assert (g["out_t0"], g["out_t1"], g["out_frame"]) == (pytest.approx(.1), pytest.approx(.2), 2)
+    assert body["stats"]["gap_frames"] == 2
+    # seconds bookends from the CLI resolve the same way
+    _set_report(job, clip_frac="", clip_start=0.5, clip_end=0.75)
+    again = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()
+    assert [(x["track"], x["frames"], x["out_frame"]) for x in again["gaps"]] == [(1, 2, 2)]
+
+
+def test_letter_gaps_ignore_trim_on_hdr_output(store):
+    job = store("assisted")
+    _set_report(job, clip_frac="0.5-0.75", hdr_output=True)
+    gaps = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()["gaps"]
+    assert len(gaps) == 2
+    assert [(g["out_t0"], g["out_frame"]) for g in gaps] == [(g["t0"], g["frame"]) for g in gaps]
+
+
+def _node_eval(code):
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node is needed to evaluate the Review JavaScript")
+    result = subprocess.run([node], input=code, capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def test_gap_times_are_formatted_as_rendered_video_timecode():
+    page = web.PAGE
+    start = page.index("function lgOutTime(")
+    code = page[start:page.index("\n}\n", start) + 3]
+    out = _node_eval(code + """
+for(const v of [5423.37,0,0.0333,65.2,59.9996,3600,-1,NaN])console.log(lgOutTime(v));""")
+    assert out.split() == ["1:30:23.370", "0:00:00.000", "0:00:00.033", "0:01:05.200",
+                           "0:01:00.000", "1:00:00.000", "0:00:00.000", "0:00:00.000"]
+    assert "time in the rendered video" in page
+    assert "lgOutTime(x.out_t0" in page and "x.out_frame" in page
+    # the click still seeks the editor on the scan timeline
+    assert "openLetterGap(${+x.t0})" in page

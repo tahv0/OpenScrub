@@ -4431,7 +4431,7 @@ def _assisted_row(d, poly):
     return row
 
 
-def apply_assisted_cover(dets, fps, cuts, frame_count=None):
+def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None):
     """-> (render rows, CoverPlan) for --plate-coverage assisted.
 
     Dense plate rows get their own or a borrowed letter mask, rows the plan
@@ -4458,7 +4458,8 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None):
         last = aoffs.get(d.track)
         if last is None or d.t_end >= last[0]:
             aoffs[d.track] = (d.t_end, tuple(d.aoff))
-    plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count)
+    plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count,
+                                    first_frame=first_frame)
     out = []
     for key, d in enumerate(dets):
         if key in planned:
@@ -4477,8 +4478,11 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None):
     return out, plan
 
 
-def assisted_cover_from_report(doc):
-    """The CoverPlan a render of this saved report would use (see run_render)."""
+def assisted_cover_from_report(doc, frame_range=None):
+    """The CoverPlan a render of this saved report would use (see run_render).
+
+    frame_range=(first, end) limits counts and gaps to the frames an output
+    clip keeps (see output_frame_range); None keeps the whole timeline."""
     capable = isinstance(doc, dict) and doc.get("plate_policy_evidence_version") == 1
     dets, rstate, _ = _decode_report(doc, optional_full=capable)
     if capable:
@@ -4487,8 +4491,13 @@ def assisted_cover_from_report(doc):
     if not rstate:
         raise ValueError("report has no render_state")
     cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
-    return apply_assisted_cover(dets, rstate["fps"], cuts,
-                                frame_count=len(rstate.get("cum") or ()) or None)[1]
+    n = len(rstate.get("cum") or ()) or None
+    if frame_range is None:
+        return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=n)[1]
+    first, end = frame_range
+    end = end if n is None else min(end, n)
+    return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=end,
+                                first_frame=first)[1]
 
 
 def _dedupe_dense(act, frame_index=None, frame_digest=None):
@@ -10316,6 +10325,43 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     return state
 
 
+def resolve_output_clip(clip_frac, clip_start, clip_end, duration):
+    """-> (start, end or None) seconds of an SDR output trim, or None.
+
+    `duration` is called only for fraction bookends (web UI): they resolve
+    against the server's own measurement so an iPhone's reported length
+    can't shift the trim. Shared by run_render and the Review gap list."""
+    cf = (clip_frac or "").strip()
+    if cf:
+        dur = duration()
+        a, _, b = cf.partition("-")
+        cs = max(0.0, min(1.0, float(a))) * dur
+        bf = float(b)
+        ce = (bf * dur) if bf < 0.999 else 0.0    # ~1.0 == to end
+    else:
+        cs = float(clip_start or 0)
+        ce = float(clip_end or 0)
+    return (cs, ce if ce > 0 else None) if (cs > 0 or ce > 0) else None
+
+
+def output_frame_range(clip, fps, frame_count):
+    """-> (first, end): the source frames an SDR render with `clip` writes,
+    by the render loop's own test (t >= start - 1e-6, t <= end + 1e-6)."""
+    if not clip:
+        return 0, frame_count
+    cs, ce = clip
+    first = max(0, math.floor((cs - 1e-6) * fps) - 1)
+    while first / fps < cs - 1e-6:
+        first += 1
+    end = frame_count
+    if ce is not None:
+        last = math.floor((ce + 1e-6) * fps) + 1
+        while last >= 0 and last / fps > ce + 1e-6:
+            last -= 1
+        end = min(frame_count, last + 1)
+    return first, max(first, end)
+
+
 def _assisted_report(source_report, state):
     """True when the detections come from a letters only scan: the saved
     settings say assisted, or the report carries the assisted-only
@@ -10412,21 +10458,11 @@ def run_render(args, state, cb=None):
     mt = (getattr(args, "mute_audio_tracks", "") or "").strip()
     mute_tracks = ("all" if mt == "all"
                    else tuple(int(x) for x in mt.split(",") if x.strip()))
-    cf = (getattr(args, "clip_frac", "") or "").strip()
-    if cf:
-        # fractions of duration (web UI) — resolve against the server's own
-        # measurement so an iPhone's reported length can't shift the trim
-        _dur = _probe_duration(args.video) or (
-            len(state.get("cum", [])) / (state.get("fps") or 30.0))
-        a, _, b = cf.partition("-")
-        cs = max(0.0, min(1.0, float(a))) * _dur
-        bf = float(b)
-        ce = (bf * _dur) if bf < 0.999 else 0.0    # ~1.0 == to end
-    else:
-        cs = float(getattr(args, "clip_start", 0) or 0)
-        ce = float(getattr(args, "clip_end", 0) or 0)
-    clip = ((cs, ce if ce > 0 else None)
-            if (cs > 0 or ce > 0) else None)
+    clip = resolve_output_clip(
+        getattr(args, "clip_frac", ""), getattr(args, "clip_start", 0),
+        getattr(args, "clip_end", 0),
+        lambda: _probe_duration(args.video) or (
+            len(state.get("cum", [])) / (state.get("fps") or 30.0)))
     if clip and getattr(args, "hdr_source", None) and not args.preview:
         cb.log("      NOTE: output trim is not yet supported on HDR output — "
                "rendering full length. Use --hdr-output sdr to trim.")

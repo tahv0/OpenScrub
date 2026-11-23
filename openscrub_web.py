@@ -3263,6 +3263,22 @@ def _report_is_assisted(doc):
     return isinstance(settings, dict) and settings.get("plate_coverage") == "assisted"
 
 
+def _letter_gap_output_frames(job, doc, fps):
+    """-> (first, end) source frames the job's render keeps, resolved from the
+    report's saved settings exactly as run_render trims: SDR only (an HDR
+    render ignores the trim and writes the full length)."""
+    n = len(doc["render_state"].get("cum") or ())
+    prov = doc.get("provenance") or {}
+    settings = prov.get("settings") or {}
+    if prov.get("hdr_output"):
+        return 0, n
+    clip = openscrub.resolve_output_clip(
+        settings.get("clip_frac", ""), settings.get("clip_start", 0),
+        settings.get("clip_end", 0),
+        lambda: openscrub._probe_duration(job["video"]) or n / (fps or 30.0))
+    return openscrub.output_frame_range(clip, fps, n)
+
+
 def _letter_gap_plan(job):
     """-> ({"mode", "gaps", "stats"}, fps) for the job's saved report."""
     path = os.path.join(job["dir"], "report.json")
@@ -3290,12 +3306,18 @@ def _letter_gap_plan(job):
         result = dict(_LETTER_GAPS_OFF)
     else:
         try:
-            plan = openscrub.assisted_cover_from_report(doc)
             fps = float(doc["render_state"]["fps"])
-        except (ValueError, KeyError, TypeError):
+            first, end = _letter_gap_output_frames(job, doc, fps)
+            plan = openscrub.assisted_cover_from_report(doc, frame_range=(first, end))
+        except (ValueError, KeyError, TypeError, ZeroDivisionError):
             abort(409, "report has no usable render state")
+        # out_*: the rendered video's own timeline (an SDR clip starts at
+        # its first kept frame), the times the owner types into an editor.
         gaps = [{"track": g.track, "t0": g.t0, "t1": g.t1, "frames": g.frames,
-                 "frame": g.frame, "box": [float(v) for v in g.box]} for g in plan.gaps]
+                 "frame": g.frame, "box": [float(v) for v in g.box],
+                 "out_t0": (round(g.t0 * fps) - first) / fps,
+                 "out_t1": (round(g.t1 * fps) - first) / fps,
+                 "out_frame": g.frame - first} for g in plan.gaps]
         gaps.sort(key=lambda g: (g["t0"], g["track"]))
         result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats)}
     if os.name == "posix":
@@ -8602,6 +8624,14 @@ async function loadReview(auto=null){
 // job, never on individual cards; the render reminder states the count.
 let LETTER_GAPS=null,LETTER_GAPS_LOAD=null;   // last list / {jobId,promise} of the Review load
 const ASSISTED_RENDER_REMINDER=n=>`Letters only, no box fallback: ${n} gaps listed in Review will not be covered. Render now?`;
+// Output-timeline seconds as H:MM:SS.mmm (1:30:23.370), the form a video
+// editor's timecode field takes. Milliseconds are rounded once, so 59.9996
+// carries into the next minute instead of printing 60.000.
+function lgOutTime(sec){
+ const ms=Math.max(0,Math.round((+sec||0)*1000));
+ const h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60,s=Math.floor(ms/1000)%60,r=ms%1000;
+ return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(r).padStart(3,"0")}`;
+}
 async function fetchLetterGaps(id){
  const r=await fetch(`api/jobs/${id}/letter_gaps`);
  if(!r.ok)throw Error("HTTP "+r.status);
@@ -8626,11 +8656,12 @@ async function loadLetterGaps(id,gen){
  const pct=masked+gapf?Math.floor(100*masked/(masked+gapf)):100;
  const items=g.gaps.map((x,n)=>`<button type="button" class="lgap" onclick="openLetterGap(${+x.t0})">
   <img loading="lazy" alt="Plate gap preview" src="api/jobs/${id}/letter_gap/${n}.jpg">
-  <div>plate track ${+x.track}</div><div>${(+x.t0).toFixed(2)}–${(+x.t1).toFixed(2)}s · ${+x.frames} frame${+x.frames===1?"":"s"}</div></button>`).join("");
+  <div>plate track ${+x.track}</div><div>${lgOutTime(x.out_t0??x.t0)}–${lgOutTime(x.out_t1??x.t1)}</div>
+  <div>frame ${+(x.out_frame??x.frame)} · ${+x.frames} frame${+x.frames===1?"":"s"}</div></button>`).join("");
  el.hidden=false;
  el.innerHTML=`<p class="lgnotice" role="status">Letters only, no box fallback: gaps below are not covered. Check the output.</p>
   <div>letters covered on ${pct}% of plate frames (${bridged} bridged), ${g.gaps.length} gaps</div>
-  <div class="detscope">Based on the last saved review choices.</div>
+  <div class="detscope">Based on the last saved review choices. Times and frame numbers are the time in the rendered video.</div>
   ${items?`<div class="lglist">${items}</div>`:""}`;
 }
 async function openLetterGap(t0){

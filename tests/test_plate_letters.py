@@ -133,3 +133,12 @@ def test_planner_frames_match_the_renderers_rule():
                         if openscrub._active_on_frame(d, f / fps, f)]
                 got = [f for f in _frames(S(0, 1, t0, t1, (), True), fps) if f >= max(0, i - 10)]
                 assert got == want, (fps, t0, t1)
+
+
+def test_first_frame_drops_frames_before_an_output_clip():
+    s = [S(0, 1, 0.0, 0.0, POLY, True), S(1, 1, 0.1, 0.5, (), True), S(2, 2, 2.5, 2.9, (), True)]
+    plan = plan_cover(s, 10.0, [], frame_count=30, first_frame=3)
+    # frame 0's mask still lends to frames 3-5 of track 1 (borrowing sees
+    # every sample), track 2 is a gap trimmed to the clip
+    assert [(g.track, g.t0, g.frames) for g in plan.gaps] == [(2, 2.5, 5)]
+    assert plan.stats == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 5}

@@ -93,11 +93,13 @@ def _span(t0, t1, fps):
     return lo, hi
 
 
-def _frames(s, fps, frame_count=None):
+def _frames(s, fps, frame_count=None, first_frame=None):
     lo, hi = _span(s.t0, s.t1, fps)
     hi += 1
     if frame_count is not None:
         lo, hi = max(lo, 0), min(hi, frame_count)
+    if first_frame is not None:
+        lo = max(lo, first_frame)
     return range(lo, hi)
 
 
@@ -124,7 +126,7 @@ def _merge_runs(frames):
     return runs
 
 
-def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
+def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None, first_frame=None):
     """Bridge short dropouts between the end of one track and the start of another."""
     order = sorted(starts, key=lambda tr: starts[tr].t0)
     t0s = [starts[tr].t0 for tr in order]
@@ -160,7 +162,7 @@ def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
         a, b = ends[ta], starts[tb]
         af, bf = _last(a, fps), _first(b, fps)
         top = bf if frame_count is None else min(bf, frame_count)
-        for f in range(max(af + 1, 0), top):
+        for f in range(max(af + 1, 0 if first_frame is None else first_frame), top):
             u = (f - af) / (bf - af)
             box = tuple(x + (y - x) * u for x, y in zip(a.box, b.box))
             plan.bridges.append(Bridge(ta, f, box, plan.polys[a.key]))
@@ -169,9 +171,12 @@ def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
     plan.bridges.sort(key=lambda br: (br.frame, br.track))
 
 
-def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count=None):
+def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count=None,
+               first_frame=None):
     """frame_count, when given, limits every counted or listed frame to
-    0..frame_count-1: grace-padded spans past the video's end are ignored."""
+    0..frame_count-1: grace-padded spans past the video's end are ignored.
+    first_frame, when given, also ignores frames before it (an output clip
+    that starts later); borrowing still sees every sample."""
     cuts = sorted(cuts)
     plan = CoverPlan()
     by_track = {}
@@ -196,7 +201,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
         for s in lst:
             if s.poly:
                 plan.polys[s.key] = s.poly
-                covered.update(_frames(s, fps, frame_count))
+                covered.update(_frames(s, fps, frame_count, first_frame))
                 continue
             sh = shot(s)
             best = None
@@ -222,7 +227,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
                 k += 1
             if best is not None:
                 plan.polys[s.key] = best.poly
-                covered.update(_frames(s, fps, frame_count))
+                covered.update(_frames(s, fps, frame_count, first_frame))
             else:
                 plan.drop.add(s.key)
                 dropped.append(s)
@@ -233,14 +238,15 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
             ends[track] = max(masked, key=lambda s: (s.t1, s.key))
             starts_[track] = min(masked, key=lambda s: (s.t0, s.key))
 
-    _join(plan, ends, starts_, state, fps, cuts, join_s, frame_count)
+    _join(plan, ends, starts_, state, fps, cuts, join_s, frame_count, first_frame)
 
     for track, (covered, dropped) in state.items():
         if not dropped:
             continue
         gap_frames = set()
         for s in dropped:
-            gap_frames.update(f for f in _frames(s, fps, frame_count) if f not in covered)
+            gap_frames.update(f for f in _frames(s, fps, frame_count, first_frame)
+                              if f not in covered)
         if not gap_frames:
             continue
         dropped_frames = sorted(((_first(s, fps), s) for s in dropped), key=lambda x: x[0])

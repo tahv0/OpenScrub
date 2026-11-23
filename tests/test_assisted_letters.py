@@ -793,3 +793,20 @@ def test_assisted_report_rendered_as_full_or_narrow_blacks_out_the_box(tmp_path,
         out2, _, _, _ = _render_saved_assisted(tmp_path, "saved", rewrite=report)
         for frame in out2:
             assert black_share(frame, inner) > 0.99
+
+
+def test_output_clip_resolves_like_the_render_loop():
+    assert openscrub.resolve_output_clip("", 0, 0, lambda: 1 / 0) is None
+    assert openscrub.resolve_output_clip("", 0.5, 0, lambda: 1 / 0) == (0.5, None)
+    assert openscrub.resolve_output_clip("0.25-1.0", 0, 0, lambda: 8.0) == (2.0, None)
+    assert openscrub.resolve_output_clip("0.25-0.5", 0, 0, lambda: 8.0) == (2.0, 4.0)
+    assert openscrub.output_frame_range(None, 10.0, 30) == (0, 30)
+    assert openscrub.output_frame_range((0.35, None), 10.0, 30) == (4, 30)
+    assert openscrub.output_frame_range((0.5, 0.75), 10.0, 30) == (5, 8)
+    assert openscrub.output_frame_range((0.5, 9.0), 10.0, 30) == (5, 30)
+    for fps in (24.0, 29.97, 30.0, 59.94):
+        for cs, ce in ((1.0, 2.0), (1 / 3, 7 / 3), (0.1, None)):
+            first, end = openscrub.output_frame_range((cs, ce), fps, 1000)
+            kept = [i for i in range(1000) if i / fps >= cs - 1e-6
+                    and (ce is None or i / fps <= ce + 1e-6)]
+            assert (first, end) == (kept[0], kept[-1] + 1)
