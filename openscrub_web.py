@@ -25,6 +25,7 @@ over the GPU.
 
 import argparse
 import contextlib
+import errno
 import hashlib
 from io import BytesIO
 import base64
@@ -811,6 +812,8 @@ def job_public(job):
         "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
         "recovery_required": FILES.initialize(job).recovery_required,
         "checkpoint_unfinished": bool(job.get("_checkpoint_unfinished")),
+        # "render" | "scan" | None: which step an error/cancelled job was on
+        "failed_action": job.get("failed_action"),
         "download_name": video_name,
         "report_name": report_name,
     }
@@ -1644,6 +1647,7 @@ def _reserve_queue_locked(job, action, prepared):
         gen = job["qgen"]
         FILES.initialize(job).queued[gen] = prepared
     job["phase"] = "queued_render" if action == "render" else "queued"
+    job["failed_action"] = None
     return job["id"], action, gen, prepared
 
 
@@ -1764,6 +1768,7 @@ def _run_job(job, action, owner=None):
         if not _operation_valid(job, owner):
             return
         job["phase"] = "scanning" if action in ('scan', 'resume') else "rendering"
+        job["failed_action"] = None
         checkpoint_stop = (threading.Event() if action in ('scan', 'resume')
                            and job['options'].get('checkpoint_review') is True else None)
         owner.checkpoint_stop = checkpoint_stop
@@ -1983,6 +1988,7 @@ def _run_job(job, action, owner=None):
                     job["phase"] = "cancelled"
                     outcome = "cancelled"
                     job["error"] = "cancelled by user"
+                    job["failed_action"] = _failed_step(action)
         except BaseException as e:
             msg = str(e) or type(e).__name__
             if isinstance(e, SystemExit):
@@ -1996,6 +2002,8 @@ def _run_job(job, action, owner=None):
                 if not committed and not files.recovery_required and _operation_valid(job, owner):
                     job["phase"] = "error"
                     outcome, diagnostic_error = "error", error_code
+                    job["failed_action"] = _failed_step(action)
+                    msg = _with_disk_full_hint(msg, e, job["failed_action"])
                     job["error"] = msg
                     job["log"].append(f"ERROR: {msg}")
         finally:
@@ -2019,6 +2027,24 @@ def _run_job(job, action, owner=None):
                     WORKER.pop("diagnostic_ref", None)
 
 
+def _failed_step(action):
+    """Which step a failed/cancelled job was on: the page offers Retry render
+    (keeps the review) for a render and Retry scan for a scan."""
+    return "render" if action == "render" else "scan"
+
+
+def _with_disk_full_hint(msg, error, step):
+    """A full disk is the user's to fix: say so, and which retry keeps the work.
+    ffmpeg reports it only in its stderr text, so match the message too."""
+    full = (isinstance(error, OSError) and error.errno == errno.ENOSPC
+            or "No space left on device" in msg)
+    if not full:
+        return msg
+    retry = ("press Retry render — your review choices are kept" if step == "render"
+             else "press Retry scan")
+    return f"{msg} — the disk is full. Free some disk space, then {retry}."
+
+
 def start_worker():
     t = threading.Thread(target=worker, daemon=True, name="job-worker")
     WORKER["thread"] = t
@@ -2038,9 +2064,14 @@ def check_worker():
         job = JOBS.get(jid) if jid else None
         lost_action = job is not None and job.get("phase") in _ACTIVE_PHASES
         if lost_action:
+            rendering = job.get("phase") in ("rendering", "queued_render")
             job["phase"] = "error"
             job["eta"] = None
+            job["failed_action"] = "render" if rendering else "scan"
             job["error"] = ("the job worker stopped unexpectedly — the "
+                            "server restarted it; Retry render renders again "
+                            "with your saved review choices" if rendering else
+                            "the job worker stopped unexpectedly — the "
                             "server restarted it; Retry re-runs the scan "
                             "with the file already on the server")
             job["log"].append("ERROR: " + job["error"])
@@ -2619,7 +2650,9 @@ def job_cancel(jid):
             job.update(phase='paused', error=None, output=None, eta=None)
             job['log'].append('— resume cancelled; saved checkpoint retained —')
         elif job.get("phase") in _ACTIVE_PHASES:
-            job.update(phase="cancelled", error="cancelled by user", eta=None)
+            step = "render" if job.get("phase") in ("rendering", "queued_render") else "scan"
+            job.update(phase="cancelled", error="cancelled by user", eta=None,
+                       failed_action=step)
             job["log"].append("— cancelled —")
         if job.get("trackbg", {}).get("state") == "running":
             job["trackbg"] = {"state": "done", "added": 0,
@@ -6675,14 +6708,22 @@ async function loadJobs(){
   `<div class="row" style="justify-content:space-between;padding:4px 0">
    <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
-   ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+   ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?(j.failed_action==="render"?`<a href="#" title="Retry the render — keeps your review choices" style="text-decoration:none;font-size:15px" onclick="retryRender('${j.id}');return false">&#8635;</a>`:`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`):""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
 }
 
-async function retryJob(id){
+async function retryJob(id,afterRender=false){
+ if(afterRender&&!confirm("Scan again from the start? The new scan replaces this job's review, so your Blur / Keep visible choices and box edits are discarded. To keep them, use Retry render instead."))return;
  const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
  let j={};try{j=await r.json();}catch(e){}
  if(!r.ok){alert(j.error||"could not retry the job");return;}
+ JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+}
+// A failed render keeps the scan and the saved review: render it again.
+async function retryRender(id){
+ const r=await fetch("api/jobs/"+id+"/render",{method:"POST"});
+ let j={};try{j=await r.json();}catch(e){}
+ if(!r.ok){alert(j.error||"could not retry the render");return;}
  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
 }
 async function delJob(id){
@@ -7096,7 +7137,17 @@ async function refreshCycle(cycle){
    a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
   if(j.phase==="scanning"&&j.checkpoint_enabled)
    a+=`<button id="checkpointStop" class="sec" onclick="stopCheckpoint()" ${j.checkpoint_stopping?'disabled':''}>${j.checkpoint_stopping?'Stopping…':'Stop &amp; Review'}</button>`;
-  if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
+  if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished&&j.failed_action==="render")
+   a=`<button onclick="retryRender(CUR)">Retry render</button>
+    <button class="sec" onclick="loadReview()">Back to review</button>
+    <div style="width:100%;font-size:12px;color:#9ca3af">The render did not
+    finish, but the scan and your review choices are saved. <b>Retry render</b>
+    renders again with them (if the disk was full, free some space first).
+    <b>Back to review</b> lets you change choices first; then press Save edits
+    &amp; render.</div>
+    <div style="width:100%;font-size:12px"><a href="#" onclick="retryJob(CUR,true);return false">Scan again from the start</a>
+    <span style="color:#9ca3af">— discards your review choices</span></div>`;
+  else if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it

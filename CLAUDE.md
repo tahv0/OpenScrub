@@ -931,6 +931,17 @@ defined — there was a real UnboundLocalError from ordering once.
   report-less job rehydrates with its ORIGINAL settings for Retry.
   Client half: startScan resets any select with selectedIndex<0 to its
   defaultSelected option. Never add a sys.exit path reachable from a job.
+- FAILED RENDER KEEPS THE REVIEW: the worker records `failed_action`
+  ("render" | "scan", in `job_public`) on every error/cancel path (worker,
+  queued cancel, watchdog) and clears it when the job is queued again. A
+  render failure offers **Retry render** (POST /render — already allowed from
+  error/cancelled) and **Back to review**; "Scan again from the start" is a
+  small link behind a confirm, because a rescan writes a new report and drops
+  every Blur/Keep choice and box edit. Before this the only button after a
+  disk-full render was Retry scan. A full disk (ENOSPC, or "No space left on
+  device" in ffmpeg's stderr text) gets a hint naming the retry that keeps the
+  work. The render's half-written stage file is already removed on failure
+  (RenderDelivery.__exit__).
 - REQUEST PATHS (CodeQL py/path-injection): every route that turns a
   request value into a filesystem path calls `server_path_error` AND
   repeats its single-`startswith` containment guard INLINE before the
