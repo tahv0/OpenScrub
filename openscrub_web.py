@@ -55,6 +55,7 @@ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_rend
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import checkpoints
+from openscrub_internal import scan_progress
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal import diagnostics
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
@@ -814,6 +815,13 @@ def job_public(job):
         "checkpoint_unfinished": bool(job.get("_checkpoint_unfinished")),
         # "render" | "scan" | None: which step an error/cancelled job was on
         "failed_action": job.get("failed_action"),
+        # stop and continue: a running scan offers Stop when it supports it;
+        # a stopped one says where it stopped
+        "stop_supported": getattr(FILES.initialize(job).active, 'progress_stop', None) is not None,
+        "stopping": bool(getattr(getattr(FILES.initialize(job).active, 'progress_stop', None),
+                                 'is_set', lambda: False)()),
+        "stopped_frame": job.get("stopped_frame"),
+        "stopped_total": job.get("stopped_total"),
         "download_name": video_name,
         "report_name": report_name,
     }
@@ -1762,19 +1770,24 @@ def _run_job(job, action, owner=None):
             _finish_operation(job, owner)
     jid = job["id"]
     files = FILES.initialize(job)
+    progress_path = os.path.join(job["dir"], scan_progress.PROGRESS_NAME)
     with files.report_lock:
         if owner.operation is None:  # compatibility with old queue entries
             _begin_operation(job, owner)
         if not _operation_valid(job, owner):
             return
-        job["phase"] = "scanning" if action in ('scan', 'resume') else "rendering"
+        job["phase"] = "scanning" if action in ('scan', 'resume', 'continue') else "rendering"
         job["failed_action"] = None
         checkpoint_stop = (threading.Event() if action in ('scan', 'resume')
                            and job['options'].get('checkpoint_review') is True else None)
         owner.checkpoint_stop = checkpoint_stop
+        owner.progress_stop = None      # set once the scan is known to support Stop
+        if action == 'continue':
+            job["error"] = None
         generation = job.get('qgen', 0)
     sink = DIAGNOSTICS
-    diagnostic_ref = sink.start("scan" if action == "resume" else action) if sink is not None else None
+    diagnostic_ref = (sink.start("scan" if action in ("resume", "continue") else action)
+                      if sink is not None else None)
     outcome, diagnostic_error = "superseded", None
     escaped = False
     try:
@@ -1832,9 +1845,12 @@ def _run_job(job, action, owner=None):
         cb.publish_render = publish_render
         source = owner.source if owner is not None else job["video"]
         try:
-            if action in ('scan', 'resume'):
-                job["log"].append("— scan started —")
+            if action in ('scan', 'resume', 'continue'):
+                job["log"].append("— scan continued —" if action == 'continue'
+                                  else "— scan started —")
                 args = build_args(dict(job, video=source))
+                if action == 'continue' and checkpoint_stop is not None:
+                    raise ValueError('Stop & Review jobs continue with Resume')
                 if action == 'resume' and checkpoint_stop is None:
                     raise ValueError('resume requires an opted-in checkpoint scan')
                 if checkpoint_stop is not None:
@@ -1875,9 +1891,22 @@ def _run_job(job, action, owner=None):
                     _adopt_scan_source(job, owner)
                     outcome = "review"
                     return
-                state = openscrub.run_scan(args, cb)
+                control = None
+                if action == 'continue' or openscrub.stop_supported(args):
+                    if action == 'scan':
+                        scan_progress.remove(progress_path)   # a fresh scan starts over
+                    stop_event = threading.Event()
+                    with files.report_lock:
+                        owner.progress_stop = stop_event
+                    control = scan_progress.ScanProgressControl(
+                        progress_path, stop_requested=stop_event.is_set,
+                        resume=(action == 'continue'),
+                        meta={"video": source, "name": job.get("name")})
+                state = openscrub.run_scan(args, cb, progress=control)
                 openscrub.write_report(os.path.join(job["dir"], "report.json"),
                                       args, state, publisher=cb.publish_report)
+                # The report is published: the saved progress has done its job.
+                scan_progress.remove(progress_path)
                 with files.report_lock:
                     if not _operation_valid(job, owner):
                         return
@@ -1978,7 +2007,20 @@ def _run_job(job, action, owner=None):
                             return
                         job.update(output=res["output"], phase="done", progress=1.0, eta=None)
                 outcome = "done"
+        except openscrub.ScanStopped as stop:
+            with files.report_lock:
+                if _operation_valid(job, owner) and not owner.operation.is_set():
+                    job.update(phase="stopped", stopped_frame=stop.frame,
+                               stopped_total=stop.total, error=None, eta=None,
+                               progress=_stopped_progress(stop.frame, stop.total))
+                    job["log"].append("— stopped at frame %d of %d; progress saved —"
+                                      % (stop.frame, stop.total))
+                    outcome = "cancelled"
+                else:
+                    scan_progress.remove(progress_path)   # cancelled meanwhile
         except openscrub.PipelineCancelled:
+            if action in ('scan', 'continue'):
+                scan_progress.remove(progress_path)       # Cancel discards progress
             recovery = _has_render_recovery(job["dir"])
             with files.report_lock:
                 if recovery:
@@ -2000,12 +2042,32 @@ def _run_job(job, action, owner=None):
                     files.recovery_required = True
                     job.update(phase="error", error="render delivery requires recovery", eta=None)
                 if not committed and not files.recovery_required and _operation_valid(job, owner):
-                    job["phase"] = "error"
                     outcome, diagnostic_error = "error", error_code
-                    job["failed_action"] = _failed_step(action)
-                    msg = _with_disk_full_hint(msg, e, job["failed_action"])
-                    job["error"] = msg
-                    job["log"].append(f"ERROR: {msg}")
+                    saved = (_saved_progress_frame(progress_path)
+                             if action in ('scan', 'continue') else None)
+                    if saved is not None:
+                        # The scan's progress survives the error: keep the job
+                        # stopped so Continue carries on from the last save.
+                        frame, total = saved
+                        if isinstance(e, scan_progress.ProgressError):
+                            reason = (e.what if isinstance(e, scan_progress.ProgressMismatch)
+                                      else msg)
+                            msg = ("Can't continue: %s. Cancel the scan and start it again."
+                                   % reason)
+                        else:
+                            msg = _with_disk_full_hint(msg, e, "continue")
+                            msg = ("The scan stopped because of an error at %d%% (%s). "
+                                   "Continue scan carries on from the last save."
+                                   % (int(100 * frame / max(total, 1)), msg))
+                        job.update(phase="stopped", stopped_frame=frame, stopped_total=total,
+                                   progress=_stopped_progress(frame, total), error=msg)
+                        job["log"].append(f"ERROR: {msg}")
+                    else:
+                        job["phase"] = "error"
+                        job["failed_action"] = _failed_step(action)
+                        msg = _with_disk_full_hint(msg, e, job["failed_action"])
+                        job["error"] = msg
+                        job["log"].append(f"ERROR: {msg}")
         finally:
             with files.report_lock:
                 if _operation_valid(job, owner):
@@ -2027,6 +2089,29 @@ def _run_job(job, action, owner=None):
                     WORKER.pop("diagnostic_ref", None)
 
 
+def _stopped_progress(frame, total):
+    # The scan frame loop fills the first 45% of the bar (WebCallbacks.progress).
+    return round(0.45 * frame / max(total, 1), 5)
+
+
+def _saved_progress(path):
+    """(next_frame, total, meta) of a job's saved scan progress, or None."""
+    try:
+        state = scan_progress.load(path)
+        meta = state.get("meta")
+        return (int(state["next_frame"]), int(state["total"]),
+                meta if isinstance(meta, dict) else {})
+    except (OSError, scan_progress.ProgressError, KeyError, TypeError, ValueError,
+            AttributeError):
+        return None
+
+
+def _saved_progress_frame(path):
+    """(next_frame, total) of a job's saved scan progress, or None."""
+    saved = _saved_progress(path)
+    return None if saved is None else saved[:2]
+
+
 def _failed_step(action):
     """Which step a failed/cancelled job was on: the page offers Retry render
     (keeps the review) for a render and Retry scan for a scan."""
@@ -2041,6 +2126,7 @@ def _with_disk_full_hint(msg, error, step):
     if not full:
         return msg
     retry = ("press Retry render — your review choices are kept" if step == "render"
+             else "press Continue scan" if step == "continue"
              else "press Retry scan")
     return f"{msg} — the disk is full. Free some disk space, then {retry}."
 
@@ -2063,7 +2149,16 @@ def check_worker():
     with JOBS_LOCK:
         job = JOBS.get(jid) if jid else None
         lost_action = job is not None and job.get("phase") in _ACTIVE_PHASES
-        if lost_action:
+        saved = (_saved_progress_frame(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
+                 if lost_action and job.get("phase") in ("scanning", "queued") else None)
+        if saved is not None:
+            # The scan's autosaved progress survives the dead worker.
+            job.update(phase="stopped", stopped_frame=saved[0], stopped_total=saved[1],
+                       progress=_stopped_progress(*saved), eta=None,
+                       error="the job worker stopped unexpectedly — Continue scan "
+                             "carries on from the last save")
+            job["log"].append("ERROR: " + job["error"])
+        elif lost_action:
             rendering = job.get("phase") in ("rendering", "queued_render")
             job["phase"] = "error"
             job["eta"] = None
@@ -2606,6 +2701,49 @@ def job_stop(jid):
     return jsonify(state='stopping'), 202
 
 
+@app.route('/api/jobs/<jid>/stop_scan', methods=['POST'])
+def job_stop_scan(jid):
+    """Stop a running scan after its current frame and save its progress,
+    so Continue scan can carry on later (frees the GPU in between)."""
+    job = JOBS.get(jid) or abort(404)
+    files = FILES.initialize(job)
+    with files.report_lock:
+        owner = files.active
+        stop = getattr(owner, 'progress_stop', None)
+        if (job.get('phase') != 'scanning' or owner is None or stop is None
+                or not _operation_valid(job, owner) or owner.operation.is_set()):
+            return jsonify(error='this scan cannot be stopped and continued'), 409
+        stop.set()
+        job['log'].append('— stopping: saving progress after the current frame —')
+    return jsonify(state='stopping'), 202
+
+
+@app.route('/api/jobs/<jid>/continue', methods=['POST'])
+def job_continue(jid):
+    """Queue a stopped scan to carry on from its saved progress."""
+    job = JOBS.get(jid) or abort(404)
+    prepared = _prepare_work(job, 'continue')
+    ticket = None
+    try:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            _report_current(job)
+            if files.active is not None or files.work > 1:
+                return jsonify(error='job work is still cleaning up'), 409
+            if job.get('phase') != 'stopped':
+                return jsonify(error='only a stopped scan can be continued'), 409
+            if not os.path.exists(os.path.join(job['dir'], scan_progress.PROGRESS_NAME)):
+                return jsonify(error='this job has no saved scan progress'), 409
+            job.update(error=None, eta=None)
+            job['log'].append('— continuing the stopped scan —')
+            ticket = _reserve_queue_locked(job, 'continue', prepared)
+    finally:
+        if ticket is None:
+            prepared.release()
+    enqueue(job, 'continue', ticket)
+    return jsonify(ok=True)
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     """Cancel a job. The job the worker is RUNNING stops cooperatively at
@@ -2649,11 +2787,21 @@ def job_cancel(jid):
             files.source_report_bound = False
             job.update(phase='paused', error=None, output=None, eta=None)
             job['log'].append('— resume cancelled; saved checkpoint retained —')
+        elif job.get("phase") == "stopped":
+            # Cancel discards a stopped scan's saved progress.
+            scan_progress.remove(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
+            job.update(phase="cancelled", error="cancelled by user", eta=None,
+                       failed_action="scan")
+            job["log"].append("— cancelled; saved scan progress discarded —")
         elif job.get("phase") in _ACTIVE_PHASES:
             step = "render" if job.get("phase") in ("rendering", "queued_render") else "scan"
             job.update(phase="cancelled", error="cancelled by user", eta=None,
                        failed_action=step)
             job["log"].append("— cancelled —")
+            if step == "scan" and files.active is None:
+                # nothing is running that could still save: discard now (a
+                # running scan discards its own progress when it sees Cancel)
+                scan_progress.remove(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
         if job.get("trackbg", {}).get("state") == "running":
             job["trackbg"] = {"state": "done", "added": 0,
                               "error": "cancelled by user"}
@@ -10858,6 +11006,48 @@ def rehydrate_jobs():
         return _rehydrate_jobs()
 
 
+def _register_stopped_job(jid, jdir, progress_file):
+    saved = _saved_progress(progress_file)
+    opts = {}
+    try:
+        with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
+            opts = json.load(f)
+        if not isinstance(opts, dict):
+            opts = {}
+    except (OSError, ValueError):
+        opts = {}
+    up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
+               if os.path.exists(os.path.join(jdir, "input" + e))), None)
+    frame, total, meta = saved if saved is not None else (None, None, {})
+    video = meta.get("video") if isinstance(meta.get("video"), str) else up
+    name = meta.get("name") if isinstance(meta.get("name"), str) else (
+        os.path.basename(video) if video else jid)
+    if saved is None:
+        error = ("the saved scan progress is unreadable — Cancel the scan and "
+                 "start it again")
+    elif not video or not os.path.exists(video):
+        error = ("source video not found at %s — Continue scan works again once "
+                 "the video is available at that path" % (video or "(unknown)"))
+    else:
+        error = None
+    try:
+        size = os.path.getsize(video) if video else 0
+    except OSError:
+        size = 0
+    job = {
+        "id": jid, "dir": jdir, "video": video, "name": name, "options": opts,
+        "phase": "stopped", "stopped_frame": frame, "stopped_total": total,
+        "progress": _stopped_progress(frame or 0, total or 1), "size": size,
+        "log": JobLog(["(recovered after server restart — the scan was stopped "
+                       "with its progress saved)"]),
+        "error": error, "output": None, "created": os.path.getmtime(jdir),
+        "cancel": threading.Event(), "stats": {},
+    }
+    FILES.initialize(job)
+    with JOBS_LOCK:
+        JOBS[jid] = job
+
+
 def _rehydrate_jobs():
     """Re-register jobs found on disk after a restart. A job with a report
     is a reviewable job; one with an output file is a finished one — either
@@ -10902,6 +11092,17 @@ def _rehydrate_jobs():
             FILES.initialize(job).recovery_required = True
             with JOBS_LOCK:
                 JOBS[jid] = job
+            n += 1
+            continue
+        progress_file = os.path.join(jdir, scan_progress.PROGRESS_NAME)
+        scan_progress.discard_stage(progress_file)
+        if os.path.exists(rep) and os.path.exists(progress_file):
+            # published, but stopped before the progress file was removed
+            scan_progress.remove(progress_file)
+        if not os.path.exists(rep) and os.path.exists(progress_file):
+            # A stopped (or crashed, autosaved) scan: list it as stopped even
+            # when its source video is not mounted right now.
+            _register_stopped_job(jid, jdir, progress_file)
             n += 1
             continue
         if not os.path.exists(rep):
@@ -11047,6 +11248,28 @@ def retention_sweep(days):
                     _reap_job_dir(p, jid, retries=1)
 
 
+def stop_scan_for_shutdown(timeout=20.0, poll=0.2):
+    """docker stop: ask a running stoppable scan to save its progress first.
+
+    Waits at most `timeout` seconds; a save that does not finish in time
+    leaves the last autosave. Returns True when the scan stopped."""
+    jid = WORKER.get("current")
+    job = JOBS.get(jid) if jid else None
+    if job is None or job.get("phase") != "scanning":
+        return False
+    stop = getattr(FILES.initialize(job).active, 'progress_stop', None)
+    if stop is None:
+        return False
+    stop.set()
+    print("stopping the running scan to save its progress…", flush=True)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if job.get("phase") != "scanning":
+            return job.get("phase") == "stopped"
+        time.sleep(poll)
+    return False
+
+
 def retention_loop(days):
     while True:
         retention_sweep(days)
@@ -11126,6 +11349,7 @@ def main():
             os._exit(1)
         _terming.append(1)
         print("SIGTERM — locking vault before exit…")
+        stop_scan_for_shutdown()
         _shutdown("sigterm")
         os._exit(0)
     signal.signal(signal.SIGTERM, _on_sigterm)

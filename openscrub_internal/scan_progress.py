@@ -280,6 +280,14 @@ def load(path):
     return doc["state"]
 
 
+def discard_stage(path):
+    """Delete a stage file left by a save that never finished."""
+    try:
+        os.remove(path + _STAGE)
+    except FileNotFoundError:
+        pass
+
+
 def remove(path):
     """Delete the progress file and any leftover stage file."""
     for name in (path, path + _STAGE):
@@ -304,7 +312,7 @@ class ScanProgressControl:
     AUTO_MIN, AUTO_MAX, AUTO_FACTOR = 60.0, 300.0, 100.0
 
     def __init__(self, path, *, stop_requested, resume, autosave_seconds="auto",
-                 clock=time.monotonic):
+                 clock=time.monotonic, meta=None):
         if not callable(stop_requested):
             raise TypeError("stop_requested must be callable")
         self.path = path
@@ -318,6 +326,9 @@ class ScanProgressControl:
         self.next_frame = 0      # the engine's next frame, set at each boundary
         self.autosave_disabled = False
         self._save_cost = 0.0
+        # caller facts saved beside the state (the web stores the source
+        # video and job name, so a restart can list the stopped job)
+        self.meta = dict(meta or {})
 
     def autosave_interval(self):
         if self.autosave_seconds != "auto":

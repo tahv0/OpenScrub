@@ -9393,6 +9393,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
         started = time.monotonic()
         scan_progress.save(progress.path, {
             "identity": _progress_identity(), "next_frame": idx, "total": total,
+            "meta": getattr(progress, "meta", None) or {},
             "raw": [scan_progress.encode_detection(d) for d in raw],
             "cum": [list(p) for p in cum], "bands": [list(p) for p in bands],
             "scene_cuts": list(scene_cuts), "cut_idx": cut_idx,
