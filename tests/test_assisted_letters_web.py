@@ -192,19 +192,46 @@ def test_render_reminder_present_and_no_per_card_warning():
         assert "no box fallback" not in body and "letterGap" not in body
 
 
-def test_render_reminder_cancel_sends_nothing_and_ordinary_jobs_are_not_asked():
+def test_render_reminder_after_save_uses_the_fresh_gap_count():
     from test_review_save_failures import run_js
-    # The harness's confirm() answers Cancel and records nothing; count calls.
-    run_js("""let asked=[];confirm=m=>{asked.push(m);return false;};
-    setup();LETTER_GAPS={jobId:'A',mode:'assisted',gaps:[{},{},{}]};
-    if(await saveAndRender()!==false)throw Error('cancelled render went ahead');
-    if(calls.length)throw Error('cancel still sent '+calls.length+' request(s)');
-    if(asked.length!==1||!asked[0].startsWith('Letters only, no box fallback: 3 gaps listed in Review'))
+    # save -> fetch the gap list of the report just saved -> confirm -> render
+    run_js("""let asked=[];confirm=m=>{asked.push(m);return true;};setup();
+    LETTER_GAPS={jobId:'A',mode:'assisted',gaps:[{},{},{},{},{}]};   // stale: 5 before the edits
+    const p=saveAndRender();
+    if(calls.length!==1||!calls[0].url.endsWith('/detections')||asked.length)throw Error('save not first');
+    await reply();
+    if(calls.length!==2||calls[1].url!=='api/jobs/A/letter_gaps'||asked.length)throw Error('no fresh gap fetch');
+    await reply({mode:'assisted',gaps:[{},{}],stats:{}});
+    if(asked.length!==1||!asked[0].startsWith('Letters only, no box fallback: 2 gaps listed in Review'))
       throw Error('reminder: '+JSON.stringify(asked));
-    LETTER_GAPS={jobId:'A',mode:'off',gaps:[]};const p=saveAndRender();
-    if(asked.length!==1||calls.length!==1)throw Error('ordinary job asked or did not save');
-    while(queue.length)await reply();await p;
-    if(!calls.some(c=>c.url.endsWith('/render')))throw Error('ordinary job did not render');""")
+    if(calls.length!==3||!calls[2].url.endsWith('/render'))throw Error('render not after confirm');
+    await reply();if(await p!==true)throw Error('render not reported');""")
+
+
+def test_render_reminder_cancel_keeps_saved_edits_and_does_not_render():
+    from test_review_save_failures import run_js
+    run_js("""let asked=[];confirm=m=>{asked.push(m);return false;};setup();
+    LETTER_GAPS_LOAD={jobId:'A',promise:Promise.resolve({mode:'assisted',gaps:[{}]})};
+    const p=saveAndRender();await reply();await reply({mode:'assisted',gaps:[{},{},{}],stats:{}});
+    if(await p!==false)throw Error('cancelled render went ahead');
+    if(calls.some(c=>c.url.endsWith('/render')))throw Error('cancel still rendered');
+    if(asked.length!==1||!asked[0].includes(' 3 gaps listed'))throw Error('reminder: '+JSON.stringify(asked));
+    if(MAN.length||BE.adds.length||hasReviewEdits(EDITS))throw Error('saved edits not acknowledged');
+    if(!document.getElementById('reviewSaveStatus').textContent.includes('Edits saved. Render cancelled'))
+      throw Error('status: '+document.getElementById('reviewSaveStatus').textContent);""")
+
+
+def test_render_reminder_failed_gap_fetch_asks_and_ordinary_jobs_are_not_asked():
+    from test_review_save_failures import run_js
+    run_js("""let asked=[];confirm=m=>{asked.push(m);return false;};
+    setup();const p=saveAndRender();          // ordinary job: save then render, never asked
+    await reply();if(calls.length!==2||!calls[1].url.endsWith('/render'))throw Error('ordinary job');
+    await reply();await p;if(asked.length)throw Error('ordinary job asked');
+    calls.length=0;openJob('A');setup();
+    LETTER_GAPS_LOAD={jobId:'A',promise:Promise.resolve({mode:'assisted',gaps:[]})};
+    const q=saveAndRender();await reply();queue.shift().reject(Error('offline'));await tick();
+    if(await q!==false||calls.some(c=>c.url.endsWith('/render')))throw Error('failed fetch rendered');
+    if(asked.length!==1||!asked[0].includes('could not be checked'))throw Error(JSON.stringify(asked));""")
 
 
 from test_scan_options import intake  # noqa: E402,F401
@@ -243,19 +270,6 @@ sel.value="full";plateCoverChanged(sel);if(asked.length!==2)throw Error("asked f
     result = subprocess.run([node], input="var confirm;" + script, capture_output=True,
                             text=True, timeout=15)
     assert result.returncode == 0, result.stderr
-
-
-def test_render_reminder_waits_for_the_review_gap_load():
-    from test_review_save_failures import run_js
-    run_js("""let asked=[];confirm=m=>{asked.push(m);return false;};
-    setup();const p=saveAndRender();          // ordinary job: saves at once
-    if(calls.length!==1)throw Error('ordinary save delayed');
-    while(queue.length)await reply();await p;calls.length=0;asked=[];
-    LETTER_GAPS_LOAD={jobId:'A',promise:Promise.resolve({mode:'assisted',gaps:[{}]})};
-    if(await saveAndRender()!==false||calls.length||asked.length!==1||!asked[0].includes(' 1 gaps listed'))
-      throw Error('assisted load: '+JSON.stringify(asked));
-    LETTER_GAPS_LOAD={jobId:'A',promise:Promise.reject(Error('offline'))};LETTER_GAPS_LOAD.promise.catch(()=>{});
-    if(await saveAndRender()!==false||calls.length||asked.length!==2)throw Error('failed load rendered');""")
 
 
 def _set_report(job, **settings):

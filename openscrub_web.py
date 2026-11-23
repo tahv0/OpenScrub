@@ -8648,6 +8648,9 @@ async function loadLetterGaps(id,gen){
  let g,err=null;
  try{g=await startLetterGapLoad(id);}catch(e){err=e;}
  if(!ownsView(id,gen))return;
+ renderLetterGaps(id,g,err);
+}
+function renderLetterGaps(id,g,err){
  const el=document.getElementById("letterGaps");if(!el)return;
  if(err){el.hidden=false;el.textContent="Plate letter gaps could not be checked ("+err.message+"). Open Review again to retry.";return;}
  if(g.mode!=="assisted"){el.hidden=true;el.innerHTML="";return;}
@@ -8673,14 +8676,20 @@ async function openLetterGap(t0){
  sl.value=String(cp?Math.floor(t0*cp.fps):t0);
  beScrub();
 }
-// -> true to render (or a promise of it). Only assisted jobs start a gap load
-// (Review / done view), so an ordinary job's save stays synchronous.
-function assistedRenderGate(id){
- const decide=g=>g.mode!=="assisted"||confirm(ASSISTED_RENDER_REMINDER(g.gaps.length));
- const load=LETTER_GAPS_LOAD&&LETTER_GAPS_LOAD.jobId===id?LETTER_GAPS_LOAD.promise:null;
- if(load)return load.then(decide,()=>confirm("The plate letter gap list could not be checked. Render now?"));
- if(LETTER_GAPS&&LETTER_GAPS.jobId===id)return decide(LETTER_GAPS);
- return true;   // no gap load for this job: not an assisted job
+// Assisted jobs only (Review / done view start a gap load for them, so an
+// ordinary job's save stays synchronous and is never asked).
+function assistedLetterJob(id){
+ return !!(LETTER_GAPS_LOAD&&LETTER_GAPS_LOAD.jobId===id||LETTER_GAPS&&LETTER_GAPS.jobId===id&&LETTER_GAPS.mode==="assisted");
+}
+// Runs AFTER the edits are saved: the count comes from a fresh gap list of
+// the report just written, never from the list loaded before the edits.
+async function assistedRenderConfirm(id,gen){
+ let g=null,err=null;
+ try{g=await fetchLetterGaps(id);}catch(e){err=e;}
+ if(!ownsView(id,gen))return false;
+ renderLetterGaps(id,g,err);
+ if(err)return confirm("The plate letter gap list could not be checked. Render now?");
+ return g.mode!=="assisted"||confirm(ASSISTED_RENDER_REMINDER(g.gaps.length));
 }
 function disposeReview(){
  if(REVIEW_SCHED){const old=REVIEW_SCHED;REVIEW_SCHED=null;old.dispose();}
@@ -9562,14 +9571,8 @@ async function saveAndRender(resume=false){
  const id=CUR,gen=VIEW_GEN,d=EDITS,reviewOwner=REVIEW_SCHED,editorIntent=BE_OPEN_INTENT;
  if(!id||!d||d.busy)return false;
  if(resume?(PHPH!=='paused'||!REVIEW_META?.checkpoint||REVIEW_META.jobId!==id||REVIEW_META.viewGen!==gen):PHPH==='paused')return false;
- // Assisted plate letters: remind before anything is saved or sent.
- if(!resume){
-  const gate=assistedRenderGate(id);
-  if(gate!==true){
-   if(!(gate instanceof Promise?await gate:gate))return false;
-   if(!ownsView(id,gen)||EDITS!==d||d.busy)return false;
-  }
- }
+ // Assisted plate letters: save first, then remind with the fresh gap count.
+ const assistedJob=!resume&&assistedLetterJob(id);
  const b=d.editor;
  if(resume&&reviewGesturePending(b)){saveStatus(d,'Finish or cancel the current edit before resuming.');return false;}
  let submission;
@@ -9622,6 +9625,17 @@ async function saveAndRender(resume=false){
   }
   if(hasReviewEdits(d)){
    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+  }
+  if(assistedJob){
+   saveStatus(d,"Edits saved; checking plate letter gaps…"+allowError);
+   const go=await assistedRenderConfirm(id,gen);
+   if(!ownsView(id,gen)){
+    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+   }
+   if(!go){saveStatus(d,"Edits saved. Render cancelled — save again to render."+allowError);return false;}
+   if(hasReviewEdits(d)){
+    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+   }
   }
   saveStatus(d,"Edits saved; requesting render…");
   await reviewPost(`api/jobs/${id}/render`);
