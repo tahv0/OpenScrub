@@ -6485,6 +6485,16 @@ def _narrow_from_probability(crop, prob):
 LETTER_SIZES = (320, 640, 224)
 
 
+def _batch_errors():
+    """onnxruntime's own failure types, raised when a session refuses a batch."""
+    try:
+        from onnxruntime.capi import onnxruntime_pybind11_state as ort_err
+        return tuple(getattr(ort_err, n) for n in ("InvalidArgument", "Fail", "RuntimeException")
+                     if hasattr(ort_err, n))
+    except Exception:
+        return (RuntimeError,)
+
+
 class TextRegionDetector:
     """Scene-text region detector — the "anytext" category. Finds text
     REGIONS in the wild (street signs, name badges, papers on a desk,
@@ -6511,6 +6521,10 @@ class TextRegionDetector:
                 raise ValueError("text detector hash mismatch")
             self.sess = _ort_session(path)
             self._in = self.sess.get_inputs()[0].name
+            try:
+                self.log("      text model on %s" % self.sess.get_providers()[0])
+            except Exception:
+                pass
             self.log("      all-text detector: PP-OCRv5 det loaded "
                      "(text regions are blurred, never read)")
         except Exception as e:
@@ -6540,60 +6554,114 @@ class TextRegionDetector:
             return [], "inference_error"
         return [p + (x1, y1) for p in polys], reason
 
-    def _crop_probability(self, crop, size):
-        """Text probability map of a crop resized to `size` px long side, /32-aligned."""
+    @staticmethod
+    def _crop_blob(crop, size):
+        """Normalized NCHW blob of a crop resized to `size` px long side, /32-aligned."""
         ch, cw = crop.shape[:2]
         scale = float(size) / max(ch, cw)
         nh = max(32, int(round(ch * scale / 32)) * 32)
         nw = max(32, int(round(cw * scale / 32)) * 32)
         image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
         image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
-        blob = image.transpose(2, 0, 1)[None].astype(np.float32)
-        return self.sess.run(None, {self._in: blob})[0][0, 0]
+        return image.transpose(2, 0, 1)[None].astype(np.float32)
+
+    def _crop_probability(self, crop, size):
+        """Text probability map of a crop resized to `size` px long side, /32-aligned."""
+        return self.sess.run(None, {self._in: self._crop_blob(crop, size)})[0][0, 0]
+
+    def _crop_probabilities(self, crops, size):
+        """Probability map per crop (None where inference failed). Crops whose
+        resized shape matches go to the model in one batched call; a model that
+        refuses a batch above 1 is called one crop at a time from then on."""
+        blobs = [self._crop_blob(c, size) for c in crops]
+        groups = {}
+        for i, blob in enumerate(blobs):
+            groups.setdefault(blob.shape, []).append(i)
+        probs = [None] * len(crops)
+        for idxs in groups.values():
+            if len(idxs) > 1 and not getattr(self, "_batch_refused", False):
+                try:
+                    out = self.sess.run(None, {self._in: np.concatenate([blobs[i] for i in idxs])})[0]
+                    if out.shape[0] != len(idxs):
+                        raise _batch_errors()[0]("batch output has %d rows" % out.shape[0])
+                    for k, i in enumerate(idxs):
+                        probs[i] = out[k, 0]
+                    continue
+                except _batch_errors():
+                    self._batch_refused = True
+                    self.log("      text model: batching unavailable, using one crop per call")
+                except Exception:
+                    pass        # isolate the failure crop by crop below
+            for i in idxs:
+                try:
+                    probs[i] = self.sess.run(None, {self._in: blobs[i]})[0][0, 0]
+                except Exception:
+                    probs[i] = None
+        return probs
 
     def find_letters(self, frame, box, sizes=LETTER_SIZES):
-        """Plate lettering outline for the assisted cover, in frame pixels.
+        """Plate lettering outline for the assisted cover, in frame pixels
+        (see find_letters_many; `last_sizes` names the sizes that contributed)."""
+        out = self.find_letters_many(frame, [box], sizes)[0]
+        many = getattr(self, "last_sizes_many", None)
+        self.last_sizes = many[0] if many else ()
+        return out
+
+    def find_letters_many(self, frame, boxes, sizes=LETTER_SIZES):
+        """Lettering outlines for several plate boxes of one frame, per box.
 
         No strict check: only the plausibility rule discards specks. The
-        first size runs alone; when its outline is empty or implausible, the
-        other sizes run and every outline plausible on its own is unioned (a
-        union only adds cover). `last_sizes` names the sizes that contributed.
+        first size runs alone; boxes whose outline is empty or implausible
+        there run the other sizes, and every outline plausible on its own is
+        unioned (a union only adds cover). Crops of one resized shape share a
+        model call. `last_sizes_many[i]` names the sizes that contributed to
+        box i.
         """
-        self.last_sizes = ()
-        if self.sess is None:
-            return []
-        try:
-            h, w = frame.shape[:2]
-            x1, y1, x2, y2 = (int(v) for v in box)
-        except (TypeError, ValueError, OverflowError, AttributeError):
-            return []
-        # A plate at the frame edge still gets letters: use its visible part.
-        x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
-        if x2 - x1 < 8 or y2 - y1 < 8:
-            return []
-        crop = frame[y1:y2, x1:x2]
-        ch, cw = crop.shape[:2]
-
-        def outline(size):
+        boxes = list(boxes)
+        results = [[] for _ in boxes]
+        used = [[] for _ in boxes]
+        self.last_sizes_many = [() for _ in boxes]
+        if self.sess is None or not boxes:
+            return results
+        h, w = frame.shape[:2]
+        info = {}
+        for i, box in enumerate(boxes):
             try:
-                polys, reason = _restored_quads(crop, self._crop_probability(crop, size), clip=True)
-            except Exception:
-                return []
-            if reason or not polys or not _plausible_lettering([p / (cw, ch) for p in polys]):
-                return []
-            return polys
-
+                x1, y1, x2, y2 = (int(v) for v in box)
+            except (TypeError, ValueError, OverflowError, AttributeError):
+                continue
+            # A plate at the frame edge still gets letters: use its visible part.
+            x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+            if x2 - x1 < 8 or y2 - y1 < 8:
+                continue
+            info[i] = (frame[y1:y2, x1:x2], x1, y1)
         sizes = tuple(sizes)
-        found, used = [], []
-        for i, size in enumerate(sizes):
-            polys = outline(size)
-            if polys:
-                found += polys
-                used.append(size)
-            if i == 0 and polys:
+        pending = list(info)
+        for k, size in enumerate(sizes):
+            if not pending:
                 break
-        self.last_sizes = tuple(used)
-        return [p + (x1, y1) for p in found]
+            probs = self._crop_probabilities([info[i][0] for i in pending], size)
+            nxt = []
+            for i, prob in zip(pending, probs):
+                crop, x1, y1 = info[i]
+                ch, cw = crop.shape[:2]
+                polys = []
+                if prob is not None:
+                    try:
+                        polys, reason = _restored_quads(crop, prob, clip=True)
+                        if reason or not polys or not _plausible_lettering(
+                                [p / (cw, ch) for p in polys]):
+                            polys = []
+                    except Exception:
+                        polys = []
+                if polys:
+                    results[i] += [p + (x1, y1) for p in polys]
+                    used[i].append(size)
+                if not (k == 0 and polys):
+                    nxt.append(i)
+            pending = nxt
+        self.last_sizes_many = [tuple(u) for u in used]
+        return results
 
     def available(self):
         return self.sess is not None
@@ -9364,12 +9432,23 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                         and not in_ignore_region(box, args.ignore_regions))
 
             # zones are applied inside _maybe_tiled, before seam merging
-            for (px1, py1, px2, py2, pconf) in (
-                    _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate or assisted
-                                                       else detect_scale),
-                                 frame, plater.INPUT, tile_mode,
-                                 seam_allow=plate_allowed)
-                    if "plate" in _psc else []):
+            plate_rows = (_maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate or assisted
+                                                             else detect_scale),
+                                       frame, plater.INPUT, tile_mode,
+                                       seam_allow=plate_allowed)
+                          if "plate" in _psc else [])
+            frame_letters, frame_sizes = [], []
+            if assisted and letters_on and plate_rows:
+                # one batched text-model pass for all of this frame's plates
+                started = time.perf_counter()
+                try:
+                    frame_letters = texter.find_letters_many(
+                        frame, [r[:4] for r in plate_rows])
+                    frame_sizes = list(getattr(texter, "last_sizes_many", ()) or ())
+                except Exception:
+                    frame_letters, frame_sizes = [], []
+                letter_stats["seconds"] += time.perf_counter() - started
+            for plate_i, (px1, py1, px2, py2, pconf) in enumerate(plate_rows):
                 row = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),
@@ -9407,16 +9486,13 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                 elif assisted:
                     letter_stats["plates"] += 1
                     if letters_on:
-                        started = time.perf_counter()
-                        try:
-                            polygons = texter.find_letters(frame, (px1, py1, px2, py2))
-                        except Exception:
-                            polygons = []
-                        letter_stats["seconds"] += time.perf_counter() - started
+                        polygons = (frame_letters[plate_i]
+                                    if plate_i < len(frame_letters) else [])
                         row.poly = _box_normalized_letters(row, cx, cy, polygons)
                         if row.poly:
                             letter_stats["masked"] += 1
-                            for size in getattr(texter, "last_sizes", ()) or ():
+                            for size in (frame_sizes[plate_i]
+                                         if plate_i < len(frame_sizes) else ()):
                                 letter_stats["sizes"][size] = letter_stats["sizes"].get(size, 0) + 1
                 if optional_policy:
                     row._plate_policy_evidence = MappingProxyType({

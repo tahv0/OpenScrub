@@ -213,12 +213,16 @@ def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=
     class Text:
         def __init__(self, *a, **kw): pass
         def available(self): return text
-        def find_letters(self, frame, box):
-            seen.append(tuple(box))
-            self.last_sizes = (320,)
-            # one outline inside the box, one sticking out of it (clipped)
-            return [np.array([[20, 20], [70, 20], [70, 40], [20, 40]], np.float32),
-                    np.array([[5, 30], [90, 30], [90, 45], [5, 45]], np.float32)]
+        def find_letters_many(self, frame, boxes):
+            self.last_sizes_many = []
+            out = []
+            for box in boxes:
+                seen.append(tuple(box))
+                self.last_sizes_many.append((320,))
+                # one outline inside the box, one sticking out of it (clipped)
+                out.append([np.array([[20, 20], [70, 20], [70, 40], [20, 40]], np.float32),
+                            np.array([[5, 30], [90, 30], [90, 45], [5, 45]], np.float32)])
+            return out
         def find_plate(self, frame, box):
             raise AssertionError("assisted mode must not run the strict check")
 
@@ -610,3 +614,99 @@ def test_full_and_narrow_renders_unchanged_against_base_engine(tmp_path):
         old = _render_frames(base, tmp_path, coverage, "base")
         assert len(new) == len(old) == 4
         assert all(np.array_equal(a, b) for a, b in zip(new, old)), coverage
+
+
+# --- batching ----------------------------------------------------------------
+
+class _BatchSession:
+    """Fake text model that accepts batches and records every call's input shape."""
+
+    def __init__(self, rects, limit=None):
+        self.rects, self.limit, self.calls = rects, limit, []
+
+    def run(self, outputs, inputs):
+        blob = next(iter(inputs.values()))
+        n, _, h, w = blob.shape
+        self.calls.append(tuple(blob.shape))
+        if self.limit and n > self.limit:
+            from onnxruntime.capi import onnxruntime_pybind11_state as ort_err
+            raise ort_err.InvalidArgument("batch axis is fixed at 1")
+        prob = np.zeros((n, 1, h, w), np.float32)
+        rect = self.rects.get(max(h, w))
+        if rect:
+            x1, y1, x2, y2 = rect
+            prob[:, 0, int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)] = .9
+        return [prob]
+
+
+def _batch_detector(session):
+    det = openscrub.TextRegionDetector.__new__(openscrub.TextRegionDetector)
+    logs = []
+    det.sess, det._in, det.log = session, "x", logs.append
+    return det, logs
+
+
+BOXES = [(50, 50, 350, 150), (40, 50, 340, 150), (20, 20, 120, 180)]
+
+
+def test_find_letters_many_matches_single_calls_and_batches():
+    rects = {320: WORD}
+    det, _ = _batch_detector(_BatchSession(rects))
+    many = det.find_letters_many(FRAME, BOXES)
+    sessions_calls = det.sess.calls
+    single_det, _ = _batch_detector(_BatchSession(rects))
+    singles = [single_det.find_letters(FRAME, b) for b in BOXES]
+    assert len(many) == len(BOXES)
+    for got, want in zip(many, singles):
+        assert len(got) == len(want) > 0
+        for g, w in zip(got, want):
+            np.testing.assert_allclose(g, w)
+    # boxes 0 and 1 resize to one shape (one call of 2); box 2 is taller
+    assert len(sessions_calls) == 2 and sorted(c[0] for c in sessions_calls) == [1, 2]
+    assert len(single_det.sess.calls) == 3
+    assert det.last_sizes_many == [(320,)] * 3
+
+
+def test_find_letters_many_escalates_per_box_only():
+    class Mixed(_BatchSession):
+        def run(self, outputs, inputs):
+            out = super().run(outputs, inputs)
+            blob = next(iter(inputs.values()))
+            n, _, h, w = blob.shape
+            if max(h, w) == 320 and h > w:      # the tall crop gets a speck only
+                out[0][:] = 0
+                out[0][:, 0, int(.45 * h):int(.55 * h), int(.45 * w):int(.5 * w)] = .9
+            return out
+    det, _ = _batch_detector(Mixed({320: WORD, 640: WORD, 224: WORD}))
+    wide = (20, 20, 120, 180)       # 100x160: tall, speck at 320
+    many = det.find_letters_many(FRAME, [BOXES[0], wide])
+    assert det.last_sizes_many[0] == (320,)
+    assert det.last_sizes_many[1] == (640, 224)
+    assert many[0] and many[1]
+    # the first box never went on to 640/224
+    assert [c[0] for c in det.sess.calls if max(c[2:]) != 320] == [1, 1]
+    singles = _batch_detector(Mixed({320: WORD, 640: WORD, 224: WORD}))[0].find_letters(FRAME, wide)
+    for g, w in zip(many[1], singles):
+        np.testing.assert_allclose(g, w)
+
+
+def test_find_letters_many_falls_back_when_batching_is_refused():
+    rects = {320: WORD}
+    det, logs = _batch_detector(_BatchSession(rects, limit=1))
+    many = det.find_letters_many(FRAME, BOXES[:2])
+    want = [_batch_detector(_BatchSession(rects))[0].find_letters(FRAME, b) for b in BOXES[:2]]
+    for got, exp in zip(many, want):
+        assert len(got) == len(exp) > 0
+    assert logs.count("      text model: batching unavailable, using one crop per call") == 1
+    before = len(det.sess.calls)
+    det.find_letters_many(FRAME, BOXES[:2])
+    assert all(c[0] == 1 for c in det.sess.calls[before:])     # no more batch attempts
+    assert logs.count("      text model: batching unavailable, using one crop per call") == 1
+
+
+def test_find_letters_many_without_model_or_boxes():
+    det, _ = _batch_detector(None)
+    assert det.find_letters_many(FRAME, BOXES) == [[], [], []]
+    det, _ = _batch_detector(_BatchSession({320: WORD}))
+    assert det.find_letters_many(FRAME, []) == []
+    assert det.find_letters_many(FRAME, [(0, 0, 3, 3), BOXES[0]])[0] == []
