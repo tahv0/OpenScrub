@@ -818,3 +818,32 @@ def test_output_clip_resolves_like_the_render_loop():
             kept = [i for i in range(1000) if i / fps >= cs - 1e-6
                     and (ce is None or i / fps <= ce + 1e-6)]
             assert (first, end) == (kept[0], kept[-1] + 1)
+
+
+def test_untracked_plate_rows_are_logged_once_per_render(tmp_path):
+    rows = [_plate_row(0, _rect_poly(LETTER_RECT))]
+    loose = openscrub.Detection(0, .1, PLATE, "plate", "plate", .9)            # not dense
+    orphan = openscrub.Detection(0, .1, PLATE, "plate", "plate", .9, dense=True)  # track -1
+    logs = []
+    dets, _ = openscrub.apply_assisted_cover(rows + [loose, orphan], FPS, [], log=logs.append)
+    assert loose in dets and orphan in dets
+    assert logs == ["      assisted letters: 2 plate detections without a track get the full box"]
+    logs.clear()
+    openscrub.apply_assisted_cover(rows, FPS, [], log=logs.append)
+    assert logs == []
+    openscrub.apply_assisted_cover(rows + [loose], FPS, [])   # callers without a log still work
+    # run_render threads its callbacks through
+    source = tmp_path / "loose.mp4"
+    _plain_video(source, 2)
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args(
+        [str(source), "--mode", "box", "--pad", "0", "--plate-coverage", "assisted",
+         "--no-box-fallback", "-o", str(tmp_path / "loose_out.mp4")]), parser)
+
+    class CB(openscrub.Callbacks):
+        def log(self, msg):
+            logs.append(msg)
+
+    openscrub.run_render(args, {"fps": FPS, "cum": [(0, 0)] * 2, "bands": [(0, 0)] * 2,
+                                "detections": rows + [loose], "stats": {}}, CB())
+    assert logs.count("      assisted letters: 1 plate detection without a track gets the full box") == 1

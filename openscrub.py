@@ -4431,19 +4431,24 @@ def _assisted_row(d, poly):
     return row
 
 
-def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None):
+def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, log=None):
     """-> (render rows, CoverPlan) for --plate-coverage assisted.
 
     Dense plate rows get their own or a borrowed letter mask, rows the plan
     cannot cover are not painted (they are the plan's gaps), and each bridge
     becomes a one-frame row on the ending track. Non-plate rows pass through;
-    a manual quad row loses any poly so the quad painter alone decides."""
+    a manual quad row loses any poly so the quad painter alone decides.
+    Plate rows without a track pass through too (full box); `log`, when
+    given, gets one line with their count."""
     samples = []
     planned = set()
     aoffs = {}
+    untracked = 0
     for key, d in enumerate(dets):
-        if (d.category != "plate" or not d.dense or d.track < 0
-                or plate_quad.valid_record(d.manual_plate_quad)):
+        if d.category != "plate" or plate_quad.valid_record(d.manual_plate_quad):
+            continue
+        if not d.dense or d.track < 0:
+            untracked += 1
             continue
         evidence = getattr(d, "_plate_policy_evidence", None)
         if evidence is not None and not plate_policy.supported_geometry(d):
@@ -4460,6 +4465,9 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None):
             aoffs[d.track] = (d.t_end, tuple(d.aoff))
     plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count,
                                     first_frame=first_frame)
+    if untracked and log is not None:
+        log("      assisted letters: %d plate detection%s without a track get%s the full box"
+            % (untracked, "" if untracked == 1 else "s", "s" if untracked == 1 else ""))
     out = []
     for key, d in enumerate(dets):
         if key in planned:
@@ -10422,7 +10430,7 @@ def run_render(args, state, cb=None):
         # which plates are covered. The plan lives in state for the report.
         detections, plan = apply_assisted_cover(detections, state["fps"],
                                                 state.get("scene_cuts", []),
-                                                frame_count=len(state["cum"]))
+                                                frame_count=len(state["cum"]), log=cb.log)
         state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
         state["plate_letter_stats"] = dict(plan.stats)
         cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
