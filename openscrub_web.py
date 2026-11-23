@@ -3320,6 +3320,9 @@ def _letter_gap_plan(job):
                  "out_frame": g.frame - first} for g in plan.gaps]
         gaps.sort(key=lambda g: (g["t0"], g["track"]))
         result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats)}
+    # The report generation this list describes: a preview by index must
+    # name it, so a list from before a save never previews the new plan.
+    result["token"] = hashlib.sha256(repr(stamp).encode()).hexdigest()[:16]
     if os.name == "posix":
         with _REPORT_PARSE_GUARD:
             # A vault lock or delete during the computation must not repopulate.
@@ -4777,7 +4780,8 @@ def job_letter_gap(jid, n):
     """Preview of gap n: its middle frame of the scan video, plate box drawn."""
     job = JOBS.get(jid) or abort(404)
     result, fps = _letter_gap_plan(job)
-    if result["mode"] != "assisted" or not 0 <= n < len(result["gaps"]) or not fps:
+    if (result["mode"] != "assisted" or not 0 <= n < len(result["gaps"]) or not fps
+            or request.args.get("v") != result.get("token")):
         abort(404)
     gap = result["gaps"][n]
     t = gap["frame"] / fps
@@ -8658,7 +8662,7 @@ function renderLetterGaps(id,g,err){
  // floor: never round a partly covered job up to 100%
  const pct=masked+gapf?Math.floor(100*masked/(masked+gapf)):100;
  const items=g.gaps.map((x,n)=>`<button type="button" class="lgap" onclick="openLetterGap(${+x.t0})">
-  <img loading="lazy" alt="Plate gap preview" src="api/jobs/${id}/letter_gap/${n}.jpg">
+  <img loading="lazy" alt="Plate gap preview" src="api/jobs/${id}/letter_gap/${n}.jpg?v=${encodeURIComponent(g.token||"")}">
   <div>plate track ${+x.track}</div><div>${lgOutTime(x.out_t0??x.t0)}–${lgOutTime(x.out_t1??x.t1)}</div>
   <div>frame ${+(x.out_frame??x.frame)} · ${+x.frames} frame${+x.frames===1?"":"s"}</div></button>`).join("");
  el.hidden=false;

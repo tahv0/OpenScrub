@@ -143,14 +143,36 @@ def test_letter_gaps_route_reports_off_for_other_jobs(store):
 
 def test_letter_gap_preview_is_a_jpeg(store):
     job = store("assisted")
-    response = get("/api/jobs/%s/letter_gap/0.jpg" % job["id"])
+    token = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()["token"]
+    response = get("/api/jobs/%s/letter_gap/0.jpg?v=%s" % (job["id"], token))
     assert response.status_code == 200
     assert response.mimetype == "image/jpeg"
     image = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_COLOR)
     assert image is not None and image.shape[0] == 240
-    assert get("/api/jobs/%s/letter_gap/9.jpg" % job["id"]).status_code == 404
+    assert get("/api/jobs/%s/letter_gap/9.jpg?v=%s" % (job["id"], token)).status_code == 404
     off = store("full")
     assert get("/api/jobs/%s/letter_gap/0.jpg" % off["id"]).status_code == 404
+
+
+def test_letter_gap_preview_refuses_a_list_from_an_older_report(store):
+    job = store("assisted")
+    token = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()["token"]
+    assert isinstance(token, str) and token
+    url = "/api/jobs/%s/letter_gap/0.jpg" % job["id"]
+    assert get(url).status_code == 404                     # no token
+    assert get(url + "?v=stale").status_code == 404
+    assert get(url + "?v=" + token).status_code == 200
+    # a save rewrites the report: the old list's index no longer applies
+    path = Path(job["dir"]) / "report.json"
+    doc = json.loads(path.read_text())
+    doc["detections"] = doc["detections"][5:]               # only track 1 is left
+    path.write_text(json.dumps(doc, indent=1))
+    fresh = get("/api/jobs/%s/letter_gaps" % job["id"]).get_json()
+    assert fresh["token"] != token and len(fresh["gaps"]) == 1
+    assert get(url + "?v=" + token).status_code == 404
+    assert get(url + "?v=" + fresh["token"]).status_code == 200
+    # Review builds the preview URL with the list's token
+    assert "letter_gap/${n}.jpg?v=${encodeURIComponent(g.token" in web.PAGE
 
 
 ASSISTED_CONFIRM = ("Letters only, no box fallback: where letters are not found clearly, "
