@@ -6541,6 +6541,7 @@ class TextRegionDetector:
             self.log("      all-text detector unavailable (%s) — the "
                      "anytext category is INACTIVE this run" % e)
             self.sess = None
+            self.error = str(e) or type(e).__name__
 
     def find_plate(self, frame, box):
         try:
@@ -8909,8 +8910,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     if assisted:
         cb.log("      assisted letters: locating plates and their letters on every frame at full resolution")
         if not letters_on:
-            cb.log("      assisted letters: text model unavailable — NO plate gets a letter "
-                   "mask this run, so every plate frame is a gap. Review all of them.")
+            # Refuse like the inert-category guard: without the text model no
+            # plate gets a mask, so an overnight scan would cover nothing.
+            reason = (getattr(texter, "error", None) if texter is not None else None) \
+                or "unknown reason"
+            raise RuntimeError("letters only, no box fallback needs the text model, "
+                               "which could not be loaded: %s" % reason)
     letter_stats = {"plates": 0, "masked": 0, "seconds": 0.0,
                     "sizes": {size: 0 for size in LETTER_SIZES}}
     scene_cuts, cut_sig, cut_idx = [], None, -1

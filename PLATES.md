@@ -197,7 +197,9 @@ be checked by a person.
 **Turn it on.** Scan Setup, Advanced, Plate cover: choose "Letters only, no box
 fallback (experimental, slow)" and confirm the dialog. On the command line,
 `--plate-coverage assisted` is refused unless `--no-box-fallback` is also given.
-The choice is saved in the report and reused for re-renders.
+The choice is saved in the report and reused for re-renders. If the text model
+cannot be loaded, the scan is refused before any frame is read: without it no
+plate would get a mask.
 
 **What it does.** On every frame with a detected plate the text model runs on the
 crop at 320 px; boxes whose outline is empty or implausible also run 640 and 224

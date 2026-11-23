@@ -211,7 +211,9 @@ def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=
             return [(10, 10, 80, 50, .9)]
 
     class Text:
-        def __init__(self, *a, **kw): pass
+        def __init__(self, *a, **kw):
+            if not text:
+                self.error = "synthetic load failure"
         def available(self): return text
         def find_letters_many(self, frame, boxes):
             self.last_sizes_many = []
@@ -262,11 +264,17 @@ def test_assisted_scan_stores_masks_and_cuts(tmp_path, monkeypatch):
             "320:6 640:0 224:0; text model 0.0 s") in state["_logs"]
 
 
-def test_assisted_scan_without_text_model_keeps_plates(tmp_path, monkeypatch):
-    state = scan_assisted(tmp_path, monkeypatch, text=False)
-    plates = [d for d in state["detections"] if d.category == "plate"]
-    assert plates and not any(d.poly for d in plates) and not state["_seen"]
-    assert any("text model unavailable" in m for m in state["_logs"])
+def test_assisted_scan_without_text_model_is_refused(tmp_path, monkeypatch):
+    # An overnight scan that can mask no letters would cover nothing at all.
+    decoded = []
+    real = openscrub.cv2.VideoCapture
+    monkeypatch.setattr(openscrub.cv2, "VideoCapture",
+                        lambda *a, **k: decoded.append(a) or real(*a, **k))
+    with pytest.raises(RuntimeError) as err:
+        scan_assisted(tmp_path, monkeypatch, text=False)
+    assert str(err.value) == ("letters only, no box fallback needs the text model, "
+                              "which could not be loaded: synthetic load failure")
+    assert not decoded                          # refused before reading frames
 
 
 def test_fast_skip_resume_counts_as_a_cut(tmp_path, monkeypatch):
