@@ -290,7 +290,15 @@ Key classes/functions (locate with grep, line numbers drift):
   re-renders stay correct. Report fields (additive): `scene_cuts`,
   `plate_letter_gaps`, `plate_letter_stats`; provenance `plate_coverage: assisted`.
   Keep/undecided plates are not gaps; an enabled sample with no mask is. Full and
-  strict modes must stay byte-identical.
+  strict modes must stay byte-identical. The planner counts a sample's frames by the
+  RENDERER's rule (`idx/fps` within `[t0-0.01, t1+0.01]`, `RENDER_TOL_S`; rounding
+  hid a half-frame-start gap). A full/strict render of a letters only report
+  (saved `plate_coverage: assisted` or a `scene_cuts` key) clears plate polys on
+  copies -> full boxes. No text model -> the assisted scan is REFUSED. The gap
+  route adds `out_t0/out_t1/out_frame` (rendered-video timeline via the shared
+  `resolve_output_clip`/`output_frame_range`; HDR ignores trim) and a report
+  `token` the preview URL must carry (`?v=`, else 404). The render reminder runs
+  AFTER the save, on a fresh `/letter_gaps`.
 - Tiled detection (`_maybe_tiled`, `--tile auto|on|off`): when the
   frame long side >= 2.6x the YOLO input (4K vs 640), plates/person/
   screen ALSO scan an overlapping 2x2 (3x3 at >=5.2x) tile grid; boxes

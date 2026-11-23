@@ -214,8 +214,11 @@ recorded in the report as `scene_cuts`).
 **Gaps.** A gap is a run of frames where a plate that should be covered has no
 letter mask, own or borrowed. Gaps are listed in Review (plate, start and end
 time, frames, a preview, click to jump) with a summary such as "letters covered
-on 92% of plate frames". Review shows one notice at the top, and rendering
-reminds you how many gaps stay uncovered. Plates left visible by a Keep choice or
+on 92% of plate frames". Times and frame numbers are those of the rendered video
+(H:MM:SS.mmm), so they can be typed straight into a video editor. Review shows one
+notice at the top, and rendering (after your edits are saved) reminds you how many
+gaps stay uncovered. Moving or resizing a plate box does not cover a gap; use Track
+object on that plate instead. Plates left visible by a Keep choice or
 an undecided card are not gaps; Review already lists them as cards.
 
 **Bridged stretches are not listed as gaps.** Listing them would add checking
@@ -228,4 +231,5 @@ identify someone; blur and mosaic may be reversible. The scan checks every frame
 at full resolution and is slow; leaving it running overnight is fine. Native SDR
 and HDR renders both use it. Report fields: `plate_letter_gaps`,
 `plate_letter_stats`, `scene_cuts` (additive). Full-box and strict modes are
-unchanged.
+unchanged; rendering a letters only report with full or strict cover gives full
+plate boxes, never letter masks.
