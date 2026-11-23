@@ -7318,10 +7318,12 @@ async function refreshCycle(cycle){
  if(SHELLPH!==shellPhase){
   SHELLPH=shellPhase;
   let a="";
-  if(j.phase=="scanning"||j.phase=="rendering")
-   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
-  if(j.phase==="scanning"&&j.stop_supported)
-   a+=`<button id="scanStop" class="sec" title="Stop the scan and free the GPU. Continue later from this point." onclick="stopScan()" ${j.stopping?'disabled':''}>${j.stopping?'Stopping…':'Stop'}</button>`;
+  if(j.phase=="scanning"||j.phase=="rendering"){
+   // Stop (and Continue, once stopped) always sit on the left, Cancel right
+   if(j.phase==="scanning"&&j.stop_supported)
+    a=`<button id="scanStop" class="sec" title="Stop the scan and free the GPU. Continue later from this point." onclick="stopScan()" ${j.stopping?'disabled':''}>${j.stopping?'Stopping…':'Stop'}</button>`;
+   a+=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  }
   if(j.phase==="stopped")
    a=`<div style="width:100%"><b>Stopped at ${stoppedPct(j)}% (frame ${j.stopped_frame} of ${j.stopped_total})</b></div>
     <div style="width:100%;font-size:12px;color:#9ca3af">Progress is saved in the

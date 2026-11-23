@@ -312,3 +312,12 @@ def test_cancel_question_only_mentions_stop_when_offered():
     line = page[start:page.index("\n", start)]
     assert "j.stop_supported" in line
     assert "Cancel throws away the scanning done so far.\")" in page
+
+
+def test_stop_and_continue_sit_left_of_cancel():
+    page = web.PAGE
+    start = page.index('if(j.phase=="scanning"||j.phase=="rendering")')
+    block = page[start:page.index('if(j.phase==="stopped")', start)]
+    assert block.index('id="scanStop"') < block.index('onclick="cancelJob()">Cancel<')
+    stopped = page[page.index('if(j.phase==="stopped")'):]
+    assert stopped.index(">Continue scan<") < stopped.index(">Cancel scan<")
