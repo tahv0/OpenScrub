@@ -942,6 +942,28 @@ defined — there was a real UnboundLocalError from ordering once.
   device" in ffmpeg's stderr text) gets a hint naming the retry that keeps the
   work. The render's half-written stage file is already removed on failure
   (RenderDelivery.__exit__).
+- SCAN STOP AND CONTINUE (detector-only scans, step 1): `openscrub.stop_supported`
+  (no text category in --categories or any window) gates it. The web gives the
+  running scan's owner a `progress_stop` event (POST /stop_scan) and runs
+  `run_scan(..., progress=ScanProgressControl)`: at a frame boundary the loop
+  saves `<job>/scan-progress.json.gz` (openscrub_internal/scan_progress.py:
+  raw per-frame detections BEFORE tracking — assign/smooth/group run once
+  after the loop — plus the few loop counters) and raises `ScanStopped`; the
+  job becomes phase `stopped` (POST /continue queues action `continue`).
+  Autosave interval = 100x the last save's duration, clamped 60-300 s. Continue
+  re-finds the previous frame and the last OCR-cadence frame by pixel sha256 +
+  post-read CAP_PROP_POS_MSEC (`_seek_cap` accepts a one-frame-off landing,
+  which would shift every later detection) and refuses (`ProgressMismatch`)
+  when the scanned video, settings (`EXCLUDED_SETTINGS` lists the render/
+  transport-only ones), model files or OpenScrub VERSION changed. Any
+  found-derived (text) state at save time is refused, never dropped. The file
+  is deleted on completion (after publish), Cancel, Retry and job delete; a
+  crash after an autosave, a dead worker, or docker stop (SIGTERM waits up to
+  20 s in `stop_scan_for_shutdown`) leaves the job `stopped`; rehydrate lists
+  a stopped job even when its source video is not mounted (the progress file
+  carries `meta` {video, name}). test_stop_continue_equals_straight_scan pins
+  the core guarantee: stopping anywhere and continuing gives the uninterrupted
+  report. Text scans (OCR memory, scroll, backtrack) are step 2.
 - REQUEST PATHS (CodeQL py/path-injection): every route that turns a
   request value into a filesystem path calls `server_path_error` AND
   repeats its single-`startswith` containment guard INLINE before the

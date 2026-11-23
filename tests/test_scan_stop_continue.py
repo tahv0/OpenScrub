@@ -263,6 +263,7 @@ def test_text_scan_is_not_supported(tmp_path):
     assert not openscrub.stop_supported(args)
     custom = _args(video, ["--categories", "plate,badge", "--custom-regex", "badge=B\\d+"])
     assert not openscrub.stop_supported(custom)
+    assert not openscrub.stop_supported(object())   # no settings: fail closed
     control = sp.ScanProgressControl(str(tmp_path / "p"), stop_requested=lambda: False,
                                      resume=False)
     with pytest.raises(ValueError, match="text categories"):

@@ -1902,7 +1902,8 @@ def _run_job(job, action, owner=None):
                         progress_path, stop_requested=stop_event.is_set,
                         resume=(action == 'continue'),
                         meta={"video": source, "name": job.get("name")})
-                state = openscrub.run_scan(args, cb, progress=control)
+                state = (openscrub.run_scan(args, cb) if control is None
+                         else openscrub.run_scan(args, cb, progress=control))
                 openscrub.write_report(os.path.join(job["dir"], "report.json"),
                                       args, state, publisher=cb.publish_report)
                 # The report is published: the saved progress has done its job.

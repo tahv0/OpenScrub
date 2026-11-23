@@ -8825,7 +8825,10 @@ STOP_CONTINUE_CATEGORIES = frozenset({"face", "plate", "person", "qrcode",
 
 def stop_supported(args):
     """Whether this scan can be stopped and continued (no text categories)."""
-    cats = {c.strip() for c in (getattr(args, "categories", "") or "").split(",") if c.strip()}
+    raw = getattr(args, "categories", None)
+    if not isinstance(raw, str):
+        return False            # not a real scan's settings: fail closed
+    cats = {c.strip() for c in raw.split(",") if c.strip()}
     for window in (getattr(args, "windows_data", None) or []):
         cats |= {c.strip() for c in (window.get("cats") or []) if c and c.strip()}
     return cats <= STOP_CONTINUE_CATEGORIES

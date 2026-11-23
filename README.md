@@ -521,6 +521,17 @@ Docker; `0` = unlimited). For files that large, the "path on the
 server" box is the better route anyway: the server reads the file in
 place and nothing crosses the network.
 
+**Stop and continue later.** A running face, plate, person, QR-code or
+screen scan has a **Stop** button next to Cancel. Stop saves the scan's
+progress in the job folder and frees the GPU; **Continue scan** (or ▶ in the
+job list) carries on from that frame, and the result is the same as a scan
+that never stopped. Progress is also saved automatically every 1-5 minutes,
+so a crash or a `docker restart` leaves the job stopped at the last save
+instead of losing it. Continue is refused if the video, the scan settings, a
+detection model or OpenScrub itself changed in between. **Cancel** still
+throws the progress away (it asks first). Scans with text categories (names,
+numbers, addresses…) cannot be stopped yet.
+
 A failed or cancelled job keeps its uploaded file: use its ↻ **Retry**
 button (jobs list or the job page) to re-run the scan without uploading
 again, or delete the job to free the space. The server also refuses an
