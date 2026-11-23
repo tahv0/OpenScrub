@@ -124,7 +124,7 @@ _WHAT = {
     "engine_version": "OpenScrub was updated",
     "format_version": "OpenScrub was updated",
     "input_sha256": "the video file changed",
-    "scan_sha256": "the scan copy of the video changed",
+    "scan_sha256": "the video file changed",
     "total_frames": "the video's frame count changed",
 }
 
@@ -308,6 +308,7 @@ class ScanProgressControl:
         self._last = clock()
         self.saved_frame = None
         self.total = None
+        self.next_frame = 0      # the engine's next frame, set at each boundary
         self.autosave_disabled = False
 
     def autosave_due(self):

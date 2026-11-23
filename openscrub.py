@@ -33,6 +33,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import InitVar, dataclass, asdict
 from types import MappingProxyType
@@ -43,6 +44,7 @@ import numpy as np
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_letters
 from openscrub_internal import plate_policy
+from openscrub_internal import scan_progress
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import hdr_quad_pairs
 from openscrub_internal.reports import atomic_report
@@ -8782,23 +8784,90 @@ def _quad_scan_digest(args):
     return sha256_file(args.video)
 
 
-def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None):
+class ScanStopped(Exception):
+    """A scan stopped on request after saving its progress (stop and continue)."""
+
+    def __init__(self, frame, total):
+        super().__init__("scan stopped at frame %d of %d" % (frame, total))
+        self.frame, self.total = frame, total
+
+
+class _BackgroundHash:
+    """SHA-256 of a file computed on a daemon thread; result() waits."""
+
+    def __init__(self, path):
+        self.path, self._value, self._error = path, None, None
+        self._done = threading.Event()
+        self.started = time.monotonic()
+        threading.Thread(target=self._run, name="scan-progress-hash", daemon=True).start()
+
+    def _run(self):
+        try:
+            self._value = sha256_file(self.path)
+        except BaseException as error:      # reported by result()
+            self._error = error
+        finally:
+            self._done.set()
+
+    def result(self):
+        self._done.wait()
+        if self._error is not None:
+            raise scan_progress.ProgressError("cannot read the video to check it: %s"
+                                              % self._error)
+        return self._value
+
+
+# Categories whose detectors keep no state between frames (step 1 of stop and
+# continue). Text categories carry OCR memory, scroll and backtrack state.
+STOP_CONTINUE_CATEGORIES = frozenset({"face", "plate", "person", "qrcode",
+                                      "screen", "anytext", "none"})
+
+
+def stop_supported(args):
+    """Whether this scan can be stopped and continued (no text categories)."""
+    cats = {c.strip() for c in (getattr(args, "categories", "") or "").split(",") if c.strip()}
+    for window in (getattr(args, "windows_data", None) or []):
+        cats |= {c.strip() for c in (window.get("cats") or []) if c and c.strip()}
+    return cats <= STOP_CONTINUE_CATEGORIES
+
+
+def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None,
+             progress=None):
     """Scan pass only. A stop callback requests a whole-frame boundary.
 
     The opt-in boundary result is an unverified engine candidate, not a saved
     checkpoint or permission to render. Ordinary callers retain their existing
     return shape. See CHECKPOINT_CONTRACT.md for later producer obligations.
+
+    `progress` (a scan_progress.ScanProgressControl) enables stop and
+    continue for detector-only scans: the run saves its state into the
+    control's file at frame boundaries, raises ScanStopped on a stop, and
+    with ``progress.resume`` carries on from the saved frame.
     """
+    if progress is not None:
+        if stop_requested is not None or _checkpoint_stream is not None:
+            raise ValueError("stop and continue cannot be combined with Stop & Review")
+        if not stop_supported(args):
+            raise ValueError("stop and continue does not support text categories yet")
     main_capture = [None]
     try:
-        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream)
+        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream,
+                              progress)
     finally:
         if main_capture[0] is not None:
             main_capture[0].release()
 
 
-def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
+def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
+                   progress=None):
     cb = cb or Callbacks()
+    progress_identity = None
+    if progress is not None:
+        # Before any setup mutates args: the continued run rebuilds args from
+        # the same saved options and must arrive at the same snapshot.
+        progress_identity = {"engine_version": VERSION,
+                             "format_version": scan_progress.SCAN_PROGRESS_VERSION,
+                             "settings": scan_progress.settings_identity(args)}
     if stop_requested is not None and not callable(stop_requested):
         raise TypeError("stop_requested must be a no-argument callback")
     monitor_stop = stop_requested is not None
@@ -8820,6 +8889,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if not hasattr(args, attr):
             setattr(args, attr, default)
     normalize_vfr(args, cb)
+    progress_hash = None
+    if progress is not None:
+        # Hash the frames actually scanned (the scan copy when normalization
+        # made one; it is rebuilt from the original whenever that changes) in
+        # the background, so a stop or a crash can later prove the same video.
+        progress_hash = _BackgroundHash(args.video)
     cats = {c.strip() for c in args.categories.split(",")
             if c.strip() and c.strip() != "none"}
     # per-window categories (unified editor) extend the load set: a category
@@ -9278,13 +9353,156 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                   or detect_scale < 1.0 else "."))
     idx = checkpoint_start
     dense_now = []
+
+    # --- stop and continue (detector-only scans) -------------------------
+    # Everything the frame loop carries from one frame to the next is either
+    # saved here or rebuilt from the frame it came from; tracking, smoothing
+    # and grouping run once after the loop over the whole raw list, so a
+    # continued scan ends with exactly the report of an uninterrupted one.
+    progress_models = None
+    read_ref = None          # (index, frame, decoder pos) of the last frame read
+    scan_small_pos = None    # decoder pos after reading the scan_small frame
+    if progress is not None:
+        face_path = (getattr(args, "face_model", None)
+                     or os.environ.get("OPENSCRUB_FACE_MODEL")) if facer is not None else None
+        progress_models = {}
+        for kind, path in (("face", face_path),
+                           ("plate", getattr(plater, "model_path", None)),
+                           ("person", getattr(personer, "model_path", None))):
+            progress_models[kind] = (scan_progress.file_sha256(path) if path and os.path.isfile(path)
+                                     else "missing" if path else None)
+
+    def _progress_identity():
+        waited = time.monotonic()
+        digest = progress_hash.result()
+        if time.monotonic() - waited > 1.0:
+            cb.log("      stop/continue: waited %.0f s for the video check"
+                   % (time.monotonic() - waited))
+        return dict(progress_identity, scan_sha256=digest, total_frames=total,
+                    fps=fps, models=progress_models)
+
+    def _progress_save():
+        # Found-derived state belongs to text scans (step 2): refuse rather
+        # than silently drop it.
+        if (memory is not None or face_tracks or bt_deep or prev_keys or zdrop_raw
+                or scans):
+            raise scan_progress.ProgressError(
+                "this scan holds text-scan state that stop and continue cannot save yet")
+        if not len(cum) == len(bands) == idx:
+            raise scan_progress.ProgressError("the scan timeline is not aligned at frame %d" % idx)
+        started = time.monotonic()
+        scan_progress.save(progress.path, {
+            "identity": _progress_identity(), "next_frame": idx, "total": total,
+            "raw": [scan_progress.encode_detection(d) for d in raw],
+            "cum": [list(p) for p in cum], "bands": [list(p) for p in bands],
+            "scene_cuts": list(scene_cuts), "cut_idx": cut_idx,
+            "letter_stats": {"plates": letter_stats["plates"], "masked": letter_stats["masked"],
+                             "seconds": letter_stats["seconds"],
+                             "sizes": [[k, v] for k, v in letter_stats["sizes"].items()]},
+            "n_scans": n_scans, "last_scan_idx": last_scan_idx,
+            "scan_cx": scan_cx, "scan_cy": scan_cy, "prev_fcx": prev_fcx, "prev_fcy": prev_fcy,
+            "zone_dropped": zone_dropped, "win_inactive": win_inactive,
+            "n_recalled": n_recalled, "recall_counts": recall_counts,
+            # digests + decoder timestamps of the frames a continue re-reads
+            "frame_ref": ({"index": read_ref[0], "sha256": _frame_sha256(read_ref[1]),
+                           "pos_msec": read_ref[2]} if read_ref is not None else None),
+            "small_ref": ({"index": last_scan_idx, "sha256": _frame_sha256(scan_small),
+                           "pos_msec": scan_small_pos}
+                          if scan_small is not None else None)})
+        progress.mark_saved(idx, total)
+        return time.monotonic() - started
+
+    resuming = progress is not None and progress.resume
+    if resuming:
+        cb.log("      continuing a stopped scan: checking the video and settings…")
+        saved = scan_progress.load(progress.path)
+        scan_progress.compare_identity(saved.get("identity") or {}, _progress_identity())
+        try:
+            idx = int(saved["next_frame"])
+            if not 0 < idx <= max(total, idx) or int(saved["total"]) != total:
+                raise ValueError("frame out of range")
+            raw = [scan_progress.decode_detection(d) for d in saved["raw"]]
+            cum = [tuple(float(v) for v in p) for p in saved["cum"]]
+            bands = [tuple(float(v) for v in p) for p in saved["bands"]]
+            scene_cuts = [int(v) for v in saved["scene_cuts"]]
+            cut_idx = int(saved["cut_idx"])
+            ls = saved["letter_stats"]
+            letter_stats = {"plates": int(ls["plates"]), "masked": int(ls["masked"]),
+                            "seconds": float(ls["seconds"]),
+                            "sizes": {int(k): int(v) for k, v in ls["sizes"]}}
+            n_scans, last_scan_idx = int(saved["n_scans"]), int(saved["last_scan_idx"])
+            scan_cx, scan_cy = float(saved["scan_cx"]), float(saved["scan_cy"])
+            prev_fcx, prev_fcy = float(saved["prev_fcx"]), float(saved["prev_fcy"])
+            zone_dropped = {str(k): int(v) for k, v in saved["zone_dropped"].items()}
+            win_inactive = {str(k): int(v) for k, v in saved["win_inactive"].items()}
+            n_recalled = int(saved["n_recalled"])
+            recall_counts = {str(k): int(v) for k, v in saved["recall_counts"].items()}
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise scan_progress.ProgressError("the saved progress is incomplete") from error
+        if not len(cum) == len(bands) == idx:
+            raise scan_progress.ProgressError("the saved progress is not aligned")
+        # Rebuilt, not saved: the last OCR-cadence frame (scan_small) and the
+        # previous frame (scene-cut signature, and the decoder position). A
+        # seek can land a frame off, so each frame is FOUND again by its
+        # pixel digest plus the decoder's own post-read timestamp, exactly
+        # as recorded when it was first read; not found -> refuse.
+        def _small_of(fr):
+            return cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                              fx=BT_SCALE, fy=BT_SCALE)
+
+        def _locate(ref, transform):
+            index, digest, pos = int(ref["index"]), str(ref["sha256"]), ref["pos_msec"]
+            # A decoder timestamp of 0 is real only for the first frames; a
+            # build that reports nothing usable cannot tell repeats apart.
+            if (not isinstance(pos, (int, float)) or not math.isfinite(pos) or pos < 0
+                    or (pos == 0 and index > 1)):
+                raise scan_progress.ProgressError(
+                    "this video cannot be positioned exactly, so the scan cannot continue")
+            if _seek_cap(cap, max(0, index - 3), fps):
+                for _ in range(9):
+                    ok_, fr_ = cap.read()
+                    if not ok_ or fr_ is None:
+                        break
+                    if (cap.get(cv2.CAP_PROP_POS_MSEC) == pos
+                            and _frame_sha256(transform(fr_)) == digest):
+                        return fr_
+            raise scan_progress.ProgressError("cannot find frame %d of the video again" % index)
+
+        small_ref, frame_ref = saved.get("small_ref"), saved.get("frame_ref")
+        if bt_on and last_scan_idx >= 0:
+            if not small_ref or int(small_ref["index"]) != last_scan_idx:
+                raise scan_progress.ProgressError("the saved progress is incomplete")
+            scan_small = _small_of(_locate(small_ref, _small_of))
+        positioned = False
+        if frame_ref:
+            fr = _locate(frame_ref, lambda f: f)
+            if assisted:
+                if cut_idx != int(frame_ref["index"]):
+                    raise scan_progress.ProgressError("the saved progress is incomplete")
+                cut_sig = plate_letters.frame_signature(fr)
+            positioned = int(frame_ref["index"]) == idx - 1
+        elif assisted and cut_idx >= 0:
+            raise scan_progress.ProgressError("the saved progress is incomplete")
+        # After a jump (fast-skip between windows) the stopped run had
+        # itself just positioned with _seek_cap; repeat that same call.
+        if not positioned and not _seek_cap(cap, idx, fps):
+            raise scan_progress.ProgressError("cannot seek to the saved frame %d" % idx)
+        if frame_ref:
+            read_ref = (int(frame_ref["index"]), fr, frame_ref["pos_msec"])
+        if small_ref:
+            scan_small_pos = small_ref["pos_msec"]
+        progress.mark_saved(idx, total)
+        cb.log("      continuing from frame %d of %d (%d detection(s) so far)"
+               % (idx, total, len(raw)))
+
     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
     # manual jobs — exactly the "one person 16 minutes in" case), frames
     # before the detection window carry no information we need, so SEEK past
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on and not optional_policy and not monitor_stop:
+    if (win_start > 1.0 and not track_on and not optional_policy and not monitor_stop
+            and not resuming):
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -9312,6 +9530,30 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             raise
 
     while True:
+        if progress is not None:
+            # Frame boundary: everything before idx is fully processed.
+            progress.next_frame = idx
+            if progress.stop_requested():
+                if idx == 0:
+                    _release_scan_capture()
+                    raise PipelineCancelled()
+                _release_scan_capture()
+                # Free the GPU before the (possibly slow) video check.
+                facer = plater = personer = qrer = texter = None
+                import gc
+                gc.collect()
+                spent = _progress_save()
+                cb.log("      stopped at frame %d of %d — progress saved (%.1f s)"
+                       % (idx, total, spent))
+                raise ScanStopped(idx, total)
+            if idx > 0 and progress.autosave_due():
+                try:
+                    spent = _progress_save()
+                    cb.log("      progress autosaved at frame %d of %d (%.1f s)"
+                           % (idx, total, spent))
+                except scan_progress.ProgressError as error:
+                    progress.autosave_disabled = True
+                    cb.log("      NOTE: progress autosave off for this scan: %s" % error)
         if monitor_stop:
             if _stop_now():
                 # A stop at the reported final index still needs the next
@@ -9348,6 +9590,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             else:
                 scan_exit_reason = "decoder_read_stopped_after_reported_count"
             break
+        if progress is not None:
+            read_ref = (idx, frame, cap.get(cv2.CAP_PROP_POS_MSEC))
         if monitor_stop and frame.shape[:2] != (vh, vw):
             dimensions_match = False
         if assisted:
@@ -9683,6 +9927,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if due and idx - last_scan_idx >= 2:
             t = idx / fps
             scan_small = small
+            if progress is not None:
+                scan_small_pos = read_ref[2]
             if ocr is not None:
                 words = read_adaptive(ocr, frame,
                                       getattr(args, "ocr_upscale", "auto"))
