@@ -98,3 +98,23 @@ def test_identity_names_what_changed():
 def test_render_only_settings_are_not_identity():
     assert (sp.settings_identity(_args("--mode", "blur"))
             == sp.settings_identity(_args("--mode", "inpaint")))
+
+
+def test_autosave_interval_scales_with_scan_size():
+    now = [0.0]
+    control = sp.ScanProgressControl("unused", stop_requested=lambda: False, resume=False,
+                                     clock=lambda: now[0])
+    assert control.autosave_interval() == 60          # nothing saved yet: every minute
+    control.mark_saved(10, 100, cost=0.05)            # a light scan: still every minute
+    assert control.autosave_interval() == 60
+    control.mark_saved(10, 100, cost=2.0)             # a big scan: 2 s saves -> 200 s
+    assert control.autosave_interval() == 200
+    control.mark_saved(10, 100, cost=9.0)             # never longer than 5 minutes
+    assert control.autosave_interval() == 300
+    now[0] += 299
+    assert not control.autosave_due()
+    now[0] += 1
+    assert control.autosave_due()
+    fixed = sp.ScanProgressControl("unused", stop_requested=lambda: False, resume=False,
+                                   autosave_seconds=None)
+    assert not fixed.autosave_due()

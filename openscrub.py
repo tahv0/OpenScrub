@@ -9409,8 +9409,9 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
             "small_ref": ({"index": last_scan_idx, "sha256": _frame_sha256(scan_small),
                            "pos_msec": scan_small_pos}
                           if scan_small is not None else None)})
-        progress.mark_saved(idx, total)
-        return time.monotonic() - started
+        spent = time.monotonic() - started
+        progress.mark_saved(idx, total, spent)
+        return spent
 
     resuming = progress is not None and progress.resume
     if resuming:

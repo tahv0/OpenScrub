@@ -292,11 +292,18 @@ def remove(path):
 class ScanProgressControl:
     """How one scan run stops, autosaves and continues.
 
-    The engine calls ``due()`` at each frame boundary and ``save()`` with
-    its state; ``stop_requested`` is the web's stop signal.
+    The engine checks ``stop_requested()`` and ``autosave_due()`` at each
+    frame boundary and calls ``mark_saved`` after writing the file.
+
+    ``autosave_seconds="auto"`` (the default) sizes the interval to the
+    scan: saving may cost about 1% of scan time, so the interval is 100x the
+    last save's duration, kept between 1 and 5 minutes. A number fixes it;
+    None turns autosave off.
     """
 
-    def __init__(self, path, *, stop_requested, resume, autosave_seconds=300.0,
+    AUTO_MIN, AUTO_MAX, AUTO_FACTOR = 60.0, 300.0, 100.0
+
+    def __init__(self, path, *, stop_requested, resume, autosave_seconds="auto",
                  clock=time.monotonic):
         if not callable(stop_requested):
             raise TypeError("stop_requested must be callable")
@@ -310,12 +317,21 @@ class ScanProgressControl:
         self.total = None
         self.next_frame = 0      # the engine's next frame, set at each boundary
         self.autosave_disabled = False
+        self._save_cost = 0.0
+
+    def autosave_interval(self):
+        if self.autosave_seconds != "auto":
+            return self.autosave_seconds
+        return min(self.AUTO_MAX, max(self.AUTO_MIN, self.AUTO_FACTOR * self._save_cost))
 
     def autosave_due(self):
-        if self.autosave_disabled or self.autosave_seconds is None:
+        interval = self.autosave_interval()
+        if self.autosave_disabled or interval is None:
             return False
-        return self.clock() - self._last >= self.autosave_seconds
+        return self.clock() - self._last >= interval
 
-    def mark_saved(self, frame, total):
+    def mark_saved(self, frame, total, cost=None):
         self._last = self.clock()
         self.saved_frame, self.total = frame, total
+        if cost is not None:
+            self._save_cost = float(cost)
