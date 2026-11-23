@@ -4409,6 +4409,87 @@ def apply_coverage(dets, coverage, cb=None):
     return out
 
 
+def _assisted_row(d, poly):
+    """Copy of a plate row carrying `poly`, painted by the silhouette painters.
+
+    A lettering row (narrow mode) only shows its poly on its exact inspected
+    frame, so it becomes a plain row; policy attributes come along."""
+    if isinstance(d, NarrowPlateDetection):
+        fields = {k: copy.deepcopy(v) for k, v in vars(d).items()
+                  if k in Detection.__dataclass_fields__ and k != "manual_plate_quad"}
+        cls = Detection
+        if isinstance(d, FrameBoundedNarrowPlateDetection):
+            cls = FrameBoundedDetection
+            fields.update(scan_frame_start=d.scan_frame_start, scan_frame_end=d.scan_frame_end)
+        row = cls(**fields, manual_plate_quad=copy.deepcopy(d.manual_plate_quad))
+        for key, value in vars(d).items():
+            if key.startswith("_plate"):
+                setattr(row, key, value)
+    else:
+        row = copy.copy(d)
+    row.poly = poly
+    return row
+
+
+def apply_assisted_cover(dets, fps, cuts):
+    """-> (render rows, CoverPlan) for --plate-coverage assisted.
+
+    Dense plate rows get their own or a borrowed letter mask, rows the plan
+    cannot cover are not painted (they are the plan's gaps), and each bridge
+    becomes a one-frame row on the ending track. Non-plate rows pass through;
+    a manual quad row loses any poly so the quad painter alone decides."""
+    samples = []
+    planned = set()
+    aoffs = {}
+    for key, d in enumerate(dets):
+        if (d.category != "plate" or not d.dense or d.track < 0
+                or plate_quad.valid_record(d.manual_plate_quad)):
+            continue
+        evidence = getattr(d, "_plate_policy_evidence", None)
+        if evidence is not None and not plate_policy.supported_geometry(d):
+            continue   # never rendered: not a sample, not a gap
+        # A report without the uncertain plate policy has no evidence: direct.
+        direct = evidence is None or evidence.get("origin") == "detection"
+        box = (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+               d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
+        samples.append(plate_letters.Sample(key, d.track, d.t_start, d.t_end, box,
+                                            tuple(d.poly or ()), direct))
+        planned.add(key)
+        last = aoffs.get(d.track)
+        if last is None or d.t_end >= last[0]:
+            aoffs[d.track] = (d.t_end, tuple(d.aoff))
+    plan = plate_letters.plan_cover(samples, fps, list(cuts or []))
+    out = []
+    for key, d in enumerate(dets):
+        if key in planned:
+            if key not in plan.drop:
+                out.append(_assisted_row(d, plan.polys[key]))
+        elif d.category == "plate" and d.poly and plate_quad.valid_record(d.manual_plate_quad):
+            out.append(_assisted_row(d, ()))
+        else:
+            out.append(d)
+    for br in plan.bridges:
+        ax, ay = aoffs[br.track][1]
+        t = br.frame / fps
+        out.append(Detection(t, t, (br.box[0] - ax, br.box[1] - ay, br.box[2] - ax, br.box[3] - ay),
+                             "plate", "plate (bridged)", 0.0, aoff=(ax, ay), last_seen=t,
+                             dense=True, track=br.track, poly=br.poly))
+    return out, plan
+
+
+def assisted_cover_from_report(doc):
+    """The CoverPlan a render of this saved report would use (see run_render)."""
+    capable = isinstance(doc, dict) and doc.get("plate_policy_evidence_version") == 1
+    dets, rstate, _ = _decode_report(doc, optional_full=capable)
+    if capable:
+        choices = plate_policy.evaluate(dets, *_saved_plate_policy(doc), capable_off=True)
+        dets = [d for d, choice in zip(dets, choices) if choice.enabled]
+    if not rstate:
+        raise ValueError("report has no render_state")
+    cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
+    return apply_assisted_cover(dets, rstate["fps"], cuts)[1]
+
+
 def _dedupe_dense(act, frame_index=None, frame_digest=None):
     """Dense track samples are POSITION SNAPSHOTS whose spans carry a
     small grace overlap; a frame covered by TWO snapshots of the same
@@ -7592,6 +7673,13 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
         doc["plate_coverage_limitation"] = state["plate_coverage_limitation"]
     if "scene_cuts" in state:
         doc["scene_cuts"] = [int(i) for i in state["scene_cuts"]]
+    if "plate_letter_gaps" in state:
+        doc["plate_letter_gaps"] = copy.deepcopy(state["plate_letter_gaps"])
+        doc["plate_letter_stats"] = dict(state.get("plate_letter_stats") or {})
+    else:
+        # A saved report re-rendered in another mode must not keep stale gaps.
+        doc.pop("plate_letter_gaps", None)
+        doc.pop("plate_letter_stats", None)
     aspans = getattr(args, "audio_spans", None)
     if ((source is None and aspans)
             or (source is not None and state.get("audio_redactions_overridden"))):
@@ -7616,6 +7704,15 @@ def load_report(path):
     with open(path, encoding="utf-8") as f:
         doc = json.load(f)
     return _decode_report(doc)
+
+
+def _saved_plate_policy(doc):
+    """The plate policy settings a capable report was decided with (validated)."""
+    settings = doc.get("provenance", {}).get("settings", {})
+    optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
+                settings.get("plate_auto_cutoff"))
+    plate_policy.validate_settings(*optional)
+    return optional
 
 
 def _decode_report(doc, optional_full=False):
@@ -10177,6 +10274,16 @@ def run_render(args, state, cb=None):
     if state.get("plate_policy"):
         choices = plate_policy.evaluate(detections, *state["plate_policy"], capable_off=True)
         detections = [d for d, choice in zip(detections, choices) if choice.enabled]
+    if getattr(args, "plate_coverage", "full") == "assisted":
+        # Only the cover's SHAPE changes: the policy above already decided
+        # which plates are covered. The plan lives in state for the report.
+        detections, plan = apply_assisted_cover(detections, state["fps"],
+                                                state.get("scene_cuts", []))
+        state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
+        state["plate_letter_stats"] = dict(plan.stats)
+        cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
+               "%(bridged_frames)d bridged, %(gap_frames)d without a mask" % plan.stats
+               + " in %d gap(s) — review them" % len(plan.gaps))
     _geometry_preflight(detections, state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")
     dst = args.output or os.path.splitext(args.video)[0] + (
@@ -10332,10 +10439,7 @@ def run_pipeline(args, cb=None):
             expected = source.get("provenance", {}).get("input_sha256")
             if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
                 raise ValueError("optional plate report has no valid scanned source hash")
-            settings = source.get("provenance", {}).get("settings", {})
-            optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
-                        settings.get("plate_auto_cutoff"))
-            plate_policy.validate_settings(*optional)
+            optional = _saved_plate_policy(source)
         dets, rstate, prov = _decode_report(source, optional_full=capable)
         if not getattr(args, "_plate_coverage_explicit", False):
             settings = prov.get("settings") or {}

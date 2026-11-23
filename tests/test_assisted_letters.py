@@ -317,3 +317,296 @@ def test_from_report_reads_scene_cuts_back(tmp_path, monkeypatch):
              str(tmp_path / "out.mp4")]), parser)
         openscrub.run_pipeline(args)
     assert seen[0]["scene_cuts"] == [2] and "scene_cuts" not in seen[1]
+
+
+# --- render: apply the cover plan --------------------------------------------
+
+import importlib.util
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from types import MappingProxyType
+
+from openscrub_internal import plate_policy
+
+FPS = 10.0
+PLATE = (20, 20, 140, 76)                 # frame pixels
+LETTER_RECT = (.25, .3, .75, .7)          # box-normalized
+# The letters' pixel area, inset 2 px against codec ringing at the edges.
+LETTERS = (20 + 30 + 2, 20 + 16.8 + 2, 20 + 90 - 2, 20 + 39.2 - 2)
+
+
+def _rect_poly(r):
+    x1, y1, x2, y2 = r
+    return (((x1, y1), (x2, y1), (x2, y2), (x1, y2)),)
+
+
+def black_share(frame, region):
+    x1, y1, x2, y2 = (int(round(v)) for v in region)
+    roi = frame[y1:y2, x1:x2]
+    return float((roi.max(axis=2) < 40).mean())
+
+
+def _plain_video(path, frames, size=(160, 96)):
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), FPS, size)
+    assert writer.isOpened()
+    for _ in range(frames):
+        writer.write(np.full((size[1], size[0], 3), 220, np.uint8))
+    writer.release()
+
+
+def _read_all(path):
+    cap = cv2.VideoCapture(str(path))
+    frames = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        frames.append(frame)
+    cap.release()
+    return frames
+
+
+def _plate_row(i, poly=(), track=0, box=PLATE, origin=None, choice=None):
+    row = openscrub.Detection(i / FPS, i / FPS + .03, box, "plate", "plate", .9,
+                              dense=True, track=track, poly=poly)
+    if origin is not None:
+        row._plate_policy_evidence = MappingProxyType(
+            {"origin": origin, "frame": i, "geometry_valid": True})
+        row._plate_saved_enabled = True
+        row._plate_output_choice = choice
+    return row
+
+
+
+def render_assisted(tmp_path, report=None):
+    """5 frames: 0-1 masked, 2 borrows from 1, a cut at 3, 3-4 have no mask."""
+    source = tmp_path / "assisted.mp4"
+    output = tmp_path / "assisted_out.mp4"
+    _plain_video(source, 5)
+    rows = [_plate_row(i, _rect_poly(LETTER_RECT) if i < 2 else ()) for i in range(5)]
+    parser = openscrub.build_parser()
+    argv = [str(source), "--mode", "box", "--pad", "0",
+            "--plate-coverage", "assisted", "--no-box-fallback", "-o", str(output)]
+    if report:
+        argv += ["--report", str(report)]
+    args = openscrub._prep_args(parser.parse_args(argv), parser)
+    state = {"fps": FPS, "cum": [(0, 0)] * 5, "bands": [(0, 0)] * 5,
+             "detections": rows, "stats": {}, "scene_cuts": [3]}
+    openscrub.run_render(args, state)
+    return _read_all(output)
+
+
+def test_assisted_render_masks_letters_and_leaves_gaps_visible(tmp_path):
+    report = tmp_path / "report.json"
+    out = render_assisted(tmp_path, report)
+    assert len(out) == 5
+    assert black_share(out[0], PLATE) < 0.8 and black_share(out[0], LETTERS) > 0.99
+    assert black_share(out[1], LETTERS) > 0.99
+    assert black_share(out[2], LETTERS) > 0.99 and black_share(out[2], PLATE) < 0.8
+    assert black_share(out[3], PLATE) == 0
+    assert black_share(out[4], PLATE) == 0
+    doc = json.loads(report.read_text())
+    assert doc["plate_letter_gaps"] == [
+        {"track": 0, "t0": .3, "t1": .4, "frames": 2, "frame": 4, "box": list(PLATE)}]
+    assert doc["plate_letter_stats"] == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 2}
+
+
+def test_assisted_bridge_rows_span_one_frame_on_the_ending_track():
+    rows = [_plate_row(i, _rect_poly(LETTER_RECT)) for i in range(3)]
+    rows += [_plate_row(i, _rect_poly(LETTER_RECT), track=1, box=(24, 20, 144, 76))
+             for i in range(6, 9)]
+    dets, plan = openscrub.apply_assisted_cover(rows, FPS, [])
+    bridges = [d for d in dets if d not in rows]
+    assert [round(d.t_start * FPS) for d in bridges] == [3, 4, 5]
+    assert all(d.t_start == d.t_end and d.track == 0 and d.dense and d.category == "plate"
+               and d.poly == _rect_poly(LETTER_RECT) for d in bridges)
+    assert bridges[0].cbox[0] == pytest.approx(21)
+    assert plan.stats["bridged_frames"] == 3 and not plan.gaps
+
+
+def rows_after_policy(keep_track):
+    rows = []
+    for track, choice in ((3, None), (keep_track, "keep")):
+        rows += [_plate_row(i, _rect_poly(LETTER_RECT) if i == 0 else (), track=track,
+                            origin="detection", choice=choice) for i in range(3)]
+        rows.append(_plate_row(30, (), track=track, origin="interpolation", choice=choice))
+    undecided = [_plate_row(i, (), track=8, origin="detection") for i in range(3)]
+    for row in undecided:
+        row._plate_saved_enabled = False   # a card still waiting for review
+    rows += undecided
+    choices = plate_policy.evaluate(rows, None, None, None, capable_off=True)
+    return [d for d, c in zip(rows, choices) if c.enabled]
+
+
+def test_keep_and_undecided_plates_are_neither_covered_nor_gaps():
+    dets, plan = openscrub.apply_assisted_cover(rows_after_policy(keep_track=7), 10.0, [])
+    assert all(d.track != 7 for d in dets) and all(g.track != 7 for g in plan.gaps)
+    assert all(d.track != 8 for d in dets) and all(g.track != 8 for g in plan.gaps)
+    # track 3 is enabled: frames 1-2 borrow, the far synthetic sample at 3 s is a gap
+    assert [g.frame for g in plan.gaps if g.track == 3] == [30]
+    assert all(d.poly for d in dets)
+
+
+def test_assisted_rows_without_evidence_count_as_direct():
+    # A report without the uncertain plate policy has no evidence: rows are direct.
+    rows = [_plate_row(0, ()), _plate_row(1, _rect_poly(LETTER_RECT))]
+    dets, plan = openscrub.apply_assisted_cover(rows, FPS, [])
+    assert [d.poly for d in dets] == [_rect_poly(LETTER_RECT)] * 2 and not plan.gaps
+
+
+def row_with_quad_and_poly():
+    return openscrub.Detection(0, .1, PLATE, "plate", "plate", .9, dense=True, track=0,
+                               poly=_rect_poly(LETTER_RECT),
+                               manual_plate_quad={"stand-in": True})
+
+
+def test_manual_quad_wins_over_letter_mask(monkeypatch):
+    monkeypatch.setattr(openscrub.plate_quad, "valid_record", lambda q: bool(q))
+    dets, _ = openscrub.apply_assisted_cover([row_with_quad_and_poly()], 10.0, [])
+    assert dets[0].manual_plate_quad and not dets[0].poly
+
+
+def test_non_plate_rows_pass_through_unchanged():
+    face = openscrub.Detection(0, .1, (1, 1, 9, 9), "face", "face", .9, dense=True, track=0)
+    dets, _ = openscrub.apply_assisted_cover([face], FPS, [])
+    assert dets == [face] and dets[0] is face
+
+
+def test_assisted_narrow_row_becomes_a_plain_lettered_row():
+    base = _plate_row(0, ())
+    row = openscrub._record_narrow_plate(base, 0, None, (), 0, "no_text")
+    dets, _ = openscrub.apply_assisted_cover([row, _plate_row(1, _rect_poly(LETTER_RECT))], FPS, [])
+    assert not any(isinstance(d, openscrub.NarrowPlateDetection) for d in dets)
+    assert all(d.poly for d in dets)
+
+
+def test_assisted_cover_from_report_mirrors_the_render(tmp_path):
+    source = tmp_path / "src.mp4"
+    _plain_video(source, 1)
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args(
+        [str(source), "--plate-coverage", "assisted", "--no-box-fallback"]), parser)
+    rows = [_plate_row(i, _rect_poly(LETTER_RECT) if i < 2 else ()) for i in range(5)]
+    report = tmp_path / "r.json"
+    openscrub.write_report(report, args, {"fps": FPS, "cum": [(0, 0)] * 5,
+                                          "bands": [(0, 0)] * 5, "detections": rows,
+                                          "scene_cuts": [3]})
+    plan = openscrub.assisted_cover_from_report(json.loads(report.read_text()))
+    assert [(g.track, g.frame, g.frames) for g in plan.gaps] == [(0, 4, 2)]
+    assert plan.stats == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 2}
+
+
+def test_assisted_cover_from_capable_report_applies_keep(tmp_path):
+    doc = {"plate_policy_evidence_version": 1,
+           "provenance": {"settings": {"uncertain_policy": "off"}},
+           "render_state": {"fps": FPS, "cum": [[0, 0]] * 3, "bands": [[0, 0]] * 3},
+           "detections": []}
+    for track, choice in ((1, None), (2, "keep")):
+        for i in range(3):
+            doc["detections"].append({
+                "t_start": i / FPS, "t_end": i / FPS + .03, "cbox": list(PLATE),
+                "category": "plate", "text": "plate", "confidence": .9, "dense": True,
+                "track": track, "enabled": True, "output_choice": choice,
+                "poly": [] if i else [list(map(list, _rect_poly(LETTER_RECT)[0]))],
+                "policy_evidence": {"origin": "detection", "frame": i, "geometry_valid": True}})
+    doc["detections"].append({
+        "t_start": 2.0, "t_end": 2.03, "cbox": list(PLATE), "category": "plate",
+        "text": "plate", "confidence": .9, "dense": True, "track": 1, "enabled": True,
+        "policy_evidence": {"origin": "interpolation"}})
+    plan = openscrub.assisted_cover_from_report(doc)
+    assert [(g.track, g.frame) for g in plan.gaps] == [(1, 20)]
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="HDR render needs ffmpeg")
+def test_assisted_hdr_render_masks_letters(tmp_path):
+    src = tmp_path / "hdr.mkv"
+    made = subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                           "color=c=0xdddddd:s=160x96:r=10:d=0.5", "-pix_fmt", "yuv420p10le",
+                           "-c:v", "libx265", "-x265-params", "log-level=error", str(src)])
+    if made.returncode != 0:
+        pytest.skip("ffmpeg has no libx265")
+    out = tmp_path / "hdr_out.mkv"
+    rows = [_plate_row(i, _rect_poly(LETTER_RECT) if i < 2 else ()) for i in range(5)]
+    dets, _ = openscrub.apply_assisted_cover(rows, FPS, [3])
+    openscrub._render_hdr_into(str(src), str(out), dets, [(0, 0)] * 5, [(0, 0)] * 5, FPS,
+                               pad=0, mode="box", encoder="libx265", tags={})
+    frames = _read_all(out)
+    assert black_share(frames[0], LETTERS) > 0.95 and black_share(frames[0], PLATE) < 0.8
+    assert black_share(frames[2], LETTERS) > 0.95
+    assert black_share(frames[4], PLATE) < 0.05
+
+
+# --- full and narrow renders unchanged against the base engine ---------------
+
+BASE_COMMIT = "09086f6"
+REPO = Path(__file__).resolve().parent.parent
+
+
+def _base_engine(tmp_path):
+    """Import openscrub.py and openscrub_internal as they were at BASE_COMMIT."""
+    root = tmp_path / "base_engine"
+    root.mkdir()
+    try:
+        code = subprocess.run(["git", "-C", str(REPO), "show", BASE_COMMIT + ":openscrub.py"],
+                              check=True, capture_output=True).stdout
+        tar = subprocess.run(["git", "-C", str(REPO), "archive", BASE_COMMIT, "openscrub_internal"],
+                             check=True, capture_output=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("base commit not available (no git checkout)")
+    (root / "openscrub_base.py").write_bytes(code)
+    subprocess.run(["tar", "-x", "-C", str(root)], input=tar, check=True)
+    saved = {k: v for k, v in sys.modules.items()
+             if k == "openscrub_internal" or k.startswith("openscrub_internal.")}
+    for k in saved:
+        del sys.modules[k]
+    sys.path.insert(0, str(root))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "openscrub_base_" + BASE_COMMIT, root / "openscrub_base.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(root))
+        for k in [k for k in sys.modules
+                  if k == "openscrub_internal" or k.startswith("openscrub_internal.")]:
+            del sys.modules[k]
+        sys.modules.update(saved)
+    return module
+
+
+def _render_frames(engine, tmp_path, coverage, tag):
+    source = tmp_path / "unchanged.mp4"
+    if not source.exists():
+        _plain_video(source, 4, (96, 64))
+    cap = cv2.VideoCapture(str(source))
+    ok, first = cap.read()
+    cap.release()
+    assert ok
+    letters = (((.25, .25), (.75, .25), (.75, .75), (.25, .75)),)
+    rows = [engine.Detection(i / FPS, i / FPS + .03, (10, 10, 80, 50), "plate", "plate", .9,
+                             dense=True, track=0, poly=letters if i % 2 else ())
+            for i in range(4)]
+    rows.append(engine._record_narrow_plate(
+        engine.Detection(0, .03, (10, 10, 80, 50), "plate", "plate", .9, dense=True, track=1),
+        0, engine._frame_sha256(first), letters, 0, ""))
+    rows.append(engine.Detection(0, .4, (60, 30, 90, 60), "face", "face", .9))
+    output = tmp_path / f"{tag}_{coverage}.mp4"
+    parser = engine.build_parser()
+    args = engine._prep_args(parser.parse_args(
+        [str(source), "--mode", "box", "--pad", "0",
+         "--plate-coverage", coverage, "-o", str(output)]), parser)
+    engine.run_render(args, {"fps": FPS, "cum": [(0, 0)] * 4, "bands": [(0, 0)] * 4,
+                             "detections": rows, "stats": {}})
+    return _read_all(output)
+
+
+def test_full_and_narrow_renders_unchanged_against_base_engine(tmp_path):
+    base = _base_engine(tmp_path)
+    for coverage in ("full", "narrow"):
+        new = _render_frames(openscrub, tmp_path, coverage, "branch")
+        old = _render_frames(base, tmp_path, coverage, "base")
+        assert len(new) == len(old) == 4
+        assert all(np.array_equal(a, b) for a, b in zip(new, old)), coverage
