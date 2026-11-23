@@ -506,7 +506,7 @@ def test_assisted_cover_from_report_mirrors_the_render(tmp_path):
 def test_assisted_cover_from_capable_report_applies_keep(tmp_path):
     doc = {"plate_policy_evidence_version": 1,
            "provenance": {"settings": {"uncertain_policy": "off"}},
-           "render_state": {"fps": FPS, "cum": [[0, 0]] * 3, "bands": [[0, 0]] * 3},
+           "render_state": {"fps": FPS, "cum": [[0, 0]] * 30, "bands": [[0, 0]] * 30},
            "detections": []}
     for track, choice in ((1, None), (2, "keep")):
         for i in range(3):
@@ -710,3 +710,27 @@ def test_find_letters_many_without_model_or_boxes():
     det, _ = _batch_detector(_BatchSession({320: WORD}))
     assert det.find_letters_many(FRAME, []) == []
     assert det.find_letters_many(FRAME, [(0, 0, 3, 3), BOXES[0]])[0] == []
+
+
+def test_assisted_cover_gets_the_timeline_length(tmp_path, monkeypatch):
+    source = tmp_path / "src.mp4"
+    _plain_video(source, 1)
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args(
+        [str(source), "--plate-coverage", "assisted", "--no-box-fallback"]), parser)
+    # the last row is grace-padded past the 5-frame timeline
+    rows = [_plate_row(i, _rect_poly(LETTER_RECT) if i < 2 else ()) for i in range(5)]
+    rows[4].t_end = 1.2
+    report = tmp_path / "r.json"
+    openscrub.write_report(report, args, {"fps": FPS, "cum": [(0, 0)] * 5,
+                                          "bands": [(0, 0)] * 5, "detections": rows,
+                                          "scene_cuts": [3]})
+    plan = openscrub.assisted_cover_from_report(json.loads(report.read_text()))
+    assert max(g.frame for g in plan.gaps) <= 4
+    assert plan.stats["gap_frames"] == 2
+    seen = []
+    real = openscrub.plate_letters.plan_cover
+    monkeypatch.setattr(openscrub.plate_letters, "plan_cover",
+                        lambda *a, **k: (seen.append(k.get("frame_count")), real(*a, **k))[1])
+    openscrub.apply_assisted_cover(rows, FPS, [3], frame_count=5)
+    assert seen == [5]

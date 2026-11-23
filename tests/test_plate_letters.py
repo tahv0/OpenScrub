@@ -85,3 +85,22 @@ def test_join_picks_the_nearest_of_two_neighbours():
     s = [S(0, 1, 0.0, 0.0, POLY, True, box=(0, 0, 100, 30)),
          S(1, 2, 0.3, 0.3, POLY, True, box=(10, 0, 110, 30)), S(2, 3, 0.3, 0.3, POLY, True, box=(90, 0, 190, 30))]
     assert {b.track for b in plan_cover(s, 10.0, []).bridges} == {1}
+
+
+def test_frames_past_the_video_end_are_not_counted_or_listed():
+    # a grace-padded sample reaching frames 8..14 of a 10-frame video
+    s = [S(0, 1, 0.0, 0.0, POLY, True), S(1, 1, 0.8, 1.4, POLY, True),
+         S(2, 2, 0.9, 1.4, (), True)]
+    plan = plan_cover(s, 10.0, [], frame_count=10)
+    assert plan.stats == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 1}
+    assert [(g.t0, g.t1, g.frames, g.frame) for g in plan.gaps] == [(0.9, 0.9, 1, 9)]
+    assert all(g.frame <= 9 for g in plan.gaps)
+    # no frame count: unchanged behaviour
+    assert plan_cover(s, 10.0, []).stats["masked_frames"] == 8
+
+
+def test_bridge_frames_past_the_video_end_are_ignored():
+    a = S(0, 1, 0.0, 0.0, POLY, True)
+    b = S(1, 2, 0.9, 0.9, POLY, True)
+    plan = plan_cover([a, b], 10.0, [], frame_count=6)
+    assert [br.frame for br in plan.bridges] == [1, 2, 3, 4, 5]

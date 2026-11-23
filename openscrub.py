@@ -4431,7 +4431,7 @@ def _assisted_row(d, poly):
     return row
 
 
-def apply_assisted_cover(dets, fps, cuts):
+def apply_assisted_cover(dets, fps, cuts, frame_count=None):
     """-> (render rows, CoverPlan) for --plate-coverage assisted.
 
     Dense plate rows get their own or a borrowed letter mask, rows the plan
@@ -4458,7 +4458,7 @@ def apply_assisted_cover(dets, fps, cuts):
         last = aoffs.get(d.track)
         if last is None or d.t_end >= last[0]:
             aoffs[d.track] = (d.t_end, tuple(d.aoff))
-    plan = plate_letters.plan_cover(samples, fps, list(cuts or []))
+    plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count)
     out = []
     for key, d in enumerate(dets):
         if key in planned:
@@ -4487,7 +4487,8 @@ def assisted_cover_from_report(doc):
     if not rstate:
         raise ValueError("report has no render_state")
     cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
-    return apply_assisted_cover(dets, rstate["fps"], cuts)[1]
+    return apply_assisted_cover(dets, rstate["fps"], cuts,
+                                frame_count=len(rstate.get("cum") or ()) or None)[1]
 
 
 def _dedupe_dense(act, frame_index=None, frame_digest=None):
@@ -10354,7 +10355,8 @@ def run_render(args, state, cb=None):
         # Only the cover's SHAPE changes: the policy above already decided
         # which plates are covered. The plan lives in state for the report.
         detections, plan = apply_assisted_cover(detections, state["fps"],
-                                                state.get("scene_cuts", []))
+                                                state.get("scene_cuts", []),
+                                                frame_count=len(state["cum"]))
         state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
         state["plate_letter_stats"] = dict(plan.stats)
         cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
