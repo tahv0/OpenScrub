@@ -192,8 +192,12 @@ details .inner .full{grid-column:1/-1}
    <div class="mutd">Choose a cutoff at least as high as the plate threshold. No cutoff is preset.</div>
   </div>
   <div class="full" id="plate-policy-error" role="alert" hidden style="color:#fca5a5"></div>
-  <div class="full"><label style="display:inline"><input type="checkbox" id="plateletters"> Plate lettering only (experimental) <span class="qm" data-tip="Try to cover only the lettering on detected plates. Text detection can miss characters, and the visible plate background may still identify someone. Unverified frames use the full detected plate box when available; review the output.">?</span></label>
-   <div id="platelettersNote" class="mutd">For the plate category. Text detection can miss letters; the plate background and character positions remain visible and may identify someone. Checks every frame and can be slow. Unsupported sources or uncertain text use the full detected plate box when available; review the output.</div></div>
+  <div class="full"><label for="platecover">Plate cover <span class="qm" data-tip="How detected plates are covered. Full plate box covers the whole plate. Letters only, strict covers only the lettering where it is verified and uses the full plate box elsewhere. Letters only, no box fallback covers only the letters it finds and draws nothing where letters are not found clearly; those spots are listed as gaps in Review. Text detection can miss characters, and the visible plate background may still identify someone; review the output.">?</span></label>
+   <select id="platecover" autocomplete="off" onchange="plateCoverChanged(this)">
+    <option value="full" selected>Full plate box (default)</option>
+    <option value="narrow">Letters only, strict (experimental)</option>
+    <option value="assisted">Letters only, no box fallback (experimental, slow)</option></select>
+   <div id="platelettersNote" class="mutd">For the plate category. The letter choices check every frame and can be slow; text detection can miss letters, and the plate background and character positions remain visible and may identify someone. Strict uses the full plate box where text is uncertain or the source is unsupported. No box fallback draws nothing there and lists those spots as gaps in Review. Review the output.</div></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
    <option>rect</option></select></div>
   <div><label>Detection scale <span class="qm" data-tip="Run face detection on a smaller copy of each frame to scan faster (1.0 = full size, 0.5 = half). The output video is unaffected. Lower values can miss small or distant faces - keep 1.0 unless faces are large and close-up. The Scan speed setting can lower this too.">?</span></label><input type="number" id="dscale" value="1.0" step="0.1" min="0.2" max="1"></div>
@@ -1164,6 +1168,14 @@ const FREEDISK=+"%%FREEDISK%%"||0; // server free disk at page load (bytes,
 let MS={plate:true,person:true,plate_autofetch:true};
 fetch("/api/model_status").then(r=>r.json())
  .then(d=>{MS=Object.assign(MS,d);if(S.dur)renderCats();}).catch(()=>{});
+// Plate cover: "letters only, no box fallback" is chosen once, here, and
+// only through this dialog (the engine refuses it without the consent flag).
+const ASSISTED_CONFIRM="Letters only, no box fallback: where letters are not found clearly, nothing is drawn instead of the full plate box. Those spots are listed as gaps in Review. OpenScrub does not find every plate, so check the output. Scanning is slow. Turn it on?";
+let PLATECOVER_PREV="full";
+function plateCoverChanged(sel){
+ if(sel.value==="assisted"&&!confirm(ASSISTED_CONFIRM)){sel.value=PLATECOVER_PREV;return;}
+ PLATECOVER_PREV=sel.value;
+}
 async function startScan(){
  if(!S.dur){alert("Load a video first.");return;}
  if(!S.file&&!$("spath").value.trim()){alert("Choose a file or server path.");return;}
@@ -1269,7 +1281,9 @@ async function startScan(){
   ignore_zones:S.ignore,
  };
  if(platePolicy){o.uncertain_policy=platePolicy.policy;o.plate_auto_cutoff=platePolicy.cutoff;}
- if($("plateletters").checked)o.plate_coverage="narrow";
+ const plateCover=$("platecover").value;
+ if(plateCover==="narrow"||plateCover==="assisted")o.plate_coverage=plateCover;
+ if(plateCover==="assisted")o.no_box_fallback=true;
  if($("verifyhdrplates").checked)o.verify_hdr_plate_frames=true;
  if(checkpoint){o.checkpoint_review=true;delete o.windows;delete o.ignore_zones;}
  const fd=new FormData();

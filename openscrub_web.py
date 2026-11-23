@@ -814,6 +814,9 @@ def job_public(job):
         "download_name": video_name,
         "report_name": report_name,
     }
+    if job.get('options', {}).get('plate_coverage') == 'assisted':
+        # Lets a re-render from the done view show the gap reminder too.
+        result['assisted_letters'] = True
     if job.get('options', {}).get('checkpoint_review') is True:
         stop = getattr(FILES.initialize(job).active, 'checkpoint_stop', None)
         result['checkpoint_enabled'] = True
@@ -1055,6 +1058,11 @@ def build_args(job, for_render=False):
     # A render is governed by the saved report, not a later job option.
     if not for_render and o.get("plate_coverage") == "narrow":
         argv += ["--plate-coverage", "narrow"]
+    elif not for_render and o.get("plate_coverage") == "assisted":
+        # The Scan Setup dialog is the only consent; never infer it.
+        if o.get("no_box_fallback") is not True:
+            raise ValueError("assisted plate letters needs explicit confirmation")
+        argv += ["--plate-coverage", "assisted", "--no-box-fallback"]
     # unified Scan Setup jobs: stacked detection windows (fractions of
     # duration, resolved server-side by the engine) with per-window
     # categories + zones travel as a windows.json inside the job dir
@@ -2104,7 +2112,8 @@ def enforce_vault_lock():
                 abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
-                "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
+                "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample",
+                "job_letter_gap"}
             version = request.args.get('v')
             versioned_image = (request.endpoint in {'job_thumb', 'job_detframe'}
                                and version is not None and re.fullmatch(r'[0-9a-f]{32}', version))
@@ -3240,6 +3249,88 @@ def _parse_report_once(path, stamp, opened):
         return doc
 
 
+# Assisted plate-letter gap lists, one per report stamp (small: a list of gap
+# dicts). Computed from the SAVED report so they reflect the last saved review
+# choices before any render; shares the parse cache's guard and epoch.
+_LETTER_PLANS = {}           # realpath -> (stamp, (result, fps))
+_LETTER_PLANS_MAX = 8
+_LETTER_GAPS_OFF = {"mode": "off", "gaps": [], "stats": {}}
+
+
+def _report_is_assisted(doc):
+    prov = doc.get("provenance") if isinstance(doc, dict) else None
+    settings = prov.get("settings") if isinstance(prov, dict) else None
+    return isinstance(settings, dict) and settings.get("plate_coverage") == "assisted"
+
+
+def _letter_gap_plan(job):
+    """-> ({"mode", "gaps", "stats"}, fps) for the job's saved report."""
+    path = os.path.join(job["dir"], "report.json")
+    key = os.path.realpath(path)
+    try:
+        opened = open(path, encoding="utf-8")
+    except FileNotFoundError:
+        return dict(_LETTER_GAPS_OFF), None
+    with opened:
+        st = os.fstat(opened.fileno())
+        if not stat.S_ISREG(st.st_mode):
+            abort(500, "report is not a regular file")
+        stamp = _file_stamp(st)
+        with _REPORT_PARSE_GUARD:
+            cached = _LETTER_PLANS.get(key)
+            epoch = _REPORT_PARSE_EPOCH[0]
+        if os.name == "posix" and cached is not None and cached[0] == stamp:
+            return cached[1]
+        try:
+            doc = _parse_report_once(path, stamp, opened)
+        except (ValueError, UnicodeError):
+            abort(500, "report invalid")
+    fps = None
+    if not _report_is_assisted(doc):
+        result = dict(_LETTER_GAPS_OFF)
+    else:
+        try:
+            plan = openscrub.assisted_cover_from_report(doc)
+            fps = float(doc["render_state"]["fps"])
+        except (ValueError, KeyError, TypeError):
+            abort(409, "report has no usable render state")
+        gaps = [{"track": g.track, "t0": g.t0, "t1": g.t1, "frames": g.frames,
+                 "frame": g.frame, "box": [float(v) for v in g.box]} for g in plan.gaps]
+        gaps.sort(key=lambda g: (g["t0"], g["track"]))
+        result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats)}
+    if os.name == "posix":
+        with _REPORT_PARSE_GUARD:
+            # A vault lock or delete during the computation must not repopulate.
+            if epoch == _REPORT_PARSE_EPOCH[0]:
+                _LETTER_PLANS.pop(key, None)
+                while len(_LETTER_PLANS) >= _LETTER_PLANS_MAX:
+                    _LETTER_PLANS.pop(next(iter(_LETTER_PLANS)))
+                _LETTER_PLANS[key] = (stamp, (result, fps))
+    return result, fps
+
+
+def _letter_gap_jpeg(frame, box):
+    """The gap's frame cropped to the box plus one box size of margin, 240 px tall."""
+    H, W = frame.shape[:2]
+    x1, y1, x2, y2 = box
+    bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
+    cx1, cy1 = max(0, int(x1 - bw)), max(0, int(y1 - bh))
+    cx2, cy2 = min(W, int(x2 + bw + 1)), min(H, int(y2 + bh + 1))
+    if cx2 - cx1 < 2 or cy2 - cy1 < 2:
+        cx1, cy1, cx2, cy2 = 0, 0, W, H
+    crop = frame[cy1:cy2, cx1:cx2]
+    scale = 240.0 / crop.shape[0]
+    out = cv2.resize(crop, (max(1, int(round(crop.shape[1] * scale))), 240),
+                     interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
+    p1 = (int(round((x1 - cx1) * scale)), int(round((y1 - cy1) * scale)))
+    p2 = (int(round((x2 - cx1) * scale)), int(round((y2 - cy1) * scale)))
+    cv2.rectangle(out, p1, p2, (36, 191, 251), 2)
+    ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        abort(404)
+    return buf.tobytes()
+
+
 def _expire_idle_report_parses(now=None):
     now = time.monotonic() if now is None else now
     with _REPORT_PARSE_GUARD:
@@ -3253,6 +3344,7 @@ def _forget_report_parses():
     with _REPORT_PARSE_GUARD:
         _REPORT_PARSE_EPOCH[0] += 1
         _REPORT_PARSES.clear()
+        _LETTER_PLANS.clear()
         _REPORT_PARSE_USED.clear()
         _REPORT_PARSE_LOCKS.clear()
 
@@ -4540,6 +4632,9 @@ def job_detections(jid):
                           processed_frames=marker['next_frame'], total_frames=marker['total_frames'])
         if capable:
             result['plate_policy'] = policy
+        if _report_is_assisted(doc):
+            # Review then loads /letter_gaps for the gap list and render reminder.
+            result['assisted_letters'] = True
         return jsonify(result)
     except _ThumbnailError as error:
         return _thumbnail_error_response(error)
@@ -4645,6 +4740,37 @@ def job_frame_at(jid):
             abort(404)
         return buf.tobytes()
     payload = _validated_frame_read(job, request.args.get("src") == "output", decode)
+    return Response(payload, mimetype="image/jpeg")
+
+
+@app.route("/api/jobs/<jid>/letter_gaps")
+def job_letter_gaps(jid):
+    """Assisted plate letters: gaps the saved report's cover leaves visible."""
+    job = JOBS.get(jid) or abort(404)
+    return jsonify(_letter_gap_plan(job)[0])
+
+
+@app.route("/api/jobs/<jid>/letter_gap/<int:n>.jpg")
+def job_letter_gap(jid, n):
+    """Preview of gap n: its middle frame of the scan video, plate box drawn."""
+    job = JOBS.get(jid) or abort(404)
+    result, fps = _letter_gap_plan(job)
+    if result["mode"] != "assisted" or not 0 <= n < len(result["gaps"]) or not fps:
+        abort(404)
+    gap = result["gaps"][n]
+    t = gap["frame"] / fps
+
+    def decode(path):
+        cap = _open_preview_capture(path)
+        try:
+            frame = openscrub._grab_frame(cap, t, fps)
+        finally:
+            cap.release()
+            openscrub._grab_state.pop(id(cap), None)
+        if frame is None:
+            abort(404)
+        return _letter_gap_jpeg(frame, gap["box"])
+    payload = _validated_frame_read(job, False, decode)
     return Response(payload, mimetype="image/jpeg")
 
 
@@ -6034,6 +6160,13 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .thumbwell img{width:100%;height:112px;object-fit:contain}
 .thumbwell.unavailable:after{content:"Preview unavailable";font-size:12px;color:#94a3b8}
 .thumbwell.unavailable img{display:none}
+#letterGaps{margin:8px 0;border:1px solid #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a;min-width:0}
+#letterGaps .lgnotice{color:#fbbf24;font-weight:600;margin:0 0 4px}
+#letterGaps .lglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(175px,100%),1fr));
+ gap:9px;max-height:420px;overflow:auto;margin-top:6px}
+#appzone #letterGaps button.lgap{background:var(--panel);border:1px solid #334155;border-radius:8px;
+ padding:6px;font-size:12px;color:#cbd5e1;text-align:center;min-width:0;cursor:pointer}
+#letterGaps .lgap img{width:100%;height:112px;object-fit:contain;background:#0f172a;border-radius:5px;display:block}
 .reviewgrid{position:relative;width:100%;overflow-anchor:none}
 .reviewrow{position:absolute;left:0;right:0;align-items:stretch}
 .reviewspacer{position:absolute;left:0;right:0;pointer-events:none}
@@ -6945,6 +7078,7 @@ async function refreshCycle(cycle){
     <div id="compare" style="width:100%"></div>
     <div id="beslot_done" style="width:100%"></div>`;
   const actions=document.getElementById("actions");beUnmountIn(actions);actions.innerHTML=a;
+  if(j.phase=="done"&&j.assisted_letters){LETTER_GAPS=null;startLetterGapLoad(id);}
   if(j.phase!="scanning")img.style.display="none";
  }
  renderExportProgress();
@@ -8434,6 +8568,7 @@ async function loadReview(auto=null){
  <p class="detscope">Mixed groups appear in both output views. Filters only change the view.</p>
  <p id="reviewFilterHint" class="detscope"></p>
  <p id="reviewFilterEmpty" hidden></p>
+ <div id="letterGaps" hidden></div>
  <div id="beslot"></div><div class="row reviewranges">
  <button class="sec" data-review-prev onclick="REVIEW_SCHED?.range(-1)">Previous review cards</button>
  <span data-review-range role="status" aria-live="polite"></span>
@@ -8458,7 +8593,63 @@ async function loadReview(auto=null){
  detail.insertAdjacentHTML('beforeend',html);
  REVIEW_SCHED=new ReviewScheduler(id,gen,document.getElementById('review'),REVIEW_META);
  refreshReviewFilters();REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
+ LETTER_GAPS=null;LETTER_GAPS_LOAD=null;
+ if(d.assisted_letters)loadLetterGaps(id,gen);
  return BE_OPEN_INTENT;
+}
+// Assisted plate letters ("letters only, no box fallback"): the gap list is
+// computed server-side from the SAVED report. One notice at the top of the
+// job, never on individual cards; the render reminder states the count.
+let LETTER_GAPS=null,LETTER_GAPS_LOAD=null;   // last list / {jobId,promise} of the Review load
+const ASSISTED_RENDER_REMINDER=n=>`Letters only, no box fallback: ${n} gaps listed in Review will not be covered. Render now?`;
+async function fetchLetterGaps(id){
+ const r=await fetch(`api/jobs/${id}/letter_gaps`);
+ if(!r.ok)throw Error("HTTP "+r.status);
+ const g=await r.json();
+ if(!g||typeof g.mode!=="string"||!Array.isArray(g.gaps))throw Error("invalid gap list");
+ LETTER_GAPS={...g,jobId:id};
+ return LETTER_GAPS;
+}
+function startLetterGapLoad(id){
+ const promise=fetchLetterGaps(id);promise.catch(()=>{});
+ LETTER_GAPS_LOAD={jobId:id,promise};return promise;
+}
+async function loadLetterGaps(id,gen){
+ let g,err=null;
+ try{g=await startLetterGapLoad(id);}catch(e){err=e;}
+ if(!ownsView(id,gen))return;
+ const el=document.getElementById("letterGaps");if(!el)return;
+ if(err){el.hidden=false;el.textContent="Plate letter gaps could not be checked ("+err.message+"). Open Review again to retry.";return;}
+ if(g.mode!=="assisted"){el.hidden=true;el.innerHTML="";return;}
+ const s=g.stats||{},masked=+s.masked_frames||0,gapf=+s.gap_frames||0,bridged=+s.bridged_frames||0;
+ // floor: never round a partly covered job up to 100%
+ const pct=masked+gapf?Math.floor(100*masked/(masked+gapf)):100;
+ const items=g.gaps.map((x,n)=>`<button type="button" class="lgap" onclick="openLetterGap(${+x.t0})">
+  <img loading="lazy" alt="Plate gap preview" src="api/jobs/${id}/letter_gap/${n}.jpg">
+  <div>plate track ${+x.track}</div><div>${(+x.t0).toFixed(2)}–${(+x.t1).toFixed(2)}s · ${+x.frames} frame${+x.frames===1?"":"s"}</div></button>`).join("");
+ el.hidden=false;
+ el.innerHTML=`<p class="lgnotice" role="status">Letters only, no box fallback: gaps below are not covered. Check the output.</p>
+  <div>letters covered on ${pct}% of plate frames (${bridged} bridged), ${g.gaps.length} gaps</div>
+  <div class="detscope">Based on the last saved review choices.</div>
+  ${items?`<div class="lglist">${items}</div>`:""}`;
+}
+async function openLetterGap(t0){
+ const id=CUR,gen=VIEW_GEN;
+ await loadBoxEdit(true);
+ if(!ownsView(id,gen))return;
+ const sl=document.getElementById("beT");if(!sl||!Number.isFinite(t0))return;
+ const cp=BE_VIEW?.checkpoint;
+ sl.value=String(cp?Math.floor(t0*cp.fps):t0);
+ beScrub();
+}
+// -> true to render (or a promise of it). Only assisted jobs start a gap load
+// (Review / done view), so an ordinary job's save stays synchronous.
+function assistedRenderGate(id){
+ const decide=g=>g.mode!=="assisted"||confirm(ASSISTED_RENDER_REMINDER(g.gaps.length));
+ const load=LETTER_GAPS_LOAD&&LETTER_GAPS_LOAD.jobId===id?LETTER_GAPS_LOAD.promise:null;
+ if(load)return load.then(decide,()=>confirm("The plate letter gap list could not be checked. Render now?"));
+ if(LETTER_GAPS&&LETTER_GAPS.jobId===id)return decide(LETTER_GAPS);
+ return true;   // no gap load for this job: not an assisted job
 }
 function disposeReview(){
  if(REVIEW_SCHED){const old=REVIEW_SCHED;REVIEW_SCHED=null;old.dispose();}
@@ -9340,6 +9531,14 @@ async function saveAndRender(resume=false){
  const id=CUR,gen=VIEW_GEN,d=EDITS,reviewOwner=REVIEW_SCHED,editorIntent=BE_OPEN_INTENT;
  if(!id||!d||d.busy)return false;
  if(resume?(PHPH!=='paused'||!REVIEW_META?.checkpoint||REVIEW_META.jobId!==id||REVIEW_META.viewGen!==gen):PHPH==='paused')return false;
+ // Assisted plate letters: remind before anything is saved or sent.
+ if(!resume){
+  const gate=assistedRenderGate(id);
+  if(gate!==true){
+   if(!(gate instanceof Promise?await gate:gate))return false;
+   if(!ownsView(id,gen)||EDITS!==d||d.busy)return false;
+  }
+ }
  const b=d.editor;
  if(resume&&reviewGesturePending(b)){saveStatus(d,'Finish or cancel the current edit before resuming.');return false;}
  let submission;

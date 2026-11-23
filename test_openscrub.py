@@ -544,16 +544,16 @@ def test_every_advanced_setting_has_a_help_tip():
     controls, missing = missing_tips(adv)
     ids = {cid for cid, _, _ in controls}
     assert len(ids) >= 26
-    assert {"plate-policy", "plate-auto-cutoff", "plateletters", "verifyhdrplates"} <= ids
+    assert {"plate-policy", "plate-auto-cutoff", "platecover", "verifyhdrplates"} <= ids
     assert not missing, "no help tip for " + ", ".join("#" + cid for cid in missing)
     without_policy_tip = adv.replace(
         'for="plate-policy">Plate confidence policy <span class="qm"',
         'for="plate-policy">Plate confidence policy <span class="removed"', 1)
     assert "plate-policy" in missing_tips(without_policy_tip)[1]
-    without_checkbox_tip = adv.replace(
-        'id="plateletters"> Plate lettering only (experimental) <span class="qm"',
-        'id="plateletters"> Plate lettering only (experimental) <span class="removed"', 1)
-    assert "plateletters" in missing_tips(without_checkbox_tip)[1]
+    without_cover_tip = adv.replace(
+        'for="platecover">Plate cover <span class="qm"',
+        'for="platecover">Plate cover <span class="removed"', 1)
+    assert "platecover" in missing_tips(without_cover_tip)[1]
     assert "function qmPlace" in w.PAGE and "e.preventDefault();qmPlace(q)" \
         in w.PAGE
 
