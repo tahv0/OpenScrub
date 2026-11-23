@@ -6,6 +6,7 @@ same shot, and lists the stretches that still have no mask as gaps.
 """
 from __future__ import annotations
 
+import math
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 
@@ -17,6 +18,12 @@ MERGE_FRAMES = 3
 CUT_CORREL = 0.5
 JOIN_AREA = (0.5, 2.0)
 _EPS = 1e-9
+# The renderer paints a sample on frame idx when
+# t_start - 0.01 <= idx / fps <= t_end + 0.01 (openscrub._active_on_frame and
+# plate_policy.active_on_frame). Keep this equal to that tolerance: the plan
+# must count exactly the frames the renderer paints, or a visible frame can
+# be missing from the gap list.
+RENDER_TOL_S = 0.01
 
 
 @dataclass(frozen=True)
@@ -70,11 +77,36 @@ def is_cut(previous, current):
     return cv2.compareHist(previous, current, cv2.HISTCMP_CORREL) < CUT_CORREL
 
 
+def _span(t0, t1, fps):
+    """First and last frame the renderer paints for a span (may be empty)."""
+    lo_t, hi_t = t0 - RENDER_TOL_S, t1 + RENDER_TOL_S
+    lo = math.ceil(lo_t * fps)
+    while lo / fps < lo_t:          # the same float test as the renderer
+        lo += 1
+    while (lo - 1) / fps >= lo_t:
+        lo -= 1
+    hi = math.floor(hi_t * fps)
+    while hi / fps > hi_t:
+        hi -= 1
+    while (hi + 1) / fps <= hi_t:
+        hi += 1
+    return lo, hi
+
+
 def _frames(s, fps, frame_count=None):
-    lo, hi = round(s.t0 * fps), round(s.t1 * fps) + 1
+    lo, hi = _span(s.t0, s.t1, fps)
+    hi += 1
     if frame_count is not None:
         lo, hi = max(lo, 0), min(hi, frame_count)
     return range(lo, hi)
+
+
+def _first(s, fps):
+    return _span(s.t0, s.t1, fps)[0]
+
+
+def _last(s, fps):
+    return _span(s.t0, s.t1, fps)[1]
 
 
 def _dist(a, b):
@@ -98,7 +130,7 @@ def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
     t0s = [starts[tr].t0 for tr in order]
     pairs = []
     for ta, a in ends.items():
-        af = round(a.t1 * fps)
+        af = _last(a, fps)
         ax = (a.box[0] + a.box[2]) / 2
         ay = (a.box[1] + a.box[3]) / 2
         aw = a.box[2] - a.box[0]
@@ -110,7 +142,7 @@ def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
             if tb == ta:
                 continue
             b = starts[tb]
-            bf = round(b.t0 * fps)
+            bf = _first(b, fps)
             if bisect_right(cuts, bf) != bisect_right(cuts, af):
                 continue
             dist = ((((b.box[0] + b.box[2]) / 2 - ax) ** 2 + ((b.box[1] + b.box[3]) / 2 - ay) ** 2)) ** 0.5
@@ -126,7 +158,7 @@ def _join(plan, ends, starts, state, fps, cuts, join_s, frame_count=None):
         used_a.add(ta)
         used_b.add(tb)
         a, b = ends[ta], starts[tb]
-        af, bf = round(a.t1 * fps), round(b.t0 * fps)
+        af, bf = _last(a, fps), _first(b, fps)
         top = bf if frame_count is None else min(bf, frame_count)
         for f in range(max(af + 1, 0), top):
             u = (f - af) / (bf - af)
@@ -149,7 +181,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
     gap_total = 0
 
     def shot(s):
-        return bisect_right(cuts, round(s.t0 * fps))
+        return bisect_right(cuts, _first(s, fps))
 
     state = {}
     ends = {}
@@ -211,7 +243,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
             gap_frames.update(f for f in _frames(s, fps, frame_count) if f not in covered)
         if not gap_frames:
             continue
-        dropped_frames = sorted(((round(s.t0 * fps), s) for s in dropped), key=lambda x: x[0])
+        dropped_frames = sorted(((_first(s, fps), s) for s in dropped), key=lambda x: x[0])
         starts = [f for f, _ in dropped_frames]
         n = len(dropped_frames)
         for run in _merge_runs(sorted(gap_frames)):

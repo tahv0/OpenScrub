@@ -104,3 +104,32 @@ def test_bridge_frames_past_the_video_end_are_ignored():
     b = S(1, 2, 0.9, 0.9, POLY, True)
     plan = plan_cover([a, b], 10.0, [], frame_count=6)
     assert [br.frame for br in plan.bridges] == [1, 2, 3, 4, 5]
+
+
+def test_half_frame_start_does_not_hide_a_gap():
+    # 30 fps: a direct sample at frame 40 has no mask and no donor within
+    # 1.0 s; the next (interpolated) sample starts half a frame later, at
+    # 40.5, and borrows a donor just inside 1.0 s. The renderer never paints
+    # frame 40 with that interpolated sample, so frame 40 must be a gap.
+    fps = 30.0
+    direct = S(0, 1, 40 / fps, 40 / fps, (), True)
+    interp = S(1, 1, 40.5 / fps, 41 / fps, (), False)
+    donor = S(2, 1, 41 / fps + 0.99, 41 / fps + 0.99, POLY, True)
+    plan = plan_cover([direct, interp, donor], fps, [])
+    assert 0 in plan.drop and plan.polys[1] == POLY
+    assert [(g.frame, g.frames) for g in plan.gaps] == [(40, 1)]
+
+
+def test_planner_frames_match_the_renderers_rule():
+    import openscrub
+    from openscrub_internal.plate_letters import RENDER_TOL_S, _frames
+    assert RENDER_TOL_S == 0.01
+    for fps in (10.0, 24.0, 25.0, 29.97, 30.0, 59.94, 60.0, 100.0, 120.0):
+        for i in range(0, 400, 7):
+            for t0, t1 in ((i / fps, i / fps), ((i + .5) / fps, (i + 1.5) / fps),
+                           (i / fps + 0.01, (i + 2) / fps - 0.01), (i / fps - 0.03, i / fps + 0.03)):
+                d = openscrub.Detection(t0, t1, (0, 0, 9, 9), "plate", "plate", .9)
+                want = [f for f in range(max(0, i - 10), i + 20)
+                        if openscrub._active_on_frame(d, f / fps, f)]
+                got = [f for f in _frames(S(0, 1, t0, t1, (), True), fps) if f >= max(0, i - 10)]
+                assert got == want, (fps, t0, t1)
