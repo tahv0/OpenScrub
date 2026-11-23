@@ -948,9 +948,16 @@ defined — there was a real UnboundLocalError from ordering once.
   letters only, strict / letters only, no box fallback); picking the last one
   opens a confirmation (cancel restores the previous choice) — the decision is made
   once, there. Review shows ONE notice at the top of the job (never per card), a
-  gap list (`/api/jobs/<jid>/letter_gaps`, preview `/letter_gap/<n>.jpg`, click
-  seeks the box editor) with the covered-vs-gap summary and the bridged-frame
+  gap list (`/api/jobs/<jid>/letter_gaps`, preview `/letter_gap/<n>.jpg` with
+  everything but the plate dimmed; click seeks the box editor AND scrolls to it,
+  marking the open gap) with the covered-vs-gap summary and the bridged-frame
   count, and the render step reminds how many gaps stay uncovered with Cancel.
+  The section is a collapsible `<details>` whose header states the gap count and
+  total seconds, says up front how to fix a gap (video editor, or Track object),
+  numbers the gaps with output-timeline times + frame RANGES (`out_f0`/`out_f1`,
+  list-level `fps`; additive fields), and has "Copy gap list" (clipboard, falls
+  back to a selected textarea on plain-HTTP pages). Verified visually at 1365px
+  and 390px with a synthetic assisted job (no horizontal overflow).
 - Detection models panel (face + plate): `/api/models/<kind>` (+
   `/<mid>/download`, `/download_status`, `/select`). Selection persists in
   `model_select.json` (data root); build_args passes the selected file as

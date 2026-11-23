@@ -172,7 +172,7 @@ def test_letter_gap_preview_refuses_a_list_from_an_older_report(store):
     assert get(url + "?v=" + token).status_code == 404
     assert get(url + "?v=" + fresh["token"]).status_code == 200
     # Review builds the preview URL with the list's token
-    assert "letter_gap/${n}.jpg?v=${encodeURIComponent(g.token" in web.PAGE
+    assert "letter_gap/${k}.jpg?v=${encodeURIComponent(g.token" in web.PAGE
 
 
 ASSISTED_CONFIRM = ("Letters only, no box fallback: where letters are not found clearly, "
@@ -202,11 +202,12 @@ def test_render_reminder_present_and_no_per_card_warning():
     assert ("Letters only, no box fallback: ${n} gaps listed in Review will not be covered. "
             "Render now?") in page
     assert "confirm(ASSISTED_RENDER_REMINDER" in page
-    notice = "Letters only, no box fallback: gaps below are not covered. Check the output."
+    notice = "where a plate stays visible"
     assert page.count(notice) == 1
     assert 'id="letterGaps"' in page
     assert page.index('id="letterGaps"') < page.index('<div id="beslot"></div>')
-    assert "Based on the last saved review choices." in page
+    assert "change this list after <b>Save edits &amp; render</b>" in page
+    assert "Not listed: plates OpenScrub never found" in page
     start = page.index("function reviewCard(c)")
     card = page[start:page.index("\nfunction ", start + 1)]
     choices = page[page.index("function detChoices("):page.index("function setDetLabel(")]
@@ -355,18 +356,51 @@ def test_gap_times_are_formatted_as_rendered_video_timecode():
 for(const v of [5423.37,0,0.0333,65.2,59.9996,3600,-1,NaN])console.log(lgOutTime(v));""")
     assert out.split() == ["1:30:23.370", "0:00:00.000", "0:00:00.033", "0:01:05.200",
                            "0:01:00.000", "1:00:00.000", "0:00:00.000", "0:00:00.000"]
-    assert "time in the rendered video" in page
-    assert "lgOutTime(x.out_t0" in page and "x.out_frame" in page
+    assert "times and frames are in the rendered video" in page
+    assert "lgOutTime(x.out_t0" in page and "x.out_f0" in page
     # the click still seeks the editor on the scan timeline
-    assert "openLetterGap(${+x.t0})" in page
+    assert "openLetterGap(${+x.t0},${k})" in page
 
 
 def test_gap_section_explains_box_edits_do_not_cover_gaps():
     page = web.PAGE
-    line = ("Moving or resizing a plate box does not cover a gap; "
-            "use Track object on that plate instead.")
+    line = "Moving or resizing a plate box does not cover a gap."
     start = page.index("function renderLetterGaps(")
     body = page[start:page.index("\n}\n", start)]
-    assert line in body
-    assert body.index("lglist") < body.index(line)        # under the list
+    assert line in body and "use <b>Track object</b> on the plate" in body
+    assert body.index(line) < body.index("lglist")        # read before the list
     assert "&#8857; Track object</button>" in page        # the editor's label
+
+
+def test_letter_gaps_carry_output_frame_range_and_fps(store):
+    job = store("assisted")
+    gaps = get(f"/api/jobs/{job['id']}/letter_gaps").get_json()
+    assert gaps["fps"] == FPS
+    for g in gaps["gaps"]:
+        assert g["out_f0"] == round(g["t0"] * FPS) and g["out_f1"] == round(g["t1"] * FPS)
+        assert g["out_f0"] <= g["out_frame"] <= g["out_f1"]
+
+
+def test_gap_list_copy_text_is_one_line_per_gap():
+    page = web.PAGE
+    code = "".join(page[page.index(f"function {name}("):page.index("\n}\n", page.index(f"function {name}(")) + 3]
+                   for name in ("lgOutTime", "lgSecs", "lgFrames", "lgDur", "letterGapText"))
+    out = _node_eval(code + """
+process.stdout.write(letterGapText({fps:10,gaps:[
+ {t0:3,t1:3.9,out_t0:3,out_t1:3.9,out_f0:30,out_f1:39,frames:10},
+ {t0:12,t1:12,out_t0:2,out_t1:2,out_f0:20,out_f1:20,frames:1}]}));""")
+    assert out.splitlines() == [
+        "OpenScrub plate gaps (times in the rendered video)",
+        "Gap 1\t0:00:03.000 – 0:00:03.900\tframes 30–39\t1.0 s",
+        "Gap 2\t0:00:02.000 – 0:00:02.000\tframe 20\t0.1 s"]
+
+
+def test_gap_preview_dims_everything_but_the_plate():
+    frame = np.full((96, 160, 3), 200, np.uint8)
+    jpg = web._letter_gap_jpeg(frame, (60, 40, 100, 56))
+    img = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
+    h, w = img.shape[:2]
+    assert h == 240
+    centre = img[h // 2, w // 2].astype(int)
+    corner = img[5, 5].astype(int)
+    assert centre.min() > 180 and corner.max() < 120

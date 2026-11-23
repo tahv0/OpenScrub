@@ -3317,9 +3317,11 @@ def _letter_gap_plan(job):
                  "frame": g.frame, "box": [float(v) for v in g.box],
                  "out_t0": (round(g.t0 * fps) - first) / fps,
                  "out_t1": (round(g.t1 * fps) - first) / fps,
-                 "out_frame": g.frame - first} for g in plan.gaps]
+                 "out_frame": g.frame - first,
+                 "out_f0": round(g.t0 * fps) - first,
+                 "out_f1": round(g.t1 * fps) - first} for g in plan.gaps]
         gaps.sort(key=lambda g: (g["t0"], g["track"]))
-        result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats)}
+        result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats), "fps": fps}
     # The report generation this list describes: a preview by index must
     # name it, so a list from before a save never previews the new plan.
     result["token"] = hashlib.sha256(repr(stamp).encode()).hexdigest()[:16]
@@ -3335,7 +3337,10 @@ def _letter_gap_plan(job):
 
 
 def _letter_gap_jpeg(frame, box):
-    """The gap's frame cropped to the box plus one box size of margin, 240 px tall."""
+    """The gap's frame cropped to the box plus one box size of margin, 240 px tall.
+
+    Everything outside the plate box is dimmed and the box gets a thick
+    outline, so the plate the gap is about stands out at thumbnail size."""
     H, W = frame.shape[:2]
     x1, y1, x2, y2 = box
     bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
@@ -3349,7 +3354,11 @@ def _letter_gap_jpeg(frame, box):
                      interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
     p1 = (int(round((x1 - cx1) * scale)), int(round((y1 - cy1) * scale)))
     p2 = (int(round((x2 - cx1) * scale)), int(round((y2 - cy1) * scale)))
-    cv2.rectangle(out, p1, p2, (36, 191, 251), 2)
+    lit = out.copy()
+    out = cv2.convertScaleAbs(out, alpha=.45)
+    ys, xs = slice(max(0, p1[1]), max(0, p2[1])), slice(max(0, p1[0]), max(0, p2[0]))
+    out[ys, xs] = lit[ys, xs]
+    cv2.rectangle(out, (p1[0] - 2, p1[1] - 2), (p2[0] + 2, p2[1] + 2), (36, 191, 251), 4)
     ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 82])
     if not ok:
         abort(404)
@@ -6187,12 +6196,21 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .thumbwell.unavailable:after{content:"Preview unavailable";font-size:12px;color:#94a3b8}
 .thumbwell.unavailable img{display:none}
 #letterGaps{margin:8px 0;border:1px solid #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a;min-width:0}
-#letterGaps .lgnotice{color:#fbbf24;font-weight:600;margin:0 0 4px}
-#letterGaps .lglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(175px,100%),1fr));
- gap:9px;max-height:420px;overflow:auto;margin-top:6px}
+#letterGaps p{margin:6px 0;font-size:13.5px;color:#e2e8f0}
+#letterGaps p.detscope{font-size:12px;color:#cbd5e1}
+#letterGaps .lgnotice{color:#fbbf24;font-weight:600;cursor:pointer;font-size:15px}
+#letterGaps .lgtools{margin:4px 0;align-items:center;gap:8px;font-size:12px;color:#cbd5e1}
+#letterGaps .lglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr));
+ gap:9px;max-height:470px;overflow:auto;margin-top:6px}
 #appzone #letterGaps button.lgap{background:var(--panel);border:1px solid #334155;border-radius:8px;
- padding:6px;font-size:12px;color:#cbd5e1;text-align:center;min-width:0;cursor:pointer}
-#letterGaps .lgap img{width:100%;height:112px;object-fit:contain;background:#0f172a;border-radius:5px;display:block}
+ padding:6px;font-size:12px;color:#cbd5e1;text-align:left;min-width:0;cursor:pointer;
+ display:flex;flex-direction:column;gap:3px}
+#appzone #letterGaps button.lgap:hover{border-color:#fbbf24}
+#appzone #letterGaps button.lgap.lgcur{border-color:#fbbf24;box-shadow:0 0 0 2px #f59e0b}
+#letterGaps .lgnum{font-weight:600;color:#fbbf24}
+#letterGaps .lgtime{font-variant-numeric:tabular-nums;color:#f1f5f9}
+#letterGaps .lgopen{color:#93c5fd;margin-top:2px}
+#letterGaps .lgap img{width:100%;height:130px;object-fit:contain;background:#0f172a;border-radius:5px;display:block}
 .reviewgrid{position:relative;width:100%;overflow-anchor:none}
 .reviewrow{position:absolute;left:0;right:0;align-items:stretch}
 .reviewspacer{position:absolute;left:0;right:0;pointer-events:none}
@@ -8654,32 +8672,65 @@ async function loadLetterGaps(id,gen){
  if(!ownsView(id,gen))return;
  renderLetterGaps(id,g,err);
 }
+function lgSecs(x){const n=Math.max(0,+x||0);return n<10?n.toFixed(1):String(Math.round(n));}
+function lgFrames(x){
+ const f0=+(x.out_f0??x.out_frame??x.frame),f1=+(x.out_f1??f0);
+ return f1>f0?`frames ${f0}–${f1}`:`frame ${f0}`;
+}
+function lgDur(x,fps){
+ const f0=+x.out_f0,f1=+x.out_f1;
+ return fps>0&&Number.isFinite(f0)&&Number.isFinite(f1)?(f1-f0+1)/fps:+x.frames/(fps||1);
+}
 function renderLetterGaps(id,g,err){
  const el=document.getElementById("letterGaps");if(!el)return;
  if(err){el.hidden=false;el.textContent="Plate letter gaps could not be checked ("+err.message+"). Open Review again to retry.";return;}
  if(g.mode!=="assisted"){el.hidden=true;el.innerHTML="";return;}
  const s=g.stats||{},masked=+s.masked_frames||0,gapf=+s.gap_frames||0,bridged=+s.bridged_frames||0;
+ const fps=+g.fps||0,n=g.gaps.length,wasOpen=el.querySelector("details")?.open;
  // floor: never round a partly covered job up to 100%
  const pct=masked+gapf?Math.floor(100*masked/(masked+gapf)):100;
- const items=g.gaps.map((x,n)=>`<button type="button" class="lgap" onclick="openLetterGap(${+x.t0})">
-  <img loading="lazy" alt="Plate gap preview" src="api/jobs/${id}/letter_gap/${n}.jpg?v=${encodeURIComponent(g.token||"")}">
-  <div>plate track ${+x.track}</div><div>${lgOutTime(x.out_t0??x.t0)}–${lgOutTime(x.out_t1??x.t1)}</div>
-  <div>frame ${+(x.out_frame??x.frame)} · ${+x.frames} frame${+x.frames===1?"":"s"}</div></button>`).join("");
+ const total=g.gaps.reduce((a,x)=>a+lgDur(x,fps),0);
+ const items=g.gaps.map((x,k)=>`<button type="button" class="lgap" data-gap="${k}" onclick="openLetterGap(${+x.t0},${k})"
+  title="Open this moment in the box editor below">
+  <span class="lgnum">Gap ${k+1}</span>
+  <img loading="lazy" alt="Plate ${k+1} preview" src="api/jobs/${id}/letter_gap/${k}.jpg?v=${encodeURIComponent(g.token||"")}">
+  <span class="lgtime">${lgOutTime(x.out_t0??x.t0)} – ${lgOutTime(x.out_t1??x.t1)}</span>
+  <span>${lgFrames(x)} · ${lgSecs(lgDur(x,fps))} s</span>
+  <span class="lgopen">Open in editor ▸</span></button>`).join("");
+ const head=n?`⚠ ${n} gap${n===1?"":"s"} where a plate stays visible (${lgSecs(total)} s in total)`
+  :"✓ No plate gaps: letters were found on every plate frame";
  el.hidden=false;
- el.innerHTML=`<p class="lgnotice" role="status">Letters only, no box fallback: gaps below are not covered. Check the output.</p>
-  <div>letters covered on ${pct}% of plate frames (${bridged} bridged), ${g.gaps.length} gaps</div>
-  <div class="detscope">Based on the last saved review choices. Times and frame numbers are the time in the rendered video.</div>
-  ${items?`<div class="lglist">${items}</div>`:""}
-  <div class="detscope">Moving or resizing a plate box does not cover a gap; use Track object on that plate instead.</div>`;
+ el.innerHTML=`<details${wasOpen===false?"":" open"}><summary class="lgnotice">${head}</summary>
+  <p>Plate cover is <b>Letters only, no box fallback</b>. Letters were covered on ${pct}% of the frames where a plate was found.${n?" In the gaps below a plate was found but its letters were not, so nothing is drawn over it.":""}</p>
+  ${n?`<p class="detscope"><b>To fix a gap:</b> cover it in your video editor afterwards (times and frames are in the rendered video), or click it to open that moment in the box editor below and use <b>Track object</b> on the plate (that blurs the whole plate box). Moving or resizing a plate box does not cover a gap.</p>
+  <div class="row lgtools"><button type="button" class="sec" onclick="copyLetterGaps()">Copy gap list</button><span id="lgCopied" role="status" aria-live="polite"></span></div>
+  <div class="lglist">${items}</div>`:""}
+  <p class="detscope">Not listed: plates OpenScrub never found${bridged?`, and ${bridged} frame${bridged===1?"":"s"} where a plate's cover was carried through a short detector dropout (same scene, up to 1 s)`:""}. Watch the whole output. Blur / Keep visible choices change this list after <b>Save edits &amp; render</b>.</p>
+  </details>`;
 }
-async function openLetterGap(t0){
+function letterGapText(g){
+ const fps=+g.fps||0;
+ return ["OpenScrub plate gaps (times in the rendered video)"].concat(g.gaps.map((x,k)=>
+  `Gap ${k+1}\\t${lgOutTime(x.out_t0??x.t0)} – ${lgOutTime(x.out_t1??x.t1)}\\t${lgFrames(x)}\\t${lgSecs(lgDur(x,fps))} s`)).join("\\n")+"\\n";
+}
+async function copyLetterGaps(){
+ const g=LETTER_GAPS,st=document.getElementById("lgCopied");if(!g||!st)return;
+ const text=letterGapText(g);
+ try{await navigator.clipboard.writeText(text);st.textContent="Copied "+g.gaps.length+" gaps.";return;}catch(_){}
+ // No clipboard (plain-HTTP page or blocked): show the text, selected, to copy by hand.
+ st.innerHTML='<textarea id="lgCopyText" readonly rows="4" style="width:100%"></textarea>';
+ const ta=document.getElementById("lgCopyText");ta.value=text;ta.focus();ta.select();
+}
+async function openLetterGap(t0,k){
  const id=CUR,gen=VIEW_GEN;
+ document.querySelectorAll("#letterGaps .lgap").forEach(b=>b.classList.toggle("lgcur",+b.dataset.gap===k));
  await loadBoxEdit(true);
  if(!ownsView(id,gen))return;
  const sl=document.getElementById("beT");if(!sl||!Number.isFinite(t0))return;
  const cp=BE_VIEW?.checkpoint;
  sl.value=String(cp?Math.floor(t0*cp.fps):t0);
  beScrub();
+ document.getElementById("beslot")?.scrollIntoView({block:"start",behavior:"smooth"});
 }
 // Assisted jobs only (Review / done view start a gap load for them, so an
 // ordinary job's save stays synchronous and is never asked).
