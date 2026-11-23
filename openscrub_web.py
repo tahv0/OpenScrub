@@ -1901,7 +1901,11 @@ def _run_job(job, action, owner=None):
                     control = scan_progress.ScanProgressControl(
                         progress_path, stop_requested=stop_event.is_set,
                         resume=(action == 'continue'),
-                        meta={"video": source, "name": job.get("name")})
+                        meta={"video": source, "name": job.get("name"),
+                              # the report this scan will REPLACE (a rescan
+                              # keeps the old one until it finishes): restart
+                              # tells "stopped" from "finished, not cleaned"
+                              "report_before": _report_digest(job["dir"])})
                 state = (openscrub.run_scan(args, cb) if control is None
                          else openscrub.run_scan(args, cb, progress=control))
                 openscrub.write_report(os.path.join(job["dir"], "report.json"),
@@ -2050,11 +2054,12 @@ def _run_job(job, action, owner=None):
                         # The scan's progress survives the error: keep the job
                         # stopped so Continue carries on from the last save.
                         frame, total = saved
-                        if isinstance(e, scan_progress.ProgressError):
-                            reason = (e.what if isinstance(e, scan_progress.ProgressMismatch)
-                                      else msg)
+                        if isinstance(e, scan_progress.ProgressMismatch):
                             msg = ("Can't continue: %s. Cancel the scan and start it again."
-                                   % reason)
+                                   % e.what)
+                        elif isinstance(e, scan_progress.ProgressError) and action == 'continue':
+                            msg = ("Can't continue: %s. Try Continue scan again; if it keeps "
+                                   "failing, Cancel the scan and start it again." % msg)
                         else:
                             msg = _with_disk_full_hint(msg, e, "continue")
                             msg = ("The scan stopped because of an error at %d%% (%s). "
@@ -2073,6 +2078,9 @@ def _run_job(job, action, owner=None):
             with files.report_lock:
                 if _operation_valid(job, owner):
                     job["eta"] = None
+                if action in ('scan', 'continue') and job.get("phase") == "cancelled":
+                    # a Cancel that raced a failure still discards the progress
+                    scan_progress.remove(progress_path)
     except BaseException:
         escaped = True
         raise
@@ -2088,6 +2096,14 @@ def _run_job(job, action, owner=None):
             finally:
                 if WORKER.get("diagnostic_ref") == diagnostic_ref:
                     WORKER.pop("diagnostic_ref", None)
+
+
+def _report_digest(jdir):
+    path = os.path.join(jdir, "report.json")
+    try:
+        return scan_progress.file_sha256(path)
+    except OSError:
+        return None
 
 
 def _stopped_progress(frame, total):
@@ -7295,7 +7311,7 @@ async function refreshCycle(cycle){
  if(j.error){wb.style.display="block";wb.textContent=j.error;}
  else wb.style.display="none";
 
- CANCEL_KIND=j.phase==="stopped"?2:(j.phase==="scanning"&&j.progress>0)?1:0;
+ CANCEL_KIND=j.phase==="stopped"?2:(j.phase==="scanning"&&j.progress>0)?(j.stop_supported?1:3):0;
  // action buttons rebuilt ONLY when the phase changes
  const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'')
   +(j.stop_supported?':stoppable':'')+(j.stopping?':stopping-scan':'');
@@ -8616,11 +8632,13 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){return saveAndRender();}
-// 0: nothing scanned yet, 1: a scan with progress, 2: a stopped scan
+// 0: nothing scanned yet, 1: a stoppable scan with progress, 2: a stopped
+// scan, 3: a scan with progress that cannot be stopped (text categories)
 let CANCEL_KIND=0;
 async function cancelJob(){
  if(CANCEL_KIND===2&&!confirm("Cancel throws away the saved progress of this scan."))return;
  if(CANCEL_KIND===1&&!confirm("Cancel throws away the scanning done so far. Use Stop to continue later."))return;
+ if(CANCEL_KIND===3&&!confirm("Cancel throws away the scanning done so far."))return;
  await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"});
 }
 async function stopCheckpoint(){
@@ -11132,10 +11150,17 @@ def _rehydrate_jobs():
             continue
         progress_file = os.path.join(jdir, scan_progress.PROGRESS_NAME)
         scan_progress.discard_stage(progress_file)
+        stopped_rescan = False
         if os.path.exists(rep) and os.path.exists(progress_file):
-            # published, but stopped before the progress file was removed
-            scan_progress.remove(progress_file)
-        if not os.path.exists(rep) and os.path.exists(progress_file):
+            saved = _saved_progress(progress_file)
+            before = saved[2].get("report_before") if saved is not None else None
+            if before is not None and before == _report_digest(jdir):
+                stopped_rescan = True       # the report is the OLD one it replaces
+            else:
+                # published, but the server stopped before the progress file
+                # was removed
+                scan_progress.remove(progress_file)
+        if (stopped_rescan or not os.path.exists(rep)) and os.path.exists(progress_file):
             # A stopped (or crashed, autosaved) scan: list it as stopped even
             # when its source video is not mounted right now.
             _register_stopped_job(jid, jdir, progress_file)

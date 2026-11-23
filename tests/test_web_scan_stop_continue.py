@@ -238,3 +238,77 @@ def test_page_has_stop_continue_controls():
         assert text in page, text
     start = page.index("async function cancelJob(")
     assert "confirm(" in page[start:page.index("\n}\n", start)]
+
+
+def test_stopped_rescan_survives_restart_beside_an_old_report(scan_job):
+    job = scan_job()
+    _scan(job)
+    assert job["phase"] == "review"
+    job["phase"] = "error"                      # e.g. a failed render, then a rescan
+    STOP["calls"], STOP["at"] = 0, 10
+    assert _post(f"/api/jobs/{job['id']}/retry").status_code == 200
+    _run_worker()
+    assert job["phase"] == "stopped" and os.path.exists(_progress(job))
+    web.JOBS.clear()
+    web._rehydrate_jobs()
+    assert web.JOBS[job["id"]]["phase"] == "stopped"
+    assert os.path.exists(_progress(job))
+
+
+def _fast_autosave(monkeypatch):
+    now = [0.0]
+    real = sp.ScanProgressControl
+
+    class Fast(real):
+        def __init__(self, *a, **kw):
+            kw["autosave_seconds"] = 0.5
+            kw["clock"] = lambda: now[0]
+            super().__init__(*a, **kw)
+
+        def autosave_due(self):
+            now[0] += 0.3
+            return super().autosave_due()
+    monkeypatch.setattr(sp, "ScanProgressControl", Fast)
+
+
+def test_failed_stop_save_keeps_continue_advice(scan_job, monkeypatch):
+    job = scan_job()
+    _fast_autosave(monkeypatch)
+    real_save, saves = sp.save, []
+
+    def save(path, state):
+        saves.append(state["next_frame"])
+        if len(saves) > 1 and STOP["at"] is not None and STOP["calls"] >= STOP["at"]:
+            raise sp.ProgressError("cannot read the video to check it: [Errno 5] I/O error")
+        return real_save(path, state)
+    monkeypatch.setattr(sp, "save", save)
+    STOP["at"] = 12
+    _scan(job)
+    assert job["phase"] == "stopped"
+    assert "Continue scan carries on from the last save" in job["error"]
+    assert "Cancel the scan" not in job["error"]
+
+
+def test_late_cancel_never_leaves_progress(scan_job, monkeypatch):
+    job = scan_job()
+    _fast_autosave(monkeypatch)
+
+    class Late(_Plate):
+        def find(self, frame, scale):
+            if STOP["calls"] == 15:
+                _post(f"/api/jobs/{job['id']}/cancel")
+                STOP["calls"] += 1
+                raise RuntimeError("failure racing the cancel")
+            return super().find(frame, scale)
+    monkeypatch.setattr(openscrub, "PlateDetector", Late)
+    _scan(job)
+    assert job["phase"] == "cancelled"
+    assert not os.path.exists(_progress(job))
+
+
+def test_cancel_question_only_mentions_stop_when_offered():
+    page = web.PAGE
+    start = page.index("CANCEL_KIND=j.phase")
+    line = page[start:page.index("\n", start)]
+    assert "j.stop_supported" in line
+    assert "Cancel throws away the scanning done so far.\")" in page

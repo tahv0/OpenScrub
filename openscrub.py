@@ -8868,9 +8868,17 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
     if progress is not None:
         # Before any setup mutates args: the continued run rebuilds args from
         # the same saved options and must arrive at the same snapshot.
-        progress_identity = {"engine_version": VERSION,
-                             "format_version": scan_progress.SCAN_PROGRESS_VERSION,
-                             "settings": scan_progress.settings_identity(args)}
+        try:
+            progress_identity = {"engine_version": VERSION,
+                                 "format_version": scan_progress.SCAN_PROGRESS_VERSION,
+                                 "settings": scan_progress.settings_identity(args)}
+        except scan_progress.ProgressError as error:
+            if progress.resume:
+                raise
+            # A fresh scan must never fail because Stop is unavailable.
+            cb.log("      NOTE: Stop is not available for this scan (%s); "
+                   "it runs to the end as usual" % error)
+            progress = None
     if stop_requested is not None and not callable(stop_requested):
         raise TypeError("stop_requested must be a no-argument callback")
     monitor_stop = stop_requested is not None
@@ -9556,7 +9564,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                     spent = _progress_save()
                     cb.log("      progress autosaved at frame %d of %d (%.1f s)"
                            % (idx, total, spent))
-                except scan_progress.ProgressError as error:
+                except Exception as error:       # never let an autosave end a scan
                     progress.autosave_disabled = True
                     cb.log("      NOTE: progress autosave off for this scan: %s" % error)
         if monitor_stop:

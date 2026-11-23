@@ -308,3 +308,43 @@ def test_stop_before_first_frame_saves_nothing(tmp_path, monkeypatch):
     with pytest.raises(openscrub.PipelineCancelled):
         openscrub.run_scan(_args(video, KINDS["plate-full"]), _Quiet(), progress=control)
     assert not os.path.exists(path)
+
+
+def test_autosave_failure_never_kills_an_unstopped_scan(tmp_path, monkeypatch):
+    _patch(monkeypatch)
+    video = str(tmp_path / "clip.avi")
+    _write_video(video)
+    extra = KINDS["plate-full"]
+    expected = straight(tmp_path, video, extra)
+
+    def full_disk(path, state):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(sp, "save", full_disk)
+    now = [0.0]
+    control = sp.ScanProgressControl(str(tmp_path / sp.PROGRESS_NAME),
+                                     stop_requested=lambda: False, resume=False,
+                                     autosave_seconds=0.5, clock=lambda: now.__setitem__(0, now[0] + 1) or now[0])
+    cb = _Quiet()
+    args = _args(video, extra)
+    state = openscrub.run_scan(args, cb, progress=control)
+    assert _report(tmp_path, "survived", args, state) == expected
+    assert any("autosave off" in m for m in cb.logs)
+
+
+def test_unportable_setting_only_disables_stop(tmp_path, monkeypatch):
+    _patch(monkeypatch)
+    video = str(tmp_path / "clip.avi")
+    _write_video(video)
+    args = _args(video, KINDS["plate-full"])
+    args.surprise = object()          # a value the identity cannot record
+    control = sp.ScanProgressControl(str(tmp_path / sp.PROGRESS_NAME),
+                                     stop_requested=lambda: False, resume=False)
+    cb = _Quiet()
+    openscrub.run_scan(args, cb, progress=control)
+    assert any("Stop is not available for this scan" in m for m in cb.logs)
+    args = _args(video, KINDS["plate-full"])
+    args.surprise = object()
+    resume = sp.ScanProgressControl(str(tmp_path / sp.PROGRESS_NAME),
+                                    stop_requested=lambda: False, resume=True)
+    with pytest.raises(sp.ProgressError):
+        openscrub.run_scan(args, _Quiet(), progress=resume)
