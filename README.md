@@ -67,7 +67,10 @@ consoles) — but the engine is general-purpose.
   own review card.
 - **Blur license plates** — via an optional ONNX detector model
   (see [PLATES.md](PLATES.md)); plates re-detect every frame, so a plate
-  crossing the frame stays covered.
+  crossing the frame stays covered. An opt-in **letters only, no box
+  fallback** cover (slow) paints just the characters and lists the spots it
+  could not cover as gaps in Review; it does not find every plate, so check
+  the output (see [PLATES.md](PLATES.md)).
 - **Redact text by pattern** — built-in patterns for SSNs, phone
   numbers, emails, dates, addresses (including multi-line
   street/city/state/ZIP blocks), credit/debit card numbers

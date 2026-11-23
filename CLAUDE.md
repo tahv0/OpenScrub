@@ -276,6 +276,21 @@ Key classes/functions (locate with grep, line numbers drift):
   boundingRect + 55%-of-short-side unclip pad (DB trains on SHRUNK
   kernels; the pad restores glyph coverage, fail closed). Dense like
   plates; IMMEDIATE; runs at 960px long side, /32-aligned.
+- Assisted plate letters (`--plate-coverage assisted`, needs `--no-box-fallback`;
+  UI label "letters only, no box fallback" — never word it as allowing visible
+  plates): `TextRegionDetector.find_letters`/`find_letters_many` run the text
+  model at 320 first and only escalate to 640 and 224 for boxes whose outline is
+  empty or implausible, unioning plausible outlines (a union only adds cover; no
+  strict check, no frame-hash binding). Crops of one resized shape share a model
+  call. The scan stores box-normalized polygons on plate rows plus `scene_cuts`;
+  the pure planner in `openscrub_internal/plate_letters.py` borrows the nearest
+  mask of the same track (<=1.0 s, never across a cut), joins tracks across
+  dropouts (<=1.0 s, similar size, no cut) and computes gaps. `apply_assisted_cover`/
+  `assisted_cover_from_report` run at render from report state, so Review edits and
+  re-renders stay correct. Report fields (additive): `scene_cuts`,
+  `plate_letter_gaps`, `plate_letter_stats`; provenance `plate_coverage: assisted`.
+  Keep/undecided plates are not gaps; an enabled sample with no mask is. Full and
+  strict modes must stay byte-identical.
 - Tiled detection (`_maybe_tiled`, `--tile auto|on|off`): when the
   frame long side >= 2.6x the YOLO input (4K vs 640), plates/person/
   screen ALSO scan an overlapping 2x2 (3x3 at >=5.2x) tile grid; boxes
@@ -921,6 +936,13 @@ defined — there was a real UnboundLocalError from ordering once.
 - Jobs live in `openscrub_jobs/` next to the script. On startup there is a
   ONE-TIME migration renaming a legacy `phi_blur_jobs/` dir if present —
   **the literal string "phi_blur_jobs" is deliberate; do not "fix" it.**
+- Assisted letters UI: Scan Setup `#platecover` is a three-way select (full box /
+  letters only, strict / letters only, no box fallback); picking the last one
+  opens a confirmation (cancel restores the previous choice) — the decision is made
+  once, there. Review shows ONE notice at the top of the job (never per card), a
+  gap list (`/api/jobs/<jid>/letter_gaps`, preview `/letter_gap/<n>.jpg`, click
+  seeks the box editor) with the covered-vs-gap summary and the bridged-frame
+  count, and the render step reminds how many gaps stay uncovered with Cancel.
 - Detection models panel (face + plate): `/api/models/<kind>` (+
   `/<mid>/download`, `/download_status`, `/select`). Selection persists in
   `model_select.json` (data root); build_args passes the selected file as
@@ -1128,7 +1150,15 @@ landed — partial silent misses have happened repeatedly.
 
 ## Hard rules
 
-- This is a privacy tool: **fail closed.** Over-blur beats under-blur;
+- This is a privacy tool: **fail closed** — except in the opt-in letters-only,
+  no-box-fallback mode (`--plate-coverage assisted`, which requires
+  `--no-box-fallback` or the Scan Setup confirmation): there, where letters are
+  not found clearly nothing is drawn instead of the full box, those spots are
+  listed as gaps in Review, and the user checks the output. All other modes keep
+  failing closed. No mode promises to find every plate. Bridged stretches (cover
+  carried across a short detector dropout) are deliberately NOT in the gap list
+  (owner's decision: listing them adds checking work); a wrong join can only be
+  caught by watching the output. Over-blur beats under-blur;
   unverified models are rejected loudly, never run silently.
 - No real personal data, names, or client/organization-identifying
   examples in any committed file. Test data is synthetic.

@@ -185,3 +185,45 @@ its existing retention and deletion practices.
 
 The desktop interface does not expose this option. An ordinary report without
 narrow mode retains the existing full-coverage settings and row shape.
+
+## Letters only, no box fallback (assisted, experimental, slow)
+
+This mode exists to save manual work on videos with many moving plates: the
+cover is letter-sized and follows the plate, and where letters are not found
+clearly nothing is drawn instead of the full box. OpenScrub does not find every
+plate in any mode, and in this mode it is **not fail-closed**: the output must
+be checked by a person.
+
+**Turn it on.** Scan Setup, Advanced, Plate cover: choose "Letters only, no box
+fallback (experimental, slow)" and confirm the dialog. On the command line,
+`--plate-coverage assisted` is refused unless `--no-box-fallback` is also given.
+The choice is saved in the report and reused for re-renders.
+
+**What it does.** On every frame with a detected plate the text model runs on the
+crop at 320 px; boxes whose outline is empty or implausible also run 640 and 224
+and the plausible outlines are unioned. The mask is stored with the plate and
+painted with the plate category's mode (blur, box, mosaic). Frames without their
+own mask borrow the nearest mask of the same plate within 1.0 s. A plate track
+that ends is joined to one starting within 1.0 s nearby at a similar size, and
+the frames between are covered with an interpolated box and mask. Neither
+borrowing nor joining crosses a scene cut (frames that differ almost entirely;
+recorded in the report as `scene_cuts`).
+
+**Gaps.** A gap is a run of frames where a plate that should be covered has no
+letter mask, own or borrowed. Gaps are listed in Review (plate, start and end
+time, frames, a preview, click to jump) with a summary such as "letters covered
+on 92% of plate frames". Review shows one notice at the top, and rendering
+reminds you how many gaps stay uncovered. Plates left visible by a Keep choice or
+an undecided card are not gaps; Review already lists them as cards.
+
+**Bridged stretches are not listed as gaps.** Listing them would add checking
+work, so the summary only shows how many frames were bridged. A wrong join (cover
+in the wrong place) is therefore not listed: watch the output.
+
+**Limits.** Plates the detector never finds cannot be listed. Text detection can
+miss characters. The plate background and character positions stay visible and may
+identify someone; blur and mosaic may be reversible. The scan checks every frame
+at full resolution and is slow; leaving it running overnight is fine. Native SDR
+and HDR renders both use it. Report fields: `plate_letter_gaps`,
+`plate_letter_stats`, `scene_cuts` (additive). Full-box and strict modes are
+unchanged.
