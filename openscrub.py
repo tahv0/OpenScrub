@@ -10316,6 +10316,21 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     return state
 
 
+def _assisted_report(source_report, state):
+    """True when the detections come from a letters only scan: the saved
+    settings say assisted, or the report carries the assisted-only
+    `scene_cuts` key (a full render rewrites the settings without
+    plate_coverage, but the rows keep their letter masks)."""
+    if "scene_cuts" in state:
+        return True
+    if not isinstance(source_report, dict):
+        return False
+    if "scene_cuts" in source_report:
+        return True
+    settings = (source_report.get("provenance") or {}).get("settings") or {}
+    return isinstance(settings, dict) and settings.get("plate_coverage") == "assisted"
+
+
 def run_render(args, state, cb=None):
     if "scan_boundary" in state:
         raise RuntimeError("unverified scan boundary cannot be rendered")
@@ -10362,6 +10377,23 @@ def run_render(args, state, cb=None):
         cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
                "%(bridged_frames)d bridged, %(gap_frames)d without a mask" % plan.stats
                + " in %d gap(s) — review them" % len(plan.gaps))
+    elif _assisted_report(source_report, state):
+        # Letter masks of an assisted scan are plain `poly` on the rows; any
+        # other cover would paint them as silhouettes. Fail closed: the whole
+        # plate box, on copies so the report keeps its masks.
+        cleared = 0
+        out = []
+        for d in detections:
+            if d.category == "plate" and d.poly:
+                d = copy.copy(d)
+                d.poly = ()
+                cleared += 1
+            out.append(d)
+        detections = out
+        if cleared:
+            cb.log("      plate cover %s: %d plate detection(s) from a letters only scan "
+                   "drop their letter masks and get the full plate box"
+                   % (getattr(args, "plate_coverage", "full"), cleared))
     _geometry_preflight(detections, state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")
     dst = args.output or os.path.splitext(args.video)[0] + (

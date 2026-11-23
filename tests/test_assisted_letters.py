@@ -734,3 +734,62 @@ def test_assisted_cover_gets_the_timeline_length(tmp_path, monkeypatch):
                         lambda *a, **k: (seen.append(k.get("frame_count")), real(*a, **k))[1])
     openscrub.apply_assisted_cover(rows, FPS, [3], frame_count=5)
     assert seen == [5]
+
+
+def _render_saved_assisted(tmp_path, coverage, rewrite=None):
+    """Write an assisted report whose rows all carry letter masks, then render
+    it with an explicit `coverage` (run_render with the loaded source report,
+    as the from-report path builds it)."""
+    source = tmp_path / "saved.mp4"
+    _plain_video(source, 3)
+    parser = openscrub.build_parser()
+    report = tmp_path / "saved.json"
+    if rewrite is None:
+        scan_args = openscrub._prep_args(parser.parse_args(
+            [str(source), "--plate-coverage", "assisted", "--no-box-fallback"]), parser)
+        rows = [_plate_row(i, _rect_poly(LETTER_RECT)) for i in range(3)]
+        openscrub.write_report(report, scan_args, {"fps": FPS, "cum": [(0, 0)] * 3,
+                                                   "bands": [(0, 0)] * 3, "detections": rows,
+                                                   "scene_cuts": []})
+    else:
+        report = rewrite
+    doc = json.loads(Path(report).read_text())
+    dets, rstate, _ = openscrub._decode_report(doc)
+    output = tmp_path / ("out_%s.mp4" % coverage)
+    argv = [str(source), "--mode", "box", "--pad", "0", "-o", str(output),
+            "--report", str(report)]
+    if coverage != "saved":
+        argv += ["--plate-coverage", coverage]
+    args = openscrub._prep_args(parser.parse_args(argv), parser)
+    if coverage == "saved":
+        args.plate_coverage = doc["provenance"]["settings"].get("plate_coverage", "full")
+    state = {"fps": rstate["fps"], "cum": [tuple(v) for v in rstate["cum"]],
+             "bands": [tuple(v) for v in rstate["bands"]], "detections": dets,
+             "source_report": doc, "stats": {}}
+    if "scene_cuts" in doc:
+        state["scene_cuts"] = list(doc["scene_cuts"])
+    logs = []
+
+    class CB(openscrub.Callbacks):
+        def log(self, msg):
+            logs.append(msg)
+
+    openscrub.run_render(args, state, CB())
+    return _read_all(output), report, logs, dets
+
+
+@pytest.mark.parametrize("coverage", ["full", "narrow"])
+def test_assisted_report_rendered_as_full_or_narrow_blacks_out_the_box(tmp_path, coverage):
+    out, report, logs, dets = _render_saved_assisted(tmp_path, coverage)
+    assert len(out) == 3
+    inner = (PLATE[0] + 2, PLATE[1] + 2, PLATE[2] - 2, PLATE[3] - 2)
+    for frame in out:
+        assert black_share(frame, inner) > 0.99
+    assert all(d.poly for d in dets)          # copies changed, report rows untouched
+    assert any("letter masks" in m and "full plate box" in m for m in logs)
+    if coverage == "full":
+        # the rewritten report drops plate_coverage; a later default render
+        # must still treat the saved letter masks as assisted-only
+        out2, _, _, _ = _render_saved_assisted(tmp_path, "saved", rewrite=report)
+        for frame in out2:
+            assert black_share(frame, inner) > 0.99
