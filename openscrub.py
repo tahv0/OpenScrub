@@ -4004,6 +4004,12 @@ def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
             ["-c:a", "aac", "-b:a", "192k"])
 
 
+# OS error texts ffmpeg prints when the output file cannot be written.
+_WRITE_FAILURES = ("Input/output error", "No space left on device",
+                   "Read-only file system", "Permission denied",
+                   "Disk quota exceeded", "Stale file handle")
+
+
 def _ffmpeg_failure(err_file, what, rc=None, hint=""):
     """RuntimeError carrying the TAIL of ffmpeg's own stderr (captured to
     a temp file), so the job log names the real cause — 'Could not find
@@ -4019,6 +4025,10 @@ def _ffmpeg_failure(err_file, what, rc=None, hint=""):
         pass
     msg = "%s failed%s" % (what, (" (ffmpeg exit %s)" % rc)
                            if rc is not None else "")
+    if any(words in tail for words in _WRITE_FAILURES):
+        # ffmpeg encoded fine but could not WRITE the file: the disk or the
+        # folder is the problem, and another encoder would fail the same way.
+        hint = "writing the output file failed — a disk or folder problem, not the encoder"
     return RuntimeError(msg + (": " + tail if tail else
                                " — ffmpeg gave no error message")
                         + (" — " + hint if hint else ""))

@@ -2135,17 +2135,32 @@ def _failed_step(action):
     return "render" if action == "render" else "scan"
 
 
+_WRITE_ERRNOS = {errno.EIO, errno.EROFS, errno.EACCES, errno.EPERM,
+                 getattr(errno, "EDQUOT", -1), getattr(errno, "ESTALE", -1)}
+
+
 def _with_disk_full_hint(msg, error, step):
-    """A full disk is the user's to fix: say so, and which retry keeps the work.
-    ffmpeg reports it only in its stderr text, so match the message too."""
-    full = (isinstance(error, OSError) and error.errno == errno.ENOSPC
-            or "No space left on device" in msg)
-    if not full:
-        return msg
+    """A full disk or a failed write is the user's to fix: say so, with steps,
+    and which retry keeps the work. ffmpeg reports both only in its stderr
+    text, so match the message too."""
     retry = ("press Retry render — your review choices are kept" if step == "render"
              else "press Continue scan" if step == "continue"
              else "press Retry scan")
-    return f"{msg} — the disk is full. Free some disk space, then {retry}."
+    full = (isinstance(error, OSError) and error.errno == errno.ENOSPC
+            or "No space left on device" in msg)
+    if full:
+        return f"{msg} — the disk is full. Free some disk space, then {retry}."
+    write = ("writing the output file failed" in msg
+             or any(words in msg for words in openscrub._WRITE_FAILURES))
+    os_level = isinstance(error, OSError) and error.errno in _WRITE_ERRNOS
+    if not (write or os_level):
+        return msg
+    what = ("the output could not be written to disk (this is not an encoder "
+            "problem)" if write else "a file could not be read or written on disk")
+    return (f"{msg} — {what}. Check that the drive holding OpenScrub's data "
+            "folder is connected and healthy and has free space, and that no "
+            "antivirus, indexer, backup or sync tool is locking files there (on "
+            f"Windows, exclude the folder from Defender scanning). Then {retry}.")
 
 
 def start_worker():
