@@ -3388,6 +3388,14 @@ def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
 # Render
 # ----------------------------------------------------------------------------
 
+def _note_inpaint_support(modes, log):
+    """Say once per render when inpaint falls back to a flat fill."""
+    if "inpaint" in modes and not hasattr(cv2, "inpaint"):
+        log("      NOTE: inpaint is not available in this OpenCV build (no photo "
+            "module) — inpaint regions are filled flat with the colour around "
+            "them instead. Nothing of the original pixels is kept.")
+
+
 def _inpaint_fill(img, x1, y1, x2, y2):
     """Region fill for mode "inpaint": reconstruct the area from its
     surroundings (cv2 Telea) on a context-padded crop, so the object
@@ -3402,6 +3410,18 @@ def _inpaint_fill(img, x1, y1, x2, y2):
     cx1, cy1 = max(0, x1 - pw), max(0, y1 - ph)
     cx2, cy2 = min(w, x2 + pw), min(h, y2 + ph)
     crop = img[cy1:cy2, cx1:cx2]
+    if not hasattr(cv2, "inpaint"):
+        # OpenCV built without its photo module (the CUDA image's slim
+        # build): fill flat with the surroundings' mean colour. Like Telea it
+        # keeps nothing of the original pixels inside the region.
+        ring = np.ones(crop.shape[:2], bool)
+        ring[y1 - cy1:y2 - cy1, x1 - cx1:x2 - cx1] = False
+        around = crop[ring]
+        value = (np.rint(around.mean(axis=0)) if around.size
+                 else np.zeros(crop.shape[2:], np.float64))
+        out = np.empty((y2 - y1, x2 - x1) + crop.shape[2:], crop.dtype)
+        out[...] = value.astype(crop.dtype)
+        return out
     ten_bit = crop.dtype == np.uint16
     work = ((np.clip(crop, 0, 1023) >> 2).astype(np.uint8)
             if ten_bit else crop)
@@ -4692,6 +4712,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
     # Public entry checks source extents before the single delivery stage.
     # Coverage may legally round a positive source box to an empty integer box.
     mode_map = mode_map or {}
+    _note_inpaint_support(set(mode_map.values()) | {mode},
+                          (cb.log if cb is not None else print))
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
@@ -5104,6 +5126,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
         except (TypeError, ValueError, IndexError):
             raise ValueError("invalid bounded clip interval") from None
     mode_map = mode_map or {}
+    _note_inpaint_support(set(mode_map.values()) | {mode},
+                          (cb.log if cb is not None else print))
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
