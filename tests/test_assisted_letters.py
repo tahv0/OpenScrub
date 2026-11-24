@@ -426,6 +426,37 @@ def test_assisted_render_masks_letters_and_leaves_gaps_visible(tmp_path):
     assert doc["plate_letter_stats"] == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 2}
 
 
+def test_assisted_render_retires_a_trailing_cover_after_a_track_handoff(tmp_path):
+    source = tmp_path / "handoff.mp4"
+    output = tmp_path / "out.mp4"
+    _plain_video(source, 5, size=(224, 112))
+    letters = _rect_poly((.15, .2, .85, .8))
+    # Track 0's held box and track 1's onset padding overlap. Track 2 is
+    # nearby and was actually observed alongside track 1 on frame 2.
+    def plate(track, frame, x, y, start, end):
+        row = _plate_row(frame, letters, track, box=(x, y, x + 100, y + 36),
+                         origin="detection")
+        row.t_start, row.t_end = start / FPS, end / FPS
+        row.last_seen = frame / FPS
+        return row
+    rows = [plate(0, 0, 10, 14, 0, 3), plate(1, 2, 31, 14, 0, 2),
+            plate(1, 3, 34, 14, 3, 3), plate(2, 2, 34, 25, 2, 4)]
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args([
+        str(source), "--mode", "box", "--pad", "0", "--plate-coverage", "assisted",
+        "--no-box-fallback", "-o", str(output)]), parser)
+    state = {"fps": FPS, "cum": [(0, 0)] * 5, "bands": [(0, 0)] * 5,
+             "detections": rows, "stats": {}, "scene_cuts": []}
+    openscrub.run_render(args, state)
+    frames = _read_all(output)
+    assert black_share(frames[0], (28, 25, 39, 31)) > .99  # original position
+    assert black_share(frames[0], (100, 25, 110, 31)) < .01  # no premature copy
+    assert black_share(frames[1], (60, 25, 80, 31)) > .99  # no flash at handoff
+    assert black_share(frames[2], (28, 25, 39, 31)) < .01  # old position retired
+    assert black_share(frames[2], (55, 25, 100, 31)) > .99
+    assert black_share(frames[3], (58, 46, 102, 49)) > .99  # second plate's hold
+
+
 def test_assisted_bridge_rows_span_one_frame_on_the_ending_track():
     rows = [_plate_row(i, _rect_poly(LETTER_RECT)) for i in range(3)]
     rows += [_plate_row(i, _rect_poly(LETTER_RECT), track=1, box=(24, 20, 144, 76))

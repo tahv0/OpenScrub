@@ -66,6 +66,46 @@ def test_cut_detected_between_different_scenes_not_within_one():
     assert not is_cut(frame_signature(a), frame_signature(a + 3))
 
 
+def test_moving_plate_keeps_its_letters_through_a_100ms_miss_until_a_cut():
+    fps = 30
+    gray = np.random.default_rng(42).integers(20, 200, (90, 160), dtype=np.uint8)
+    scene = np.repeat(gray[:, :, None], 3, axis=2)
+    scene[35:48, 70:100] = (90, 90, 150)
+    cuts, samples = [], []
+    previous = None
+    for i in range(6):
+        frame = np.roll(scene, i, axis=1)
+        frame[:, :, 0] += i % 2  # near-neutral pixels switch HSV hue
+        if i == 5:
+            frame[:] = (20, 180, 200)
+        signature = frame_signature(frame)
+        if previous is not None and is_cut(previous, signature):
+            cuts.append(i)
+        previous = signature
+        samples.append(S(i, 1, i / fps, i / fps, POLY if i in (0, 4) else (),
+                         True, box=(70 + i, 35, 100 + i, 48)))
+    plan = plan_cover(samples, fps, cuts)
+    assert set(plan.polys) == {0, 1, 2, 3, 4}
+    assert cuts == [5] and plan.drop == {5}
+
+
+def test_handoff_keeps_cover_if_the_other_track_cannot_replace_the_hold():
+    # Second track is detected briefly. Trimming the first track at its
+    # sighting would expose frames 3 and 4, where it is the only cover.
+    a = Sample(0, 1, 0, .4, (0, 0, 100, 30), POLY, True, 0)
+    b = Sample(1, 2, .1, .2, (15, 0, 115, 30), POLY, True, .2)
+    plan = plan_cover([a, b], 10, [])
+    assert plan.spans.get(a.key, (a.t0, a.t1))[1] == .4
+
+
+def test_ambiguous_or_cross_cut_handoffs_keep_the_original_masks():
+    a = Sample(0, 1, 0, .3, (0, 0, 100, 30), POLY, True, 0)
+    b = Sample(1, 2, 0, .4, (15, 0, 115, 30), POLY, True, .2)
+    c = Sample(2, 3, 0, .4, (20, 0, 120, 30), POLY, True, .2)
+    assert not plan_cover([a, b, c], 10, []).spans
+    assert not plan_cover([a, b], 10, [1]).spans
+
+
 def test_dropout_between_two_tracks_is_bridged_and_not_a_gap():
     s = [S(0, 1, 0.0, 0.0, POLY, True, box=(0, 0, 100, 30)), S(1, 2, 0.5, 0.5, POLY, True, box=(40, 0, 140, 30))]
     plan = plan_cover(s, 10.0, [])
@@ -142,3 +182,61 @@ def test_first_frame_drops_frames_before_an_output_clip():
     # every sample), track 2 is a gap trimmed to the clip
     assert [(g.track, g.t0, g.frames) for g in plan.gaps] == [(2, 2.5, 5)]
     assert plan.stats == {"masked_frames": 3, "bridged_frames": 0, "gap_frames": 5}
+
+
+def test_partial_letters_recover_across_moving_boxes_and_empty_samples():
+    line = (((.08, .3), (.92, .3), (.92, .7), (.08, .7)),)
+    partial = (((.46, .27), (.91, .27), (.91, .66), (.46, .66)),)
+    times = [0, .033, .10, .133, .166, .2]
+    masks = [line, line, partial, (), partial, partial]
+    rows = [S(i, 1, t, t, mask, True, box=(4*i, 10, 4*i+120, 50))
+            for i, (t, mask) in enumerate(zip(times, masks))]
+    plan = plan_cover(rows, 30, [])
+    for i in range(2, 6):
+        assert line[0] in plan.polys[i]
+    assert partial[0] in plan.polys[2]  # the new observation extends above the old line
+    assert rows[2].poly == partial
+
+
+def test_diagonal_plate_rejects_isolated_corner_text_with_clean_neighbours():
+    band = ((.04, .18), (.18, .04), (.96, .82), (.82, .96))
+    corner = ((.03, .8), (.13, .8), (.13, .9), (.03, .9))
+    inline = ((.02, .06), (.06, .06), (.06, .1), (.02, .1))
+    rows = [S(i, 1, i / 30, i / 30, p, True, box=(10, 10, 210, 210))
+            for i, p in enumerate([(band,), (band, corner, inline), (band,)])]
+    assert plan_cover(rows, 30, []).polys[1] == (band, inline)
+
+
+def test_partial_mask_needs_recent_independent_evidence_in_the_same_shot_and_track():
+    partial = (((.5, .2), (.9, .2), (.9, .8), (.5, .8)),)
+    def row(i, t, mask, track=1, direct=True):
+        return S(i, track, t, t, mask, direct)
+    for rows, cuts in [
+        ([row(0, 0, POLY), row(1, .03, POLY), row(2, .1, partial)], [2]),
+        ([row(0, 0, POLY), row(1, .03, POLY), row(2, 1, partial)], []),
+        ([row(0, 0, POLY, 2), row(1, .03, POLY, 2), row(2, .1, partial)], []),
+        ([row(0, 0, POLY), row(1, .03, POLY, direct=False), row(2, .1, partial)], []),
+    ]:
+        assert plan_cover(rows, 30, cuts).polys[2] == partial
+
+
+def test_split_second_line_and_extension_past_the_band_stay_covered():
+    band = ((.1, .25), (.9, .25), (.9, .45), (.1, .45))
+    # The clean line spans 80% of the box. Each component of the second
+    # line is small on its own, but together they span most of that line.
+    def glyph(x, y):
+        return ((x, y), (x + .08, y), (x + .08, y + .08), (x, y + .08))
+    second = tuple(glyph(x, .65) for x in (.22, .35, .48, .61))
+    extended = (band,) + second + (glyph(.88, .3),)
+    rows = [S(i, 1, i / 30, i / 30, p, True)
+            for i, p in enumerate([(band,), extended, (band,)])]
+    assert plan_cover(rows, 30, []).polys[1] == extended
+
+
+def test_letters_missing_at_one_end_even_when_new_mask_has_similar_length():
+    line = (((.05, .3), (.85, .3), (.85, .7), (.05, .7)),)
+    shifted = (((.19, .3), (.96, .3), (.96, .7), (.19, .7)),)
+    fragment = ((.08, .4), (.12, .4), (.12, .5), (.08, .5))
+    rows = [S(i, 1, i / 30, i / 30, p, True)
+            for i, p in enumerate([line, line, shifted + (fragment,)])]
+    assert line[0] in plan_cover(rows, 30, []).polys[2]

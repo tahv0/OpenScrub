@@ -4489,8 +4489,14 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, lo
         direct = evidence is None or evidence.get("origin") == "detection"
         box = (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
                d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
+        seen = None
+        if direct and _frame_authority(d) is None:
+            frame = evidence.get("frame") if evidence is not None else None
+            sighting = frame / fps if type(frame) is int else d.last_seen
+            if d.t_start - 1e-6 <= sighting <= d.t_end + 1e-6:
+                seen = min(d.t_end, max(d.t_start, sighting))
         samples.append(plate_letters.Sample(key, d.track, d.t_start, d.t_end, box,
-                                            tuple(d.poly or ()), direct))
+                                            tuple(d.poly or ()), direct, seen))
         planned.add(key)
         last = aoffs.get(d.track)
         if last is None or d.t_end >= last[0]:
@@ -4504,7 +4510,10 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, lo
     for key, d in enumerate(dets):
         if key in planned:
             if key not in plan.drop:
-                out.append(_assisted_row(d, plan.polys[key]))
+                row = _assisted_row(d, plan.polys[key])
+                if key in plan.spans:
+                    row.t_start, row.t_end = plan.spans[key]
+                out.append(row)
         elif d.category == "plate" and d.poly and plate_quad.valid_record(d.manual_plate_quad):
             out.append(_assisted_row(d, ()))
         else:

@@ -209,7 +209,22 @@ own mask borrow the nearest mask of the same plate within 1.0 s. A plate track
 that ends is joined to one starting within 1.0 s nearby at a similar size, and
 the frames between are covered with an interpolated box and mask. Neither
 borrowing nor joining crosses a scene cut (frames that differ almost entirely;
-recorded in the report as `scene_cuts`).
+recorded in the report as `scene_cuts`). A small pan or color shift can change
+the color histogram, so the scan also checks the change in a thumbnail of the
+scene. Rescan older footage to update its saved cuts.
+
+When a lettering outline briefly shrinks, the renderer checks up to 0.45 s
+on either side for two agreeing single-line sightings of the same plate in
+the same shot. It can add the missing part in the current plate box. A clear
+line also lets it ignore small, detached patches beside the lettering, such
+as a tool logo inside a tilted plate’s rectangular crop. Multi-line lettering
+and partially hidden characters still need visual review. Re-rendering a saved
+letters-only scan applies this check.
+
+When two successive tracks have overlapping holds and clearly matching plate
+positions, the render uses one moving letter mask between the sightings.
+Ambiguous matches keep their separate covers. This handoff also applies when
+rendering an existing letters-only scan.
 
 **Gaps.** A gap is a run of frames where a plate that should be covered has no
 letter mask, own or borrowed. Gaps are listed in Review (plate, start and end
