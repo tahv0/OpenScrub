@@ -350,8 +350,8 @@ def _node_eval(code):
 
 def test_gap_times_are_formatted_as_rendered_video_timecode():
     page = web.PAGE
-    start = page.index("function lgOutTime(")
-    code = page[start:page.index("\n}\n", start) + 3]
+    code = "".join(page[page.index(f"function {name}("):page.index("\n}\n", page.index(f"function {name}(")) + 3]
+                   for name in ("fmtTime", "lgOutTime"))
     out = _node_eval(code + """
 for(const v of [5423.37,0,0.0333,65.2,59.9996,3600,-1,NaN])console.log(lgOutTime(v));""")
     assert out.split() == ["1:30:23.370", "0:00:00.000", "0:00:00.033", "0:01:05.200",
@@ -384,7 +384,8 @@ def test_letter_gaps_carry_output_frame_range_and_fps(store):
 def test_gap_list_copy_text_is_one_line_per_gap():
     page = web.PAGE
     code = "".join(page[page.index(f"function {name}("):page.index("\n}\n", page.index(f"function {name}(")) + 3]
-                   for name in ("lgOutTime", "lgSecs", "lgFrames", "lgDur", "letterGapText"))
+                   for name in ("fmtTime", "lgOutTime", "lgSecs", "lgFrames", "lgDur",
+                                "letterGapText"))
     out = _node_eval(code + """
 process.stdout.write(letterGapText({fps:10,gaps:[
  {t0:3,t1:3.9,out_t0:3,out_t1:3.9,out_f0:30,out_f1:39,frames:10},

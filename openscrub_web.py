@@ -6573,7 +6573,7 @@ APP_JS = """function renderAudioSugg(){
    +(used?'<span style="color:#4ade80">&#10003; added</span> '
      :'<button class="tog" style="font-size:11px;padding:1px 7px" '
       +'onclick="applyAudioSugg('+i+')">Add</button> ')
-   +s.t0.toFixed(1)+'&ndash;'+s.t1.toFixed(1)+'s '
+   +fmtTime(s.t0)+'&ndash;'+fmtTime(s.t1)+' '
    +'<b>'+(CATDN[s.category]||s.category)+'</b> '
    +'<span style="color:#94a3b8">&ldquo;'
    +String(s.text||"").replace(/[<>&]/g,"")+'&rdquo;</span></div>';
@@ -6614,7 +6614,7 @@ function renderTranscript(){
   if(a)st+='outline:2px solid #f59e0b;';
   if(m)st+='background:#7f1d1d;color:#fecaca;text-decoration:line-through;';
   else if(g)st+='background:#78350f;color:#fde68a;';
-  h+='<span style="'+st+'" title="'+wd[0].toFixed(2)+'&ndash;'+wd[1].toFixed(2)+'s'+(m?' (will be muted)':'')+'" onclick="txWordClick('+i+')">'+esc(wd[2])+'</span>';
+  h+='<span style="'+st+'" title="'+fmtTime(wd[0])+'&ndash;'+fmtTime(wd[1])+(m?' (will be muted)':'')+'" onclick="txWordClick('+i+')">'+esc(wd[2])+'</span>';
  });
  h+='</div><div style="font-size:11px;color:#64748b">'
   +(BE.txAnchor>=0?'<b style="color:#f59e0b">now click the last word of the range to mute it</b>'
@@ -7465,14 +7465,14 @@ async function beApplySample(view,serial,data){
     view.plate.message=`Frame ${s.index} is ready. Search this frame to see its suggestions.`;
    }else view.plate.message='The source or frame changed since the sampled search. Inspect and search again.';
   }
-  const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
+  const label=document.getElementById('beL');if(label)label.textContent=`requested ${fmtTime(data.sample.requested_s)} · frame ${data.sample.index} at ${fmtTime(b.t)}`;
   beFilter();beQuadControls(view);beDraw();beTLDraw();bePlateRender(view);
  }finally{if(url&&!installed)URL.revokeObjectURL(url);}
 }
 function beRequestSample(view,t){
  if(!view||!view.current()||!Number.isFinite(t))return;
  if(view.checkpoint&&(PHPH!=='paused'||t<0||t>=view.checkpoint.duration))return;
- beInvalidateSample(view,`Inspecting ${t.toFixed(3)}s…`);
+ beInvalidateSample(view,`Inspecting ${fmtTime(t)}…`);
  EDIT_SAMPLE_IO.wanted={view,serial:view.serial,t};
  return bePumpSamples();
 }
@@ -7691,7 +7691,7 @@ function bePlateRender(view){
   for(const frame of p.batch.frames){
    const button=document.createElement('button');button.type='button';button.className='sec';
    button.disabled=!!p.request;
-   button.textContent=`Inspect frame ${frame.index} · ${frame.time_s.toFixed(2)}s · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
+   button.textContent=`Inspect frame ${frame.index} · ${fmtTime(frame.time_s)} · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
    button.onclick=()=>bePlateInspectSample(view,frame);samples.appendChild(button);
   }
  }
@@ -7998,8 +7998,8 @@ async function loadBoxEdit(fromReview){
    <button class="sec" id="beQuad" style="display:none" onclick="beQuadMode()">Edit plate corners</button>
    <button class="sec" id="beQuadReset" style="display:none" onclick="beQuadReset()">Reset to full plate mask</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
-    from <input type="number" id="beT0" step="${checkpoint?'any':'0.1'}" min="0" style="width:74px">
-    to <input type="number" id="beT1" step="${checkpoint?'any':'0.1'}" style="width:74px"> s
+    from <input type="text" inputmode="decimal" id="beT0" title="h:mm:ss.mmm or seconds" style="width:104px">
+    to <input type="text" inputmode="decimal" id="beT1" title="h:mm:ss.mmm or seconds" style="width:104px">
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
    <button data-save-edits onclick="${checkpoint?'saveAndResume()':'beSave()'}">${checkpoint?'Save &amp; Resume':'Save changes &amp; re-render'}</button></div>
@@ -8069,7 +8069,7 @@ async function beTogglePlay(){
   if(!current()||!BE.playing)return;
   BE.t=v.currentTime;
   document.getElementById("beT").value=BE.t;
-  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+  document.getElementById("beL").textContent=fmtTime(BE.t);
   const now=performance.now();
   if(!inFlight&&now-lastQ>150){
    inFlight=true;lastQ=now;
@@ -8167,7 +8167,7 @@ function beTLDraw(){
  g.moveTo(tlX(BE.t,w),0);g.lineTo(tlX(BE.t,w),72);g.stroke();
  const full=BE.win[0]<0.05&&BE.win[1]>BE.dur-0.05;
  document.getElementById("beWinL").textContent=full?(BE_VIEW?.checkpoint?"window: processed portion":"window: whole video")
-  :`window: ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s`;
+  :`window: ${fmtTime(BE.win[0])}–${fmtTime(BE.win[1])}`;
 }
 function tlHook(){
  const cv=document.getElementById("beTL"),view=BE_VIEW,editor=BE;if(!cv||!view)return;
@@ -8355,7 +8355,7 @@ async function beTrackGo(box){
   intent:BE_OPEN_INTENT,reviewRequest:REVIEW_REQUEST,state:'starting',timer:null,polling:false};
  const payload={box:copyEdit(box),t_ref:view.readySample.sample.canonical_s,t0,t1,seed:copyEdit(view.readySample.precondition)};
  draft.track=launch;view.trackLaunch=launch;renderTrackStatus(draft);
- st.style.display="inline";st.textContent=`tracking ${t0.toFixed(1)}–${t1.toFixed(1)}s…`;
+ st.style.display="inline";st.textContent=`tracking ${fmtTime(t0)}–${fmtTime(t1)}…`;
  try{
   await reviewPost(`api/jobs/${launch.id}/track_object`,payload);
   if(!trackOwned(launch))return;
@@ -8468,9 +8468,10 @@ function beAddMode(){
 }
 function beApplyTimes(){
  if(BE.sel<0||!beReady())return;
- const t0=+document.getElementById("beT0").value,
-       t1=+document.getElementById("beT1").value;
- if(![t0,t1].every(Number.isFinite)||!(t1>t0&&t0>=0&&t1<=BE.dur)){alert("'to' must be after 'from'.");return;}
+ const t0=parseTime(document.getElementById("beT0").value),
+       t1=parseTime(document.getElementById("beT1").value);
+ if(t0===null||t1===null){alert("Enter times as h:mm:ss.mmm (for example 0:01:23.400) or in seconds.");return;}
+ if(!(t1>t0&&t0>=0&&t1<=BE.dur)){alert("'to' must be after 'from'.");return;}
  const row=BE.raw.find(x=>x.i===BE.sel);if(!beCaptureGeometry(BE_VIEW,row))return;
  BE.times[BE.sel]=[t0,t1];reviewResolveActions(EDITS);
  const b=BE.boxes.find(x=>x.i===BE.sel);
@@ -8480,8 +8481,9 @@ function beApplyTimes(){
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
  el.style.display="inline-flex";
- document.getElementById("beT0").value=BE_VIEW?.checkpoint?String(b.t_start):b.t_start.toFixed(1);
- document.getElementById("beT1").value=BE_VIEW?.checkpoint?String(b.t_end):b.t_end.toFixed(1);
+ // checkpoint review keeps the exact stored seconds; elsewhere h:mm:ss.mmm
+ document.getElementById("beT0").value=BE_VIEW?.checkpoint?String(b.t_start):fmtTime(b.t_start);
+ document.getElementById("beT1").value=BE_VIEW?.checkpoint?String(b.t_end):fmtTime(b.t_end);
 }
 function manualId(){
  const c=globalThis.crypto;
@@ -8788,7 +8790,7 @@ function reviewCard(c){
  const unit=c.policyRows?'sample':'appearance';
  return `<div class="det" id="det${c.id}" data-cat="${detLabel(cat)}">
   <div class="thumbwell"><img alt="Detection preview" style="cursor:zoom-in" onclick="zoomDet(${c.id})"></div>
-  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} ${c.policyRows?'samples':'frames'}</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} ${c.policyRows?'samples':'frames'}</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${fmtTime(x.t_start)}–${fmtTime(x.t_end)}</div>
   ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} ${unit}s in this ${detLabel(reviewCategoryName(cat))} group</div>`:''}
   ${detChoices(c.id,c.zone?'Outside-zone detection':reviewCategoryName(cat),!!c.policyRows)}
   <button type="button" class="sec" data-thumb-reopen hidden onclick="loadReview()">Re-open review</button></div>`;
@@ -8904,10 +8906,23 @@ const ASSISTED_RENDER_REMINDER=n=>`Letters only, no box fallback: ${n} gaps list
 // Output-timeline seconds as H:MM:SS.mmm (1:30:23.370), the form a video
 // editor's timecode field takes. Milliseconds are rounded once, so 59.9996
 // carries into the next minute instead of printing 60.000.
-function lgOutTime(sec){
+// Review times: h:mm:ss.mmm everywhere (cards, editor, gap list, audio).
+function fmtTime(sec){
  const ms=Math.max(0,Math.round((+sec||0)*1000));
  const h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60,s=Math.floor(ms/1000)%60,r=ms%1000;
  return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(r).padStart(3,"0")}`;
+}
+// "h:mm:ss.mmm", "m:ss.mmm" or plain seconds -> seconds; anything else -> null
+function parseTime(text){
+ const t=String(text??"").trim();
+ if(!/^(\\d+:)?(\\d+:)?\\d+(\\.\\d+)?$/.test(t))return null;
+ const parts=t.split(":").map(Number);
+ if(parts.slice(1).some(v=>v>=60))return null;
+ const v=parts.reduce((acc,p)=>acc*60+p,0);
+ return Number.isFinite(v)?Math.round(v*1000)/1000:null;
+}
+function lgOutTime(sec){
+ return fmtTime(sec);
 }
 async function fetchLetterGaps(id){
  const r=await fetch(`api/jobs/${id}/letter_gaps`);
