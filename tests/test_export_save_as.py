@@ -85,7 +85,8 @@ def run_js(scenario):
     node_bin = shutil.which("node")
     assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
     # This is the real evaluated Python string, not an independently copied JS helper.
-    source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refreshCycle(cycle)", 1)[0]
+    page = web.app.test_client().get("/").get_data(as_text=True)
+    source = page.split("function shellHtml(j)", 1)[1].split("async function refreshCycle(cycle)", 1)[0]
     source = "function shellHtml(j)" + source
     script = HARNESS + "\n" + source + r"""
 assert.equal(typeof saveExportAs,'function','Save As must be implemented');
@@ -246,6 +247,7 @@ def test_large_export_shows_speed_in_its_own_units_and_retains_average():
 length='10000000000';chunks=[{byteLength:2000},{byteLength:9999998000}];
 writeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();
 await tick(250);const first=writeGate;writeGate=deferred();first.resolve();await flush();
-await tick(250);assert.match(status(),/4.0 KB\/s/);
+await tick(250);assert.match(status(),/2.0 KB \/ 10.0 GB/);
+assert.match(status(),/Speed: 4.0 KB\/s/);
 writeGate.resolve();await pending;assert.match(status(),/20.0 GB\/s average/);
 """)

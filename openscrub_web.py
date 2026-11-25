@@ -7138,9 +7138,9 @@ function exportPickerOptions(kind,name){
   types:[{description:kind==="report"?"JSON audit report":ext.toUpperCase()+" video",
    accept:{[mime]:[suffix]}}],excludeAcceptAllOption:true};
 }
-function exportRate(rate){
- const power=Math.max(0,Math.min(3,Math.floor(Math.log10(rate)/3)));
- return (rate/1000**power).toFixed(power?1:0)+" "+["B","KB","MB","GB"][power]+"/s";
+function exportBytes(bytes){
+ const power=Math.max(0,Math.min(3,Math.floor(Math.log10(bytes)/3)));
+ return (bytes/1000**power).toFixed(power?1:0)+" "+["B","KB","MB","GB"][power];
 }
 function exportDuration(seconds){
  const s=Math.max(0,Math.floor(seconds));
@@ -7163,28 +7163,24 @@ function renderExportProgress(){
   bar.hidden=state.phase==="download";
   let text="Download started — see browser downloads";
   if(state.phase!=="download"){
-   const amount=Math.max(state.total||0,state.written);
-   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;
-   const unit=["B","KB","MB","GB"][power],scale=1000**power;
-   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;
    const elapsed=(now-state.start)/1000;
    const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;
    let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":
     state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":
     waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;
-   const count=state.total===null?bytes(state.written):
-    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;
+   const count=state.total===null?exportBytes(state.written):
+    `${exportBytes(state.written)} / ${exportBytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;
    text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;
    if(state.phase==="saving"&&!waiting&&elapsed>=0.25&&state.samples.length>1){
     // Retain one observation at/before the rolling ten-second boundary.
     while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();
     const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);
-    if(rate>0){text+=` · ${exportRate(rate)}`;
+    if(rate>0){text+=` · Speed: ${exportBytes(rate)}/s`;
      if(state.total!==null&&state.written<state.total)
       text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}
    }
    if(state.phase==="saved"&&state.written>0&&state.end>state.start)
-    text+=` · ${exportRate(state.written*1000/(state.end-state.start))} average`;
+    text+=` · ${exportBytes(state.written*1000/(state.end-state.start))}/s average`;
    if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;
   }
   document.getElementById(`export-${kind}-status`).textContent=text;
