@@ -321,3 +321,55 @@ def test_stop_and_continue_sit_left_of_cancel():
     assert block.index('id="scanStop"') < block.index('onclick="cancelJob()">Cancel<')
     stopped = page[page.index('if(j.phase==="stopped")'):]
     assert stopped.index(">Continue scan<") < stopped.index(">Cancel scan<")
+
+
+def test_package_continues_with_video_at_new_path(scan_job, tmp_path):
+    import gzip
+    import io
+    import json
+    import shutil
+    from pathlib import Path
+
+    original = scan_job()
+    STOP["at"] = 12
+    _scan(original)
+    assert original["phase"] == "stopped"
+    frame = original["stopped_frame"]
+    destination = tmp_path / "other-pc" / "renamed.avi"
+    destination.parent.mkdir()
+    with web.app.test_client() as client:
+        response = client.get(f"/api/jobs/{original['id']}/stopped-package")
+        assert response.status_code == 200
+        package = response.get_data()
+        response.close()
+        def import_copy(payload=package):
+            return client.post("/api/jobs/import-stopped", data={
+                "package": (io.BytesIO(payload), "transfer.openscrub-scan"),
+                "server_path": str(destination)})
+        destination.write_bytes(b"different video")
+        assert import_copy().status_code == 400
+        shutil.copyfile(original["video"], destination)
+        changed = json.loads(gzip.decompress(package))
+        changed["engine"] = "different-build"
+        assert import_copy(gzip.compress(json.dumps(changed).encode())).status_code == 400
+        assert import_copy(b"broken").status_code == 400
+        response = import_copy()
+        assert response.status_code == 201, response.get_data()
+        imported = web.JOBS[response.json["id"]]
+    # Imported state must still bind to PC 2's path after a server restart.
+    web.JOBS.pop(imported["id"])
+    web._register_stopped_job(imported["id"], imported["dir"], _progress(imported))
+    imported = web.JOBS[imported["id"]]
+    assert imported["video"] == str(destination)
+    assert imported["phase"] == "stopped" and imported["stopped_frame"] == frame
+    STOP["at"] = None
+    assert _post(f"/api/jobs/{imported['id']}/continue").status_code == 200
+    _run_worker()
+    assert imported["phase"] == "review", imported.get("error")
+    assert original["phase"] == "stopped"
+    actual = json.loads((Path(imported["dir"]) / "report.json").read_text())
+    assert actual["detections"]
+    assert _post(f"/api/jobs/{original['id']}/continue").status_code == 200
+    _run_worker()
+    expected = json.loads((Path(original["dir"]) / "report.json").read_text())
+    assert actual["detections"] == expected["detections"]

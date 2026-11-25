@@ -532,6 +532,16 @@ detection model or OpenScrub itself changed in between. **Cancel** still
 throws the progress away (it asks first). Scans with text categories (names,
 numbers, addresses…) cannot be stopped yet.
 
+**Continue on another PC.** After the job shows **Stopped**, choose **Export
+paused scan** and transfer the `.openscrub-scan` file. On the other PC, open
+Scan Setup and enter the path to its copy of the original video in **path on
+the server**. For Docker, use the path inside the container. Choose **Import
+paused scan**, select the package, then click **Continue scan**. The package
+contains scan progress and settings. The video stays on each PC. Its name and
+path can differ; its contents must match. Use the same OpenScrub build and
+matching detection models and settings. The transfer limit is 512 MiB of
+uncompressed scan data. The original job remains stopped.
+
 A failed or cancelled job keeps its uploaded file: use its ↻ **Retry**
 button (jobs list or the job page) to re-run the scan without uploading
 again, or delete the job to free the space. The server also refuses an

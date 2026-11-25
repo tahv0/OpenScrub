@@ -124,7 +124,10 @@ details .inner .full{grid-column:1/-1}
   <input type="file" id="file" accept="video/*" style="display:none">
   <div class="mutd" style="margin:7px 0 3px">&#8230;or a path on the server (press Enter)</div>
   <input type="text" id="spath" placeholder="/media/footage/clip.mp4" style="width:100%">
-  <div class="mutd" style="margin-top:6px">Nothing uploads until Start scan.</div>
+  <div class="mutd" style="margin-top:6px">Start scan uploads a selected video.</div>
+  <button type="button" class="sec" onclick="chooseStoppedPackage()">Import paused scan…</button>
+  <span id="stoppedImportStatus" role="status" class="mutd"></span>
+  <input type="file" id="stoppedPackage" hidden accept=".openscrub-scan" onchange="importStoppedPackage(this)">
  </div>
 
  <div class="card"><h2 id="cattitle">Categories</h2>
@@ -1178,6 +1181,21 @@ function plateCoverChanged(sel){
  if((sel.value==="assisted"||sel.value==="multi")&&!confirm(ASSISTED_CONFIRM)){sel.value=PLATECOVER_PREV;return;}
  if(sel.value==="steady"&&!confirm("Track one plate per shot. Other plates in the same shot may be visible. Use only for single-plate footage and review the output.")){sel.value=PLATECOVER_PREV;return;}
  PLATECOVER_PREV=sel.value;
+}
+function chooseStoppedPackage(){
+ if(!$("spath").value.trim()){alert("Enter the path to the matching video on this PC first.");$("spath").focus();return;}
+ $("stoppedPackage").click();
+}
+async function importStoppedPackage(input){
+ const file=input.files[0];if(!file)return;
+ const form=new FormData();form.append("package",file);form.append("server_path",$("spath").value.trim());
+ input.disabled=true;$("stoppedImportStatus").textContent="Checking video and importing scan…";
+ try{
+  const response=await fetch("api/jobs/import-stopped",{method:"POST",body:form});
+  const result=await response.json();if(!response.ok)throw Error(result.error||"Import failed");
+  openJob(result.id);
+ }catch(error){alert(error.message);}
+ finally{input.disabled=false;input.value="";$("stoppedImportStatus").textContent="";}
 }
 async function startScan(){
  if(!S.dur){alert("Load a video first.");return;}

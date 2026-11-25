@@ -55,7 +55,7 @@ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_rend
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import checkpoints
-from openscrub_internal import scan_progress
+from openscrub_internal import scan_progress, scan_transfer
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal import diagnostics
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
@@ -1902,10 +1902,14 @@ def _run_job(job, action, owner=None):
                     stop_event = threading.Event()
                     with files.report_lock:
                         owner.progress_stop = stop_event
+                    try:
+                        build = scan_transfer.engine_build(openscrub.__file__)
+                    except OSError:
+                        build = None  # Local Stop/Continue also works in source-less distributions.
                     control = scan_progress.ScanProgressControl(
                         progress_path, stop_requested=stop_event.is_set,
                         resume=(action == 'continue'),
-                        meta={"video": source, "name": job.get("name"),
+                        meta={"video": source, "name": job.get("name"), "engine_build": build,
                               # the report this scan will REPLACE (a rescan
                               # keeps the old one until it finishes): restart
                               # tells "stopped" from "finished, not cleaned"
@@ -2273,7 +2277,7 @@ def enforce_vault_lock():
                         'job_track_object'}):
                 abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
-                "job_retry", "job_render", "job_track_object", "job_mediainfo",
+                "job_retry", "job_render", "job_track_object", "job_mediainfo", "export_stopped_scan",
                 "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample",
                 "job_letter_gap"}
             version = request.args.get('v')
@@ -2346,7 +2350,7 @@ def refuse_upload_without_disk_room():
     by the time create_job touches request.files, werkzeug has already
     spooled the whole upload into the temp dir — too late to protect the
     disk. Checking the Content-Length header here reads nothing."""
-    if request.method == "POST" and request.path == "/api/jobs":
+    if request.method == "POST" and request.path in ("/api/jobs", "/api/jobs/import-stopped"):
         err = _upload_disk_error(request.content_length)
         if err:
             return jsonify({"error": err}), 507
@@ -2752,6 +2756,69 @@ def job_stop_scan(jid):
         stop.set()
         job['log'].append('— stopping: saving progress after the current frame —')
     return jsonify(state='stopping'), 202
+
+
+@app.get("/api/jobs/<jid>/stopped-package")
+def export_stopped_scan(jid):
+    job = JOBS.get(jid) or abort(404)
+    stream = tempfile.TemporaryFile()
+    try:
+        with FILES.initialize(job).report_lock:
+            _report_current(job)
+            if job.get("phase") != "stopped":
+                abort(409, "Stop the scan and wait for progress to be saved first")
+            scan_transfer.write_package(stream, os.path.join(job["dir"], scan_progress.PROGRESS_NAME),
+                                        job["options"], job["video"], openscrub.__file__)
+        length = stream.tell()
+        stream.seek(0)
+        response = send_file(stream, as_attachment=True, download_name=job["id"] + ".openscrub-scan",
+                             mimetype="application/octet-stream")
+        response.content_length = length
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+    except (OSError, ValueError) as error:
+        stream.close()
+        return jsonify(error=str(error)), 409
+    except BaseException:
+        stream.close()
+        raise
+
+
+@app.post("/api/jobs/import-stopped")
+def import_stopped_scan():
+    upload = request.files.get("package")
+    path = request.form.get("server_path", "").strip()
+    if not path or upload is None:
+        return jsonify(error="Choose the scan package and enter the local video path"), 400
+    video = _request_source_path(path)
+    error = server_path_error(video)
+    if error:
+        return jsonify(error=error), 400
+    try:
+        options, state = scan_transfer.read_package(upload.stream, video, openscrub.__file__)
+        _optional_plate_settings(options)
+    except (ValueError, OSError, EOFError, RecursionError) as error:
+        return jsonify(error=str(error)), 400
+    job = new_job(video, options, os.path.basename(video), _defer_registration=True)
+    try:
+        args = build_args(job)
+        if not openscrub.stop_supported(args):
+            raise ValueError("Unsupported scan settings")
+        saved = state["identity"]
+        scan_progress.compare_identity(saved, dict(saved, engine_version=openscrub.VERSION,
+                                                   settings=scan_progress.settings_identity(args)))
+        atomic_report(os.path.join(job["dir"], OPTIONS_FILE), options)
+        scan_progress.save(os.path.join(job["dir"], scan_progress.PROGRESS_NAME), state)
+        frame, total = state["next_frame"], state["total"]
+        job.update(phase="stopped", stopped_frame=frame, stopped_total=total,
+                   size=os.path.getsize(video), progress=_stopped_progress(frame, total))
+        _register_new_jobs([job])
+    except BaseException as error:
+        _discard_unregistered_checkpoint(job)
+        if isinstance(error, ValueError):
+            return jsonify(error=str(error)), 400
+        raise
+    return jsonify(id=job["id"]), 201
 
 
 @app.route('/api/jobs/<jid>/continue', methods=['POST'])
@@ -7362,6 +7429,7 @@ async function refreshCycle(cycle){
     job folder. Continue scan carries on from here; the result is the same as an
     uninterrupted scan.</div>
     <button onclick="continueScan(CUR)">Continue scan</button>
+    <a href="api/jobs/${id}/stopped-package" download>Export paused scan</a>
     <button class="sec" onclick="cancelJob()">Cancel scan</button>`;
   if(j.phase==="scanning"&&j.checkpoint_enabled)
    a+=`<button id="checkpointStop" class="sec" onclick="stopCheckpoint()" ${j.checkpoint_stopping?'disabled':''}>${j.checkpoint_stopping?'Stopping…':'Stop &amp; Review'}</button>`;
