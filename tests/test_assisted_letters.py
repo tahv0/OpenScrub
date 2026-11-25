@@ -197,7 +197,7 @@ def _write_video(path, frames, cut_at):
     writer.release()
 
 
-def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=True):
+def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=True, steady=False):
     source = str(tmp_path / "scan.mp4")
     _write_video(source, frames, cut_at)
     seen = []
@@ -233,6 +233,8 @@ def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=
     parser = openscrub.build_parser()
     argv = [source, "--categories", "plate", "--plate-coverage", "assisted",
             "--no-box-fallback", "--scan-speed", "fastest", "--tile", "off", "--no-backtrack"]
+    if steady:
+        argv.append("--steady-single-plate")
     if windows:
         argv += ["--detect-windows-frac", windows]
     args = openscrub._prep_args(parser.parse_args(argv), parser)
@@ -878,3 +880,16 @@ def test_untracked_plate_rows_are_logged_once_per_render(tmp_path):
     openscrub.run_render(args, {"fps": FPS, "cum": [(0, 0)] * 2, "bands": [(0, 0)] * 2,
                                 "detections": rows + [loose], "stats": {}}, CB())
     assert logs.count("      assisted letters: 1 plate detection without a track gets the full box") == 1
+
+def test_steady_single_plate_restarts_at_each_cut(tmp_path, monkeypatch):
+    from openscrub_internal import steady_plate
+    corners = np.float32([[20, 20], [70, 20], [70, 35], [20, 35]])
+    monkeypatch.setattr(steady_plate, "_fit", lambda image, polys: corners)
+    state = scan_assisted(tmp_path, monkeypatch, steady=True)
+    rows = sorted((d for d in state["detections"] if d.category == "plate"), key=lambda d: d.last_seen)
+    assert len(rows) == 6
+    assert all(d.text == "plate (steady)" and d.poly and d.t_start == d.t_end for d in rows)
+    assert rows[0].track == rows[2].track != rows[3].track == rows[5].track
+    assert all(d.confidence == .9 for d in rows)
+    import json
+    json.dumps([vars(d) for d in rows])

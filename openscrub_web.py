@@ -1074,6 +1074,8 @@ def build_args(job, for_render=False):
         if o.get("no_box_fallback") is not True:
             raise ValueError("assisted plate letters needs explicit confirmation")
         argv += ["--plate-coverage", "assisted", "--no-box-fallback"]
+        if o.get("steady_single_plate") is True:
+            argv.append("--steady-single-plate")
     # unified Scan Setup jobs: stacked detection windows (fractions of
     # duration, resolved server-side by the engine) with per-window
     # categories + zones travel as a windows.json inside the job dir

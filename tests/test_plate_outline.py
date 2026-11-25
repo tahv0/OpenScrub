@@ -95,3 +95,12 @@ def test_continuous_mask_keeps_both_lettering_estimates_and_a_separate_line():
     for point in np.vstack((first, second)):
         assert cv2.pointPolygonTest(np.float32(merged[0]), tuple(map(float, point)), False) >= 0
     np.testing.assert_allclose(merged[1], separate)
+
+
+def test_steady_interpolation_preserves_plate_when_corner_labels_flip():
+    from openscrub_internal.steady_plate import trajectory
+    gray = np.zeros((100, 100), np.uint8)
+    quad = np.float32([[40, 12], [45, 80], [58, 79], [53, 11]])
+    anchors = {0: quad, 2: np.roll(quad, 2, axis=0)}
+    result = trajectory([gray] * 3, anchors)
+    np.testing.assert_allclose(result[1], quad)

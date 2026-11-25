@@ -98,6 +98,9 @@ def test_build_args_requires_confirmation_for_assisted(tmp_path, monkeypatch):
     args = web.build_args(job)
     assert args.plate_coverage == "assisted" and args.no_box_fallback
     assert args._plate_coverage_explicit
+    job["options"]["steady_single_plate"] = True
+    assert web.build_args(job).steady_single_plate
+    assert not web.build_args(job, for_render=True).steady_single_plate
     # A render follows the saved report, never the job option.
     assert web.build_args(job, for_render=True).plate_coverage == "full"
 
@@ -188,7 +191,8 @@ def test_scan_setup_has_plate_cover_choice_with_help_tip():
     values = re.findall(r'<option value="([^"]*)"[^>]*>([^<]*)</option>', m.group(1))
     assert values == [("full", "Full plate box (default)"),
                       ("narrow", "Letters only, strict (experimental)"),
-                      ("assisted", "Letters only, no box fallback (experimental, slow)")]
+                      ("assisted", "Letters only, no box fallback (experimental, slow)"),
+                      ("steady", "Steady single plate per shot (experimental)")]
     label = page[page.rfind("<label", 0, m.start()):m.start()]
     assert 'for="platecover"' in label and 'class="qm" data-tip="' in label
     assert 'id="plateletters"' not in page
@@ -261,14 +265,16 @@ from test_scan_options import intake  # noqa: E402,F401
 
 
 @pytest.mark.parametrize("kind", ["upload", "server-path"])
-def test_assisted_options_survive_real_admission(intake, kind):
+@pytest.mark.parametrize("steady", [False, True])
+def test_assisted_options_survive_real_admission(intake, kind, steady):
     client, post, video, source, jobs_dir = intake
     response = post(kind, json.dumps({"categories": "plate", "plate_coverage": "assisted",
-                                      "no_box_fallback": True}))
+                                      "no_box_fallback": True, "steady_single_plate": steady}))
     assert response.status_code == 200
     job = web.JOBS[response.json["jobs"][0]]
     assert job["options"]["no_box_fallback"] is True
     args = web.build_args(job)
+    assert args.steady_single_plate is steady
     assert args.plate_coverage == "assisted" and args.no_box_fallback
 
 

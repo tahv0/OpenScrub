@@ -252,3 +252,16 @@ and HDR renders both use it. Report fields: `plate_letter_gaps`,
 `plate_letter_stats`, `scene_cuts` (additive). Full-box and strict modes are
 unchanged; rendering a letters only report with full or strict cover gives full
 plate boxes, never letter masks.
+
+### Steady single plate per shot
+
+In Scan Setup → Advanced → Plate cover, choose **Steady single plate per shot**
+for footage of one plate in each shot. The scanner selects a small set of
+fully visible plate outlines and follows their corners forward and backward
+between those frames. A scene cut starts a separate track. Partial plates
+can extend outside the image. Shots without a usable anchor keep the usual
+assisted lettering results. The per-frame geometry is saved for Review and export.
+
+This mode targets one plate. If a shot contains several plates, use a
+multi-plate coverage option. The CLI equivalent is
+`--plate-coverage assisted --no-box-fallback --steady-single-plate`.

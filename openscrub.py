@@ -1579,6 +1579,87 @@ def _backfill_plate_letters(detections, cap, fps, first, cuts, allowed, cum, cb)
         row.poly = _box_normalized_letters(row, ox, oy, [*originals, polygon])
 
 
+def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
+    """Replace plate guesses with a single trajectory in user-selected single-plate footage."""
+    from collections import defaultdict
+    from openscrub_internal.steady_plate import shot_paths
+
+    rows = defaultdict(list)
+    outlines = defaultdict(list)
+    for row in detections:
+        if row.category != "plate" or not row.dense:
+            continue
+        i = round(row.last_seen * fps)
+        rows[i].append(row)
+        if row.poly:
+            x, y, right, bottom = row.cbox
+            origin = np.array([x, y]) + row.aoff
+            outlines[i].append(
+                [np.asarray(p) * [right - x, bottom - y] + origin for p in row.poly]
+            )
+    if not outlines:
+        return
+
+    def check():
+        if cb.cancelled():
+            raise PipelineCancelled()
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    screen = np.float32([[0, 0], [width, 0], [width, height], [0, height]])
+    track = max((d.track for d in detections), default=-1) + 1
+    replaced = set()
+    new = []
+    for start, stop, path in shot_paths(
+        cap, first, len(cum), cuts, outlines, fps, check
+    ):
+        for i in range(start, stop):
+            q = path[i - start]
+            q = np.float32(q.mean(axis=0) + 1.07 * (q - q.mean(axis=0)))
+            area, visible = cv2.intersectConvexConvex(q, screen)
+            if area < 1:
+                continue
+            shape = visible[:, 0]
+            lo = np.floor(shape.min(axis=0))
+            hi = np.ceil(shape.max(axis=0))
+            box = (*lo, *hi)
+            if not allowed(i / fps, box):
+                continue
+            ox, oy = cum[i]
+            confidence = max(
+                (
+                    r.confidence
+                    for r in rows.get(i, ())
+                    if _box_iou(box, np.asarray(r.cbox) + [*r.aoff, *r.aoff]) > 0
+                ),
+                default=0.0,
+            )
+            row = Detection(
+                i / fps,
+                i / fps,
+                (
+                    float(lo[0]) - ox,
+                    float(lo[1]) - oy,
+                    float(hi[0]) - ox,
+                    float(hi[1]) - oy,
+                ),
+                "plate",
+                "plate (steady)",
+                confidence,
+                (ox, oy),
+                last_seen=i / fps,
+                dense=True,
+                track=track,
+            )
+            row.poly = _box_normalized_letters(row, ox, oy, [shape])
+            new.append(row)
+            replaced.update(id(r) for r in rows.get(i, ()))
+        track += 1
+    if new:
+        detections[:] = [r for r in detections if id(r) not in replaced] + new
+        cb.log(f"      steady single plate: tracked outline on {len(new)} frames")
+
+
 def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
                         _checkpoint_capture=None, _checkpoint_start=0, letter_onset=False):
     """Make each dense track leak-free from true first appearance to exit.
@@ -3871,6 +3952,20 @@ def _silhouette_mask(polys, poly_box, x1i, y1i, rw, rh):
     return mask if mask.any() else None
 
 
+def _blur_letter_mask(roi, mask):
+    # Sample using the visible strip, so changes in the detector box cannot
+    # pull in a different mix of bumper, clothing, or background each frame.
+    x, y, width, height = cv2.boundingRect(mask)
+    if not width or not height:
+        return
+    patch = roi[y:y+height, x:x+width]
+    cell = max(8, math.ceil(max(width, height) / 5))
+    small = cv2.resize(patch, (max(1, width // cell), max(1, height // cell)),
+                       interpolation=cv2.INTER_AREA)
+    blurred = cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR)
+    cv2.copyTo(blurred, mask[y:y+height, x:x+width], patch)
+
+
 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
                     pad_px=0):
     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
@@ -3898,6 +3993,9 @@ def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
         k = 2 * int(pad_px) + 1
         mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
     roi = frame[y1i:y2i, x1i:x2i]
+    if mode == "letter_blur":
+        _blur_letter_mask(roi, mask)
+        return
     if mode == "box":
         filled = np.zeros_like(roi)
     elif mode == "inpaint":
@@ -4424,6 +4522,9 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
         if px2 <= px1 or py2 <= py1:
             return
         roi = plane[py1:py2, px1:px2]
+        if mode == "letter_blur":
+            _blur_letter_mask(roi, m)
+            return
         if mode == "box":
             filled = np.full_like(roi, black)
         elif mode == "inpaint":
@@ -4536,6 +4637,7 @@ def _assisted_row(d, poly):
                 setattr(row, key, value)
     else:
         row = copy.copy(d)
+    row._assisted_strip = d.text == "plate (steady)"
     row.poly = plate_outline.continuous_mask(poly) if len(poly) > 1 else poly
     return row
 
@@ -4925,7 +5027,10 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 if quad is not None:
                     _paint_plate_quad_yuv10(y, u, v, quad, _mode_for(d.category), px)
                 elif d.poly and not isinstance(d, NarrowPlateDetection):
-                    _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
+                    paint_mode = _mode_for(d.category)
+                    if paint_mode == "blur" and getattr(d, "_assisted_strip", False):
+                        paint_mode = "letter_blur"
+                    _blur_silhouette_yuv10(y, u, v, *box, paint_mode,
                                            d.poly, pbox, pad_px=px)
                 else:
                     _blur_yuv10(y, u, v, *box, _mode_for(d.category),
@@ -5408,7 +5513,10 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 elif poly:
                     # segmentation silhouette: mask only the body, not the box —
                     # px (pad+drift) becomes an outward mask dilation
-                    blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+                    paint_mode = _mode_for(d.category)
+                    if paint_mode == "blur" and getattr(d, "_assisted_strip", False):
+                        paint_mode = "letter_blur"
+                    blur_silhouette(frame, x1, y1, x2, y2, paint_mode,
                                     poly, pbox, pad_px=px)
                 else:
                     blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
@@ -6619,7 +6727,6 @@ def _narrow_from_probability(crop, prob):
     return polys, ""
 
 
-
 # Plate-crop sizes (long side, px) for the assisted letter cover: the first
 # runs alone; the rest only when its outline is empty or implausible.
 LETTER_SIZES = (320, 640, 224)
@@ -7557,6 +7664,8 @@ def _settings_dict(args):
             "_report_input", "_plate_coverage_explicit", "no_box_fallback"}
     if getattr(args, "uncertain_policy", None) in (None, "off"):
         skip.update(("uncertain_policy", "plate_auto_cutoff"))
+    if not getattr(args, "steady_single_plate", False):
+        skip.add("steady_single_plate")
     out = {k: v for k, v in vars(args).items()
            if k not in skip and not (k == 'verify_hdr_plate_frames' and not v)
            and isinstance(v, (str, int, float, bool, list, tuple, type(None)))}
@@ -8406,6 +8515,8 @@ def build_parser():
     ap.add_argument("--plate-coverage", choices=["full", "narrow", "assisted"], default=None,
                     help="plate coverage: full (default), opt-in lettering-only, or "
                          "assisted (letters only, no box fallback; needs --no-box-fallback)")
+    ap.add_argument("--steady-single-plate", action="store_true",
+                    help="track one plate per shot from sparse outlines (assisted coverage only)")
     ap.add_argument("--no-box-fallback", action="store_true",
                     help="with --plate-coverage assisted: where letters are not found "
                          "clearly, draw nothing instead of the full plate box; such "
@@ -8668,6 +8779,9 @@ def _prep_args(args, parser):
     args.plate_coverage = getattr(args, "plate_coverage", None) or "full"
     if args.plate_coverage not in ("full", "narrow", "assisted"):
         parser.error("--plate-coverage must be full, narrow or assisted")
+    if getattr(args, "steady_single_plate", False) and (
+            args.plate_coverage != "assisted" or getattr(args, "uncertain_policy", None) not in (None, "off")):
+        parser.error("steady single plate requires assisted coverage and the standard plate policy")
     if (args.plate_coverage == "assisted" and args._plate_coverage_explicit
             and not getattr(args, "no_box_fallback", False)):
         parser.error("--plate-coverage assisted never falls back to the full plate box; "
@@ -10592,6 +10706,19 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                         row.t_start = max(row.t_start, scene_cuts[shot-1] / fps)
                     if shot < len(scene_cuts):
                         row.t_end = max(row.t_start, min(row.t_end, (scene_cuts[shot] - 1) / fps))
+        if assisted and getattr(args, "steady_single_plate", False):
+            if checkpoint_stream is None:
+                steady_cap = cv2.VideoCapture(args.video)
+            else:
+                from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+                steady_cap = ScanCapture(FrameStream(
+                    checkpoint_stream.source, start_frame=checkpoint_start,
+                    check_cancelled=checkpoint_stream.check_cancelled).__enter__())
+            try:
+                _single_plate_shots(detections, steady_cap, fps, checkpoint_start, cum,
+                                    scene_cuts, scope_allows, cb)
+            finally:
+                steady_cap.release()
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "

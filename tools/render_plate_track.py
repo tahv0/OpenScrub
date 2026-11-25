@@ -19,31 +19,7 @@ if __package__ in (None, ''):
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from openscrub_internal.plate_outline import follow
-
-
-def trajectory(frames, anchors):
-    result = np.empty((len(frames), 4, 2), np.float32)
-    keys = sorted(anchors)
-    for k in keys:
-        result[k] = anchors[k]
-    def walk(start, end, step):
-        q = anchors[start]
-        for i in range(start + step, end + step, step):
-            moved = follow(frames[i-step], frames[i], q)
-            if moved is not None:
-                q = moved
-            yield i, q
-    for i, q in walk(keys[0], 0, -1):
-        result[i] = q
-    for a, b in zip(keys, keys[1:]):
-        for i, q in walk(a, b-1, 1):
-            result[i] = q
-        for i, q in walk(b, a+1, -1):
-            result[i] += (q - result[i]) * ((i-a)/(b-a))
-    for i, q in walk(keys[-1], len(frames)-1, 1):
-        result[i] = q
-    return result
+from openscrub_internal.steady_plate import trajectory
 
 
 def visible_strip(frame, quad, previous=None, *, adaptive=False):
