@@ -893,3 +893,31 @@ def test_steady_single_plate_restarts_at_each_cut(tmp_path, monkeypatch):
     assert all(d.confidence == .9 for d in rows)
     import json
     json.dumps([vars(d) for d in rows])
+
+
+def test_two_steady_plates_keep_separate_paths_during_miss(monkeypatch):
+    from openscrub_internal import steady_plate
+    image = np.zeros((90, 240, 3), np.uint8)
+    class Capture:
+        reads = 0
+        def get(self, prop):
+            return 240 if prop == cv2.CAP_PROP_FRAME_WIDTH else 90
+        def read(self):
+            self.reads += 1
+            return True, image
+    cap = Capture()
+    monkeypatch.setattr(steady_plate, "_fit", lambda image, polys: polys[0])
+    corners = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    rows = [openscrub.Detection(i/30, i/30, (x,20,x+60,40), "plate", "plate", .9,
+                                last_seen=i/30, dense=True, track=track, poly=corners)
+            for i in range(7) for track, x in [(10, 15), (11, 145)]
+            if i != 3 or track != 10]
+    openscrub._steady_plate_shots(rows, cap, 30, 0, [(0,0)]*7, [], lambda t,b: True,
+                                  openscrub.Callbacks(), multi=True)
+    assert cap.reads == 7
+    assert len(rows) == 14
+    for row in rows:
+        assert row.text == "plate (steady)"
+        assert row.cbox[0] < 30 if row.track == 10 else row.cbox[0] > 130
+    missing = next(row for row in rows if row.track == 10 and row.last_seen == 3/30)
+    assert missing.poly and missing.confidence == 0

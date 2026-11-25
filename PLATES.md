@@ -265,3 +265,10 @@ assisted lettering results. The per-frame geometry is saved for Review and expor
 This mode targets one plate. If a shot contains several plates, use a
 multi-plate coverage option. The CLI equivalent is
 `--plate-coverage assisted --no-box-fallback --steady-single-plate`.
+
+**Steady tracking for each plate** fits a separate path to each visible
+appearance. A short detector miss inside the picture can keep its track.
+A gap at the frame edge starts a new appearance on return, even for the
+same car. When forward and backward tracking disagree, both candidate
+locations can be covered. The CLI setting is
+`--plate-coverage assisted --no-box-fallback --steady-plates`.

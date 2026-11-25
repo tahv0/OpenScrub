@@ -104,3 +104,30 @@ def test_steady_interpolation_preserves_plate_when_corner_labels_flip():
     anchors = {0: quad, 2: np.roll(quad, 2, axis=0)}
     result = trajectory([gray] * 3, anchors)
     np.testing.assert_allclose(result[1], quad)
+
+
+def test_plate_crossing_dropout_and_offscreen_return():
+    from types import SimpleNamespace
+    from openscrub_internal.steady_plate import assign_appearances
+    def sample(i, x):
+        return SimpleNamespace(t_start=i/30, cbox=(x, 20, x+20, 30), aoff=(0, 0))
+    # One plate moves right, the other left. The first is missed on frame 3.
+    right = [sample(i, 30+6*i) for i in (0, 1, 2, 4, 5)]
+    left = [sample(i, 78-6*i) for i in range(6)]
+    exiting = [sample(i, x) for i, x in [(10, 4), (11, 0), (14, 0), (15, 4)]]
+    _, bounds = assign_appearances(left+right+exiting, 30, 140, 60, [10], 0)
+    assert len({r.track for r in right}) == len({r.track for r in left}) == 1
+    assert right[0].track != left[0].track
+    before, after = exiting[1].track, exiting[2].track
+    assert before != after and bounds[before][1] == 11 and bounds[after][0] == 14
+
+
+def test_ambiguous_motion_retains_both_locations():
+    from openscrub_internal.steady_plate import trajectory
+    gray = np.zeros((80, 200), np.uint8)
+    quad = np.float32([[10, 30], [55, 30], [55, 45], [10, 45]])
+    other = quad + [90, 0]
+    alternatives = {}
+    path = trajectory([gray]*3, {0: quad, 2: np.float32(other)}, alternatives=alternatives)
+    np.testing.assert_allclose(path[1], quad)
+    np.testing.assert_allclose(alternatives[1], other)

@@ -101,6 +101,10 @@ def test_build_args_requires_confirmation_for_assisted(tmp_path, monkeypatch):
     job["options"]["steady_single_plate"] = True
     assert web.build_args(job).steady_single_plate
     assert not web.build_args(job, for_render=True).steady_single_plate
+    job["options"].pop("steady_single_plate")
+    job["options"]["steady_plates"] = True
+    assert web.build_args(job).steady_plates
+    assert not web.build_args(job, for_render=True).steady_plates
     # A render follows the saved report, never the job option.
     assert web.build_args(job, for_render=True).plate_coverage == "full"
 
@@ -192,6 +196,7 @@ def test_scan_setup_has_plate_cover_choice_with_help_tip():
     assert values == [("full", "Full plate box (default)"),
                       ("narrow", "Letters only, strict (experimental)"),
                       ("assisted", "Letters only, no box fallback (experimental, slow)"),
+                      ("multi", "Steady tracking for each plate (experimental)"),
                       ("steady", "Steady single plate per shot (experimental)")]
     label = page[page.rfind("<label", 0, m.start()):m.start()]
     assert 'for="platecover"' in label and 'class="qm" data-tip="' in label

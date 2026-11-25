@@ -416,7 +416,7 @@ def _stable_letters(rows, fps, cuts):
 
 
 def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count=None,
-               first_frame=None):
+               first_frame=None, independent=False):
     """frame_count, when given, limits every counted or listed frame to
     0..frame_count-1: grace-padded spans past the video's end are ignored.
     first_frame, when given, also ignores frames before it (an output clip
@@ -426,7 +426,7 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
     by_track = {}
     for s in samples:
         by_track.setdefault(s.track, []).append(s)
-    trimmed = _trim_overlapping_holds(by_track, fps, cuts, join_s, plan)
+    trimmed = {} if independent else _trim_overlapping_holds(by_track, fps, cuts, join_s, plan)
     masked_total = 0
     gap_total = 0
 
@@ -484,7 +484,8 @@ def plan_cover(samples, fps, cuts, borrow_s=BORROW_S, join_s=JOIN_S, frame_count
             ends[track] = max(masked, key=lambda s: (s.t1, s.key))
             starts_[track] = min(masked, key=lambda s: (s.t0, s.key))
 
-    _join(plan, ends, starts_, state, fps, cuts, join_s, trimmed, frame_count, first_frame)
+    if not independent:
+        _join(plan, ends, starts_, state, fps, cuts, join_s, trimmed, frame_count, first_frame)
 
     for track, (covered, dropped) in state.items():
         if not dropped:

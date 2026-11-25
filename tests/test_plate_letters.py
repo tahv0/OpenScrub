@@ -240,3 +240,9 @@ def test_letters_missing_at_one_end_even_when_new_mask_has_similar_length():
     rows = [S(i, 1, i / 30, i / 30, p, True)
             for i, p in enumerate([line, line, shifted + (fragment,)])]
     assert line[0] in plan_cover(rows, 30, []).polys[2]
+
+
+def test_independent_appearances_do_not_bridge_on_return():
+    rows = [S(0, 1, 0., 0., POLY, True), S(1, 2, .5, .5, POLY, True)]
+    assert plan_cover(rows, 10, []).bridges
+    assert not plan_cover(rows, 10, [], independent=True).bridges

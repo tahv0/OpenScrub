@@ -1579,8 +1579,8 @@ def _backfill_plate_letters(detections, cap, fps, first, cuts, allowed, cum, cb)
         row.poly = _box_normalized_letters(row, ox, oy, [*originals, polygon])
 
 
-def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
-    """Replace plate guesses with a single trajectory in user-selected single-plate footage."""
+def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, multi=False):
+    """Build independent shot-local trajectories for the selected plate coverage mode."""
     from collections import defaultdict
     from openscrub_internal.steady_plate import shot_paths
 
@@ -1590,13 +1590,23 @@ def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
         if row.category != "plate" or not row.dense:
             continue
         i = round(row.last_seen * fps)
-        rows[i].append(row)
-        if row.poly:
-            x, y, right, bottom = row.cbox
-            origin = np.array([x, y]) + row.aoff
-            outlines[i].append(
-                [np.asarray(p) * [right - x, bottom - y] + origin for p in row.poly]
+        if multi and row.track < 0:
+            continue
+        group = row.track if multi else None
+        rows[i, group].append(row)
+        x, y, right, bottom = row.cbox
+        origin = np.array([x, y]) + row.aoff
+        polygons = [
+            np.asarray(p) * [right - x, bottom - y] + origin for p in (row.poly or ())
+        ]
+        outlines[i].append(
+            (
+                group,
+                polygons,
+                math.ceil(row.t_start * fps - 1e-6),
+                math.floor(row.t_end * fps + 1e-6) + 1,
             )
+        )
     if not outlines:
         return
 
@@ -1610,18 +1620,38 @@ def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
     track = max((d.track for d in detections), default=-1) + 1
     replaced = set()
     new = []
-    for start, stop, path in shot_paths(
-        cap, first, len(cum), cuts, outlines, fps, check
+    for group, start, stop, path, alternatives in shot_paths(
+        cap, first, len(cum), cuts, outlines, fps, check, multi=multi
     ):
         for i in range(start, stop):
             q = path[i - start]
             q = np.float32(q.mean(axis=0) + 1.07 * (q - q.mean(axis=0)))
             area, visible = cv2.intersectConvexConvex(q, screen)
-            if area < 1:
+            shapes = [visible[:, 0]] if area >= 1 else []
+            if multi:
+                candidates = [
+                    p
+                    for tid, polygons, _, _ in outlines.get(i, ())
+                    if tid == group
+                    for p in polygons
+                ]
+                if i in alternatives:
+                    alternate = alternatives[i]
+                    center = alternate.mean(axis=0)
+                    candidates.append(center + 1.07 * (alternate - center))
+                for candidate in candidates:
+                    hull = cv2.convexHull(np.float32(candidate))
+                    size, clipped = cv2.intersectConvexConvex(hull, screen)
+                    if size > 0 and (
+                        area < 1
+                        or cv2.intersectConvexConvex(clipped, visible)[0] < size - 0.5
+                    ):
+                        shapes.append(clipped[:, 0])
+            if not shapes:
                 continue
-            shape = visible[:, 0]
-            lo = np.floor(shape.min(axis=0))
-            hi = np.ceil(shape.max(axis=0))
+            points = np.vstack(shapes)
+            lo = np.floor(points.min(axis=0))
+            hi = np.ceil(points.max(axis=0))
             box = (*lo, *hi)
             if not allowed(i / fps, box):
                 continue
@@ -1629,7 +1659,7 @@ def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
             confidence = max(
                 (
                     r.confidence
-                    for r in rows.get(i, ())
+                    for r in rows.get((i, group), ())
                     if _box_iou(box, np.asarray(r.cbox) + [*r.aoff, *r.aoff]) > 0
                 ),
                 default=0.0,
@@ -1649,15 +1679,15 @@ def _single_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb):
                 (ox, oy),
                 last_seen=i / fps,
                 dense=True,
-                track=track,
+                track=group if multi else track,
             )
-            row.poly = _box_normalized_letters(row, ox, oy, [shape])
+            row.poly = _box_normalized_letters(row, ox, oy, shapes)
             new.append(row)
-            replaced.update(id(r) for r in rows.get(i, ()))
+            replaced.update(id(r) for r in rows.get((i, group), ()))
         track += 1
     if new:
         detections[:] = [r for r in detections if id(r) not in replaced] + new
-        cb.log(f"      steady single plate: tracked outline on {len(new)} frames")
+        cb.log(f"      steady plate tracking: tracked outline on {len(new)} frames")
 
 
 def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
@@ -4642,7 +4672,7 @@ def _assisted_row(d, poly):
     return row
 
 
-def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, log=None):
+def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, log=None, independent=False):
     """-> (render rows, CoverPlan) for --plate-coverage assisted.
 
     Dense plate rows get their own or a borrowed letter mask, rows the plan
@@ -4681,7 +4711,7 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, lo
         if last is None or d.t_end >= last[0]:
             aoffs[d.track] = (d.t_end, tuple(d.aoff))
     plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count,
-                                    first_frame=first_frame)
+                                    first_frame=first_frame, independent=independent)
     if untracked and log is not None:
         log("      assisted letters: %d plate detection%s without a track get%s the full box"
             % (untracked, "" if untracked == 1 else "s", "s" if untracked == 1 else ""))
@@ -4720,12 +4750,13 @@ def assisted_cover_from_report(doc, frame_range=None):
         raise ValueError("report has no render_state")
     cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
     n = len(rstate.get("cum") or ()) or None
+    independent = doc.get("provenance", {}).get("settings", {}).get("steady_plates") is True
     if frame_range is None:
-        return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=n)[1]
+        return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=n, independent=independent)[1]
     first, end = frame_range
     end = end if n is None else min(end, n)
     return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=end,
-                                first_frame=first)[1]
+                                first_frame=first, independent=independent)[1]
 
 
 def _dedupe_dense(act, frame_index=None, frame_digest=None):
@@ -7664,6 +7695,8 @@ def _settings_dict(args):
             "_report_input", "_plate_coverage_explicit", "no_box_fallback"}
     if getattr(args, "uncertain_policy", None) in (None, "off"):
         skip.update(("uncertain_policy", "plate_auto_cutoff"))
+    if not getattr(args, "steady_plates", False):
+        skip.add("steady_plates")
     if not getattr(args, "steady_single_plate", False):
         skip.add("steady_single_plate")
     out = {k: v for k, v in vars(args).items()
@@ -8515,7 +8548,10 @@ def build_parser():
     ap.add_argument("--plate-coverage", choices=["full", "narrow", "assisted"], default=None,
                     help="plate coverage: full (default), opt-in lettering-only, or "
                          "assisted (letters only, no box fallback; needs --no-box-fallback)")
-    ap.add_argument("--steady-single-plate", action="store_true",
+    steady_modes = ap.add_mutually_exclusive_group()
+    steady_modes.add_argument("--steady-plates", action="store_true",
+                              help="track a separate steady path for each plate (assisted coverage)")
+    steady_modes.add_argument("--steady-single-plate", action="store_true",
                     help="track one plate per shot from sparse outlines (assisted coverage only)")
     ap.add_argument("--no-box-fallback", action="store_true",
                     help="with --plate-coverage assisted: where letters are not found "
@@ -8779,9 +8815,9 @@ def _prep_args(args, parser):
     args.plate_coverage = getattr(args, "plate_coverage", None) or "full"
     if args.plate_coverage not in ("full", "narrow", "assisted"):
         parser.error("--plate-coverage must be full, narrow or assisted")
-    if getattr(args, "steady_single_plate", False) and (
+    if (getattr(args, "steady_single_plate", False) or getattr(args, "steady_plates", False)) and (
             args.plate_coverage != "assisted" or getattr(args, "uncertain_policy", None) not in (None, "off")):
-        parser.error("steady single plate requires assisted coverage and the standard plate policy")
+        parser.error("steady plate tracking requires assisted coverage and the standard plate policy")
     if (args.plate_coverage == "assisted" and args._plate_coverage_explicit
             and not getattr(args, "no_box_fallback", False)):
         parser.error("--plate-coverage assisted never falls back to the full plate box; "
@@ -10653,7 +10689,14 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
     finally:
         if _gap_cap["cap"] is not None:
             _gap_cap["cap"].release()
-    n_tracks = assign_dense_tracks(detections)
+    multi = assisted and getattr(args, "steady_plates", False)
+    if multi:
+        from openscrub_internal.steady_plate import assign_appearances
+        n_tracks = assign_dense_tracks([r for r in detections if r.category != "plate"])
+        plate_rows = [r for r in detections if r.category == "plate" and r.dense]
+        n_tracks, edge_bounds = assign_appearances(plate_rows, fps, vw, vh, scene_cuts, n_tracks)
+    else:
+        n_tracks = assign_dense_tracks(detections)
     if assisted and n_tracks:
         def scope_allows(t, box):
             scope = _scope_at(t)
@@ -10706,7 +10749,22 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                         row.t_start = max(row.t_start, scene_cuts[shot-1] / fps)
                     if shot < len(scene_cuts):
                         row.t_end = max(row.t_start, min(row.t_end, (scene_cuts[shot] - 1) / fps))
-        if assisted and getattr(args, "steady_single_plate", False):
+        if multi:
+            # Reverse tracking and grace padding may create rows outside a
+            # visible appearance. Do not extend them over an entry or exit.
+            kept = []
+            for row in detections:
+                if row.category == "plate" and row.track in edge_bounds:
+                    first_seen, last_seen = edge_bounds[row.track]
+                    if first_seen is not None:
+                        row.t_start = max(row.t_start, first_seen/fps)
+                    if last_seen is not None:
+                        row.t_end = min(row.t_end, last_seen/fps)
+                    if row.t_start > row.t_end or not row.t_start-1e-6 <= row.last_seen <= row.t_end+1e-6:
+                        continue
+                kept.append(row)
+            detections = kept
+        if assisted and (getattr(args, "steady_single_plate", False) or getattr(args, "steady_plates", False)):
             if checkpoint_stream is None:
                 steady_cap = cv2.VideoCapture(args.video)
             else:
@@ -10715,8 +10773,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                     checkpoint_stream.source, start_frame=checkpoint_start,
                     check_cancelled=checkpoint_stream.check_cancelled).__enter__())
             try:
-                _single_plate_shots(detections, steady_cap, fps, checkpoint_start, cum,
-                                    scene_cuts, scope_allows, cb)
+                _steady_plate_shots(detections, steady_cap, fps, checkpoint_start, cum,
+                                    scene_cuts, scope_allows, cb, multi=getattr(args, "steady_plates", False))
             finally:
                 steady_cap.release()
         if n_gaps or n_lead or lead_s:
@@ -10882,6 +10940,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                                  args.plate_auto_cutoff)
     if assisted:
         state["scene_cuts"] = scene_cuts
+        state["steady_plates"] = multi
     if monitor_stop:
         if cb.cancelled():
             raise PipelineCancelled()
@@ -10997,7 +11056,8 @@ def run_render(args, state, cb=None):
         # which plates are covered. The plan lives in state for the report.
         detections, plan = apply_assisted_cover(detections, state["fps"],
                                                 state.get("scene_cuts", []),
-                                                frame_count=len(state["cum"]), log=cb.log)
+                                                frame_count=len(state["cum"]), log=cb.log,
+                                                independent=state.get("steady_plates", False))
         state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
         state["plate_letter_stats"] = dict(plan.stats)
         cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
@@ -11247,6 +11307,7 @@ def run_pipeline(args, cb=None):
                                "recalls": 0, "remembered": 0}}
             if "scene_cuts" in source:
                 state["scene_cuts"] = list(source.get("scene_cuts", []))
+                state["steady_plates"] = source.get("provenance", {}).get("settings", {}).get("steady_plates") is True
             if optional:
                 state["plate_policy"] = optional
             return run_render(args, state, cb)

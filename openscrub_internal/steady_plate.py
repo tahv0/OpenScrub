@@ -1,4 +1,4 @@
-"""Estimate one plate trajectory per shot from sparse, fully visible outlines."""
+"""Estimate shot-local plate trajectories from sparse, fully visible outlines."""
 
 import tempfile
 import cv2 as cv
@@ -183,7 +183,7 @@ def _fit(image, polygons):
     return cv.perspectiveTransform(np.float32(p), inv)[:, 0]
 
 
-def trajectory(frames, anchors, check=lambda: None):
+def trajectory(frames, anchors, check=lambda: None, alternatives=None):
     result = np.empty((len(frames), 4, 2), np.float32)
     keys = sorted(anchors)
     for k in keys:
@@ -217,19 +217,25 @@ def trajectory(frames, anchors, check=lambda: None):
             key=lambda points: np.square(points - points.mean(axis=0) - target).sum(),
         )
         for i, q in walk(b, a + 1, -1, ordered):
+            if alternatives is not None:
+                shared, _ = cv.intersectConvexConvex(result[i], q)
+                if shared < 0.5 * min(cv.contourArea(result[i]), cv.contourArea(q)):
+                    alternatives[i] = q.copy()
+                    continue
             result[i] += (q - result[i]) * ((i - a) / (b - a))
     for i, q in walk(keys[-1], len(frames) - 1, 1):
         result[i] = q
     return result
 
 
-def shot_paths(capture, first, end, cuts, samples, fps, check):
-    """Yield (first frame, exclusive end, path) for shots with usable anchors."""
+def shot_paths(capture, first, end, cuts, samples, fps, check, *, multi=False):
+    """Yield shot-local paths and alternative locations for independent appearances."""
     size = None
     period = max(1, round(fps * 5 / 6))
     boundaries = [first, *sorted(c for c in cuts if first < c < end), end]
     for start, stop in zip(boundaries, boundaries[1:]):
-        anchors = {}
+        by_track = {}
+        spans = {}
         with tempfile.TemporaryFile() as gray_file:
             for i in range(start, stop):
                 check()
@@ -248,7 +254,13 @@ def shot_paths(capture, first, end, cuts, samples, fps, check):
                 # Match the geometry sampler to the original prototype;
                 # optical flow above uses area resampling for fine texture.
                 color = cv.resize(image, size)
-                for polygons in samples[i]:
+                for track, polygons, lo, hi in samples[i]:
+                    old_lo, old_hi = spans.get(track, (i, i + 1))
+                    spans[track] = max(start, min(old_lo, lo)), min(
+                        stop, max(old_hi, hi)
+                    )
+                    if not polygons:
+                        continue
                     outline = _fit(color, [np.float32(p * scale) for p in polygons])
                     if (
                         outline is None
@@ -272,10 +284,11 @@ def shot_paths(capture, first, end, cuts, samples, fps, check):
                         / (length * depth)
                         * min(1, length / 100)
                     )
+                    anchors = by_track.setdefault(track, {})
                     key = i // period
                     if key not in anchors or score > anchors[key][0]:
                         anchors[key] = score, i - start, corners
-            if not anchors:
+            if not by_track:
                 continue
             gray_file.flush()
             frames = np.memmap(
@@ -284,7 +297,89 @@ def shot_paths(capture, first, end, cuts, samples, fps, check):
                 dtype=np.uint8,
                 shape=(stop - start, size[1], size[0]),
             )
-            points = {i: q for _, i, q in anchors.values()}
-            path = trajectory(frames, points, check) / scale
+            for track, anchors in by_track.items():
+                begin, end = spans[track] if multi else (start, stop)
+                points = {i + start - begin: q for _, i, q in anchors.values()}
+                alternatives = {} if multi else None
+                path = (
+                    trajectory(
+                        frames[begin - start : end - start], points, check, alternatives
+                    )
+                    / scale
+                )
+                extra = {begin + i: q / scale for i, q in (alternatives or {}).items()}
+                yield track, begin, end, path, extra
             del frames
-        yield start, stop, path
+
+
+def assign_appearances(rows, fps, width, height, cuts, next_id):
+    """Associate concurrent plates by predicted center and size within a shot."""
+    from bisect import bisect_right
+    from itertools import groupby
+
+    def geometry(row):
+        x, y, right, bottom = np.array(row.cbox) + [*row.aoff, *row.aoff]
+        size = np.maximum([right - x, bottom - y], 1.0)
+        margin = max(2.0, 0.05 * max(size))
+        edge = min(x, y, width - right, height - bottom) <= margin
+        return np.array([(x + right) / 2, (y + bottom) / 2]), size, edge
+
+    active = {}
+    bounds = {}
+    cuts = sorted(cuts)
+    shot = -1
+    for frame, group in groupby(
+        sorted(rows, key=lambda r: r.t_start), lambda r: round(r.t_start * fps)
+    ):
+        current_shot = bisect_right(cuts, frame)
+        if current_shot != shot:
+            active.clear()
+            shot = current_shot
+        group = list(group)
+        observations = [geometry(r) for r in group]
+        pairs = []
+        for track, (when, center, size, velocity, at_edge) in list(active.items()):
+            gap = frame - when
+            last_prediction = center + velocity * (gap - 1)
+            outside = np.any(last_prediction + size / 2 <= 0) or np.any(
+                last_prediction - size / 2 >= [width, height]
+            )
+            if gap > max(1, round(0.6 * fps)) or (gap > 1 and (at_edge or outside)):
+                if outside:
+                    bounds[track][1] = when
+                del active[track]
+                continue
+            predicted = center + velocity * gap
+            for j, (point, dims, edge) in enumerate(observations):
+                if gap > 1 and edge:
+                    continue
+                distance = np.linalg.norm(point - predicted) / max(max(size), max(dims))
+                if distance < 1.5:
+                    pairs.append(
+                        (
+                            distance + 0.25 * np.linalg.norm(np.log(dims / size)),
+                            track,
+                            j,
+                        )
+                    )
+        matches = {}
+        used = set()
+        for _, track, j in sorted(pairs):
+            if j not in matches and track not in used:
+                matches[j] = track
+                used.add(track)
+        for j, row in enumerate(group):
+            point, size, edge = observations[j]
+            if j in matches:
+                track = matches[j]
+                when, center, _, velocity, _ = active[track]
+                velocity = 0.25 * velocity + 0.75 * (point - center) / (frame - when)
+            else:
+                track = next_id
+                next_id += 1
+                velocity = np.zeros(2)
+                bounds[track] = [frame if edge else None, None]
+            bounds[track][1] = frame if edge else None
+            active[track] = frame, point, size, velocity, edge
+            row.track = track
+    return next_id, bounds

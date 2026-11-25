@@ -197,6 +197,7 @@ details .inner .full{grid-column:1/-1}
     <option value="full" selected>Full plate box (default)</option>
     <option value="narrow">Letters only, strict (experimental)</option>
     <option value="assisted">Letters only, no box fallback (experimental, slow)</option>
+    <option value="multi">Steady tracking for each plate (experimental)</option>
     <option value="steady">Steady single plate per shot (experimental)</option></select>
    <div id="platelettersNote" class="mutd">For the plate category. The letter choices check every frame and can be slow; text detection can miss letters, and the plate background and character positions remain visible and may identify someone. Strict uses the full plate box where text is uncertain or the source is unsupported. No box fallback draws nothing there and lists those spots as gaps in Review. Review the output.</div></div>
   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
@@ -1174,7 +1175,7 @@ fetch("/api/model_status").then(r=>r.json())
 const ASSISTED_CONFIRM="Letters only, no box fallback: where letters are not found clearly, nothing is drawn instead of the full plate box. Those spots are listed as gaps in Review. OpenScrub does not find every plate, so check the output. Scanning is slow. Turn it on?";
 let PLATECOVER_PREV="full";
 function plateCoverChanged(sel){
- if(sel.value==="assisted"&&!confirm(ASSISTED_CONFIRM)){sel.value=PLATECOVER_PREV;return;}
+ if((sel.value==="assisted"||sel.value==="multi")&&!confirm(ASSISTED_CONFIRM)){sel.value=PLATECOVER_PREV;return;}
  if(sel.value==="steady"&&!confirm("Track one plate per shot. Other plates in the same shot may be visible. Use only for single-plate footage and review the output.")){sel.value=PLATECOVER_PREV;return;}
  PLATECOVER_PREV=sel.value;
 }
@@ -1286,9 +1287,9 @@ async function startScan(){
  const plateCover=$("platecover").value;
  if(plateCover==="narrow"||plateCover==="assisted")o.plate_coverage=plateCover;
  if(plateCover==="assisted")o.no_box_fallback=true;
- if(plateCover==="steady"){
-  if(platePolicy){alert("Steady single plate requires the standard plate policy.");return;}
-  o.plate_coverage="assisted";o.no_box_fallback=true;o.steady_single_plate=true;
+ if(plateCover==="steady"||plateCover==="multi"){
+  if(platePolicy){alert("Steady tracking requires the standard plate policy.");return;}
+  o.plate_coverage="assisted";o.no_box_fallback=true;if(plateCover==="multi")o.steady_plates=true;else o.steady_single_plate=true;
  }
  if($("verifyhdrplates").checked)o.verify_hdr_plate_frames=true;
  if(checkpoint){o.checkpoint_review=true;delete o.windows;delete o.ignore_zones;}
