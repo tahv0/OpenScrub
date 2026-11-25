@@ -131,3 +131,13 @@ def test_ambiguous_motion_retains_both_locations():
     path = trajectory([gray]*3, {0: quad, 2: np.float32(other)}, alternatives=alternatives)
     np.testing.assert_allclose(path[1], quad)
     np.testing.assert_allclose(alternatives[1], other)
+
+
+@pytest.mark.parametrize("missing", ["calcOpticalFlowPyrLK", "estimateAffinePartial2D"])
+def test_follow_without_optional_opencv_modules(monkeypatch, missing):
+    monkeypatch.delattr(cv2, missing, raising=False)
+    previous = np.random.default_rng(41).integers(0, 256, (120, 220), dtype=np.uint8)
+    quad = np.float32([[31, 40], [142, 40], [142, 69], [31, 69]])
+    current = np.roll(previous, (6, -9), axis=(0, 1))
+    np.testing.assert_allclose(plate_outline.follow(previous, current, quad), quad + [-9, 6])
+    assert plate_outline.follow(previous, np.zeros_like(current), quad) is None

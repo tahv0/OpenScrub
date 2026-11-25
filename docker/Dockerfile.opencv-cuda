@@ -63,14 +63,14 @@ RUN git clone --depth 1 --branch ${OPENCV_VERSION} \
       https://github.com/opencv/opencv_contrib.git
 
 # BUILD_LIST limits the build to what OpenScrub calls (core/imgproc/
-# imgcodecs/videoio/dnn/objdetect/python3) plus cudev for the CUDA
+# imgcodecs/video/calib3d/videoio/dnn/objdetect/python3) plus cudev for the CUDA
 # backend; cmake pulls in their dependencies automatically. FaceDetectorYN
 # and FaceRecognizerSF live in objdetect; readNet in dnn.
 RUN cmake -S opencv -B build -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/opt/opencv \
       -D OPENCV_EXTRA_MODULES_PATH=/src/opencv_contrib/modules \
-      -D BUILD_LIST=core,imgproc,imgcodecs,videoio,dnn,objdetect,python3,cudev \
+      -D BUILD_LIST=core,imgproc,imgcodecs,video,calib3d,videoio,dnn,objdetect,python3,cudev \
       -D WITH_CUDA=ON \
       -D OPENCV_DNN_CUDA=ON \
       -D WITH_CUDNN=ON \

@@ -64,6 +64,33 @@ def lettering(crop):
     return None
 
 
+def _patch_translation(previous, current, points):
+    """Estimate translation on builds with imgproc but without LK or calib3d."""
+    h, w = previous.shape
+    radius, search = 4, 24
+    shifts = []
+    for px, py in np.rint(points[:40, 0]).astype(int):
+        if not (radius <= px < w-radius and radius <= py < h-radius):
+            continue
+        patch = previous[py-radius:py+radius+1, px-radius:px+radius+1]
+        if patch.std() < 6:
+            continue
+        left, top = max(0, px-search-radius), max(0, py-search-radius)
+        region = current[top:py+search+radius+1, left:px+search+radius+1]
+        scores = cv2.matchTemplate(region, patch, cv2.TM_CCOEFF_NORMED)
+        _, score, _, (x, y) = cv2.minMaxLoc(scores)
+        if score >= .85:
+            shifts.append((left+x+radius-px, top+y+radius-py))
+    if len(shifts) < 5:
+        return None
+    shifts = np.asarray(shifts)
+    median = np.median(shifts, axis=0)
+    agreeing = shifts[np.linalg.norm(shifts-median, axis=1) <= 2]
+    if len(agreeing) < max(5, .6*len(shifts)):
+        return None
+    return np.float32(np.median(agreeing, axis=0))
+
+
 def follow(previous, current, quad):
     """Estimate motion from plate and nearby visible features in a local window."""
     h, w = current.shape
@@ -82,18 +109,26 @@ def follow(previous, current, quad):
     points = cv2.goodFeaturesToTrack(a, 180, .012, 4, mask=support)
     if points is None or len(points) < 5:
         return None
-    moved, ok, _ = cv2.calcOpticalFlowPyrLK(a, b, points, None)
-    back, valid, _ = cv2.calcOpticalFlowPyrLK(b, a, moved, None)
-    keep = (ok.ravel() & valid.ravel()).astype(bool)
-    keep &= np.linalg.norm((back - points)[:, 0], axis=1) < 1.2
-    if keep.sum() < 5:
-        return None
-    matrix, inliers = cv2.estimateAffinePartial2D(
-        points[keep] + lo, moved[keep] + lo, ransacReprojThreshold=2)
-    if (matrix is None or inliers.sum() < max(5, keep.sum() * .55)
-            or not .80 < np.linalg.det(matrix[:, :2]) < 1.25):
-        return None
-    prediction = cv2.transform(quad[None], matrix)[0]
+    flow = getattr(cv2, "calcOpticalFlowPyrLK", None)
+    fit_affine = getattr(cv2, "estimateAffinePartial2D", None)
+    if flow is None or fit_affine is None:
+        shift = _patch_translation(a, b, points)
+        if shift is None:
+            return None
+        prediction = quad + shift
+    else:
+        moved, ok, _ = flow(a, b, points, None)
+        back, valid, _ = flow(b, a, moved, None)
+        keep = (ok.ravel() & valid.ravel()).astype(bool)
+        keep &= np.linalg.norm((back - points)[:, 0], axis=1) < 1.2
+        if keep.sum() < 5:
+            return None
+        matrix, inliers = fit_affine(
+            points[keep] + lo, moved[keep] + lo, ransacReprojThreshold=2)
+        if (matrix is None or inliers.sum() < max(5, keep.sum() * .55)
+                or not .80 < np.linalg.det(matrix[:, :2]) < 1.25):
+            return None
+        prediction = cv2.transform(quad[None], matrix)[0]
     # Nearby features can vote consistently for a foreground hand. Check the
     # appearance of the plate itself where both frames have visible pixels.
     target = np.float32([[0, 0], [47, 0], [47, 15], [0, 15]])
