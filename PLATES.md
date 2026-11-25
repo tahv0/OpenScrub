@@ -272,3 +272,7 @@ A gap at the frame edge starts a new appearance on return, even for the
 same car. When forward and backward tracking disagree, both candidate
 locations can be covered. The CLI setting is
 `--plate-coverage assisted --no-box-fallback --steady-plates`.
+
+Both steady modes support **Review uncertain** and **Blur candidates**. Detector
+scores determine which appearances qualify for automatic blur. Motion estimates
+can carry the mask between detections without adding confidence votes.

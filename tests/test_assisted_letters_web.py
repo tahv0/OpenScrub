@@ -98,6 +98,7 @@ def test_build_args_requires_confirmation_for_assisted(tmp_path, monkeypatch):
     args = web.build_args(job)
     assert args.plate_coverage == "assisted" and args.no_box_fallback
     assert args._plate_coverage_explicit
+    job["options"].update(uncertain_policy="manual_review", plate_auto_cutoff=.8)
     job["options"]["steady_single_plate"] = True
     assert web.build_args(job).steady_single_plate
     assert not web.build_args(job, for_render=True).steady_single_plate

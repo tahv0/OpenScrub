@@ -1288,7 +1288,6 @@ async function startScan(){
  if(plateCover==="narrow"||plateCover==="assisted")o.plate_coverage=plateCover;
  if(plateCover==="assisted")o.no_box_fallback=true;
  if(plateCover==="steady"||plateCover==="multi"){
-  if(platePolicy){alert("Steady tracking requires the standard plate policy.");return;}
   o.plate_coverage="assisted";o.no_box_fallback=true;if(plateCover==="multi")o.steady_plates=true;else o.steady_single_plate=true;
  }
  if($("verifyhdrplates").checked)o.verify_hdr_plate_frames=true;

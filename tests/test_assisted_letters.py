@@ -197,7 +197,7 @@ def _write_video(path, frames, cut_at):
     writer.release()
 
 
-def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=True, steady=False):
+def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=True, steady=False, policy=None):
     source = str(tmp_path / "scan.mp4")
     _write_video(source, frames, cut_at)
     seen = []
@@ -234,7 +234,9 @@ def scan_assisted(tmp_path, monkeypatch, windows=None, frames=6, cut_at=3, text=
     argv = [source, "--categories", "plate", "--plate-coverage", "assisted",
             "--no-box-fallback", "--scan-speed", "fastest", "--tile", "off", "--no-backtrack"]
     if steady:
-        argv.append("--steady-single-plate")
+        argv.append("--steady-plates" if steady == "multi" else "--steady-single-plate")
+    if policy:
+        argv.extend(["--uncertain-policy", policy, "--plate-auto-cutoff", ".95"])
     if windows:
         argv += ["--detect-windows-frac", windows]
     args = openscrub._prep_args(parser.parse_args(argv), parser)
@@ -895,7 +897,8 @@ def test_steady_single_plate_restarts_at_each_cut(tmp_path, monkeypatch):
     json.dumps([vars(d) for d in rows])
 
 
-def test_two_steady_plates_keep_separate_paths_during_miss(monkeypatch):
+@pytest.mark.parametrize("policy", [False, True])
+def test_two_steady_plates_keep_separate_paths_during_miss(monkeypatch, policy):
     from openscrub_internal import steady_plate
     image = np.zeros((90, 240, 3), np.uint8)
     class Capture:
@@ -912,8 +915,12 @@ def test_two_steady_plates_keep_separate_paths_during_miss(monkeypatch):
                                 last_seen=i/30, dense=True, track=track, poly=corners)
             for i in range(7) for track, x in [(10, 15), (11, 145)]
             if i != 3 or track != 10]
+    if policy:
+        for row in rows:
+            row._plate_policy_evidence = {"origin": "detection", "frame": round(row.last_seen*30),
+                                          "geometry_valid": True}
     openscrub._steady_plate_shots(rows, cap, 30, 0, [(0,0)]*7, [], lambda t,b: True,
-                                  openscrub.Callbacks(), multi=True)
+                                  openscrub.Callbacks(), multi=True, policy=policy)
     assert cap.reads == 7
     assert len(rows) == 14
     for row in rows:
@@ -921,3 +928,23 @@ def test_two_steady_plates_keep_separate_paths_during_miss(monkeypatch):
         assert row.cbox[0] < 30 if row.track == 10 else row.cbox[0] > 130
     missing = next(row for row in rows if row.track == 10 and row.last_seen == 3/30)
     assert missing.poly and missing.confidence == 0
+    if policy:
+        assert missing._plate_policy_evidence["origin"] == "visual_continuation"
+
+@pytest.mark.parametrize("mode", ["single", "multi"])
+@pytest.mark.parametrize("policy", ["manual_review", "blur_candidates"])
+def test_steady_cover_preserves_confidence_policy(tmp_path, monkeypatch, mode, policy):
+    from openscrub_internal import plate_policy, steady_plate
+    monkeypatch.setattr(steady_plate, "_fit", lambda image, polygons: polygons[0])
+    state = scan_assisted(tmp_path, monkeypatch, steady=mode, policy=policy)
+    plates = [r for r in state["detections"] if r.category == "plate"]
+    direct = [r for r in plates if plate_policy.is_direct(r)]
+    assert sorted(r._plate_policy_evidence["frame"] for r in direct) == list(range(6))
+    assert all(r.text == "plate (steady)" and r.confidence == .9 for r in direct)
+    def decisions():
+        return plate_policy.evaluate(plates, policy, .35, .95)
+    assert all(d.enabled == (policy == "blur_candidates") for d in decisions())
+    direct[0]._plate_output_choice = "keep"
+    direct[1]._plate_output_choice = "blur"
+    chosen = {id(r): d.enabled for r, d in zip(plates, decisions())}
+    assert not chosen[id(direct[0])] and chosen[id(direct[1])]

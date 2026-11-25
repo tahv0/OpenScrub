@@ -1579,7 +1579,7 @@ def _backfill_plate_letters(detections, cap, fps, first, cuts, allowed, cum, cb)
         row.poly = _box_normalized_letters(row, ox, oy, [*originals, polygon])
 
 
-def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, multi=False):
+def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, multi=False, policy=False):
     """Build independent shot-local trajectories for the selected plate coverage mode."""
     from collections import defaultdict
     from openscrub_internal.steady_plate import shot_paths
@@ -1623,6 +1623,9 @@ def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, 
     for group, start, stop, path, alternatives in shot_paths(
         cap, first, len(cum), cuts, outlines, fps, check, multi=multi
     ):
+        if policy and not multi:
+            shot_tracks = {r.track for i in range(start, stop) for r in rows.get((i, group), ())
+                           if plate_policy.supported_geometry(r)}
         for i in range(start, stop):
             q = path[i - start]
             q = np.float32(q.mean(axis=0) + 1.07 * (q - q.mean(axis=0)))
@@ -1682,8 +1685,29 @@ def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, 
                 track=group if multi else track,
             )
             row.poly = _box_normalized_letters(row, ox, oy, shapes)
+            originals = rows.get((i, group), ())
+            if policy:
+                # Change the painted geometry without merging detector votes or
+                # transferring a Review choice to another appearance.
+                if originals:
+                    for original in originals:
+                        if (not plate_policy.supported_geometry(original) or
+                                not _box_iou(box, np.asarray(original.cbox) + [*original.aoff, *original.aoff])):
+                            continue
+                        fitted = copy.copy(original)
+                        fitted.cbox, fitted.aoff, fitted.poly = row.cbox, row.aoff, row.poly
+                        fitted.t_start = fitted.t_end = i / fps
+                        fitted.text = row.text
+                        new.append(fitted)
+                        replaced.add(id(original))
+                    continue
+                if not multi and len(shot_tracks) != 1:
+                    continue
+                row.track = group if multi else next(iter(shot_tracks))
+                row._plate_policy_evidence = MappingProxyType({
+                    "origin": "visual_continuation", "frame": i, "geometry_valid": True})
             new.append(row)
-            replaced.update(id(r) for r in rows.get((i, group), ()))
+            replaced.update(id(r) for r in originals)
         track += 1
     if new:
         detections[:] = [r for r in detections if id(r) not in replaced] + new
@@ -4736,6 +4760,12 @@ def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, lo
     return out, plan
 
 
+def _independent_plate_cover(settings):
+    return settings.get("steady_plates") is True or (
+        settings.get("steady_single_plate") is True
+        and settings.get("uncertain_policy") in ("manual_review", "blur_candidates"))
+
+
 def assisted_cover_from_report(doc, frame_range=None):
     """The CoverPlan a render of this saved report would use (see run_render).
 
@@ -4750,7 +4780,7 @@ def assisted_cover_from_report(doc, frame_range=None):
         raise ValueError("report has no render_state")
     cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
     n = len(rstate.get("cum") or ()) or None
-    independent = doc.get("provenance", {}).get("settings", {}).get("steady_plates") is True
+    independent = _independent_plate_cover(doc.get("provenance", {}).get("settings") or {})
     if frame_range is None:
         return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=n, independent=independent)[1]
     first, end = frame_range
@@ -8816,8 +8846,8 @@ def _prep_args(args, parser):
     if args.plate_coverage not in ("full", "narrow", "assisted"):
         parser.error("--plate-coverage must be full, narrow or assisted")
     if (getattr(args, "steady_single_plate", False) or getattr(args, "steady_plates", False)) and (
-            args.plate_coverage != "assisted" or getattr(args, "uncertain_policy", None) not in (None, "off")):
-        parser.error("steady plate tracking requires assisted coverage and the standard plate policy")
+            args.plate_coverage != "assisted"):
+        parser.error("steady plate tracking requires assisted coverage")
     if (args.plate_coverage == "assisted" and args._plate_coverage_explicit
             and not getattr(args, "no_box_fallback", False)):
         parser.error("--plate-coverage assisted never falls back to the full plate box; "
@@ -10774,7 +10804,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                     check_cancelled=checkpoint_stream.check_cancelled).__enter__())
             try:
                 _steady_plate_shots(detections, steady_cap, fps, checkpoint_start, cum,
-                                    scene_cuts, scope_allows, cb, multi=getattr(args, "steady_plates", False))
+                                    scene_cuts, scope_allows, cb, multi=getattr(args, "steady_plates", False),
+                                    policy=bool(optional_policy))
             finally:
                 steady_cap.release()
         if n_gaps or n_lead or lead_s:
@@ -10940,7 +10971,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                                  args.plate_auto_cutoff)
     if assisted:
         state["scene_cuts"] = scene_cuts
-        state["steady_plates"] = multi
+        state["independent_plate_cover"] = multi or (bool(optional_policy) and getattr(args, "steady_single_plate", False))
     if monitor_stop:
         if cb.cancelled():
             raise PipelineCancelled()
@@ -11057,7 +11088,7 @@ def run_render(args, state, cb=None):
         detections, plan = apply_assisted_cover(detections, state["fps"],
                                                 state.get("scene_cuts", []),
                                                 frame_count=len(state["cum"]), log=cb.log,
-                                                independent=state.get("steady_plates", False))
+                                                independent=state.get("independent_plate_cover", False))
         state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
         state["plate_letter_stats"] = dict(plan.stats)
         cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
@@ -11307,7 +11338,7 @@ def run_pipeline(args, cb=None):
                                "recalls": 0, "remembered": 0}}
             if "scene_cuts" in source:
                 state["scene_cuts"] = list(source.get("scene_cuts", []))
-                state["steady_plates"] = source.get("provenance", {}).get("settings", {}).get("steady_plates") is True
+                state["independent_plate_cover"] = _independent_plate_cover(source.get("provenance", {}).get("settings") or {})
             if optional:
                 state["plate_policy"] = optional
             return run_render(args, state, cb)
