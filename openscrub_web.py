@@ -7127,6 +7127,21 @@ function exportDownloadStarted(kind){
  EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});
  renderExportProgress();
 }
+function exportPickerOptions(kind,name){
+ const ext=kind==="report"?"json":(name.match(/[.]([a-z0-9]{1,15})$/i)?.[1].toLowerCase()||"mp4");
+ const mime=kind==="report"?"application/json":({
+  mp4:"video/mp4",m4v:"video/mp4",mkv:"video/x-matroska",mov:"video/quicktime",
+  webm:"video/webm",avi:"video/x-msvideo",ts:"video/mp2t"
+ })[ext]||"application/octet-stream";
+ const suffix="."+ext;
+ return {suggestedName:name.toLowerCase().endsWith(suffix)?name:name+suffix,
+  types:[{description:kind==="report"?"JSON audit report":ext.toUpperCase()+" video",
+   accept:{[mime]:[suffix]}}],excludeAcceptAllOption:true};
+}
+function exportRate(rate){
+ const power=Math.max(0,Math.min(3,Math.floor(Math.log10(rate)/3)));
+ return (rate/1000**power).toFixed(power?1:0)+" "+["B","KB","MB","GB"][power]+"/s";
+}
 function exportDuration(seconds){
  const s=Math.max(0,Math.floor(seconds));
  return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;
@@ -7160,14 +7175,16 @@ function renderExportProgress(){
    const count=state.total===null?bytes(state.written):
     `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;
    text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;
-   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){
+   if(state.phase==="saving"&&!waiting&&elapsed>=0.25&&state.samples.length>1){
     // Retain one observation at/before the rolling ten-second boundary.
     while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();
     const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);
-    if(rate>0){text+=` · ${bytes(rate)}/s`;
+    if(rate>0){text+=` · ${exportRate(rate)}`;
      if(state.total!==null&&state.written<state.total)
       text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}
    }
+   if(state.phase==="saved"&&state.written>0&&state.end>state.start)
+    text+=` · ${exportRate(state.written*1000/(state.end-state.start))} average`;
    if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;
   }
   document.getElementById(`export-${kind}-status`).textContent=text;
@@ -7191,7 +7208,7 @@ async function saveExportAs(kind,button){
  try{
   // Invoke synchronously from the click, before the first network await.
   let handle;
-  try{handle=await window.showSaveFilePicker({suggestedName:name});}
+  try{handle=await window.showSaveFilePicker(exportPickerOptions(kind,name));}
   catch(e){if(e.name!=="AbortError")throw e;
    if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);
    if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;
