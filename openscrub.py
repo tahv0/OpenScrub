@@ -33,6 +33,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import InitVar, dataclass, asdict
 from types import MappingProxyType
@@ -41,7 +42,10 @@ import cv2
 import numpy as np
 
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_outline
+from openscrub_internal import plate_letters
 from openscrub_internal import plate_policy
+from openscrub_internal import scan_progress
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import hdr_quad_pairs
 from openscrub_internal.reports import atomic_report
@@ -767,6 +771,11 @@ class Detection:
         self.manual_plate_quad = manual_plate_quad
 
 
+# Least share of the plate box lettering must span before it may replace the
+# full box. Checked at render too, so reports saved before this rule are safe.
+NARROW_MIN_WIDTH, NARROW_MIN_HEIGHT = 0.5, 0.3
+
+
 @dataclass
 class NarrowPlateDetection(Detection):
     # Present only on opt-in plate rows; ordinary report rows stay unchanged.
@@ -799,6 +808,38 @@ def _record_narrow_plate(d, frame_index, frame_digest, poly, margin, reason):
     return row
 
 
+def _box_normalized_letters(row, cx, cy, polygons):
+    """Frame-pixel letter polygons -> polygons normalized to the row's box, clipped to [0, 1]."""
+    bx1, by1 = row.cbox[0] + cx, row.cbox[1] + cy
+    bw, bh = row.cbox[2] - row.cbox[0], row.cbox[3] - row.cbox[1]
+    if bw <= 0 or bh <= 0:
+        return ()
+    out = []
+    for polygon in polygons or ():
+        try:
+            points = [((float(x) - bx1) / bw, (float(y) - by1) / bh) for x, y in polygon]
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if len(points) >= 3 and all(math.isfinite(v) for point in points for v in point):
+            out.append(tuple((min(1.0, max(0.0, x)), min(1.0, max(0.0, y))) for x, y in points))
+    return tuple(out)
+
+
+def _plausible_lettering(polygons):
+    """Whether box-normalized polygons are big enough to be a plate's lettering.
+
+    Lettering takes up much of a plate's width and height. A speck, thin line
+    or single stroke is a wrong localization, and masking only that would
+    leave nearly the whole detected box visible.
+    """
+    size = 100
+    mask = np.zeros((size, size), np.uint8)
+    cv2.fillPoly(mask, [np.rint(np.asarray(p, np.float64) * size).astype(np.int32)
+                        for p in polygons], 1)
+    return bool(mask.any(axis=0).mean() >= NARROW_MIN_WIDTH
+                and mask.any(axis=1).mean() >= NARROW_MIN_HEIGHT)
+
+
 def _narrow_plate_eligible(d, frame_index, frame):
     """Use a plate polygon only on its inspected pixels and original geometry."""
     if not isinstance(d, NarrowPlateDetection) or d.category != "plate" or not d.poly:
@@ -821,7 +862,8 @@ def _narrow_plate_eligible(d, frame_index, frame):
         digest = (frame if isinstance(frame, str)
                   else _frame_sha256(frame))
         return (evidence["frame_sha256"] == digest
-                and evidence["geometry_sha256"] == _narrow_evidence_digest(d, evidence))
+                and evidence["geometry_sha256"] == _narrow_evidence_digest(d, evidence)
+                and _plausible_lettering(d.poly))
     except (KeyError, TypeError, ValueError, OverflowError, AttributeError):
         return False
 
@@ -1475,8 +1517,205 @@ def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
     return next_id
 
 
+def _backfill_plate_letters(detections, cap, fps, first, cuts, allowed, cum, cb):
+    samples = {}
+    for row in detections:
+        if row.category == "plate" and row.dense and row.track >= 0:
+            idx = round(row.t_start * fps)
+            x, y, right, bottom = row.cbox
+            origin = np.array([x, y]) + row.aoff
+            polys = [np.float32(np.asarray(p) * [right-x, bottom-y] + origin)
+                     for p in row.poly]
+            samples.setdefault(idx, {})[row.track] = row, polys
+
+    def check_cancelled():
+        if cb.cancelled():
+            raise PipelineCancelled()
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    screen = np.float32([[0, 0], [width, 0], [width, height], [0, height]])
+    for idx, row, template, quad in plate_outline.reverse_strips(
+            samples, cap, fps, first, set(cuts), check_cancelled):
+        area, clipped = cv2.intersectConvexConvex(np.float32(quad), screen)
+        if area < 9:
+            continue
+        polygon = clipped[:, 0]
+        left, top = np.floor(polygon.min(axis=0)).astype(int)
+        right, bottom = np.ceil(polygon.max(axis=0)).astype(int)
+        t = idx / fps
+        if row is None:
+            if not allowed(t, (left, top, right, bottom)):
+                continue
+            ox, oy = cum[idx]
+            row = Detection(t, t + .3/fps,
+                            (int(left-ox), int(top-oy), int(right-ox), int(bottom-oy)),
+                            "plate", "plate", 0., (ox, oy), last_seen=t, dense=True,
+                            track=template.track)
+            if hasattr(template, "_plate_policy_evidence"):
+                row._plate_policy_evidence = MappingProxyType({
+                    "origin": "visual_continuation", "frame": idx, "geometry_valid": True})
+            detections.append(row)
+            originals = []
+        else:
+            originals = samples[idx][row.track][1]
+            ratios = [(cv2.intersectConvexConvex(p, polygon)[0], cv2.contourArea(p))
+                      for p in originals if cv2.isContourConvex(p) and cv2.contourArea(p) >= 3]
+            if any(shared >= .95 * area for shared, _ in ratios):
+                continue
+            # A future track id alone cannot authorize a detached strip over
+            # a hand or another object. Require support in the current sample.
+            if ratios and not any(shared >= .38 * min(area, measured)
+                                  for shared, measured in ratios):
+                continue
+            ox, oy = row.aoff
+            x, y, xx, yy = row.cbox
+            if not _box_iou((x+ox, y+oy, xx+ox, yy+oy), (left, top, right, bottom)):
+                continue
+            union = (min(x+ox, left), min(y+oy, top), max(xx+ox, right), max(yy+oy, bottom))
+            if not allowed(t, union):
+                continue
+            row.cbox = (int(union[0]-ox), int(union[1]-oy), int(union[2]-ox), int(union[3]-oy))
+        row.poly = _box_normalized_letters(row, ox, oy, [*originals, polygon])
+
+
+def _steady_plate_shots(detections, cap, fps, first, cum, cuts, allowed, cb, *, multi=False, policy=False):
+    """Build independent shot-local trajectories for the selected plate coverage mode."""
+    from collections import defaultdict
+    from openscrub_internal.steady_plate import shot_paths
+
+    rows = defaultdict(list)
+    outlines = defaultdict(list)
+    for row in detections:
+        if row.category != "plate" or not row.dense:
+            continue
+        i = round(row.last_seen * fps)
+        if multi and row.track < 0:
+            continue
+        group = row.track if multi else None
+        rows[i, group].append(row)
+        x, y, right, bottom = row.cbox
+        origin = np.array([x, y]) + row.aoff
+        polygons = [
+            np.asarray(p) * [right - x, bottom - y] + origin for p in (row.poly or ())
+        ]
+        outlines[i].append(
+            (
+                group,
+                polygons,
+                math.ceil(row.t_start * fps - 1e-6),
+                math.floor(row.t_end * fps + 1e-6) + 1,
+            )
+        )
+    if not outlines:
+        return
+
+    def check():
+        if cb.cancelled():
+            raise PipelineCancelled()
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    screen = np.float32([[0, 0], [width, 0], [width, height], [0, height]])
+    track = max((d.track for d in detections), default=-1) + 1
+    replaced = set()
+    new = []
+    for group, start, stop, path, alternatives in shot_paths(
+        cap, first, len(cum), cuts, outlines, fps, check, multi=multi
+    ):
+        if policy and not multi:
+            shot_tracks = {r.track for i in range(start, stop) for r in rows.get((i, group), ())
+                           if plate_policy.supported_geometry(r)}
+        for i in range(start, stop):
+            q = path[i - start]
+            q = np.float32(q.mean(axis=0) + 1.07 * (q - q.mean(axis=0)))
+            area, visible = cv2.intersectConvexConvex(q, screen)
+            shapes = [visible[:, 0]] if area >= 1 else []
+            if multi:
+                candidates = [
+                    p
+                    for tid, polygons, _, _ in outlines.get(i, ())
+                    if tid == group
+                    for p in polygons
+                ]
+                if i in alternatives:
+                    alternate = alternatives[i]
+                    center = alternate.mean(axis=0)
+                    candidates.append(center + 1.07 * (alternate - center))
+                for candidate in candidates:
+                    hull = cv2.convexHull(np.float32(candidate))
+                    size, clipped = cv2.intersectConvexConvex(hull, screen)
+                    if size > 0 and (
+                        area < 1
+                        or cv2.intersectConvexConvex(clipped, visible)[0] < size - 0.5
+                    ):
+                        shapes.append(clipped[:, 0])
+            if not shapes:
+                continue
+            points = np.vstack(shapes)
+            lo = np.floor(points.min(axis=0))
+            hi = np.ceil(points.max(axis=0))
+            box = (*lo, *hi)
+            if not allowed(i / fps, box):
+                continue
+            ox, oy = cum[i]
+            confidence = max(
+                (
+                    r.confidence
+                    for r in rows.get((i, group), ())
+                    if _box_iou(box, np.asarray(r.cbox) + [*r.aoff, *r.aoff]) > 0
+                ),
+                default=0.0,
+            )
+            row = Detection(
+                i / fps,
+                i / fps,
+                (
+                    float(lo[0]) - ox,
+                    float(lo[1]) - oy,
+                    float(hi[0]) - ox,
+                    float(hi[1]) - oy,
+                ),
+                "plate",
+                "plate (steady)",
+                confidence,
+                (ox, oy),
+                last_seen=i / fps,
+                dense=True,
+                track=group if multi else track,
+            )
+            row.poly = _box_normalized_letters(row, ox, oy, shapes)
+            originals = rows.get((i, group), ())
+            if policy:
+                # Change the painted geometry without merging detector votes or
+                # transferring a Review choice to another appearance.
+                if originals:
+                    for original in originals:
+                        if (not plate_policy.supported_geometry(original) or
+                                not _box_iou(box, np.asarray(original.cbox) + [*original.aoff, *original.aoff])):
+                            continue
+                        fitted = copy.copy(original)
+                        fitted.cbox, fitted.aoff, fitted.poly = row.cbox, row.aoff, row.poly
+                        fitted.t_start = fitted.t_end = i / fps
+                        fitted.text = row.text
+                        new.append(fitted)
+                        replaced.add(id(original))
+                    continue
+                if not multi and len(shot_tracks) != 1:
+                    continue
+                row.track = group if multi else next(iter(shot_tracks))
+                row._plate_policy_evidence = MappingProxyType({
+                    "origin": "visual_continuation", "frame": i, "geometry_valid": True})
+            new.append(row)
+            replaced.update(id(r) for r in originals)
+        track += 1
+    if new:
+        detections[:] = [r for r in detections if id(r) not in replaced] + new
+        cb.log(f"      steady plate tracking: tracked outline on {len(new)} frames")
+
+
 def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
-                        _checkpoint_capture=None, _checkpoint_start=0):
+                        _checkpoint_capture=None, _checkpoint_start=0, letter_onset=False):
     """Make each dense track leak-free from true first appearance to exit.
 
     Dense samples are instantaneous per-frame boxes; three gaps remain
@@ -1671,6 +1910,15 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
                 gh, gw = g0.shape[:2]
                 x1, y1, x2, y2 = max(0, x1), max(0, y1), min(gw, x2), min(gh, y2)
                 tmpl = g0[y1:y2, x1:x2] if (x2 - x1 >= 8 and y2 - y1 >= 8) else None
+                lettering_mask = None
+                if letter_onset and first.category == "plate" and tmpl is not None:
+                    lettering_mask = np.zeros(tmpl.shape, np.uint8)
+                    for p in first.poly:
+                        if len(p) >= 3:
+                            pts = np.rint(np.asarray(p) * [x2-x1, y2-y1]).astype(np.int32)
+                            cv2.fillPoly(lettering_mask, [pts], 255)
+                    if np.count_nonzero(lettering_mask) < 24:
+                        tmpl = None
                 if tmpl is not None and float(tmpl.std()) > 4:
                     th_, tw_ = tmpl.shape
                     box = list(sb)
@@ -1689,10 +1937,15 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
                         ry2 = min(g.shape[0], int(box[3] * SCALE) + m)
                         if rx2 - rx1 < tw_ or ry2 - ry1 < th_:
                             break   # clipped at the frame edge: object entering
-                        res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tmpl,
-                                                cv2.TM_CCOEFF_NORMED)
+                        search = g[ry1:ry2, rx1:rx2]
+                        if lettering_mask is None:
+                            res = cv2.matchTemplate(search, tmpl, cv2.TM_CCOEFF_NORMED)
+                        else:
+                            res = cv2.matchTemplate(search, tmpl, cv2.TM_CCOEFF_NORMED,
+                                                    mask=lettering_mask)
+                            res[~np.isfinite(res)] = -1
                         _, mx, _, loc = cv2.minMaxLoc(res)
-                        if mx < THR:
+                        if mx < (.78 if lettering_mask is not None else THR):
                             break   # genuinely not there yet
                         nx = (rx1 + loc[0]) / SCALE
                         ny = (ry1 + loc[1]) / SCALE
@@ -3347,6 +3600,14 @@ def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
 # Render
 # ----------------------------------------------------------------------------
 
+def _note_inpaint_support(modes, log):
+    """Say once per render when inpaint falls back to a flat fill."""
+    if "inpaint" in modes and not hasattr(cv2, "inpaint"):
+        log("      NOTE: inpaint is not available in this OpenCV build (no photo "
+            "module) — inpaint regions are filled flat with the colour around "
+            "them instead. Nothing of the original pixels is kept.")
+
+
 def _inpaint_fill(img, x1, y1, x2, y2):
     """Region fill for mode "inpaint": reconstruct the area from its
     surroundings (cv2 Telea) on a context-padded crop, so the object
@@ -3361,6 +3622,18 @@ def _inpaint_fill(img, x1, y1, x2, y2):
     cx1, cy1 = max(0, x1 - pw), max(0, y1 - ph)
     cx2, cy2 = min(w, x2 + pw), min(h, y2 + ph)
     crop = img[cy1:cy2, cx1:cx2]
+    if not hasattr(cv2, "inpaint"):
+        # OpenCV built without its photo module (the CUDA image's slim
+        # build): fill flat with the surroundings' mean colour. Like Telea it
+        # keeps nothing of the original pixels inside the region.
+        ring = np.ones(crop.shape[:2], bool)
+        ring[y1 - cy1:y2 - cy1, x1 - cx1:x2 - cx1] = False
+        around = crop[ring]
+        value = (np.rint(around.mean(axis=0)) if around.size
+                 else np.zeros(crop.shape[2:], np.float64))
+        out = np.empty((y2 - y1, x2 - x1) + crop.shape[2:], crop.dtype)
+        out[...] = value.astype(crop.dtype)
+        return out
     ten_bit = crop.dtype == np.uint16
     work = ((np.clip(crop, 0, 1023) >> 2).astype(np.uint8)
             if ten_bit else crop)
@@ -3733,6 +4006,20 @@ def _silhouette_mask(polys, poly_box, x1i, y1i, rw, rh):
     return mask if mask.any() else None
 
 
+def _blur_letter_mask(roi, mask):
+    # Sample using the visible strip, so changes in the detector box cannot
+    # pull in a different mix of bumper, clothing, or background each frame.
+    x, y, width, height = cv2.boundingRect(mask)
+    if not width or not height:
+        return
+    patch = roi[y:y+height, x:x+width]
+    cell = max(8, math.ceil(max(width, height) / 5))
+    small = cv2.resize(patch, (max(1, width // cell), max(1, height // cell)),
+                       interpolation=cv2.INTER_AREA)
+    blurred = cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR)
+    cv2.copyTo(blurred, mask[y:y+height, x:x+width], patch)
+
+
 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
                     pad_px=0):
     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
@@ -3760,6 +4047,9 @@ def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
         k = 2 * int(pad_px) + 1
         mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
     roi = frame[y1i:y2i, x1i:x2i]
+    if mode == "letter_blur":
+        _blur_letter_mask(roi, mask)
+        return
     if mode == "box":
         filled = np.zeros_like(roi)
     elif mode == "inpaint":
@@ -3943,6 +4233,12 @@ def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
             ["-c:a", "aac", "-b:a", "192k"])
 
 
+# OS error texts ffmpeg prints when the output file cannot be written.
+_WRITE_FAILURES = ("Input/output error", "No space left on device",
+                   "Read-only file system", "Permission denied",
+                   "Disk quota exceeded", "Stale file handle")
+
+
 def _ffmpeg_failure(err_file, what, rc=None, hint=""):
     """RuntimeError carrying the TAIL of ffmpeg's own stderr (captured to
     a temp file), so the job log names the real cause — 'Could not find
@@ -3958,6 +4254,10 @@ def _ffmpeg_failure(err_file, what, rc=None, hint=""):
         pass
     msg = "%s failed%s" % (what, (" (ffmpeg exit %s)" % rc)
                            if rc is not None else "")
+    if any(words in tail for words in _WRITE_FAILURES):
+        # ffmpeg encoded fine but could not WRITE the file: the disk or the
+        # folder is the problem, and another encoder would fail the same way.
+        hint = "writing the output file failed — a disk or folder problem, not the encoder"
     return RuntimeError(msg + (": " + tail if tail else
                                " — ffmpeg gave no error message")
                         + (" — " + hint if hint else ""))
@@ -4276,6 +4576,9 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
         if px2 <= px1 or py2 <= py1:
             return
         roi = plane[py1:py2, px1:px2]
+        if mode == "letter_blur":
+            _blur_letter_mask(roi, m)
+            return
         if mode == "box":
             filled = np.full_like(roi, black)
         elif mode == "inpaint":
@@ -4368,6 +4671,122 @@ def apply_coverage(dets, coverage, cb=None):
                   else "gliding oversized boxes (body shape and walking "
                        "gait concealed)"))
     return out
+
+
+def _assisted_row(d, poly):
+    """Copy of a plate row carrying `poly`, painted by the silhouette painters.
+
+    A lettering row (narrow mode) only shows its poly on its exact inspected
+    frame, so it becomes a plain row; policy attributes come along."""
+    if isinstance(d, NarrowPlateDetection):
+        fields = {k: copy.deepcopy(v) for k, v in vars(d).items()
+                  if k in Detection.__dataclass_fields__ and k != "manual_plate_quad"}
+        cls = Detection
+        if isinstance(d, FrameBoundedNarrowPlateDetection):
+            cls = FrameBoundedDetection
+            fields.update(scan_frame_start=d.scan_frame_start, scan_frame_end=d.scan_frame_end)
+        row = cls(**fields, manual_plate_quad=copy.deepcopy(d.manual_plate_quad))
+        for key, value in vars(d).items():
+            if key.startswith("_plate"):
+                setattr(row, key, value)
+    else:
+        row = copy.copy(d)
+    row._assisted_strip = d.text == "plate (steady)"
+    row.poly = plate_outline.continuous_mask(poly) if len(poly) > 1 else poly
+    return row
+
+
+def apply_assisted_cover(dets, fps, cuts, frame_count=None, first_frame=None, log=None, independent=False):
+    """-> (render rows, CoverPlan) for --plate-coverage assisted.
+
+    Dense plate rows get their own or a borrowed letter mask, rows the plan
+    cannot cover are not painted (they are the plan's gaps), and each bridge
+    becomes a one-frame row on the ending track. Non-plate rows pass through;
+    a manual quad row loses any poly so the quad painter alone decides.
+    Plate rows without a track pass through too (full box); `log`, when
+    given, gets one line with their count."""
+    samples = []
+    planned = set()
+    aoffs = {}
+    untracked = 0
+    for key, d in enumerate(dets):
+        if d.category != "plate" or plate_quad.valid_record(d.manual_plate_quad):
+            continue
+        if not d.dense or d.track < 0:
+            untracked += 1
+            continue
+        evidence = getattr(d, "_plate_policy_evidence", None)
+        if evidence is not None and not plate_policy.supported_geometry(d):
+            continue   # never rendered: not a sample, not a gap
+        # A report without the uncertain plate policy has no evidence: direct.
+        direct = evidence is None or evidence.get("origin") == "detection"
+        box = (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+               d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
+        seen = None
+        if direct and _frame_authority(d) is None:
+            frame = evidence.get("frame") if evidence is not None else None
+            sighting = frame / fps if type(frame) is int else d.last_seen
+            if d.t_start - 1e-6 <= sighting <= d.t_end + 1e-6:
+                seen = min(d.t_end, max(d.t_start, sighting))
+        samples.append(plate_letters.Sample(key, d.track, d.t_start, d.t_end, box,
+                                            tuple(d.poly or ()), direct, seen))
+        planned.add(key)
+        last = aoffs.get(d.track)
+        if last is None or d.t_end >= last[0]:
+            aoffs[d.track] = (d.t_end, tuple(d.aoff))
+    plan = plate_letters.plan_cover(samples, fps, list(cuts or []), frame_count=frame_count,
+                                    first_frame=first_frame, independent=independent)
+    if untracked and log is not None:
+        log("      assisted letters: %d plate detection%s without a track get%s the full box"
+            % (untracked, "" if untracked == 1 else "s", "s" if untracked == 1 else ""))
+    out = []
+    for key, d in enumerate(dets):
+        if key in planned:
+            if key not in plan.drop:
+                row = _assisted_row(d, plan.polys[key])
+                if key in plan.spans:
+                    row.t_start, row.t_end = plan.spans[key]
+                out.append(row)
+        elif d.category == "plate" and d.poly and plate_quad.valid_record(d.manual_plate_quad):
+            out.append(_assisted_row(d, ()))
+        else:
+            out.append(d)
+    for br in plan.bridges:
+        ax, ay = aoffs[br.track][1]
+        t = br.frame / fps
+        out.append(Detection(t, t, (br.box[0] - ax, br.box[1] - ay, br.box[2] - ax, br.box[3] - ay),
+                             "plate", "plate (bridged)", 0.0, aoff=(ax, ay), last_seen=t,
+                             dense=True, track=br.track, poly=br.poly))
+    return out, plan
+
+
+def _independent_plate_cover(settings):
+    return settings.get("steady_plates") is True or (
+        settings.get("steady_single_plate") is True
+        and settings.get("uncertain_policy") in ("manual_review", "blur_candidates"))
+
+
+def assisted_cover_from_report(doc, frame_range=None):
+    """The CoverPlan a render of this saved report would use (see run_render).
+
+    frame_range=(first, end) limits counts and gaps to the frames an output
+    clip keeps (see output_frame_range); None keeps the whole timeline."""
+    capable = isinstance(doc, dict) and doc.get("plate_policy_evidence_version") == 1
+    dets, rstate, _ = _decode_report(doc, optional_full=capable)
+    if capable:
+        choices = plate_policy.evaluate(dets, *_saved_plate_policy(doc), capable_off=True)
+        dets = [d for d, choice in zip(dets, choices) if choice.enabled]
+    if not rstate:
+        raise ValueError("report has no render_state")
+    cuts = doc.get("scene_cuts", []) if isinstance(doc, dict) else []
+    n = len(rstate.get("cum") or ()) or None
+    independent = _independent_plate_cover(doc.get("provenance", {}).get("settings") or {})
+    if frame_range is None:
+        return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=n, independent=independent)[1]
+    first, end = frame_range
+    end = end if n is None else min(end, n)
+    return apply_assisted_cover(dets, rstate["fps"], cuts, frame_count=end,
+                                first_frame=first, independent=independent)[1]
 
 
 def _dedupe_dense(act, frame_index=None, frame_digest=None):
@@ -4552,6 +4971,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
     # Public entry checks source extents before the single delivery stage.
     # Coverage may legally round a positive source box to an empty integer box.
     mode_map = mode_map or {}
+    _note_inpaint_support(set(mode_map.values()) | {mode},
+                          (cb.log if cb is not None else print))
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
@@ -4667,7 +5088,10 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                 if quad is not None:
                     _paint_plate_quad_yuv10(y, u, v, quad, _mode_for(d.category), px)
                 elif d.poly and not isinstance(d, NarrowPlateDetection):
-                    _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
+                    paint_mode = _mode_for(d.category)
+                    if paint_mode == "blur" and getattr(d, "_assisted_strip", False):
+                        paint_mode = "letter_blur"
+                    _blur_silhouette_yuv10(y, u, v, *box, paint_mode,
                                            d.poly, pbox, pad_px=px)
                 else:
                     _blur_yuv10(y, u, v, *box, _mode_for(d.category),
@@ -4964,6 +5388,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
         except (TypeError, ValueError, IndexError):
             raise ValueError("invalid bounded clip interval") from None
     mode_map = mode_map or {}
+    _note_inpaint_support(set(mode_map.values()) | {mode},
+                          (cb.log if cb is not None else print))
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
@@ -5148,7 +5574,10 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 elif poly:
                     # segmentation silhouette: mask only the body, not the box —
                     # px (pad+drift) becomes an outward mask dilation
-                    blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+                    paint_mode = _mode_for(d.category)
+                    if paint_mode == "blur" and getattr(d, "_assisted_strip", False):
+                        paint_mode = "letter_blur"
+                    blur_silhouette(frame, x1, y1, x2, y2, paint_mode,
                                     poly, pbox, pad_px=px)
                 else:
                     blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
@@ -6230,16 +6659,18 @@ def _decode_db(prob, w, h, nw, nh, thresh=0.3, box_thresh=0.5, pad_frac=0.55):
     return out
 
 
-def _narrow_from_probability(crop, prob):
-    """Decode detector kernels to separate restored quadrilaterals, or fail closed."""
+def _restored_quads(crop, prob, clip=False):
+    """Decode detector kernels to separate restored quadrilaterals in crop pixels.
+
+    Returns (polygons, reason). A restored point outside the crop fails the
+    whole decode with "invalid_geometry", unless clip=True, which clips it
+    into the crop instead.
+    """
     if crop.ndim != 3 or min(crop.shape[:2]) < 8:
         return [], "invalid_crop"
     if prob.ndim != 2 or not prob.size or not np.isfinite(prob).all():
         return [], "inference_error"
     h, w = crop.shape[:2]
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    if int(gray.max()) - int(gray.min()) < 25:
-        return [], "unverifiable_contrast"
     contours, _ = cv2.findContours((prob > .3).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     polys = []
     for contour in contours:
@@ -6277,11 +6708,29 @@ def _narrow_from_probability(crop, prob):
                 return [], "invalid_geometry"
             restored.append(np.linalg.solve(matrix, [constants[i-1], constants[i]]))
         poly = np.asarray(restored) * (w / prob.shape[1], h / prob.shape[0])
-        if not np.isfinite(poly).all() or np.any(poly[:, 0] <= 0) or np.any(poly[:, 0] >= w - 1) or np.any(poly[:, 1] <= 0) or np.any(poly[:, 1] >= h - 1):
+        if clip and np.isfinite(poly).all():
+            poly = np.column_stack((np.clip(poly[:, 0], 0, w - 1), np.clip(poly[:, 1], 0, h - 1)))
+        elif not np.isfinite(poly).all() or np.any(poly[:, 0] <= 0) or np.any(poly[:, 0] >= w - 1) or np.any(poly[:, 1] <= 0) or np.any(poly[:, 1] >= h - 1):
             return [], "invalid_geometry"
         polys.append(poly)
     if not polys:
         return [], "no_text_detected"
+    return polys, ""
+
+
+def _narrow_from_probability(crop, prob):
+    """Decode detector kernels to separate restored quadrilaterals, or fail closed."""
+    if crop.ndim != 3 or min(crop.shape[:2]) < 8:
+        return [], "invalid_crop"
+    if prob.ndim != 2 or not prob.size or not np.isfinite(prob).all():
+        return [], "inference_error"
+    h, w = crop.shape[:2]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    if int(gray.max()) - int(gray.min()) < 25:
+        return [], "unverifiable_contrast"
+    polys, reason = _restored_quads(crop, prob, clip=False)
+    if reason:
+        return [], reason
     covered = np.zeros((h, w), np.uint8)
     cv2.fillPoly(covered, [np.rint(p).astype(np.int32) for p in polys], 1)
     for poly in polys:
@@ -6339,6 +6788,20 @@ def _narrow_from_probability(crop, prob):
     return polys, ""
 
 
+# Plate-crop sizes (long side, px) for the assisted letter cover: the first
+# runs alone; the rest only when its outline is empty or implausible.
+LETTER_SIZES = (320, 640, 224)
+
+
+def _batch_errors():
+    """onnxruntime's own failure types, raised when a session refuses a batch."""
+    try:
+        from onnxruntime.capi import onnxruntime_pybind11_state as ort_err
+        return tuple(getattr(ort_err, n) for n in ("InvalidArgument", "Fail", "RuntimeException")
+                     if hasattr(ort_err, n))
+    except Exception:
+        return (RuntimeError,)
+
 
 class TextRegionDetector:
     """Scene-text region detector — the "anytext" category. Finds text
@@ -6366,12 +6829,17 @@ class TextRegionDetector:
                 raise ValueError("text detector hash mismatch")
             self.sess = _ort_session(path)
             self._in = self.sess.get_inputs()[0].name
+            try:
+                self.log("      text model on %s" % self.sess.get_providers()[0])
+            except Exception:
+                pass
             self.log("      all-text detector: PP-OCRv5 det loaded "
                      "(text regions are blurred, never read)")
         except Exception as e:
             self.log("      all-text detector unavailable (%s) — the "
                      "anytext category is INACTIVE this run" % e)
             self.sess = None
+            self.error = str(e) or type(e).__name__
 
     def find_plate(self, frame, box):
         try:
@@ -6385,19 +6853,131 @@ class TextRegionDetector:
             return [], "model_unavailable"
         crop = frame[y1:y2, x1:x2]
         ch, cw = crop.shape[:2]
-        scale = 640.0 / max(ch, cw)
-        nh = max(32, int(round(ch * scale / 32)) * 32)
-        nw = max(32, int(round(cw * scale / 32)) * 32)
-        image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
-        image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
-        blob = image.transpose(2, 0, 1)[None].astype(np.float32)
         try:
-            prob = self.sess.run(None, {self._in: blob})[0][0, 0]
+            prob = self._crop_probability(crop, 640)
             polys, reason = _narrow_from_probability(crop, prob)
+            if polys and not reason and not _plausible_lettering(
+                    [p / (cw, ch) for p in polys]):
+                return [], "implausible_lettering"
         except Exception:
             return [], "inference_error"
         return [p + (x1, y1) for p in polys], reason
 
+    @staticmethod
+    def _crop_blob(crop, size):
+        """Normalized NCHW blob of a crop resized to `size` px long side, /32-aligned."""
+        ch, cw = crop.shape[:2]
+        scale = float(size) / max(ch, cw)
+        nh = max(32, int(round(ch * scale / 32)) * 32)
+        nw = max(32, int(round(cw * scale / 32)) * 32)
+        image = cv2.resize(crop, (nw, nh)).astype(np.float32) / 255.0
+        image = (image[:, :, ::-1] - (.485, .456, .406)) / (.229, .224, .225)
+        return image.transpose(2, 0, 1)[None].astype(np.float32)
+
+    def _crop_probability(self, crop, size):
+        """Text probability map of a crop resized to `size` px long side, /32-aligned."""
+        return self.sess.run(None, {self._in: self._crop_blob(crop, size)})[0][0, 0]
+
+    def _crop_probabilities(self, crops, size):
+        """Probability map per crop (None where inference failed). Crops whose
+        resized shape matches go to the model in one batched call; a model that
+        refuses a batch above 1 is called one crop at a time from then on."""
+        blobs = [self._crop_blob(c, size) for c in crops]
+        groups = {}
+        for i, blob in enumerate(blobs):
+            groups.setdefault(blob.shape, []).append(i)
+        probs = [None] * len(crops)
+        for idxs in groups.values():
+            if len(idxs) > 1 and not getattr(self, "_batch_refused", False):
+                try:
+                    out = self.sess.run(None, {self._in: np.concatenate([blobs[i] for i in idxs])})[0]
+                    if out.shape[0] != len(idxs):
+                        raise _batch_errors()[0]("batch output has %d rows" % out.shape[0])
+                    for k, i in enumerate(idxs):
+                        probs[i] = out[k, 0]
+                    continue
+                except _batch_errors():
+                    self._batch_refused = True
+                    self.log("      text model: batching unavailable, using one crop per call")
+                except Exception:
+                    pass        # isolate the failure crop by crop below
+            for i in idxs:
+                try:
+                    probs[i] = self.sess.run(None, {self._in: blobs[i]})[0][0, 0]
+                except Exception:
+                    probs[i] = None
+        return probs
+
+    def find_letters(self, frame, box, sizes=LETTER_SIZES):
+        """Plate lettering outline for the assisted cover, in frame pixels
+        (see find_letters_many; `last_sizes` names the sizes that contributed)."""
+        out = self.find_letters_many(frame, [box], sizes)[0]
+        many = getattr(self, "last_sizes_many", None)
+        self.last_sizes = many[0] if many else ()
+        return out
+
+    def find_letters_many(self, frame, boxes, sizes=LETTER_SIZES):
+        """Lettering outlines for several plate boxes of one frame, per box.
+
+        No strict check: only the plausibility rule discards specks. The
+        first size runs alone; boxes whose outline is empty or implausible
+        there run the other sizes, and every outline plausible on its own is
+        unioned (a union only adds cover). Crops of one resized shape share a
+        model call. `last_sizes_many[i]` names the sizes that contributed to
+        box i.
+        """
+        boxes = list(boxes)
+        results = [[] for _ in boxes]
+        used = [[] for _ in boxes]
+        self.last_sizes_many = [() for _ in boxes]
+        if self.sess is None or not boxes:
+            return results
+        h, w = frame.shape[:2]
+        info = {}
+        for i, box in enumerate(boxes):
+            try:
+                x1, y1, x2, y2 = (int(v) for v in box)
+            except (TypeError, ValueError, OverflowError, AttributeError):
+                continue
+            # A plate at the frame edge still gets letters: use its visible part.
+            x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+            if x2 - x1 < 8 or y2 - y1 < 8:
+                continue
+            info[i] = (frame[y1:y2, x1:x2], x1, y1)
+        sizes = tuple(sizes)
+        pending = list(info)
+        for k, size in enumerate(sizes):
+            if not pending:
+                break
+            probs = self._crop_probabilities([info[i][0] for i in pending], size)
+            nxt = []
+            for i, prob in zip(pending, probs):
+                crop, x1, y1 = info[i]
+                ch, cw = crop.shape[:2]
+                polys = []
+                if prob is not None:
+                    try:
+                        polys, reason = _restored_quads(crop, prob, clip=True)
+                        if reason or not polys or not _plausible_lettering(
+                                [p / (cw, ch) for p in polys]):
+                            polys = []
+                    except Exception:
+                        polys = []
+                if polys:
+                    results[i] += [p + (x1, y1) for p in polys]
+                    used[i].append(size)
+                if not (k == 0 and polys):
+                    nxt.append(i)
+            pending = nxt
+        # The detector box constrains plate discovery, including on bodywork of
+        # the same color. Rim and glyph evidence can recover a rotated strip
+        # even when the text detector returns only part of the registration.
+        for i, (crop, x1, y1) in info.items():
+            strip = plate_outline.lettering(crop)
+            if strip is not None:
+                results[i].append(strip + (x1, y1))
+        self.last_sizes_many = [tuple(u) for u in used]
+        return results
 
     def available(self):
         return self.sess is not None
@@ -7142,14 +7722,19 @@ def sha256_file(path, chunk=1 << 20):
 
 def _settings_dict(args):
     skip = {"video", "output", "report", "from_report", "batch", "config",
-            "_report_input", "_plate_coverage_explicit"}
+            "_report_input", "_plate_coverage_explicit", "no_box_fallback"}
     if getattr(args, "uncertain_policy", None) in (None, "off"):
         skip.update(("uncertain_policy", "plate_auto_cutoff"))
+    if not getattr(args, "steady_plates", False):
+        skip.add("steady_plates")
+    if not getattr(args, "steady_single_plate", False):
+        skip.add("steady_single_plate")
     out = {k: v for k, v in vars(args).items()
            if k not in skip and not (k == 'verify_hdr_plate_frames' and not v)
            and isinstance(v, (str, int, float, bool, list, tuple, type(None)))}
-    if getattr(args, "plate_coverage", "full") != "narrow":
+    if getattr(args, "plate_coverage", "full") not in ("narrow", "assisted"):
         out.pop("plate_coverage", None)
+    if getattr(args, "plate_coverage", "full") != "narrow":
         out.pop("plate_narrow_margin", None)
     mm = getattr(args, "mode_map", None)
     if isinstance(mm, dict) and mm:
@@ -7474,6 +8059,15 @@ def _report_document(args, state, output_path=None, output_bytes_path=None):
             doc["audio_transcript"] = state["audio_transcript"]
     if getattr(args, "plate_coverage", "full") == "narrow" and state.get("plate_coverage_limitation"):
         doc["plate_coverage_limitation"] = state["plate_coverage_limitation"]
+    if "scene_cuts" in state:
+        doc["scene_cuts"] = [int(i) for i in state["scene_cuts"]]
+    if "plate_letter_gaps" in state:
+        doc["plate_letter_gaps"] = copy.deepcopy(state["plate_letter_gaps"])
+        doc["plate_letter_stats"] = dict(state.get("plate_letter_stats") or {})
+    else:
+        # A saved report re-rendered in another mode must not keep stale gaps.
+        doc.pop("plate_letter_gaps", None)
+        doc.pop("plate_letter_stats", None)
     aspans = getattr(args, "audio_spans", None)
     if ((source is None and aspans)
             or (source is not None and state.get("audio_redactions_overridden"))):
@@ -7498,6 +8092,15 @@ def load_report(path):
     with open(path, encoding="utf-8") as f:
         doc = json.load(f)
     return _decode_report(doc)
+
+
+def _saved_plate_policy(doc):
+    """The plate policy settings a capable report was decided with (validated)."""
+    settings = doc.get("provenance", {}).get("settings", {})
+    optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
+                settings.get("plate_auto_cutoff"))
+    plate_policy.validate_settings(*optional)
+    return optional
 
 
 def _decode_report(doc, optional_full=False):
@@ -7972,8 +8575,18 @@ def build_parser():
                          "faces — close-ups only). Never slower than "
                          "explicit --dense-face-stride/--detect-scale. "
                          "Always review the output.")
-    ap.add_argument("--plate-coverage", choices=["full", "narrow"], default=None,
-                    help="plate coverage: full (default) or opt-in lettering-only")
+    ap.add_argument("--plate-coverage", choices=["full", "narrow", "assisted"], default=None,
+                    help="plate coverage: full (default), opt-in lettering-only, or "
+                         "assisted (letters only, no box fallback; needs --no-box-fallback)")
+    steady_modes = ap.add_mutually_exclusive_group()
+    steady_modes.add_argument("--steady-plates", action="store_true",
+                              help="track a separate steady path for each plate (assisted coverage)")
+    steady_modes.add_argument("--steady-single-plate", action="store_true",
+                    help="track one plate per shot from sparse outlines (assisted coverage only)")
+    ap.add_argument("--no-box-fallback", action="store_true",
+                    help="with --plate-coverage assisted: where letters are not found "
+                         "clearly, draw nothing instead of the full plate box; such "
+                         "spots are listed as gaps in Review")
     ap.add_argument("--plate-narrow-margin", type=float, default=0,
                     help="nonnegative source-pixel margin around lettering (default 0)")
     ap.add_argument("--plate-model", default=None,
@@ -8230,8 +8843,15 @@ def _prep_args(args, parser):
                                    getattr(args, "plate_auto_cutoff", None))
     args._plate_coverage_explicit = getattr(args, "plate_coverage", None) is not None
     args.plate_coverage = getattr(args, "plate_coverage", None) or "full"
-    if args.plate_coverage not in ("full", "narrow"):
-        parser.error("--plate-coverage must be full or narrow")
+    if args.plate_coverage not in ("full", "narrow", "assisted"):
+        parser.error("--plate-coverage must be full, narrow or assisted")
+    if (getattr(args, "steady_single_plate", False) or getattr(args, "steady_plates", False)) and (
+            args.plate_coverage != "assisted"):
+        parser.error("steady plate tracking requires assisted coverage")
+    if (args.plate_coverage == "assisted" and args._plate_coverage_explicit
+            and not getattr(args, "no_box_fallback", False)):
+        parser.error("--plate-coverage assisted never falls back to the full plate box; "
+                     "add --no-box-fallback to confirm")
     try:
         args.plate_narrow_margin = float(getattr(args, "plate_narrow_margin", 0))
         if not math.isfinite(args.plate_narrow_margin) or args.plate_narrow_margin < 0:
@@ -8471,23 +9091,101 @@ def _quad_scan_digest(args):
     return sha256_file(args.video)
 
 
-def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None):
+class ScanStopped(Exception):
+    """A scan stopped on request after saving its progress (stop and continue)."""
+
+    def __init__(self, frame, total):
+        super().__init__("scan stopped at frame %d of %d" % (frame, total))
+        self.frame, self.total = frame, total
+
+
+class _BackgroundHash:
+    """SHA-256 of a file computed on a daemon thread; result() waits."""
+
+    def __init__(self, path):
+        self.path, self._value, self._error = path, None, None
+        self._done = threading.Event()
+        self.started = time.monotonic()
+        threading.Thread(target=self._run, name="scan-progress-hash", daemon=True).start()
+
+    def _run(self):
+        try:
+            self._value = sha256_file(self.path)
+        except BaseException as error:      # reported by result()
+            self._error = error
+        finally:
+            self._done.set()
+
+    def result(self):
+        self._done.wait()
+        if self._error is not None:
+            raise scan_progress.ProgressError("cannot read the video to check it: %s"
+                                              % self._error)
+        return self._value
+
+
+# Categories whose detectors keep no state between frames (step 1 of stop and
+# continue). Text categories carry OCR memory, scroll and backtrack state.
+STOP_CONTINUE_CATEGORIES = frozenset({"face", "plate", "person", "qrcode",
+                                      "screen", "anytext", "none"})
+
+
+def stop_supported(args):
+    """Whether this scan can be stopped and continued (no text categories)."""
+    raw = getattr(args, "categories", None)
+    if not isinstance(raw, str):
+        return False            # not a real scan's settings: fail closed
+    cats = {c.strip() for c in raw.split(",") if c.strip()}
+    for window in (getattr(args, "windows_data", None) or []):
+        cats |= {c.strip() for c in (window.get("cats") or []) if c and c.strip()}
+    return cats <= STOP_CONTINUE_CATEGORIES
+
+
+def run_scan(args, cb=None, *, stop_requested=None, _checkpoint_stream=None,
+             progress=None):
     """Scan pass only. A stop callback requests a whole-frame boundary.
 
     The opt-in boundary result is an unverified engine candidate, not a saved
     checkpoint or permission to render. Ordinary callers retain their existing
     return shape. See CHECKPOINT_CONTRACT.md for later producer obligations.
+
+    `progress` (a scan_progress.ScanProgressControl) enables stop and
+    continue for detector-only scans: the run saves its state into the
+    control's file at frame boundaries, raises ScanStopped on a stop, and
+    with ``progress.resume`` carries on from the saved frame.
     """
+    if progress is not None:
+        if stop_requested is not None or _checkpoint_stream is not None:
+            raise ValueError("stop and continue cannot be combined with Stop & Review")
+        if not stop_supported(args):
+            raise ValueError("stop and continue does not support text categories yet")
     main_capture = [None]
     try:
-        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream)
+        return _run_scan_impl(args, cb, stop_requested, main_capture, _checkpoint_stream,
+                              progress)
     finally:
         if main_capture[0] is not None:
             main_capture[0].release()
 
 
-def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
+def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
+                   progress=None):
     cb = cb or Callbacks()
+    progress_identity = None
+    if progress is not None:
+        # Before any setup mutates args: the continued run rebuilds args from
+        # the same saved options and must arrive at the same snapshot.
+        try:
+            progress_identity = {"engine_version": VERSION,
+                                 "format_version": scan_progress.SCAN_PROGRESS_VERSION,
+                                 "settings": scan_progress.settings_identity(args)}
+        except scan_progress.ProgressError as error:
+            if progress.resume:
+                raise
+            # A fresh scan must never fail because Stop is unavailable.
+            cb.log("      NOTE: Stop is not available for this scan (%s); "
+                   "it runs to the end as usual" % error)
+            progress = None
     if stop_requested is not None and not callable(stop_requested):
         raise TypeError("stop_requested must be a no-argument callback")
     monitor_stop = stop_requested is not None
@@ -8509,6 +9207,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if not hasattr(args, attr):
             setattr(args, attr, default)
     normalize_vfr(args, cb)
+    progress_hash = None
+    if progress is not None:
+        # Hash the frames actually scanned (the scan copy when normalization
+        # made one; it is rebuilt from the original whenever that changes) in
+        # the background, so a stop or a crash can later prove the same video.
+        progress_hash = _BackgroundHash(args.video)
     cats = {c.strip() for c in args.categories.split(",")
             if c.strip() and c.strip() != "none"}
     # per-window categories (unified editor) extend the load set: a category
@@ -8595,10 +9299,28 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                         and "face" in cats)) else None)
     qrer = QRDetector(cb) if "qrcode" in cats else None
     narrow_plate = getattr(args, "plate_coverage", "full") == "narrow" and "plate" in cats
-    texter = (TextRegionDetector(cb, verify_hash=True) if narrow_plate
+    # Assisted: letters only, no box fallback. Plates are located on every
+    # frame at full resolution like narrow, but without its strict check;
+    # frames without a letter mask become gaps for review.
+    assisted = getattr(args, "plate_coverage", "full") == "assisted" and "plate" in cats
+    texter = (TextRegionDetector(cb, verify_hash=True) if narrow_plate or assisted
               else TextRegionDetector(cb) if "anytext" in cats else None)
     if narrow_plate:
         cb.log("      narrow plates: locating plates and lettering on every frame at full resolution; review fallbacks")
+    letters_on = assisted and texter is not None and texter.available()
+    if assisted:
+        cb.log("      assisted letters: locating plates and their letters on every frame at full resolution")
+        if not letters_on:
+            # Refuse like the inert-category guard: without the text model no
+            # plate gets a mask, so an overnight scan would cover nothing.
+            reason = (getattr(texter, "error", None) if texter is not None else None) \
+                or "unknown reason"
+            raise RuntimeError("letters only, no box fallback needs the text model, "
+                               "which could not be loaded: %s" % reason)
+    letter_stats = {"plates": 0, "masked": 0, "seconds": 0.0,
+                    "sizes": {size: 0 for size in LETTER_SIZES}}
+    strip_tracker = plate_outline.StripTracker() if assisted else None
+    scene_cuts, cut_sig, cut_idx = [], None, -1
     detect_scale = float(getattr(args, "detect_scale", 1.0) or 1.0)
     if args.ignore_regions:
         cb.log(f"      ignore regions: {len(args.ignore_regions)}")
@@ -8950,13 +9672,164 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                   or detect_scale < 1.0 else "."))
     idx = checkpoint_start
     dense_now = []
+
+    # --- stop and continue (detector-only scans) -------------------------
+    # Everything the frame loop carries from one frame to the next is either
+    # saved here or rebuilt from the frame it came from; tracking, smoothing
+    # and grouping run once after the loop over the whole raw list, so a
+    # continued scan ends with exactly the report of an uninterrupted one.
+    progress_models = None
+    read_ref = None          # (index, frame, decoder pos) of the last frame read
+    scan_small_pos = None    # decoder pos after reading the scan_small frame
+    if progress is not None:
+        face_path = (getattr(args, "face_model", None)
+                     or os.environ.get("OPENSCRUB_FACE_MODEL")) if facer is not None else None
+        progress_models = {}
+        for kind, path in (("face", face_path),
+                           ("plate", getattr(plater, "model_path", None)),
+                           ("person", getattr(personer, "model_path", None))):
+            progress_models[kind] = (scan_progress.file_sha256(path) if path and os.path.isfile(path)
+                                     else "missing" if path else None)
+
+    def _progress_identity():
+        waited = time.monotonic()
+        digest = progress_hash.result()
+        if time.monotonic() - waited > 1.0:
+            cb.log("      stop/continue: waited %.0f s for the video check"
+                   % (time.monotonic() - waited))
+        return dict(progress_identity, scan_sha256=digest, total_frames=total,
+                    fps=fps, models=progress_models)
+
+    def _progress_save():
+        # Found-derived state belongs to text scans (step 2): refuse rather
+        # than silently drop it.
+        if (memory is not None or face_tracks or bt_deep or prev_keys or zdrop_raw
+                or scans):
+            raise scan_progress.ProgressError(
+                "this scan holds text-scan state that stop and continue cannot save yet")
+        if not len(cum) == len(bands) == idx:
+            raise scan_progress.ProgressError("the scan timeline is not aligned at frame %d" % idx)
+        started = time.monotonic()
+        scan_progress.save(progress.path, {
+            "identity": _progress_identity(), "next_frame": idx, "total": total,
+            "meta": getattr(progress, "meta", None) or {},
+            "raw": [scan_progress.encode_detection(d) for d in raw],
+            "cum": [list(p) for p in cum], "bands": [list(p) for p in bands],
+            "scene_cuts": list(scene_cuts), "cut_idx": cut_idx,
+            "plate_motion": ([(q.tolist(), last) for q, last in strip_tracker.tracks]
+                             if strip_tracker is not None and strip_tracker.index == cut_idx else []),
+            "letter_stats": {"plates": letter_stats["plates"], "masked": letter_stats["masked"],
+                             "seconds": letter_stats["seconds"],
+                             "sizes": [[k, v] for k, v in letter_stats["sizes"].items()]},
+            "n_scans": n_scans, "last_scan_idx": last_scan_idx,
+            "scan_cx": scan_cx, "scan_cy": scan_cy, "prev_fcx": prev_fcx, "prev_fcy": prev_fcy,
+            "zone_dropped": zone_dropped, "win_inactive": win_inactive,
+            "n_recalled": n_recalled, "recall_counts": recall_counts,
+            # digests + decoder timestamps of the frames a continue re-reads
+            "frame_ref": ({"index": read_ref[0], "sha256": _frame_sha256(read_ref[1]),
+                           "pos_msec": read_ref[2]} if read_ref is not None else None),
+            "small_ref": ({"index": last_scan_idx, "sha256": _frame_sha256(scan_small),
+                           "pos_msec": scan_small_pos}
+                          if scan_small is not None else None)})
+        spent = time.monotonic() - started
+        progress.mark_saved(idx, total, spent)
+        return spent
+
+    resuming = progress is not None and progress.resume
+    if resuming:
+        cb.log("      continuing a stopped scan: checking the video and settings…")
+        saved = scan_progress.load(progress.path)
+        scan_progress.compare_identity(saved.get("identity") or {}, _progress_identity())
+        try:
+            idx = int(saved["next_frame"])
+            if not 0 < idx <= max(total, idx) or int(saved["total"]) != total:
+                raise ValueError("frame out of range")
+            raw = [scan_progress.decode_detection(d) for d in saved["raw"]]
+            cum = [tuple(float(v) for v in p) for p in saved["cum"]]
+            bands = [tuple(float(v) for v in p) for p in saved["bands"]]
+            scene_cuts = [int(v) for v in saved["scene_cuts"]]
+            cut_idx = int(saved["cut_idx"])
+            ls = saved["letter_stats"]
+            letter_stats = {"plates": int(ls["plates"]), "masked": int(ls["masked"]),
+                            "seconds": float(ls["seconds"]),
+                            "sizes": {int(k): int(v) for k, v in ls["sizes"]}}
+            n_scans, last_scan_idx = int(saved["n_scans"]), int(saved["last_scan_idx"])
+            scan_cx, scan_cy = float(saved["scan_cx"]), float(saved["scan_cy"])
+            prev_fcx, prev_fcy = float(saved["prev_fcx"]), float(saved["prev_fcy"])
+            zone_dropped = {str(k): int(v) for k, v in saved["zone_dropped"].items()}
+            win_inactive = {str(k): int(v) for k, v in saved["win_inactive"].items()}
+            n_recalled = int(saved["n_recalled"])
+            recall_counts = {str(k): int(v) for k, v in saved["recall_counts"].items()}
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise scan_progress.ProgressError("the saved progress is incomplete") from error
+        if not len(cum) == len(bands) == idx:
+            raise scan_progress.ProgressError("the saved progress is not aligned")
+        # Rebuilt, not saved: the last OCR-cadence frame (scan_small) and the
+        # previous frame (scene-cut signature, and the decoder position). A
+        # seek can land a frame off, so each frame is FOUND again by its
+        # pixel digest plus the decoder's own post-read timestamp, exactly
+        # as recorded when it was first read; not found -> refuse.
+        def _small_of(fr):
+            return cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                              fx=BT_SCALE, fy=BT_SCALE)
+
+        def _locate(ref, transform):
+            index, digest, pos = int(ref["index"]), str(ref["sha256"]), ref["pos_msec"]
+            # A decoder timestamp of 0 is real only for the first frames; a
+            # build that reports nothing usable cannot tell repeats apart.
+            if (not isinstance(pos, (int, float)) or not math.isfinite(pos) or pos < 0
+                    or (pos == 0 and index > 1)):
+                raise scan_progress.ProgressError(
+                    "this video cannot be positioned exactly, so the scan cannot continue")
+            if _seek_cap(cap, max(0, index - 3), fps):
+                for _ in range(9):
+                    ok_, fr_ = cap.read()
+                    if not ok_ or fr_ is None:
+                        break
+                    if (cap.get(cv2.CAP_PROP_POS_MSEC) == pos
+                            and _frame_sha256(transform(fr_)) == digest):
+                        return fr_
+            raise scan_progress.ProgressError("cannot find frame %d of the video again" % index)
+
+        small_ref, frame_ref = saved.get("small_ref"), saved.get("frame_ref")
+        if bt_on and last_scan_idx >= 0:
+            if not small_ref or int(small_ref["index"]) != last_scan_idx:
+                raise scan_progress.ProgressError("the saved progress is incomplete")
+            scan_small = _small_of(_locate(small_ref, _small_of))
+        positioned = False
+        if frame_ref:
+            fr = _locate(frame_ref, lambda f: f)
+            if assisted:
+                if cut_idx != int(frame_ref["index"]):
+                    raise scan_progress.ProgressError("the saved progress is incomplete")
+                cut_sig = plate_letters.frame_signature(fr)
+                try:
+                    strip_tracker.restore(saved.get("plate_motion", []), fr, cut_idx)
+                except (TypeError, ValueError, OverflowError) as error:
+                    raise scan_progress.ProgressError("invalid saved plate motion") from error
+            positioned = int(frame_ref["index"]) == idx - 1
+        elif assisted and cut_idx >= 0:
+            raise scan_progress.ProgressError("the saved progress is incomplete")
+        # After a jump (fast-skip between windows) the stopped run had
+        # itself just positioned with _seek_cap; repeat that same call.
+        if not positioned and not _seek_cap(cap, idx, fps):
+            raise scan_progress.ProgressError("cannot seek to the saved frame %d" % idx)
+        if frame_ref:
+            read_ref = (int(frame_ref["index"]), fr, frame_ref["pos_msec"])
+        if small_ref:
+            scan_small_pos = small_ref["pos_msec"]
+        progress.mark_saved(idx, total)
+        cb.log("      continuing from frame %d of %d (%d detection(s) so far)"
+               % (idx, total, len(raw)))
+
     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
     # manual jobs — exactly the "one person 16 minutes in" case), frames
     # before the detection window carry no information we need, so SEEK past
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on and not optional_policy and not monitor_stop:
+    if (win_start > 1.0 and not track_on and not optional_policy and not monitor_stop
+            and not resuming):
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -8984,6 +9857,30 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             raise
 
     while True:
+        if progress is not None:
+            # Frame boundary: everything before idx is fully processed.
+            progress.next_frame = idx
+            if progress.stop_requested():
+                if idx == 0:
+                    _release_scan_capture()
+                    raise PipelineCancelled()
+                _release_scan_capture()
+                # Free the GPU before the (possibly slow) video check.
+                facer = plater = personer = qrer = texter = None
+                import gc
+                gc.collect()
+                spent = _progress_save()
+                cb.log("      stopped at frame %d of %d — progress saved (%.1f s)"
+                       % (idx, total, spent))
+                raise ScanStopped(idx, total)
+            if idx > 0 and progress.autosave_due():
+                try:
+                    spent = _progress_save()
+                    cb.log("      progress autosaved at frame %d of %d (%.1f s)"
+                           % (idx, total, spent))
+                except Exception as error:       # never let an autosave end a scan
+                    progress.autosave_disabled = True
+                    cb.log("      NOTE: progress autosave off for this scan: %s" % error)
         if monitor_stop:
             if _stop_now():
                 # A stop at the reported final index still needs the next
@@ -9020,8 +9917,18 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             else:
                 scan_exit_reason = "decoder_read_stopped_after_reported_count"
             break
+        if progress is not None:
+            read_ref = (idx, frame, cap.get(cv2.CAP_PROP_POS_MSEC))
         if monitor_stop and frame.shape[:2] != (vh, vw):
             dimensions_match = False
+        if assisted:
+            # Scene cuts bound mask borrowing and track joining. A frame read
+            # after a jump (seek, resumed range) follows frames never seen,
+            # which counts as a cut too.
+            sig = plate_letters.frame_signature(frame)
+            if idx > 0 and (cut_idx != idx - 1 or plate_letters.is_cut(cut_sig, sig)):
+                scene_cuts.append(idx)
+            cut_sig, cut_idx = sig, idx
         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
         cum.append((cx, cy))
 
@@ -9109,8 +10016,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         # fast, so (like dense faces) we re-detect every frame at the true
         # position rather than tracking. Only runs if a plate model is loaded.
         if (plater is not None and plater.available() and "plate" in cats
-                and (narrow_plate or idx % max(1, dense_stride) == 0)):
-            phold = 0.3 * (1 if narrow_plate else max(1, dense_stride)) / fps
+                and (narrow_plate or assisted or idx % max(1, dense_stride) == 0)):
+            phold = 0.3 * (1 if narrow_plate or assisted else max(1, dense_stride)) / fps
             _psc = _scope_at(t_now)
             _pzr = _psc.get("plate")
 
@@ -9119,16 +10026,47 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                         and not in_ignore_region(box, args.ignore_regions))
 
             # zones are applied inside _maybe_tiled, before seam merging
-            for (px1, py1, px2, py2, pconf) in (
-                    _maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate else detect_scale),
-                                 frame, plater.INPUT, tile_mode,
-                                 seam_allow=plate_allowed)
-                    if "plate" in _psc else []):
+            plate_rows = (_maybe_tiled(lambda f: plater.find(f, 1.0 if narrow_plate or assisted
+                                                             else detect_scale),
+                                       frame, plater.INPUT, tile_mode,
+                                       seam_allow=plate_allowed)
+                          if "plate" in _psc else [])
+            frame_letters, frame_sizes = [], []
+            if assisted and letters_on and plate_rows:
+                # one batched text-model pass for all of this frame's plates
+                started = time.perf_counter()
+                try:
+                    frame_letters = texter.find_letters_many(
+                        frame, [r[:4] for r in plate_rows])
+                    frame_sizes = list(getattr(texter, "last_sizes_many", ()) or ())
+                except Exception:
+                    frame_letters, frame_sizes = [], []
+                letter_stats["seconds"] += time.perf_counter() - started
+            observations = [(r, (), True) for r in plate_rows]
+            if assisted and letters_on and "plate" in _psc:
+                polygons = [frame_letters[i] if i < len(frame_letters) else []
+                            for i in range(len(plate_rows))]
+                observations = strip_tracker.step(
+                    frame, idx, plate_rows, polygons, fps,
+                    bool(scene_cuts and scene_cuts[-1] == idx), plate_allowed)
+            for plate_i, (plate_box, polygons, direct) in enumerate(observations):
+                px1, py1, px2, py2, pconf = plate_box
+                if polygons:
+                    # A partially detected word may occupy only one end of the
+                    # tracked strip. Normalize all polygons against one box.
+                    points = np.concatenate(polygons)
+                    h, w = frame.shape[:2]
+                    union = (max(0, min(px1, math.floor(points[:,0].min()))),
+                             max(0, min(py1, math.floor(points[:,1].min()))),
+                             min(w, max(px2, math.ceil(points[:,0].max()))),
+                             min(h, max(py2, math.ceil(points[:,1].max()))))
+                    if plate_allowed(union):
+                        px1, py1, px2, py2 = union
                 row = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),
                      int(px2 - cx), int(py2 - cy)),
-                    "plate", "plate", round(pconf, 3), (cx, cy),
+                    "plate", "plate", float(pconf), (cx, cy),
                     dense=True)
                 if narrow_plate:
                     polygons, reason = [], ""
@@ -9158,9 +10096,18 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                     row = _record_narrow_plate(row, idx,
                                                narrow_frame_digest if normalized else None,
                                                normalized, getattr(args, "plate_narrow_margin", 0), reason)
+                elif assisted:
+                    letter_stats["plates"] += int(direct)
+                    if letters_on:
+                        row.poly = _box_normalized_letters(row, cx, cy, polygons)
+                        if row.poly:
+                            letter_stats["masked"] += int(direct)
+                            for size in (frame_sizes[plate_i]
+                                         if plate_i < len(frame_sizes) else ()):
+                                letter_stats["sizes"][size] = letter_stats["sizes"].get(size, 0) + 1
                 if optional_policy:
                     row._plate_policy_evidence = MappingProxyType({
-                        "origin": "detection", "frame": idx,
+                        "origin": "detection" if direct else "visual_continuation", "frame": idx,
                         "geometry_valid": (row.cbox[0] < row.cbox[2]
                                            and row.cbox[1] < row.cbox[3])})
                 raw.append(row)
@@ -9324,6 +10271,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if due and idx - last_scan_idx >= 2:
             t = idx / fps
             scan_small = small
+            if progress is not None:
+                scan_small_pos = read_ref[2]
             if ocr is not None:
                 words = read_adaptive(ocr, frame,
                                       getattr(args, "ocr_upscale", "auto"))
@@ -9770,7 +10719,34 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     finally:
         if _gap_cap["cap"] is not None:
             _gap_cap["cap"].release()
-    n_tracks = assign_dense_tracks(detections)
+    multi = assisted and getattr(args, "steady_plates", False)
+    if multi:
+        from openscrub_internal.steady_plate import assign_appearances
+        n_tracks = assign_dense_tracks([r for r in detections if r.category != "plate"])
+        plate_rows = [r for r in detections if r.category == "plate" and r.dense]
+        n_tracks, edge_bounds = assign_appearances(plate_rows, fps, vw, vh, scene_cuts, n_tracks)
+    else:
+        n_tracks = assign_dense_tracks(detections)
+    if assisted and n_tracks:
+        def scope_allows(t, box):
+            scope = _scope_at(t)
+            zones = scope.get("plate")
+            return ("plate" in scope and (not zones or in_any_zone(box, zones))
+                    and not in_ignore_region(box, args.ignore_regions))
+
+        if checkpoint_stream is None:
+            reverse_cap = cv2.VideoCapture(args.video)
+        else:
+            from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+            reverse_cap = ScanCapture(FrameStream(
+                checkpoint_stream.source, start_frame=checkpoint_start,
+                check_cancelled=checkpoint_stream.check_cancelled).__enter__())
+        try:
+            _backfill_plate_letters(detections, reverse_cap, fps,
+                                    checkpoint_start if checkpoint_stream else 0,
+                                    scene_cuts, scope_allows, cum, cb)
+        finally:
+            reverse_cap.release()
     if n_tracks:
         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
                f" per-frame samples grouped into {n_tracks} track(s) "
@@ -9780,7 +10756,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                "through the video (the slow part of a dense scan)…")
         if checkpoint_stream is None:
             n_gaps, n_lead, lead_s = smooth_dense_tracks(
-                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb)
+                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb, letter_onset=assisted)
         else:
             from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
             secondary = ScanCapture(FrameStream(
@@ -9790,9 +10766,48 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
                 n_gaps, n_lead, lead_s = smooth_dense_tracks(
                     detections, fps, args.video, cum=cum,
                     win_start=max(win_start, checkpoint_start / fps), cb=cb,
-                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start)
+                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start, letter_onset=assisted)
             finally:
                 secondary.release()
+        if assisted and scene_cuts:
+            # Grace padding from the dense smoother must end at a hard cut,
+            # including for tracks which have no observation in the next shot.
+            for row in detections:
+                if row.dense and row.category == "plate":
+                    shot = bisect_right(scene_cuts, round(row.last_seen * fps))
+                    if shot:
+                        row.t_start = max(row.t_start, scene_cuts[shot-1] / fps)
+                    if shot < len(scene_cuts):
+                        row.t_end = max(row.t_start, min(row.t_end, (scene_cuts[shot] - 1) / fps))
+        if multi:
+            # Reverse tracking and grace padding may create rows outside a
+            # visible appearance. Do not extend them over an entry or exit.
+            kept = []
+            for row in detections:
+                if row.category == "plate" and row.track in edge_bounds:
+                    first_seen, last_seen = edge_bounds[row.track]
+                    if first_seen is not None:
+                        row.t_start = max(row.t_start, first_seen/fps)
+                    if last_seen is not None:
+                        row.t_end = min(row.t_end, last_seen/fps)
+                    if row.t_start > row.t_end or not row.t_start-1e-6 <= row.last_seen <= row.t_end+1e-6:
+                        continue
+                kept.append(row)
+            detections = kept
+        if assisted and (getattr(args, "steady_single_plate", False) or getattr(args, "steady_plates", False)):
+            if checkpoint_stream is None:
+                steady_cap = cv2.VideoCapture(args.video)
+            else:
+                from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+                steady_cap = ScanCapture(FrameStream(
+                    checkpoint_stream.source, start_frame=checkpoint_start,
+                    check_cancelled=checkpoint_stream.check_cancelled).__enter__())
+            try:
+                _steady_plate_shots(detections, steady_cap, fps, checkpoint_start, cum,
+                                    scene_cuts, scope_allows, cb, multi=getattr(args, "steady_plates", False),
+                                    policy=bool(optional_policy))
+            finally:
+                steady_cap.release()
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "
@@ -9933,6 +10948,12 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
         if reasons:
             cb.log("      narrow plate full-box fallbacks: "
                    + ", ".join("%s=%s" % item for item in sorted(reasons.items())))
+    if assisted:
+        cb.log("      assisted letters: masks on %d of %d plate detections; sizes used %s; "
+               "text model %.1f s" % (
+                   letter_stats["masked"], letter_stats["plates"],
+                   " ".join("%s:%d" % item for item in letter_stats["sizes"].items()),
+                   letter_stats["seconds"]))
     if monitor_stop and cb.cancelled():
         raise PipelineCancelled()
     state = {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
@@ -9948,6 +10969,9 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
     if optional_policy:
         state["plate_policy"] = (optional_policy, args.plate_threshold,
                                  args.plate_auto_cutoff)
+    if assisted:
+        state["scene_cuts"] = scene_cuts
+        state["independent_plate_cover"] = multi or (bool(optional_policy) and getattr(args, "steady_single_plate", False))
     if monitor_stop:
         if cb.cancelled():
             raise PipelineCancelled()
@@ -9969,6 +10993,58 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream):
             "checkpoint_available": False,
         }
     return state
+
+
+def resolve_output_clip(clip_frac, clip_start, clip_end, duration):
+    """-> (start, end or None) seconds of an SDR output trim, or None.
+
+    `duration` is called only for fraction bookends (web UI): they resolve
+    against the server's own measurement so an iPhone's reported length
+    can't shift the trim. Shared by run_render and the Review gap list."""
+    cf = (clip_frac or "").strip()
+    if cf:
+        dur = duration()
+        a, _, b = cf.partition("-")
+        cs = max(0.0, min(1.0, float(a))) * dur
+        bf = float(b)
+        ce = (bf * dur) if bf < 0.999 else 0.0    # ~1.0 == to end
+    else:
+        cs = float(clip_start or 0)
+        ce = float(clip_end or 0)
+    return (cs, ce if ce > 0 else None) if (cs > 0 or ce > 0) else None
+
+
+def output_frame_range(clip, fps, frame_count):
+    """-> (first, end): the source frames an SDR render with `clip` writes,
+    by the render loop's own test (t >= start - 1e-6, t <= end + 1e-6)."""
+    if not clip:
+        return 0, frame_count
+    cs, ce = clip
+    first = max(0, math.floor((cs - 1e-6) * fps) - 1)
+    while first / fps < cs - 1e-6:
+        first += 1
+    end = frame_count
+    if ce is not None:
+        last = math.floor((ce + 1e-6) * fps) + 1
+        while last >= 0 and last / fps > ce + 1e-6:
+            last -= 1
+        end = min(frame_count, last + 1)
+    return first, max(first, end)
+
+
+def _assisted_report(source_report, state):
+    """True when the detections come from a letters only scan: the saved
+    settings say assisted, or the report carries the assisted-only
+    `scene_cuts` key (a full render rewrites the settings without
+    plate_coverage, but the rows keep their letter masks)."""
+    if "scene_cuts" in state:
+        return True
+    if not isinstance(source_report, dict):
+        return False
+    if "scene_cuts" in source_report:
+        return True
+    settings = (source_report.get("provenance") or {}).get("settings") or {}
+    return isinstance(settings, dict) and settings.get("plate_coverage") == "assisted"
 
 
 def run_render(args, state, cb=None):
@@ -10006,6 +11082,35 @@ def run_render(args, state, cb=None):
     if state.get("plate_policy"):
         choices = plate_policy.evaluate(detections, *state["plate_policy"], capable_off=True)
         detections = [d for d, choice in zip(detections, choices) if choice.enabled]
+    if getattr(args, "plate_coverage", "full") == "assisted":
+        # Only the cover's SHAPE changes: the policy above already decided
+        # which plates are covered. The plan lives in state for the report.
+        detections, plan = apply_assisted_cover(detections, state["fps"],
+                                                state.get("scene_cuts", []),
+                                                frame_count=len(state["cum"]), log=cb.log,
+                                                independent=state.get("independent_plate_cover", False))
+        state["plate_letter_gaps"] = [asdict(g) for g in plan.gaps]
+        state["plate_letter_stats"] = dict(plan.stats)
+        cb.log("      assisted letters: %(masked_frames)d plate frame(s) masked, "
+               "%(bridged_frames)d bridged, %(gap_frames)d without a mask" % plan.stats
+               + " in %d gap(s) — review them" % len(plan.gaps))
+    elif _assisted_report(source_report, state):
+        # Letter masks of an assisted scan are plain `poly` on the rows; any
+        # other cover would paint them as silhouettes. Fail closed: the whole
+        # plate box, on copies so the report keeps its masks.
+        cleared = 0
+        out = []
+        for d in detections:
+            if d.category == "plate" and d.poly:
+                d = copy.copy(d)
+                d.poly = ()
+                cleared += 1
+            out.append(d)
+        detections = out
+        if cleared:
+            cb.log("      plate cover %s: %d plate detection(s) from a letters only scan "
+                   "drop their letter masks and get the full plate box"
+                   % (getattr(args, "plate_coverage", "full"), cleared))
     _geometry_preflight(detections, state["cum"], state["bands"],
                         state["fps"], args.pad, 25, "run_render")
     dst = args.output or os.path.splitext(args.video)[0] + (
@@ -10024,21 +11129,11 @@ def run_render(args, state, cb=None):
     mt = (getattr(args, "mute_audio_tracks", "") or "").strip()
     mute_tracks = ("all" if mt == "all"
                    else tuple(int(x) for x in mt.split(",") if x.strip()))
-    cf = (getattr(args, "clip_frac", "") or "").strip()
-    if cf:
-        # fractions of duration (web UI) — resolve against the server's own
-        # measurement so an iPhone's reported length can't shift the trim
-        _dur = _probe_duration(args.video) or (
-            len(state.get("cum", [])) / (state.get("fps") or 30.0))
-        a, _, b = cf.partition("-")
-        cs = max(0.0, min(1.0, float(a))) * _dur
-        bf = float(b)
-        ce = (bf * _dur) if bf < 0.999 else 0.0    # ~1.0 == to end
-    else:
-        cs = float(getattr(args, "clip_start", 0) or 0)
-        ce = float(getattr(args, "clip_end", 0) or 0)
-    clip = ((cs, ce if ce > 0 else None)
-            if (cs > 0 or ce > 0) else None)
+    clip = resolve_output_clip(
+        getattr(args, "clip_frac", ""), getattr(args, "clip_start", 0),
+        getattr(args, "clip_end", 0),
+        lambda: _probe_duration(args.video) or (
+            len(state.get("cum", [])) / (state.get("fps") or 30.0)))
     if clip and getattr(args, "hdr_source", None) and not args.preview:
         cb.log("      NOTE: output trim is not yet supported on HDR output — "
                "rendering full length. Use --hdr-output sdr to trim.")
@@ -10161,15 +11256,12 @@ def run_pipeline(args, cb=None):
             expected = source.get("provenance", {}).get("input_sha256")
             if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
                 raise ValueError("optional plate report has no valid scanned source hash")
-            settings = source.get("provenance", {}).get("settings", {})
-            optional = (settings.get("uncertain_policy"), settings.get("plate_threshold"),
-                        settings.get("plate_auto_cutoff"))
-            plate_policy.validate_settings(*optional)
+            optional = _saved_plate_policy(source)
         dets, rstate, prov = _decode_report(source, optional_full=capable)
         if not getattr(args, "_plate_coverage_explicit", False):
             settings = prov.get("settings") or {}
             saved_coverage = settings.get("plate_coverage", "full")
-            if saved_coverage not in ("full", "narrow"):
+            if saved_coverage not in ("full", "narrow", "assisted"):
                 saved_coverage = "full"
             args.plate_coverage = saved_coverage
         audio_overridden = getattr(args, "audio_spans", None) is not None
@@ -10244,6 +11336,9 @@ def run_pipeline(args, cb=None):
                      "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
                      "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                                "recalls": 0, "remembered": 0}}
+            if "scene_cuts" in source:
+                state["scene_cuts"] = list(source.get("scene_cuts", []))
+                state["independent_plate_cover"] = _independent_plate_cover(source.get("provenance", {}).get("settings") or {})
             if optional:
                 state["plate_policy"] = optional
             return run_render(args, state, cb)

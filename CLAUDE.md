@@ -276,6 +276,29 @@ Key classes/functions (locate with grep, line numbers drift):
   boundingRect + 55%-of-short-side unclip pad (DB trains on SHRUNK
   kernels; the pad restores glyph coverage, fail closed). Dense like
   plates; IMMEDIATE; runs at 960px long side, /32-aligned.
+- Assisted plate letters (`--plate-coverage assisted`, needs `--no-box-fallback`;
+  UI label "letters only, no box fallback" — never word it as allowing visible
+  plates): `TextRegionDetector.find_letters`/`find_letters_many` run the text
+  model at 320 first and only escalate to 640 and 224 for boxes whose outline is
+  empty or implausible, unioning plausible outlines (a union only adds cover; no
+  strict check, no frame-hash binding). Crops of one resized shape share a model
+  call. The scan stores box-normalized polygons on plate rows plus `scene_cuts`;
+  the pure planner in `openscrub_internal/plate_letters.py` borrows the nearest
+  mask of the same track (<=1.0 s, never across a cut), joins tracks across
+  dropouts (<=1.0 s, similar size, no cut) and computes gaps. `apply_assisted_cover`/
+  `assisted_cover_from_report` run at render from report state, so Review edits and
+  re-renders stay correct. Report fields (additive): `scene_cuts`,
+  `plate_letter_gaps`, `plate_letter_stats`; provenance `plate_coverage: assisted`.
+  Keep/undecided plates are not gaps; an enabled sample with no mask is. Full and
+  strict modes must stay byte-identical. The planner counts a sample's frames by the
+  RENDERER's rule (`idx/fps` within `[t0-0.01, t1+0.01]`, `RENDER_TOL_S`; rounding
+  hid a half-frame-start gap). A full/strict render of a letters only report
+  (saved `plate_coverage: assisted` or a `scene_cuts` key) clears plate polys on
+  copies -> full boxes. No text model -> the assisted scan is REFUSED. The gap
+  route adds `out_t0/out_t1/out_frame` (rendered-video timeline via the shared
+  `resolve_output_clip`/`output_frame_range`; HDR ignores trim) and a report
+  `token` the preview URL must carry (`?v=`, else 404). The render reminder runs
+  AFTER the save, on a fresh `/letter_gaps`.
 - Tiled detection (`_maybe_tiled`, `--tile auto|on|off`): when the
   frame long side >= 2.6x the YOLO input (4K vs 640), plates/person/
   screen ALSO scan an overlapping 2x2 (3x3 at >=5.2x) tile grid; boxes
@@ -908,6 +931,39 @@ defined — there was a real UnboundLocalError from ordering once.
   report-less job rehydrates with its ORIGINAL settings for Retry.
   Client half: startScan resets any select with selectedIndex<0 to its
   defaultSelected option. Never add a sys.exit path reachable from a job.
+- FAILED RENDER KEEPS THE REVIEW: the worker records `failed_action`
+  ("render" | "scan", in `job_public`) on every error/cancel path (worker,
+  queued cancel, watchdog) and clears it when the job is queued again. A
+  render failure offers **Retry render** (POST /render — already allowed from
+  error/cancelled) and **Back to review**; "Scan again from the start" is a
+  small link behind a confirm, because a rescan writes a new report and drops
+  every Blur/Keep choice and box edit. Before this the only button after a
+  disk-full render was Retry scan. A full disk (ENOSPC, or "No space left on
+  device" in ffmpeg's stderr text) gets a hint naming the retry that keeps the
+  work. The render's half-written stage file is already removed on failure
+  (RenderDelivery.__exit__).
+- SCAN STOP AND CONTINUE (detector-only scans, step 1): `openscrub.stop_supported`
+  (no text category in --categories or any window) gates it. The web gives the
+  running scan's owner a `progress_stop` event (POST /stop_scan) and runs
+  `run_scan(..., progress=ScanProgressControl)`: at a frame boundary the loop
+  saves `<job>/scan-progress.json.gz` (openscrub_internal/scan_progress.py:
+  raw per-frame detections BEFORE tracking — assign/smooth/group run once
+  after the loop — plus the few loop counters) and raises `ScanStopped`; the
+  job becomes phase `stopped` (POST /continue queues action `continue`).
+  Autosave interval = 100x the last save's duration, clamped 60-300 s. Continue
+  re-finds the previous frame and the last OCR-cadence frame by pixel sha256 +
+  post-read CAP_PROP_POS_MSEC (`_seek_cap` accepts a one-frame-off landing,
+  which would shift every later detection) and refuses (`ProgressMismatch`)
+  when the scanned video, settings (`EXCLUDED_SETTINGS` lists the render/
+  transport-only ones), model files or OpenScrub VERSION changed. Any
+  found-derived (text) state at save time is refused, never dropped. The file
+  is deleted on completion (after publish), Cancel, Retry and job delete; a
+  crash after an autosave, a dead worker, or docker stop (SIGTERM waits up to
+  20 s in `stop_scan_for_shutdown`) leaves the job `stopped`; rehydrate lists
+  a stopped job even when its source video is not mounted (the progress file
+  carries `meta` {video, name}). test_stop_continue_equals_straight_scan pins
+  the core guarantee: stopping anywhere and continuing gives the uninterrupted
+  report. Text scans (OCR memory, scroll, backtrack) are step 2.
 - REQUEST PATHS (CodeQL py/path-injection): every route that turns a
   request value into a filesystem path calls `server_path_error` AND
   repeats its single-`startswith` containment guard INLINE before the
@@ -921,6 +977,20 @@ defined — there was a real UnboundLocalError from ordering once.
 - Jobs live in `openscrub_jobs/` next to the script. On startup there is a
   ONE-TIME migration renaming a legacy `phi_blur_jobs/` dir if present —
   **the literal string "phi_blur_jobs" is deliberate; do not "fix" it.**
+- Assisted letters UI: Scan Setup `#platecover` is a three-way select (full box /
+  letters only, strict / letters only, no box fallback); picking the last one
+  opens a confirmation (cancel restores the previous choice) — the decision is made
+  once, there. Review shows ONE notice at the top of the job (never per card), a
+  gap list (`/api/jobs/<jid>/letter_gaps`, preview `/letter_gap/<n>.jpg` with
+  everything but the plate dimmed; click seeks the box editor AND scrolls to it,
+  marking the open gap) with the covered-vs-gap summary and the bridged-frame
+  count, and the render step reminds how many gaps stay uncovered with Cancel.
+  The section is a collapsible `<details>` whose header states the gap count and
+  total seconds, says up front how to fix a gap (video editor, or Track object),
+  numbers the gaps with output-timeline times + frame RANGES (`out_f0`/`out_f1`,
+  list-level `fps`; additive fields), and has "Copy gap list" (clipboard, falls
+  back to a selected textarea on plain-HTTP pages). Verified visually at 1365px
+  and 390px with a synthetic assisted job (no horizontal overflow).
 - Detection models panel (face + plate): `/api/models/<kind>` (+
   `/<mid>/download`, `/download_status`, `/select`). Selection persists in
   `model_select.json` (data root); build_args passes the selected file as
@@ -1128,7 +1198,15 @@ landed — partial silent misses have happened repeatedly.
 
 ## Hard rules
 
-- This is a privacy tool: **fail closed.** Over-blur beats under-blur;
+- This is a privacy tool: **fail closed** — except in the opt-in letters-only,
+  no-box-fallback mode (`--plate-coverage assisted`, which requires
+  `--no-box-fallback` or the Scan Setup confirmation): there, where letters are
+  not found clearly nothing is drawn instead of the full box, those spots are
+  listed as gaps in Review, and the user checks the output. All other modes keep
+  failing closed. No mode promises to find every plate. Bridged stretches (cover
+  carried across a short detector dropout) are deliberately NOT in the gap list
+  (owner's decision: listing them adds checking work); a wrong join can only be
+  caught by watching the output. Over-blur beats under-blur;
   unverified models are rejected loudly, never run silently.
 - No real personal data, names, or client/organization-identifying
   examples in any committed file. Test data is synthetic.

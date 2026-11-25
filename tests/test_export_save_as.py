@@ -85,7 +85,8 @@ def run_js(scenario):
     node_bin = shutil.which("node")
     assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
     # This is the real evaluated Python string, not an independently copied JS helper.
-    source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refreshCycle(cycle)", 1)[0]
+    page = web.app.test_client().get("/").get_data(as_text=True)
+    source = page.split("function shellHtml(j)", 1)[1].split("async function refreshCycle(cycle)", 1)[0]
     source = "function shellHtml(j)" + source
     script = HARNESS + "\n" + source + r"""
 assert.equal(typeof saveExportAs,'function','Save As must be implemented');
@@ -225,4 +226,28 @@ await tick(3000);let gate=writeGate;writeGate=deferred();gate.resolve();await fl
 await tick(13000);gate=writeGate;writeGate=deferred();gate.resolve();await flush();await tick(250);
 assert.match(status(),/10.0 KB\/s/);assert.equal(progress().value,104000);
 writeGate.resolve();await pending;
+""")
+
+
+def test_picker_selects_output_type_and_fills_missing_suffix():
+    run_js(r"""
+for(const [kind,name,mime,suffix] of [
+ ['video','clip','video/mp4','.mp4'],['video','clip.MKV','video/x-matroska','.mkv'],
+ ['video','clip.mov','video/quicktime','.mov'],['report','audit','application/json','.json']]){
+ const options=exportPickerOptions(kind,name);
+ assert.deepEqual(options.types[0].accept,{[mime]:[suffix]});
+ assert.equal(options.excludeAcceptAllOption,true);
+ assert.equal(options.suggestedName,name.includes('.')?name:name+suffix);
+}
+""")
+
+
+def test_large_export_shows_speed_in_its_own_units_and_retains_average():
+    run_js(r"""
+length='10000000000';chunks=[{byteLength:2000},{byteLength:9999998000}];
+writeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();
+await tick(250);const first=writeGate;writeGate=deferred();first.resolve();await flush();
+await tick(250);assert.match(status(),/2.0 KB \/ 10.0 GB/);
+assert.match(status(),/Speed: 4.0 KB\/s/);
+writeGate.resolve();await pending;assert.match(status(),/20.0 GB\/s average/);
 """)

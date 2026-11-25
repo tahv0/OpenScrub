@@ -67,7 +67,10 @@ consoles) — but the engine is general-purpose.
   own review card.
 - **Blur license plates** — via an optional ONNX detector model
   (see [PLATES.md](PLATES.md)); plates re-detect every frame, so a plate
-  crossing the frame stays covered.
+  crossing the frame stays covered. An opt-in **letters only, no box
+  fallback** cover (slow) paints just the characters and lists the spots it
+  could not cover as gaps in Review; it does not find every plate, so check
+  the output (see [PLATES.md](PLATES.md)).
 - **Redact text by pattern** — built-in patterns for SSNs, phone
   numbers, emails, dates, addresses (including multi-line
   street/city/state/ZIP blocks), credit/debit card numbers
@@ -517,6 +520,27 @@ with `--max-upload-gb N` (`OPENSCRUB_MAX_UPLOAD_GB=N` as an env var for
 Docker; `0` = unlimited). For files that large, the "path on the
 server" box is the better route anyway: the server reads the file in
 place and nothing crosses the network.
+
+**Stop and continue later.** A running face, plate, person, QR-code or
+screen scan has a **Stop** button next to Cancel. Stop saves the scan's
+progress in the job folder and frees the GPU; **Continue scan** (or ▶ in the
+job list) carries on from that frame, and the result is the same as a scan
+that never stopped. Progress is also saved automatically every 1-5 minutes,
+so a crash or a `docker restart` leaves the job stopped at the last save
+instead of losing it. Continue is refused if the video, the scan settings, a
+detection model or OpenScrub itself changed in between. **Cancel** still
+throws the progress away (it asks first). Scans with text categories (names,
+numbers, addresses…) cannot be stopped yet.
+
+**Continue on another PC.** After the job shows **Stopped**, choose **Export
+paused scan** and transfer the `.openscrub-scan` file. On the other PC, open
+Scan Setup and enter the path to its copy of the original video in **path on
+the server**. For Docker, use the path inside the container. Choose **Import
+paused scan**, select the package, then click **Continue scan**. The package
+contains scan progress and settings. The video stays on each PC. Its name and
+path can differ; its contents must match. Use the same OpenScrub build and
+matching detection models and settings. The transfer limit is 512 MiB of
+uncompressed scan data. The original job remains stopped.
 
 A failed or cancelled job keeps its uploaded file: use its ↻ **Retry**
 button (jobs list or the job page) to re-run the scan without uploading

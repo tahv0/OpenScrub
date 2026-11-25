@@ -156,6 +156,10 @@ each plate; it detects regions and does not recognize or save characters.
 plates and text on every frame at full resolution, even when a faster scan
 preset is selected. This may substantially increase scan time.
 
+A lettering mask must span at least half the width and 30% of the height of
+the detected box, otherwise the full box is used. Rendering applies the same
+rule, so older reports get it without a rescan.
+
 Narrow masks are an experimental downstream option. A localization guard
 can miss lettering, particularly with low contrast, clipping, occlusion,
 unusual layouts or motion. Extra margin is no guarantee. A plate missed by
@@ -181,3 +185,94 @@ its existing retention and deletion practices.
 
 The desktop interface does not expose this option. An ordinary report without
 narrow mode retains the existing full-coverage settings and row shape.
+
+## Letters only, no box fallback (assisted, experimental, slow)
+
+This mode exists to save manual work on videos with many moving plates: the
+cover is letter-sized and follows the plate, and where letters are not found
+clearly nothing is drawn instead of the full box. OpenScrub does not find every
+plate in any mode, and in this mode it is **not fail-closed**: the output must
+be checked by a person.
+
+**Turn it on.** Scan Setup, Advanced, Plate cover: choose "Letters only, no box
+fallback (experimental, slow)" and confirm the dialog. On the command line,
+`--plate-coverage assisted` is refused unless `--no-box-fallback` is also given.
+The choice is saved in the report and reused for re-renders. If the text model
+cannot be loaded, the scan is refused before any frame is read: without it no
+plate would get a mask.
+
+**What it does.** On every frame with a detected plate the text model runs on the
+crop at 320 px; boxes whose outline is empty or implausible also run 640 and 224
+and the plausible outlines are unioned. The scan also estimates plate corners
+from a visible rim and a row of character-sized strokes. It samples the backing
+color inside the lettering to look for characters beyond a partial word. Local
+motion projects the strip forward and backward through short gaps within the
+same shot. Start a new scan to compute these polygons. The mask is stored with the plate and
+painted with the plate category's mode (blur, box, mosaic). Frames without their
+own mask borrow the nearest mask of the same plate within 1.0 s. A plate track
+that ends is joined to one starting within 1.0 s nearby at a similar size, and
+the frames between are covered with an interpolated box and mask. Neither
+borrowing nor joining crosses a scene cut (frames that differ almost entirely;
+recorded in the report as `scene_cuts`). A small pan or color shift can change
+the color histogram, so the scan also checks the change in a thumbnail of the
+scene. Rescan older footage to update its saved cuts.
+
+When a lettering outline briefly shrinks, the renderer checks up to 0.45 s
+on either side for two agreeing single-line sightings of the same plate in
+the same shot. It can add the missing part in the current plate box. A clear
+line also lets it ignore small, detached patches beside the lettering, such
+as a tool logo inside a tilted plate’s rectangular crop. Multi-line lettering
+and partially hidden characters still need visual review. Re-rendering a saved
+letters-only scan applies this check.
+
+When two successive tracks have overlapping holds and clearly matching plate
+positions, the render uses one moving letter mask between the sightings.
+Ambiguous matches keep their separate covers. This handoff also applies when
+rendering an existing letters-only scan.
+
+**Gaps.** A gap is a run of frames where a plate that should be covered has no
+letter mask, own or borrowed. Gaps are listed in Review (plate, start and end
+time, frames, a preview, click to jump) with a summary such as "letters covered
+on 92% of plate frames". Times and frame numbers are those of the rendered video
+(H:MM:SS.mmm), so they can be typed straight into a video editor. Review shows one
+notice at the top, and rendering (after your edits are saved) reminds you how many
+gaps stay uncovered. Moving or resizing a plate box does not cover a gap; use Track
+object on that plate instead. Plates left visible by a Keep choice or
+an undecided card are not gaps; Review already lists them as cards.
+
+**Bridged stretches are not listed as gaps.** Listing them would add checking
+work, so the summary only shows how many frames were bridged. A wrong join (cover
+in the wrong place) is therefore not listed: watch the output.
+
+**Limits.** Plates the detector never finds cannot be listed. Text detection can
+miss characters. The plate background and character positions stay visible and may
+identify someone; blur and mosaic may be reversible. The scan checks every frame
+at full resolution and is slow; leaving it running overnight is fine. Native SDR
+and HDR renders both use it. Report fields: `plate_letter_gaps`,
+`plate_letter_stats`, `scene_cuts` (additive). Full-box and strict modes are
+unchanged; rendering a letters only report with full or strict cover gives full
+plate boxes, never letter masks.
+
+### Steady single plate per shot
+
+In Scan Setup → Advanced → Plate cover, choose **Steady single plate per shot**
+for footage of one plate in each shot. The scanner selects a small set of
+fully visible plate outlines and follows their corners forward and backward
+between those frames. A scene cut starts a separate track. Partial plates
+can extend outside the image. Shots without a usable anchor keep the usual
+assisted lettering results. The per-frame geometry is saved for Review and export.
+
+This mode targets one plate. If a shot contains several plates, use a
+multi-plate coverage option. The CLI equivalent is
+`--plate-coverage assisted --no-box-fallback --steady-single-plate`.
+
+**Steady tracking for each plate** fits a separate path to each visible
+appearance. A short detector miss inside the picture can keep its track.
+A gap at the frame edge starts a new appearance on return, even for the
+same car. When forward and backward tracking disagree, both candidate
+locations can be covered. The CLI setting is
+`--plate-coverage assisted --no-box-fallback --steady-plates`.
+
+Both steady modes support **Review uncertain** and **Blur candidates**. Detector
+scores determine which appearances qualify for automatic blur. Motion estimates
+can carry the mask between detections without adding confidence votes.

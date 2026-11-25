@@ -25,6 +25,7 @@ over the GPU.
 
 import argparse
 import contextlib
+import errno
 import hashlib
 from io import BytesIO
 import base64
@@ -54,6 +55,7 @@ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_rend
 from openscrub_internal import exact_samples as exact
 from openscrub_internal import plate_quads as plate_quad
 from openscrub_internal import checkpoints
+from openscrub_internal import scan_progress, scan_transfer
 from openscrub_internal import thumbnails as thumbs
 from openscrub_internal import diagnostics
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
@@ -811,9 +813,21 @@ def job_public(job):
         "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
         "recovery_required": FILES.initialize(job).recovery_required,
         "checkpoint_unfinished": bool(job.get("_checkpoint_unfinished")),
+        # "render" | "scan" | None: which step an error/cancelled job was on
+        "failed_action": job.get("failed_action"),
+        # stop and continue: a running scan offers Stop when it supports it;
+        # a stopped one says where it stopped
+        "stop_supported": getattr(FILES.initialize(job).active, 'progress_stop', None) is not None,
+        "stopping": bool(getattr(getattr(FILES.initialize(job).active, 'progress_stop', None),
+                                 'is_set', lambda: False)()),
+        "stopped_frame": job.get("stopped_frame"),
+        "stopped_total": job.get("stopped_total"),
         "download_name": video_name,
         "report_name": report_name,
     }
+    if job.get('options', {}).get('plate_coverage') == 'assisted':
+        # Lets a re-render from the done view show the gap reminder too.
+        result['assisted_letters'] = True
     if job.get('options', {}).get('checkpoint_review') is True:
         stop = getattr(FILES.initialize(job).active, 'checkpoint_stop', None)
         result['checkpoint_enabled'] = True
@@ -1055,6 +1069,15 @@ def build_args(job, for_render=False):
     # A render is governed by the saved report, not a later job option.
     if not for_render and o.get("plate_coverage") == "narrow":
         argv += ["--plate-coverage", "narrow"]
+    elif not for_render and o.get("plate_coverage") == "assisted":
+        # The Scan Setup dialog is the only consent; never infer it.
+        if o.get("no_box_fallback") is not True:
+            raise ValueError("assisted plate letters needs explicit confirmation")
+        argv += ["--plate-coverage", "assisted", "--no-box-fallback"]
+        if o.get("steady_plates") is True:
+            argv.append("--steady-plates")
+        if o.get("steady_single_plate") is True:
+            argv.append("--steady-single-plate")
     # unified Scan Setup jobs: stacked detection windows (fractions of
     # duration, resolved server-side by the engine) with per-window
     # categories + zones travel as a windows.json inside the job dir
@@ -1636,6 +1659,7 @@ def _reserve_queue_locked(job, action, prepared):
         gen = job["qgen"]
         FILES.initialize(job).queued[gen] = prepared
     job["phase"] = "queued_render" if action == "render" else "queued"
+    job["failed_action"] = None
     return job["id"], action, gen, prepared
 
 
@@ -1750,18 +1774,24 @@ def _run_job(job, action, owner=None):
             _finish_operation(job, owner)
     jid = job["id"]
     files = FILES.initialize(job)
+    progress_path = os.path.join(job["dir"], scan_progress.PROGRESS_NAME)
     with files.report_lock:
         if owner.operation is None:  # compatibility with old queue entries
             _begin_operation(job, owner)
         if not _operation_valid(job, owner):
             return
-        job["phase"] = "scanning" if action in ('scan', 'resume') else "rendering"
+        job["phase"] = "scanning" if action in ('scan', 'resume', 'continue') else "rendering"
+        job["failed_action"] = None
         checkpoint_stop = (threading.Event() if action in ('scan', 'resume')
                            and job['options'].get('checkpoint_review') is True else None)
         owner.checkpoint_stop = checkpoint_stop
+        owner.progress_stop = None      # set once the scan is known to support Stop
+        if action == 'continue':
+            job["error"] = None
         generation = job.get('qgen', 0)
     sink = DIAGNOSTICS
-    diagnostic_ref = sink.start("scan" if action == "resume" else action) if sink is not None else None
+    diagnostic_ref = (sink.start("scan" if action in ("resume", "continue") else action)
+                      if sink is not None else None)
     outcome, diagnostic_error = "superseded", None
     escaped = False
     try:
@@ -1819,9 +1849,12 @@ def _run_job(job, action, owner=None):
         cb.publish_render = publish_render
         source = owner.source if owner is not None else job["video"]
         try:
-            if action in ('scan', 'resume'):
-                job["log"].append("— scan started —")
+            if action in ('scan', 'resume', 'continue'):
+                job["log"].append("— scan continued —" if action == 'continue'
+                                  else "— scan started —")
                 args = build_args(dict(job, video=source))
+                if action == 'continue' and checkpoint_stop is not None:
+                    raise ValueError('Stop & Review jobs continue with Resume')
                 if action == 'resume' and checkpoint_stop is None:
                     raise ValueError('resume requires an opted-in checkpoint scan')
                 if checkpoint_stop is not None:
@@ -1862,9 +1895,31 @@ def _run_job(job, action, owner=None):
                     _adopt_scan_source(job, owner)
                     outcome = "review"
                     return
-                state = openscrub.run_scan(args, cb)
+                control = None
+                if action == 'continue' or openscrub.stop_supported(args):
+                    if action == 'scan':
+                        scan_progress.remove(progress_path)   # a fresh scan starts over
+                    stop_event = threading.Event()
+                    with files.report_lock:
+                        owner.progress_stop = stop_event
+                    try:
+                        build = scan_transfer.engine_build(openscrub.__file__)
+                    except OSError:
+                        build = None  # Local Stop/Continue also works in source-less distributions.
+                    control = scan_progress.ScanProgressControl(
+                        progress_path, stop_requested=stop_event.is_set,
+                        resume=(action == 'continue'),
+                        meta={"video": source, "name": job.get("name"), "engine_build": build,
+                              # the report this scan will REPLACE (a rescan
+                              # keeps the old one until it finishes): restart
+                              # tells "stopped" from "finished, not cleaned"
+                              "report_before": _report_digest(job["dir"])})
+                state = (openscrub.run_scan(args, cb) if control is None
+                         else openscrub.run_scan(args, cb, progress=control))
                 openscrub.write_report(os.path.join(job["dir"], "report.json"),
                                       args, state, publisher=cb.publish_report)
+                # The report is published: the saved progress has done its job.
+                scan_progress.remove(progress_path)
                 with files.report_lock:
                     if not _operation_valid(job, owner):
                         return
@@ -1965,7 +2020,20 @@ def _run_job(job, action, owner=None):
                             return
                         job.update(output=res["output"], phase="done", progress=1.0, eta=None)
                 outcome = "done"
+        except openscrub.ScanStopped as stop:
+            with files.report_lock:
+                if _operation_valid(job, owner) and not owner.operation.is_set():
+                    job.update(phase="stopped", stopped_frame=stop.frame,
+                               stopped_total=stop.total, error=None, eta=None,
+                               progress=_stopped_progress(stop.frame, stop.total))
+                    job["log"].append("— stopped at frame %d of %d; progress saved —"
+                                      % (stop.frame, stop.total))
+                    outcome = "cancelled"
+                else:
+                    scan_progress.remove(progress_path)   # cancelled meanwhile
         except openscrub.PipelineCancelled:
+            if action in ('scan', 'continue'):
+                scan_progress.remove(progress_path)       # Cancel discards progress
             recovery = _has_render_recovery(job["dir"])
             with files.report_lock:
                 if recovery:
@@ -1975,6 +2043,7 @@ def _run_job(job, action, owner=None):
                     job["phase"] = "cancelled"
                     outcome = "cancelled"
                     job["error"] = "cancelled by user"
+                    job["failed_action"] = _failed_step(action)
         except BaseException as e:
             msg = str(e) or type(e).__name__
             if isinstance(e, SystemExit):
@@ -1986,14 +2055,40 @@ def _run_job(job, action, owner=None):
                     files.recovery_required = True
                     job.update(phase="error", error="render delivery requires recovery", eta=None)
                 if not committed and not files.recovery_required and _operation_valid(job, owner):
-                    job["phase"] = "error"
                     outcome, diagnostic_error = "error", error_code
-                    job["error"] = msg
-                    job["log"].append(f"ERROR: {msg}")
+                    saved = (_saved_progress_frame(progress_path)
+                             if action in ('scan', 'continue') else None)
+                    if saved is not None:
+                        # The scan's progress survives the error: keep the job
+                        # stopped so Continue carries on from the last save.
+                        frame, total = saved
+                        if isinstance(e, scan_progress.ProgressMismatch):
+                            msg = ("Can't continue: %s. Cancel the scan and start it again."
+                                   % e.what)
+                        elif isinstance(e, scan_progress.ProgressError) and action == 'continue':
+                            msg = ("Can't continue: %s. Try Continue scan again; if it keeps "
+                                   "failing, Cancel the scan and start it again." % msg)
+                        else:
+                            msg = _with_disk_full_hint(msg, e, "continue")
+                            msg = ("The scan stopped because of an error at %d%% (%s). "
+                                   "Continue scan carries on from the last save."
+                                   % (int(100 * frame / max(total, 1)), msg))
+                        job.update(phase="stopped", stopped_frame=frame, stopped_total=total,
+                                   progress=_stopped_progress(frame, total), error=msg)
+                        job["log"].append(f"ERROR: {msg}")
+                    else:
+                        job["phase"] = "error"
+                        job["failed_action"] = _failed_step(action)
+                        msg = _with_disk_full_hint(msg, e, job["failed_action"])
+                        job["error"] = msg
+                        job["log"].append(f"ERROR: {msg}")
         finally:
             with files.report_lock:
                 if _operation_valid(job, owner):
                     job["eta"] = None
+                if action in ('scan', 'continue') and job.get("phase") == "cancelled":
+                    # a Cancel that raced a failure still discards the progress
+                    scan_progress.remove(progress_path)
     except BaseException:
         escaped = True
         raise
@@ -2009,6 +2104,71 @@ def _run_job(job, action, owner=None):
             finally:
                 if WORKER.get("diagnostic_ref") == diagnostic_ref:
                     WORKER.pop("diagnostic_ref", None)
+
+
+def _report_digest(jdir):
+    path = os.path.join(jdir, "report.json")
+    try:
+        return scan_progress.file_sha256(path)
+    except OSError:
+        return None
+
+
+def _stopped_progress(frame, total):
+    # The scan frame loop fills the first 45% of the bar (WebCallbacks.progress).
+    return round(0.45 * frame / max(total, 1), 5)
+
+
+def _saved_progress(path):
+    """(next_frame, total, meta) of a job's saved scan progress, or None."""
+    try:
+        state = scan_progress.load(path)
+        meta = state.get("meta")
+        return (int(state["next_frame"]), int(state["total"]),
+                meta if isinstance(meta, dict) else {})
+    except (OSError, scan_progress.ProgressError, KeyError, TypeError, ValueError,
+            AttributeError):
+        return None
+
+
+def _saved_progress_frame(path):
+    """(next_frame, total) of a job's saved scan progress, or None."""
+    saved = _saved_progress(path)
+    return None if saved is None else saved[:2]
+
+
+def _failed_step(action):
+    """Which step a failed/cancelled job was on: the page offers Retry render
+    (keeps the review) for a render and Retry scan for a scan."""
+    return "render" if action == "render" else "scan"
+
+
+_WRITE_ERRNOS = {errno.EIO, errno.EROFS, errno.EACCES, errno.EPERM,
+                 getattr(errno, "EDQUOT", -1), getattr(errno, "ESTALE", -1)}
+
+
+def _with_disk_full_hint(msg, error, step):
+    """A full disk or a failed write is the user's to fix: say so, with steps,
+    and which retry keeps the work. ffmpeg reports both only in its stderr
+    text, so match the message too."""
+    retry = ("press Retry render — your review choices are kept" if step == "render"
+             else "press Continue scan" if step == "continue"
+             else "press Retry scan")
+    full = (isinstance(error, OSError) and error.errno == errno.ENOSPC
+            or "No space left on device" in msg)
+    if full:
+        return f"{msg} — the disk is full. Free some disk space, then {retry}."
+    write = ("writing the output file failed" in msg
+             or any(words in msg for words in openscrub._WRITE_FAILURES))
+    os_level = isinstance(error, OSError) and error.errno in _WRITE_ERRNOS
+    if not (write or os_level):
+        return msg
+    what = ("the output could not be written to disk (this is not an encoder "
+            "problem)" if write else "a file could not be read or written on disk")
+    return (f"{msg} — {what}. Check that the drive holding OpenScrub's data "
+            "folder is connected and healthy and has free space, and that no "
+            "antivirus, indexer, backup or sync tool is locking files there (on "
+            f"Windows, exclude the folder from Defender scanning). Then {retry}.")
 
 
 def start_worker():
@@ -2029,10 +2189,24 @@ def check_worker():
     with JOBS_LOCK:
         job = JOBS.get(jid) if jid else None
         lost_action = job is not None and job.get("phase") in _ACTIVE_PHASES
-        if lost_action:
+        saved = (_saved_progress_frame(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
+                 if lost_action and job.get("phase") in ("scanning", "queued") else None)
+        if saved is not None:
+            # The scan's autosaved progress survives the dead worker.
+            job.update(phase="stopped", stopped_frame=saved[0], stopped_total=saved[1],
+                       progress=_stopped_progress(*saved), eta=None,
+                       error="the job worker stopped unexpectedly — Continue scan "
+                             "carries on from the last save")
+            job["log"].append("ERROR: " + job["error"])
+        elif lost_action:
+            rendering = job.get("phase") in ("rendering", "queued_render")
             job["phase"] = "error"
             job["eta"] = None
+            job["failed_action"] = "render" if rendering else "scan"
             job["error"] = ("the job worker stopped unexpectedly — the "
+                            "server restarted it; Retry render renders again "
+                            "with your saved review choices" if rendering else
+                            "the job worker stopped unexpectedly — the "
                             "server restarted it; Retry re-runs the scan "
                             "with the file already on the server")
             job["log"].append("ERROR: " + job["error"])
@@ -2103,8 +2277,9 @@ def enforce_vault_lock():
                         'job_track_object'}):
                 abort(409, 'partial checkpoint review is not available')
             read_source = request.endpoint in {
-                "job_retry", "job_render", "job_track_object", "job_mediainfo",
-                "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample"}
+                "job_retry", "job_render", "job_track_object", "job_mediainfo", "export_stopped_scan",
+                "job_detections", "job_detframe", "job_thumb", "job_frame_at", "job_video_stream", "job_edit_sample",
+                "job_letter_gap"}
             version = request.args.get('v')
             versioned_image = (request.endpoint in {'job_thumb', 'job_detframe'}
                                and version is not None and re.fullmatch(r'[0-9a-f]{32}', version))
@@ -2175,7 +2350,7 @@ def refuse_upload_without_disk_room():
     by the time create_job touches request.files, werkzeug has already
     spooled the whole upload into the temp dir — too late to protect the
     disk. Checking the Content-Length header here reads nothing."""
-    if request.method == "POST" and request.path == "/api/jobs":
+    if request.method == "POST" and request.path in ("/api/jobs", "/api/jobs/import-stopped"):
         err = _upload_disk_error(request.content_length)
         if err:
             return jsonify({"error": err}), 507
@@ -2566,6 +2741,112 @@ def job_stop(jid):
     return jsonify(state='stopping'), 202
 
 
+@app.route('/api/jobs/<jid>/stop_scan', methods=['POST'])
+def job_stop_scan(jid):
+    """Stop a running scan after its current frame and save its progress,
+    so Continue scan can carry on later (frees the GPU in between)."""
+    job = JOBS.get(jid) or abort(404)
+    files = FILES.initialize(job)
+    with files.report_lock:
+        owner = files.active
+        stop = getattr(owner, 'progress_stop', None)
+        if (job.get('phase') != 'scanning' or owner is None or stop is None
+                or not _operation_valid(job, owner) or owner.operation.is_set()):
+            return jsonify(error='this scan cannot be stopped and continued'), 409
+        stop.set()
+        job['log'].append('— stopping: saving progress after the current frame —')
+    return jsonify(state='stopping'), 202
+
+
+@app.get("/api/jobs/<jid>/stopped-package")
+def export_stopped_scan(jid):
+    job = JOBS.get(jid) or abort(404)
+    stream = tempfile.TemporaryFile()
+    try:
+        with FILES.initialize(job).report_lock:
+            _report_current(job)
+            if job.get("phase") != "stopped":
+                abort(409, "Stop the scan and wait for progress to be saved first")
+            scan_transfer.write_package(stream, os.path.join(job["dir"], scan_progress.PROGRESS_NAME),
+                                        job["options"], job["video"], openscrub.__file__)
+        length = stream.tell()
+        stream.seek(0)
+        response = send_file(stream, as_attachment=True, download_name=job["id"] + ".openscrub-scan",
+                             mimetype="application/octet-stream")
+        response.content_length = length
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+    except (OSError, ValueError) as error:
+        stream.close()
+        return jsonify(error=str(error)), 409
+    except BaseException:
+        stream.close()
+        raise
+
+
+@app.post("/api/jobs/import-stopped")
+def import_stopped_scan():
+    upload = request.files.get("package")
+    path = request.form.get("server_path", "").strip()
+    if not path or upload is None:
+        return jsonify(error="Choose the scan package and enter the local video path"), 400
+    video = _request_source_path(path)
+    error = server_path_error(video)
+    if error:
+        return jsonify(error=error), 400
+    try:
+        options, state = scan_transfer.read_package(upload.stream, video, openscrub.__file__)
+        _optional_plate_settings(options)
+    except (ValueError, OSError, EOFError, RecursionError) as error:
+        return jsonify(error=str(error)), 400
+    job = new_job(video, options, os.path.basename(video), _defer_registration=True)
+    try:
+        args = build_args(job)
+        if not openscrub.stop_supported(args):
+            raise ValueError("Unsupported scan settings")
+        saved = state["identity"]
+        scan_progress.compare_identity(saved, dict(saved, engine_version=openscrub.VERSION,
+                                                   settings=scan_progress.settings_identity(args)))
+        atomic_report(os.path.join(job["dir"], OPTIONS_FILE), options)
+        scan_progress.save(os.path.join(job["dir"], scan_progress.PROGRESS_NAME), state)
+        frame, total = state["next_frame"], state["total"]
+        job.update(phase="stopped", stopped_frame=frame, stopped_total=total,
+                   size=os.path.getsize(video), progress=_stopped_progress(frame, total))
+        _register_new_jobs([job])
+    except BaseException as error:
+        _discard_unregistered_checkpoint(job)
+        if isinstance(error, ValueError):
+            return jsonify(error=str(error)), 400
+        raise
+    return jsonify(id=job["id"]), 201
+
+
+@app.route('/api/jobs/<jid>/continue', methods=['POST'])
+def job_continue(jid):
+    """Queue a stopped scan to carry on from its saved progress."""
+    job = JOBS.get(jid) or abort(404)
+    prepared = _prepare_work(job, 'continue')
+    ticket = None
+    try:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            _report_current(job)
+            if files.active is not None or files.work > 1:
+                return jsonify(error='job work is still cleaning up'), 409
+            if job.get('phase') != 'stopped':
+                return jsonify(error='only a stopped scan can be continued'), 409
+            if not os.path.exists(os.path.join(job['dir'], scan_progress.PROGRESS_NAME)):
+                return jsonify(error='this job has no saved scan progress'), 409
+            job.update(error=None, eta=None)
+            job['log'].append('— continuing the stopped scan —')
+            ticket = _reserve_queue_locked(job, 'continue', prepared)
+    finally:
+        if ticket is None:
+            prepared.release()
+    enqueue(job, 'continue', ticket)
+    return jsonify(ok=True)
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     """Cancel a job. The job the worker is RUNNING stops cooperatively at
@@ -2609,9 +2890,21 @@ def job_cancel(jid):
             files.source_report_bound = False
             job.update(phase='paused', error=None, output=None, eta=None)
             job['log'].append('— resume cancelled; saved checkpoint retained —')
+        elif job.get("phase") == "stopped":
+            # Cancel discards a stopped scan's saved progress.
+            scan_progress.remove(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
+            job.update(phase="cancelled", error="cancelled by user", eta=None,
+                       failed_action="scan")
+            job["log"].append("— cancelled; saved scan progress discarded —")
         elif job.get("phase") in _ACTIVE_PHASES:
-            job.update(phase="cancelled", error="cancelled by user", eta=None)
+            step = "render" if job.get("phase") in ("rendering", "queued_render") else "scan"
+            job.update(phase="cancelled", error="cancelled by user", eta=None,
+                       failed_action=step)
             job["log"].append("— cancelled —")
+            if step == "scan" and files.active is None:
+                # nothing is running that could still save: discard now (a
+                # running scan discards its own progress when it sees Cancel)
+                scan_progress.remove(os.path.join(job["dir"], scan_progress.PROGRESS_NAME))
         if job.get("trackbg", {}).get("state") == "running":
             job["trackbg"] = {"state": "done", "added": 0,
                               "error": "cancelled by user"}
@@ -3240,6 +3533,122 @@ def _parse_report_once(path, stamp, opened):
         return doc
 
 
+# Assisted plate-letter gap lists, one per report stamp (small: a list of gap
+# dicts). Computed from the SAVED report so they reflect the last saved review
+# choices before any render; shares the parse cache's guard and epoch.
+_LETTER_PLANS = {}           # realpath -> (stamp, (result, fps))
+_LETTER_PLANS_MAX = 8
+_LETTER_GAPS_OFF = {"mode": "off", "gaps": [], "stats": {}}
+
+
+def _report_is_assisted(doc):
+    prov = doc.get("provenance") if isinstance(doc, dict) else None
+    settings = prov.get("settings") if isinstance(prov, dict) else None
+    return isinstance(settings, dict) and settings.get("plate_coverage") == "assisted"
+
+
+def _letter_gap_output_frames(job, doc, fps):
+    """-> (first, end) source frames the job's render keeps, resolved from the
+    report's saved settings exactly as run_render trims: SDR only (an HDR
+    render ignores the trim and writes the full length)."""
+    n = len(doc["render_state"].get("cum") or ())
+    prov = doc.get("provenance") or {}
+    settings = prov.get("settings") or {}
+    if prov.get("hdr_output"):
+        return 0, n
+    clip = openscrub.resolve_output_clip(
+        settings.get("clip_frac", ""), settings.get("clip_start", 0),
+        settings.get("clip_end", 0),
+        lambda: openscrub._probe_duration(job["video"]) or n / (fps or 30.0))
+    return openscrub.output_frame_range(clip, fps, n)
+
+
+def _letter_gap_plan(job):
+    """-> ({"mode", "gaps", "stats"}, fps) for the job's saved report."""
+    path = os.path.join(job["dir"], "report.json")
+    key = os.path.realpath(path)
+    try:
+        opened = open(path, encoding="utf-8")
+    except FileNotFoundError:
+        return dict(_LETTER_GAPS_OFF), None
+    with opened:
+        st = os.fstat(opened.fileno())
+        if not stat.S_ISREG(st.st_mode):
+            abort(500, "report is not a regular file")
+        stamp = _file_stamp(st)
+        with _REPORT_PARSE_GUARD:
+            cached = _LETTER_PLANS.get(key)
+            epoch = _REPORT_PARSE_EPOCH[0]
+        if os.name == "posix" and cached is not None and cached[0] == stamp:
+            return cached[1]
+        try:
+            doc = _parse_report_once(path, stamp, opened)
+        except (ValueError, UnicodeError):
+            abort(500, "report invalid")
+    fps = None
+    if not _report_is_assisted(doc):
+        result = dict(_LETTER_GAPS_OFF)
+    else:
+        try:
+            fps = float(doc["render_state"]["fps"])
+            first, end = _letter_gap_output_frames(job, doc, fps)
+            plan = openscrub.assisted_cover_from_report(doc, frame_range=(first, end))
+        except (ValueError, KeyError, TypeError, ZeroDivisionError):
+            abort(409, "report has no usable render state")
+        # out_*: the rendered video's own timeline (an SDR clip starts at
+        # its first kept frame), the times the owner types into an editor.
+        gaps = [{"track": g.track, "t0": g.t0, "t1": g.t1, "frames": g.frames,
+                 "frame": g.frame, "box": [float(v) for v in g.box],
+                 "out_t0": (round(g.t0 * fps) - first) / fps,
+                 "out_t1": (round(g.t1 * fps) - first) / fps,
+                 "out_frame": g.frame - first,
+                 "out_f0": round(g.t0 * fps) - first,
+                 "out_f1": round(g.t1 * fps) - first} for g in plan.gaps]
+        gaps.sort(key=lambda g: (g["t0"], g["track"]))
+        result = {"mode": "assisted", "gaps": gaps, "stats": dict(plan.stats), "fps": fps}
+    # The report generation this list describes: a preview by index must
+    # name it, so a list from before a save never previews the new plan.
+    result["token"] = hashlib.sha256(repr(stamp).encode()).hexdigest()[:16]
+    if os.name == "posix":
+        with _REPORT_PARSE_GUARD:
+            # A vault lock or delete during the computation must not repopulate.
+            if epoch == _REPORT_PARSE_EPOCH[0]:
+                _LETTER_PLANS.pop(key, None)
+                while len(_LETTER_PLANS) >= _LETTER_PLANS_MAX:
+                    _LETTER_PLANS.pop(next(iter(_LETTER_PLANS)))
+                _LETTER_PLANS[key] = (stamp, (result, fps))
+    return result, fps
+
+
+def _letter_gap_jpeg(frame, box):
+    """The gap's frame cropped to the box plus one box size of margin, 240 px tall.
+
+    Everything outside the plate box is dimmed and the box gets a thick
+    outline, so the plate the gap is about stands out at thumbnail size."""
+    H, W = frame.shape[:2]
+    x1, y1, x2, y2 = box
+    bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
+    cx1, cy1 = max(0, int(x1 - bw)), max(0, int(y1 - bh))
+    cx2, cy2 = min(W, int(x2 + bw + 1)), min(H, int(y2 + bh + 1))
+    if cx2 - cx1 < 2 or cy2 - cy1 < 2:
+        cx1, cy1, cx2, cy2 = 0, 0, W, H
+    crop = frame[cy1:cy2, cx1:cx2]
+    scale = 240.0 / crop.shape[0]
+    out = cv2.resize(crop, (max(1, int(round(crop.shape[1] * scale))), 240),
+                     interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
+    p1 = (int(round((x1 - cx1) * scale)), int(round((y1 - cy1) * scale)))
+    p2 = (int(round((x2 - cx1) * scale)), int(round((y2 - cy1) * scale)))
+    lit = out.copy()
+    out = cv2.convertScaleAbs(out, alpha=.45)
+    ys, xs = slice(max(0, p1[1]), max(0, p2[1])), slice(max(0, p1[0]), max(0, p2[0]))
+    out[ys, xs] = lit[ys, xs]
+    cv2.rectangle(out, (p1[0] - 2, p1[1] - 2), (p2[0] + 2, p2[1] + 2), (36, 191, 251), 4)
+    ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        abort(404)
+    return buf.tobytes()
+
+
 def _expire_idle_report_parses(now=None):
     now = time.monotonic() if now is None else now
     with _REPORT_PARSE_GUARD:
@@ -3253,6 +3662,7 @@ def _forget_report_parses():
     with _REPORT_PARSE_GUARD:
         _REPORT_PARSE_EPOCH[0] += 1
         _REPORT_PARSES.clear()
+        _LETTER_PLANS.clear()
         _REPORT_PARSE_USED.clear()
         _REPORT_PARSE_LOCKS.clear()
 
@@ -4540,6 +4950,9 @@ def job_detections(jid):
                           processed_frames=marker['next_frame'], total_frames=marker['total_frames'])
         if capable:
             result['plate_policy'] = policy
+        if _report_is_assisted(doc):
+            # Review then loads /letter_gaps for the gap list and render reminder.
+            result['assisted_letters'] = True
         return jsonify(result)
     except _ThumbnailError as error:
         return _thumbnail_error_response(error)
@@ -4645,6 +5058,38 @@ def job_frame_at(jid):
             abort(404)
         return buf.tobytes()
     payload = _validated_frame_read(job, request.args.get("src") == "output", decode)
+    return Response(payload, mimetype="image/jpeg")
+
+
+@app.route("/api/jobs/<jid>/letter_gaps")
+def job_letter_gaps(jid):
+    """Assisted plate letters: gaps the saved report's cover leaves visible."""
+    job = JOBS.get(jid) or abort(404)
+    return jsonify(_letter_gap_plan(job)[0])
+
+
+@app.route("/api/jobs/<jid>/letter_gap/<int:n>.jpg")
+def job_letter_gap(jid, n):
+    """Preview of gap n: its middle frame of the scan video, plate box drawn."""
+    job = JOBS.get(jid) or abort(404)
+    result, fps = _letter_gap_plan(job)
+    if (result["mode"] != "assisted" or not 0 <= n < len(result["gaps"]) or not fps
+            or request.args.get("v") != result.get("token")):
+        abort(404)
+    gap = result["gaps"][n]
+    t = gap["frame"] / fps
+
+    def decode(path):
+        cap = _open_preview_capture(path)
+        try:
+            frame = openscrub._grab_frame(cap, t, fps)
+        finally:
+            cap.release()
+            openscrub._grab_state.pop(id(cap), None)
+        if frame is None:
+            abort(404)
+        return _letter_gap_jpeg(frame, gap["box"])
+    payload = _validated_frame_read(job, False, decode)
     return Response(payload, mimetype="image/jpeg")
 
 
@@ -6034,6 +6479,22 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .thumbwell img{width:100%;height:112px;object-fit:contain}
 .thumbwell.unavailable:after{content:"Preview unavailable";font-size:12px;color:#94a3b8}
 .thumbwell.unavailable img{display:none}
+#letterGaps{margin:8px 0;border:1px solid #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a;min-width:0}
+#letterGaps p{margin:6px 0;font-size:13.5px;color:#e2e8f0}
+#letterGaps p.detscope{font-size:12px;color:#cbd5e1}
+#letterGaps .lgnotice{color:#fbbf24;font-weight:600;cursor:pointer;font-size:15px}
+#letterGaps .lgtools{margin:4px 0;align-items:center;gap:8px;font-size:12px;color:#cbd5e1}
+#letterGaps .lglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr));
+ gap:9px;max-height:470px;overflow:auto;margin-top:6px}
+#appzone #letterGaps button.lgap{background:var(--panel);border:1px solid #334155;border-radius:8px;
+ padding:6px;font-size:12px;color:#cbd5e1;text-align:left;min-width:0;cursor:pointer;
+ display:flex;flex-direction:column;gap:3px}
+#appzone #letterGaps button.lgap:hover{border-color:#fbbf24}
+#appzone #letterGaps button.lgap.lgcur{border-color:#fbbf24;box-shadow:0 0 0 2px #f59e0b}
+#letterGaps .lgnum{font-weight:600;color:#fbbf24}
+#letterGaps .lgtime{font-variant-numeric:tabular-nums;color:#f1f5f9}
+#letterGaps .lgopen{color:#93c5fd;margin-top:2px}
+#letterGaps .lgap img{width:100%;height:130px;object-fit:contain;background:#0f172a;border-radius:5px;display:block}
 .reviewgrid{position:relative;width:100%;overflow-anchor:none}
 .reviewrow{position:absolute;left:0;right:0;align-items:stretch}
 .reviewspacer{position:absolute;left:0;right:0;pointer-events:none}
@@ -6198,7 +6659,7 @@ APP_JS = """function renderAudioSugg(){
    +(used?'<span style="color:#4ade80">&#10003; added</span> '
      :'<button class="tog" style="font-size:11px;padding:1px 7px" '
       +'onclick="applyAudioSugg('+i+')">Add</button> ')
-   +s.t0.toFixed(1)+'&ndash;'+s.t1.toFixed(1)+'s '
+   +fmtTime(s.t0)+'&ndash;'+fmtTime(s.t1)+' '
    +'<b>'+(CATDN[s.category]||s.category)+'</b> '
    +'<span style="color:#94a3b8">&ldquo;'
    +String(s.text||"").replace(/[<>&]/g,"")+'&rdquo;</span></div>';
@@ -6239,7 +6700,7 @@ function renderTranscript(){
   if(a)st+='outline:2px solid #f59e0b;';
   if(m)st+='background:#7f1d1d;color:#fecaca;text-decoration:line-through;';
   else if(g)st+='background:#78350f;color:#fde68a;';
-  h+='<span style="'+st+'" title="'+wd[0].toFixed(2)+'&ndash;'+wd[1].toFixed(2)+'s'+(m?' (will be muted)':'')+'" onclick="txWordClick('+i+')">'+esc(wd[2])+'</span>';
+  h+='<span style="'+st+'" title="'+fmtTime(wd[0])+'&ndash;'+fmtTime(wd[1])+(m?' (will be muted)':'')+'" onclick="txWordClick('+i+')">'+esc(wd[2])+'</span>';
  });
  h+='</div><div style="font-size:11px;color:#64748b">'
   +(BE.txAnchor>=0?'<b style="color:#f59e0b">now click the last word of the range to mute it</b>'
@@ -6497,15 +6958,41 @@ async function loadJobs(){
  jobs.innerHTML=js.length?js.map(j=>
   `<div class="row" style="justify-content:space-between;padding:4px 0">
    <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
-   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
-   ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase==="stopped"?"stopped "+stoppedPct(j)+"%":j.phase}</span>
+   ${j.phase==="stopped"?`<a href="#" title="Continue scan" style="text-decoration:none;font-size:15px" onclick="continueScan('${j.id}');return false">&#9654;</a>`:""}
+   ${((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)?(j.failed_action==="render"?`<a href="#" title="Retry the render — keeps your review choices" style="text-decoration:none;font-size:15px" onclick="retryRender('${j.id}');return false">&#8635;</a>`:`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`):""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
 }
 
-async function retryJob(id){
+async function retryJob(id,afterRender=false){
+ if(afterRender&&!confirm("Scan again from the start? The new scan replaces this job's review, so your Blur / Keep visible choices and box edits are discarded. To keep them, use Retry render instead."))return;
  const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
  let j={};try{j=await r.json();}catch(e){}
  if(!r.ok){alert(j.error||"could not retry the job");return;}
+ JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+}
+// Stop and continue: a stopped scan's share done, from its saved frame.
+function stoppedPct(j){
+ return j.stopped_total?Math.floor(100*j.stopped_frame/j.stopped_total):0;
+}
+async function stopScan(){
+ const id=CUR,button=document.getElementById("scanStop");if(!id)return;
+ if(button){button.disabled=true;button.textContent="Stopping…";}
+ const r=await fetch("api/jobs/"+id+"/stop_scan",{method:"POST"});
+ if(!r.ok){let j={};try{j=await r.json();}catch(e){}
+  alert(j.error||"could not stop the scan");if(button){button.disabled=false;button.textContent="Stop";}}
+}
+async function continueScan(id){
+ const r=await fetch("api/jobs/"+id+"/continue",{method:"POST"});
+ let j={};try{j=await r.json();}catch(e){}
+ if(!r.ok){alert(j.error||"could not continue the scan");return;}
+ JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+}
+// A failed render keeps the scan and the saved review: render it again.
+async function retryRender(id){
+ const r=await fetch("api/jobs/"+id+"/render",{method:"POST"});
+ let j={};try{j=await r.json();}catch(e){}
+ if(!r.ok){alert(j.error||"could not retry the render");return;}
  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
 }
 async function delJob(id){
@@ -6709,6 +7196,21 @@ function exportDownloadStarted(kind){
  EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});
  renderExportProgress();
 }
+function exportPickerOptions(kind,name){
+ const ext=kind==="report"?"json":(name.match(/[.]([a-z0-9]{1,15})$/i)?.[1].toLowerCase()||"mp4");
+ const mime=kind==="report"?"application/json":({
+  mp4:"video/mp4",m4v:"video/mp4",mkv:"video/x-matroska",mov:"video/quicktime",
+  webm:"video/webm",avi:"video/x-msvideo",ts:"video/mp2t"
+ })[ext]||"application/octet-stream";
+ const suffix="."+ext;
+ return {suggestedName:name.toLowerCase().endsWith(suffix)?name:name+suffix,
+  types:[{description:kind==="report"?"JSON audit report":ext.toUpperCase()+" video",
+   accept:{[mime]:[suffix]}}],excludeAcceptAllOption:true};
+}
+function exportBytes(bytes){
+ const power=Math.max(0,Math.min(3,Math.floor(Math.log10(bytes)/3)));
+ return (bytes/1000**power).toFixed(power?1:0)+" "+["B","KB","MB","GB"][power];
+}
 function exportDuration(seconds){
  const s=Math.max(0,Math.floor(seconds));
  return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;
@@ -6730,26 +7232,24 @@ function renderExportProgress(){
   bar.hidden=state.phase==="download";
   let text="Download started — see browser downloads";
   if(state.phase!=="download"){
-   const amount=Math.max(state.total||0,state.written);
-   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;
-   const unit=["B","KB","MB","GB"][power],scale=1000**power;
-   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;
    const elapsed=(now-state.start)/1000;
    const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;
    let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":
     state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":
     waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;
-   const count=state.total===null?bytes(state.written):
-    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;
+   const count=state.total===null?exportBytes(state.written):
+    `${exportBytes(state.written)} / ${exportBytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;
    text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;
-   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){
+   if(state.phase==="saving"&&!waiting&&elapsed>=0.25&&state.samples.length>1){
     // Retain one observation at/before the rolling ten-second boundary.
     while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();
     const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);
-    if(rate>0){text+=` · ${bytes(rate)}/s`;
+    if(rate>0){text+=` · Speed: ${exportBytes(rate)}/s`;
      if(state.total!==null&&state.written<state.total)
       text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}
    }
+   if(state.phase==="saved"&&state.written>0&&state.end>state.start)
+    text+=` · ${exportBytes(state.written*1000/(state.end-state.start))}/s average`;
    if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;
   }
   document.getElementById(`export-${kind}-status`).textContent=text;
@@ -6773,7 +7273,7 @@ async function saveExportAs(kind,button){
  try{
   // Invoke synchronously from the click, before the first network await.
   let handle;
-  try{handle=await window.showSaveFilePicker({suggestedName:name});}
+  try{handle=await window.showSaveFilePicker(exportPickerOptions(kind,name));}
   catch(e){if(e.name!=="AbortError")throw e;
    if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);
    if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;
@@ -6910,16 +7410,40 @@ async function refreshCycle(cycle){
  if(j.error){wb.style.display="block";wb.textContent=j.error;}
  else wb.style.display="none";
 
+ CANCEL_KIND=j.phase==="stopped"?2:(j.phase==="scanning"&&j.progress>0)?(j.stop_supported?1:3):0;
  // action buttons rebuilt ONLY when the phase changes
- const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'');
+ const shellPhase=j.phase+(j.checkpoint_enabled?':checkpoint':'')+(j.checkpoint_stopping?':stopping':'')
+  +(j.stop_supported?':stoppable':'')+(j.stopping?':stopping-scan':'');
  if(SHELLPH!==shellPhase){
   SHELLPH=shellPhase;
   let a="";
-  if(j.phase=="scanning"||j.phase=="rendering")
-   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase=="scanning"||j.phase=="rendering"){
+   // Stop (and Continue, once stopped) always sit on the left, Cancel right
+   if(j.phase==="scanning"&&j.stop_supported)
+    a=`<button id="scanStop" class="sec" title="Stop the scan and free the GPU. Continue later from this point." onclick="stopScan()" ${j.stopping?'disabled':''}>${j.stopping?'Stopping…':'Stop'}</button>`;
+   a+=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  }
+  if(j.phase==="stopped")
+   a=`<div style="width:100%"><b>Stopped at ${stoppedPct(j)}% (frame ${j.stopped_frame} of ${j.stopped_total})</b></div>
+    <div style="width:100%;font-size:12px;color:#9ca3af">Progress is saved in the
+    job folder. Continue scan carries on from here; the result is the same as an
+    uninterrupted scan.</div>
+    <button onclick="continueScan(CUR)">Continue scan</button>
+    <a href="api/jobs/${id}/stopped-package" download>Export paused scan</a>
+    <button class="sec" onclick="cancelJob()">Cancel scan</button>`;
   if(j.phase==="scanning"&&j.checkpoint_enabled)
    a+=`<button id="checkpointStop" class="sec" onclick="stopCheckpoint()" ${j.checkpoint_stopping?'disabled':''}>${j.checkpoint_stopping?'Stopping…':'Stop &amp; Review'}</button>`;
-  if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
+  if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished&&j.failed_action==="render")
+   a=`<button onclick="retryRender(CUR)">Retry render</button>
+    <button class="sec" onclick="loadReview()">Back to review</button>
+    <div style="width:100%;font-size:12px;color:#9ca3af">The render did not
+    finish, but the scan and your review choices are saved. <b>Retry render</b>
+    renders again with them (if the disk was full, free some space first).
+    <b>Back to review</b> lets you change choices first; then press Save edits
+    &amp; render.</div>
+    <div style="width:100%;font-size:12px"><a href="#" onclick="retryJob(CUR,true);return false">Scan again from the start</a>
+    <span style="color:#9ca3af">— discards your review choices</span></div>`;
+  else if((j.phase=="error"||j.phase=="cancelled")&&!j.checkpoint_unfinished)
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
@@ -6945,6 +7469,7 @@ async function refreshCycle(cycle){
     <div id="compare" style="width:100%"></div>
     <div id="beslot_done" style="width:100%"></div>`;
   const actions=document.getElementById("actions");beUnmountIn(actions);actions.innerHTML=a;
+  if(j.phase=="done"&&j.assisted_letters){LETTER_GAPS=null;startLetterGapLoad(id);}
   if(j.phase!="scanning")img.style.display="none";
  }
  renderExportProgress();
@@ -7040,14 +7565,14 @@ async function beApplySample(view,serial,data){
     view.plate.message=`Frame ${s.index} is ready. Search this frame to see its suggestions.`;
    }else view.plate.message='The source or frame changed since the sampled search. Inspect and search again.';
   }
-  const label=document.getElementById('beL');if(label)label.textContent=`requested ${data.sample.requested_s.toFixed(3)}s · frame ${data.sample.index} at ${b.t.toFixed(3)}s`;
+  const label=document.getElementById('beL');if(label)label.textContent=`requested ${fmtTime(data.sample.requested_s)} · frame ${data.sample.index} at ${fmtTime(b.t)}`;
   beFilter();beQuadControls(view);beDraw();beTLDraw();bePlateRender(view);
  }finally{if(url&&!installed)URL.revokeObjectURL(url);}
 }
 function beRequestSample(view,t){
  if(!view||!view.current()||!Number.isFinite(t))return;
  if(view.checkpoint&&(PHPH!=='paused'||t<0||t>=view.checkpoint.duration))return;
- beInvalidateSample(view,`Inspecting ${t.toFixed(3)}s…`);
+ beInvalidateSample(view,`Inspecting ${fmtTime(t)}…`);
  EDIT_SAMPLE_IO.wanted={view,serial:view.serial,t};
  return bePumpSamples();
 }
@@ -7266,7 +7791,7 @@ function bePlateRender(view){
   for(const frame of p.batch.frames){
    const button=document.createElement('button');button.type='button';button.className='sec';
    button.disabled=!!p.request;
-   button.textContent=`Inspect frame ${frame.index} · ${frame.time_s.toFixed(2)}s · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
+   button.textContent=`Inspect frame ${frame.index} · ${fmtTime(frame.time_s)} · ${frame.matches} ${frame.matches===1?'suggestion':'suggestions'}${frame.truncated?' (truncated)':''}`;
    button.onclick=()=>bePlateInspectSample(view,frame);samples.appendChild(button);
   }
  }
@@ -7573,8 +8098,8 @@ async function loadBoxEdit(fromReview){
    <button class="sec" id="beQuad" style="display:none" onclick="beQuadMode()">Edit plate corners</button>
    <button class="sec" id="beQuadReset" style="display:none" onclick="beQuadReset()">Reset to full plate mask</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
-    from <input type="number" id="beT0" step="${checkpoint?'any':'0.1'}" min="0" style="width:74px">
-    to <input type="number" id="beT1" step="${checkpoint?'any':'0.1'}" style="width:74px"> s
+    from <input type="text" inputmode="decimal" id="beT0" title="h:mm:ss.mmm or seconds" style="width:104px">
+    to <input type="text" inputmode="decimal" id="beT1" title="h:mm:ss.mmm or seconds" style="width:104px">
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
    <button data-save-edits onclick="${checkpoint?'saveAndResume()':'beSave()'}">${checkpoint?'Save &amp; Resume':'Save changes &amp; re-render'}</button></div>
@@ -7644,7 +8169,7 @@ async function beTogglePlay(){
   if(!current()||!BE.playing)return;
   BE.t=v.currentTime;
   document.getElementById("beT").value=BE.t;
-  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+  document.getElementById("beL").textContent=fmtTime(BE.t);
   const now=performance.now();
   if(!inFlight&&now-lastQ>150){
    inFlight=true;lastQ=now;
@@ -7742,7 +8267,7 @@ function beTLDraw(){
  g.moveTo(tlX(BE.t,w),0);g.lineTo(tlX(BE.t,w),72);g.stroke();
  const full=BE.win[0]<0.05&&BE.win[1]>BE.dur-0.05;
  document.getElementById("beWinL").textContent=full?(BE_VIEW?.checkpoint?"window: processed portion":"window: whole video")
-  :`window: ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s`;
+  :`window: ${fmtTime(BE.win[0])}–${fmtTime(BE.win[1])}`;
 }
 function tlHook(){
  const cv=document.getElementById("beTL"),view=BE_VIEW,editor=BE;if(!cv||!view)return;
@@ -7930,7 +8455,7 @@ async function beTrackGo(box){
   intent:BE_OPEN_INTENT,reviewRequest:REVIEW_REQUEST,state:'starting',timer:null,polling:false};
  const payload={box:copyEdit(box),t_ref:view.readySample.sample.canonical_s,t0,t1,seed:copyEdit(view.readySample.precondition)};
  draft.track=launch;view.trackLaunch=launch;renderTrackStatus(draft);
- st.style.display="inline";st.textContent=`tracking ${t0.toFixed(1)}–${t1.toFixed(1)}s…`;
+ st.style.display="inline";st.textContent=`tracking ${fmtTime(t0)}–${fmtTime(t1)}…`;
  try{
   await reviewPost(`api/jobs/${launch.id}/track_object`,payload);
   if(!trackOwned(launch))return;
@@ -8043,9 +8568,10 @@ function beAddMode(){
 }
 function beApplyTimes(){
  if(BE.sel<0||!beReady())return;
- const t0=+document.getElementById("beT0").value,
-       t1=+document.getElementById("beT1").value;
- if(![t0,t1].every(Number.isFinite)||!(t1>t0&&t0>=0&&t1<=BE.dur)){alert("'to' must be after 'from'.");return;}
+ const t0=parseTime(document.getElementById("beT0").value),
+       t1=parseTime(document.getElementById("beT1").value);
+ if(t0===null||t1===null){alert("Enter times as h:mm:ss.mmm (for example 0:01:23.400) or in seconds.");return;}
+ if(!(t1>t0&&t0>=0&&t1<=BE.dur)){alert("'to' must be after 'from'.");return;}
  const row=BE.raw.find(x=>x.i===BE.sel);if(!beCaptureGeometry(BE_VIEW,row))return;
  BE.times[BE.sel]=[t0,t1];reviewResolveActions(EDITS);
  const b=BE.boxes.find(x=>x.i===BE.sel);
@@ -8055,8 +8581,9 @@ function beApplyTimes(){
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
  el.style.display="inline-flex";
- document.getElementById("beT0").value=BE_VIEW?.checkpoint?String(b.t_start):b.t_start.toFixed(1);
- document.getElementById("beT1").value=BE_VIEW?.checkpoint?String(b.t_end):b.t_end.toFixed(1);
+ // checkpoint review keeps the exact stored seconds; elsewhere h:mm:ss.mmm
+ document.getElementById("beT0").value=BE_VIEW?.checkpoint?String(b.t_start):fmtTime(b.t_start);
+ document.getElementById("beT1").value=BE_VIEW?.checkpoint?String(b.t_end):fmtTime(b.t_end);
 }
 function manualId(){
  const c=globalThis.crypto;
@@ -8209,7 +8736,15 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){return saveAndRender();}
-async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
+// 0: nothing scanned yet, 1: a stoppable scan with progress, 2: a stopped
+// scan, 3: a scan with progress that cannot be stopped (text categories)
+let CANCEL_KIND=0;
+async function cancelJob(){
+ if(CANCEL_KIND===2&&!confirm("Cancel throws away the saved progress of this scan."))return;
+ if(CANCEL_KIND===1&&!confirm("Cancel throws away the scanning done so far. Use Stop to continue later."))return;
+ if(CANCEL_KIND===3&&!confirm("Cancel throws away the scanning done so far."))return;
+ await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"});
+}
 async function stopCheckpoint(){
  const id=CUR,button=document.getElementById('checkpointStop');if(!id||!button)return;
  button.disabled=true;button.textContent='Stopping…';
@@ -8355,7 +8890,7 @@ function reviewCard(c){
  const unit=c.policyRows?'sample':'appearance';
  return `<div class="det" id="det${c.id}" data-cat="${detLabel(cat)}">
   <div class="thumbwell"><img alt="Detection preview" style="cursor:zoom-in" onclick="zoomDet(${c.id})"></div>
-  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} ${c.policyRows?'samples':'frames'}</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+  <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`&quot;${detLabel(x.text)}&quot;`}${x.frames?` <span class="badge">×${x.frames} ${c.policyRows?'samples':'frames'}</span>`:''}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:''}<br>${fmtTime(x.t_start)}–${fmtTime(x.t_end)}</div>
   ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} ${unit}s in this ${detLabel(reviewCategoryName(cat))} group</div>`:''}
   ${detChoices(c.id,c.zone?'Outside-zone detection':reviewCategoryName(cat),!!c.policyRows)}
   <button type="button" class="sec" data-thumb-reopen hidden onclick="loadReview()">Re-open review</button></div>`;
@@ -8434,6 +8969,7 @@ async function loadReview(auto=null){
  <p class="detscope">Mixed groups appear in both output views. Filters only change the view.</p>
  <p id="reviewFilterHint" class="detscope"></p>
  <p id="reviewFilterEmpty" hidden></p>
+ <div id="letterGaps" hidden></div>
  <div id="beslot"></div><div class="row reviewranges">
  <button class="sec" data-review-prev onclick="REVIEW_SCHED?.range(-1)">Previous review cards</button>
  <span data-review-range role="status" aria-live="polite"></span>
@@ -8458,7 +8994,128 @@ async function loadReview(auto=null){
  detail.insertAdjacentHTML('beforeend',html);
  REVIEW_SCHED=new ReviewScheduler(id,gen,document.getElementById('review'),REVIEW_META);
  refreshReviewFilters();REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
+ LETTER_GAPS=null;LETTER_GAPS_LOAD=null;
+ if(d.assisted_letters)loadLetterGaps(id,gen);
  return BE_OPEN_INTENT;
+}
+// Assisted plate letters ("letters only, no box fallback"): the gap list is
+// computed server-side from the SAVED report. One notice at the top of the
+// job, never on individual cards; the render reminder states the count.
+let LETTER_GAPS=null,LETTER_GAPS_LOAD=null;   // last list / {jobId,promise} of the Review load
+const ASSISTED_RENDER_REMINDER=n=>`Letters only, no box fallback: ${n} gaps listed in Review will not be covered. Render now?`;
+// Output-timeline seconds as H:MM:SS.mmm (1:30:23.370), the form a video
+// editor's timecode field takes. Milliseconds are rounded once, so 59.9996
+// carries into the next minute instead of printing 60.000.
+// Review times: h:mm:ss.mmm everywhere (cards, editor, gap list, audio).
+function fmtTime(sec){
+ const ms=Math.max(0,Math.round((+sec||0)*1000));
+ const h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60,s=Math.floor(ms/1000)%60,r=ms%1000;
+ return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(r).padStart(3,"0")}`;
+}
+// "h:mm:ss.mmm", "m:ss.mmm" or plain seconds -> seconds; anything else -> null
+function parseTime(text){
+ const t=String(text??"").trim();
+ if(!/^(\\d+:)?(\\d+:)?\\d+(\\.\\d+)?$/.test(t))return null;
+ const parts=t.split(":").map(Number);
+ if(parts.slice(1).some(v=>v>=60))return null;
+ const v=parts.reduce((acc,p)=>acc*60+p,0);
+ return Number.isFinite(v)?Math.round(v*1000)/1000:null;
+}
+function lgOutTime(sec){
+ return fmtTime(sec);
+}
+async function fetchLetterGaps(id){
+ const r=await fetch(`api/jobs/${id}/letter_gaps`);
+ if(!r.ok)throw Error("HTTP "+r.status);
+ const g=await r.json();
+ if(!g||typeof g.mode!=="string"||!Array.isArray(g.gaps))throw Error("invalid gap list");
+ LETTER_GAPS={...g,jobId:id};
+ return LETTER_GAPS;
+}
+function startLetterGapLoad(id){
+ const promise=fetchLetterGaps(id);promise.catch(()=>{});
+ LETTER_GAPS_LOAD={jobId:id,promise};return promise;
+}
+async function loadLetterGaps(id,gen){
+ let g,err=null;
+ try{g=await startLetterGapLoad(id);}catch(e){err=e;}
+ if(!ownsView(id,gen))return;
+ renderLetterGaps(id,g,err);
+}
+function lgSecs(x){const n=Math.max(0,+x||0);return n<10?n.toFixed(1):String(Math.round(n));}
+function lgFrames(x){
+ const f0=+(x.out_f0??x.out_frame??x.frame),f1=+(x.out_f1??f0);
+ return f1>f0?`frames ${f0}–${f1}`:`frame ${f0}`;
+}
+function lgDur(x,fps){
+ const f0=+x.out_f0,f1=+x.out_f1;
+ return fps>0&&Number.isFinite(f0)&&Number.isFinite(f1)?(f1-f0+1)/fps:+x.frames/(fps||1);
+}
+function renderLetterGaps(id,g,err){
+ const el=document.getElementById("letterGaps");if(!el)return;
+ if(err){el.hidden=false;el.textContent="Plate letter gaps could not be checked ("+err.message+"). Open Review again to retry.";return;}
+ if(g.mode!=="assisted"){el.hidden=true;el.innerHTML="";return;}
+ const s=g.stats||{},masked=+s.masked_frames||0,gapf=+s.gap_frames||0,bridged=+s.bridged_frames||0;
+ const fps=+g.fps||0,n=g.gaps.length,wasOpen=el.querySelector("details")?.open;
+ // floor: never round a partly covered job up to 100%
+ const pct=masked+gapf?Math.floor(100*masked/(masked+gapf)):100;
+ const total=g.gaps.reduce((a,x)=>a+lgDur(x,fps),0);
+ const items=g.gaps.map((x,k)=>`<button type="button" class="lgap" data-gap="${k}" onclick="openLetterGap(${+x.t0},${k})"
+  title="Open this moment in the box editor below">
+  <span class="lgnum">Gap ${k+1}</span>
+  <img loading="lazy" alt="Plate ${k+1} preview" src="api/jobs/${id}/letter_gap/${k}.jpg?v=${encodeURIComponent(g.token||"")}">
+  <span class="lgtime">${lgOutTime(x.out_t0??x.t0)} – ${lgOutTime(x.out_t1??x.t1)}</span>
+  <span>${lgFrames(x)} · ${lgSecs(lgDur(x,fps))} s</span>
+  <span class="lgopen">Open in editor ▸</span></button>`).join("");
+ const head=n?`⚠ ${n} gap${n===1?"":"s"} where a plate stays visible (${lgSecs(total)} s in total)`
+  :"✓ No plate gaps: letters were found on every plate frame";
+ el.hidden=false;
+ el.innerHTML=`<details${wasOpen===false?"":" open"}><summary class="lgnotice">${head}</summary>
+  <p>Plate cover is <b>Letters only, no box fallback</b>. Letters were covered on ${pct}% of the frames where a plate was found.${n?" In the gaps below a plate was found but its letters were not, so nothing is drawn over it.":""}</p>
+  ${n?`<p class="detscope"><b>To fix a gap:</b> cover it in your video editor afterwards (times and frames are in the rendered video), or click it to open that moment in the box editor below and use <b>Track object</b> on the plate (that blurs the whole plate box). Moving or resizing a plate box does not cover a gap.</p>
+  <div class="row lgtools"><button type="button" class="sec" onclick="copyLetterGaps()">Copy gap list</button><span id="lgCopied" role="status" aria-live="polite"></span></div>
+  <div class="lglist">${items}</div>`:""}
+  <p class="detscope">Not listed: plates OpenScrub never found${bridged?`, and ${bridged} frame${bridged===1?"":"s"} where a plate's cover was carried through a short detector dropout (same scene, up to 1 s)`:""}. Watch the whole output. Blur / Keep visible choices change this list after <b>Save edits &amp; render</b>.</p>
+  </details>`;
+}
+function letterGapText(g){
+ const fps=+g.fps||0;
+ return ["OpenScrub plate gaps (times in the rendered video)"].concat(g.gaps.map((x,k)=>
+  `Gap ${k+1}\\t${lgOutTime(x.out_t0??x.t0)} – ${lgOutTime(x.out_t1??x.t1)}\\t${lgFrames(x)}\\t${lgSecs(lgDur(x,fps))} s`)).join("\\n")+"\\n";
+}
+async function copyLetterGaps(){
+ const g=LETTER_GAPS,st=document.getElementById("lgCopied");if(!g||!st)return;
+ const text=letterGapText(g);
+ try{await navigator.clipboard.writeText(text);st.textContent="Copied "+g.gaps.length+" gaps.";return;}catch(_){}
+ // No clipboard (plain-HTTP page or blocked): show the text, selected, to copy by hand.
+ st.innerHTML='<textarea id="lgCopyText" readonly rows="4" style="width:100%"></textarea>';
+ const ta=document.getElementById("lgCopyText");ta.value=text;ta.focus();ta.select();
+}
+async function openLetterGap(t0,k){
+ const id=CUR,gen=VIEW_GEN;
+ document.querySelectorAll("#letterGaps .lgap").forEach(b=>b.classList.toggle("lgcur",+b.dataset.gap===k));
+ await loadBoxEdit(true);
+ if(!ownsView(id,gen))return;
+ const sl=document.getElementById("beT");if(!sl||!Number.isFinite(t0))return;
+ const cp=BE_VIEW?.checkpoint;
+ sl.value=String(cp?Math.floor(t0*cp.fps):t0);
+ beScrub();
+ document.getElementById("beslot")?.scrollIntoView({block:"start",behavior:"smooth"});
+}
+// Assisted jobs only (Review / done view start a gap load for them, so an
+// ordinary job's save stays synchronous and is never asked).
+function assistedLetterJob(id){
+ return !!(LETTER_GAPS_LOAD&&LETTER_GAPS_LOAD.jobId===id||LETTER_GAPS&&LETTER_GAPS.jobId===id&&LETTER_GAPS.mode==="assisted");
+}
+// Runs AFTER the edits are saved: the count comes from a fresh gap list of
+// the report just written, never from the list loaded before the edits.
+async function assistedRenderConfirm(id,gen){
+ let g=null,err=null;
+ try{g=await fetchLetterGaps(id);}catch(e){err=e;}
+ if(!ownsView(id,gen))return false;
+ renderLetterGaps(id,g,err);
+ if(err)return confirm("The plate letter gap list could not be checked. Render now?");
+ return g.mode!=="assisted"||confirm(ASSISTED_RENDER_REMINDER(g.gaps.length));
 }
 function disposeReview(){
  if(REVIEW_SCHED){const old=REVIEW_SCHED;REVIEW_SCHED=null;old.dispose();}
@@ -9340,6 +9997,8 @@ async function saveAndRender(resume=false){
  const id=CUR,gen=VIEW_GEN,d=EDITS,reviewOwner=REVIEW_SCHED,editorIntent=BE_OPEN_INTENT;
  if(!id||!d||d.busy)return false;
  if(resume?(PHPH!=='paused'||!REVIEW_META?.checkpoint||REVIEW_META.jobId!==id||REVIEW_META.viewGen!==gen):PHPH==='paused')return false;
+ // Assisted plate letters: save first, then remind with the fresh gap count.
+ const assistedJob=!resume&&assistedLetterJob(id);
  const b=d.editor;
  if(resume&&reviewGesturePending(b)){saveStatus(d,'Finish or cancel the current edit before resuming.');return false;}
  let submission;
@@ -9392,6 +10051,17 @@ async function saveAndRender(resume=false){
   }
   if(hasReviewEdits(d)){
    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+  }
+  if(assistedJob){
+   saveStatus(d,"Edits saved; checking plate letter gaps…"+allowError);
+   const go=await assistedRenderConfirm(id,gen);
+   if(!ownsView(id,gen)){
+    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+   }
+   if(!go){saveStatus(d,"Edits saved. Render cancelled — save again to render."+allowError);return false;}
+   if(hasReviewEdits(d)){
+    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+   }
   }
   saveStatus(d,"Edits saved; requesting render…");
   await reviewPost(`api/jobs/${id}/render`);
@@ -10507,6 +11177,48 @@ def rehydrate_jobs():
         return _rehydrate_jobs()
 
 
+def _register_stopped_job(jid, jdir, progress_file):
+    saved = _saved_progress(progress_file)
+    opts = {}
+    try:
+        with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
+            opts = json.load(f)
+        if not isinstance(opts, dict):
+            opts = {}
+    except (OSError, ValueError):
+        opts = {}
+    up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
+               if os.path.exists(os.path.join(jdir, "input" + e))), None)
+    frame, total, meta = saved if saved is not None else (None, None, {})
+    video = meta.get("video") if isinstance(meta.get("video"), str) else up
+    name = meta.get("name") if isinstance(meta.get("name"), str) else (
+        os.path.basename(video) if video else jid)
+    if saved is None:
+        error = ("the saved scan progress is unreadable — Cancel the scan and "
+                 "start it again")
+    elif not video or not os.path.exists(video):
+        error = ("source video not found at %s — Continue scan works again once "
+                 "the video is available at that path" % (video or "(unknown)"))
+    else:
+        error = None
+    try:
+        size = os.path.getsize(video) if video else 0
+    except OSError:
+        size = 0
+    job = {
+        "id": jid, "dir": jdir, "video": video, "name": name, "options": opts,
+        "phase": "stopped", "stopped_frame": frame, "stopped_total": total,
+        "progress": _stopped_progress(frame or 0, total or 1), "size": size,
+        "log": JobLog(["(recovered after server restart — the scan was stopped "
+                       "with its progress saved)"]),
+        "error": error, "output": None, "created": os.path.getmtime(jdir),
+        "cancel": threading.Event(), "stats": {},
+    }
+    FILES.initialize(job)
+    with JOBS_LOCK:
+        JOBS[jid] = job
+
+
 def _rehydrate_jobs():
     """Re-register jobs found on disk after a restart. A job with a report
     is a reviewable job; one with an output file is a finished one — either
@@ -10551,6 +11263,24 @@ def _rehydrate_jobs():
             FILES.initialize(job).recovery_required = True
             with JOBS_LOCK:
                 JOBS[jid] = job
+            n += 1
+            continue
+        progress_file = os.path.join(jdir, scan_progress.PROGRESS_NAME)
+        scan_progress.discard_stage(progress_file)
+        stopped_rescan = False
+        if os.path.exists(rep) and os.path.exists(progress_file):
+            saved = _saved_progress(progress_file)
+            before = saved[2].get("report_before") if saved is not None else None
+            if before is not None and before == _report_digest(jdir):
+                stopped_rescan = True       # the report is the OLD one it replaces
+            else:
+                # published, but the server stopped before the progress file
+                # was removed
+                scan_progress.remove(progress_file)
+        if (stopped_rescan or not os.path.exists(rep)) and os.path.exists(progress_file):
+            # A stopped (or crashed, autosaved) scan: list it as stopped even
+            # when its source video is not mounted right now.
+            _register_stopped_job(jid, jdir, progress_file)
             n += 1
             continue
         if not os.path.exists(rep):
@@ -10696,6 +11426,28 @@ def retention_sweep(days):
                     _reap_job_dir(p, jid, retries=1)
 
 
+def stop_scan_for_shutdown(timeout=20.0, poll=0.2):
+    """docker stop: ask a running stoppable scan to save its progress first.
+
+    Waits at most `timeout` seconds; a save that does not finish in time
+    leaves the last autosave. Returns True when the scan stopped."""
+    jid = WORKER.get("current")
+    job = JOBS.get(jid) if jid else None
+    if job is None or job.get("phase") != "scanning":
+        return False
+    stop = getattr(FILES.initialize(job).active, 'progress_stop', None)
+    if stop is None:
+        return False
+    stop.set()
+    print("stopping the running scan to save its progress…", flush=True)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if job.get("phase") != "scanning":
+            return job.get("phase") == "stopped"
+        time.sleep(poll)
+    return False
+
+
 def retention_loop(days):
     while True:
         retention_sweep(days)
@@ -10775,6 +11527,7 @@ def main():
             os._exit(1)
         _terming.append(1)
         print("SIGTERM — locking vault before exit…")
+        stop_scan_for_shutdown()
         _shutdown("sigterm")
         os._exit(0)
     signal.signal(signal.SIGTERM, _on_sigterm)
