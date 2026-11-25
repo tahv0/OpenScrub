@@ -42,6 +42,7 @@ import cv2
 import numpy as np
 
 from openscrub_internal import exact_samples as exact
+from openscrub_internal import plate_outline
 from openscrub_internal import plate_letters
 from openscrub_internal import plate_policy
 from openscrub_internal import scan_progress
@@ -1516,8 +1517,70 @@ def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
     return next_id
 
 
+def _backfill_plate_letters(detections, cap, fps, first, cuts, allowed, cum, cb):
+    samples = {}
+    for row in detections:
+        if row.category == "plate" and row.dense and row.track >= 0:
+            idx = round(row.t_start * fps)
+            x, y, right, bottom = row.cbox
+            origin = np.array([x, y]) + row.aoff
+            polys = [np.float32(np.asarray(p) * [right-x, bottom-y] + origin)
+                     for p in row.poly]
+            samples.setdefault(idx, {})[row.track] = row, polys
+
+    def check_cancelled():
+        if cb.cancelled():
+            raise PipelineCancelled()
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    screen = np.float32([[0, 0], [width, 0], [width, height], [0, height]])
+    for idx, row, template, quad in plate_outline.reverse_strips(
+            samples, cap, fps, first, set(cuts), check_cancelled):
+        area, clipped = cv2.intersectConvexConvex(np.float32(quad), screen)
+        if area < 9:
+            continue
+        polygon = clipped[:, 0]
+        left, top = np.floor(polygon.min(axis=0)).astype(int)
+        right, bottom = np.ceil(polygon.max(axis=0)).astype(int)
+        t = idx / fps
+        if row is None:
+            if not allowed(t, (left, top, right, bottom)):
+                continue
+            ox, oy = cum[idx]
+            row = Detection(t, t + .3/fps,
+                            (int(left-ox), int(top-oy), int(right-ox), int(bottom-oy)),
+                            "plate", "plate", 0., (ox, oy), last_seen=t, dense=True,
+                            track=template.track)
+            if hasattr(template, "_plate_policy_evidence"):
+                row._plate_policy_evidence = MappingProxyType({
+                    "origin": "visual_continuation", "frame": idx, "geometry_valid": True})
+            detections.append(row)
+            originals = []
+        else:
+            originals = samples[idx][row.track][1]
+            ratios = [(cv2.intersectConvexConvex(p, polygon)[0], cv2.contourArea(p))
+                      for p in originals if cv2.isContourConvex(p) and cv2.contourArea(p) >= 3]
+            if any(shared >= .95 * area for shared, _ in ratios):
+                continue
+            # A future track id alone cannot authorize a detached strip over
+            # a hand or another object. Require support in the current sample.
+            if ratios and not any(shared >= .38 * min(area, measured)
+                                  for shared, measured in ratios):
+                continue
+            ox, oy = row.aoff
+            x, y, xx, yy = row.cbox
+            if not _box_iou((x+ox, y+oy, xx+ox, yy+oy), (left, top, right, bottom)):
+                continue
+            union = (min(x+ox, left), min(y+oy, top), max(xx+ox, right), max(yy+oy, bottom))
+            if not allowed(t, union):
+                continue
+            row.cbox = (int(union[0]-ox), int(union[1]-oy), int(union[2]-ox), int(union[3]-oy))
+        row.poly = _box_normalized_letters(row, ox, oy, [*originals, polygon])
+
+
 def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
-                        _checkpoint_capture=None, _checkpoint_start=0):
+                        _checkpoint_capture=None, _checkpoint_start=0, letter_onset=False):
     """Make each dense track leak-free from true first appearance to exit.
 
     Dense samples are instantaneous per-frame boxes; three gaps remain
@@ -1712,6 +1775,15 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
                 gh, gw = g0.shape[:2]
                 x1, y1, x2, y2 = max(0, x1), max(0, y1), min(gw, x2), min(gh, y2)
                 tmpl = g0[y1:y2, x1:x2] if (x2 - x1 >= 8 and y2 - y1 >= 8) else None
+                lettering_mask = None
+                if letter_onset and first.category == "plate" and tmpl is not None:
+                    lettering_mask = np.zeros(tmpl.shape, np.uint8)
+                    for p in first.poly:
+                        if len(p) >= 3:
+                            pts = np.rint(np.asarray(p) * [x2-x1, y2-y1]).astype(np.int32)
+                            cv2.fillPoly(lettering_mask, [pts], 255)
+                    if np.count_nonzero(lettering_mask) < 24:
+                        tmpl = None
                 if tmpl is not None and float(tmpl.std()) > 4:
                     th_, tw_ = tmpl.shape
                     box = list(sb)
@@ -1730,10 +1802,15 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None, *,
                         ry2 = min(g.shape[0], int(box[3] * SCALE) + m)
                         if rx2 - rx1 < tw_ or ry2 - ry1 < th_:
                             break   # clipped at the frame edge: object entering
-                        res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tmpl,
-                                                cv2.TM_CCOEFF_NORMED)
+                        search = g[ry1:ry2, rx1:rx2]
+                        if lettering_mask is None:
+                            res = cv2.matchTemplate(search, tmpl, cv2.TM_CCOEFF_NORMED)
+                        else:
+                            res = cv2.matchTemplate(search, tmpl, cv2.TM_CCOEFF_NORMED,
+                                                    mask=lettering_mask)
+                            res[~np.isfinite(res)] = -1
                         _, mx, _, loc = cv2.minMaxLoc(res)
-                        if mx < THR:
+                        if mx < (.78 if lettering_mask is not None else THR):
                             break   # genuinely not there yet
                         nx = (rx1 + loc[0]) / SCALE
                         ny = (ry1 + loc[1]) / SCALE
@@ -4459,7 +4536,7 @@ def _assisted_row(d, poly):
                 setattr(row, key, value)
     else:
         row = copy.copy(d)
-    row.poly = poly
+    row.poly = plate_outline.continuous_mask(poly) if len(poly) > 1 else poly
     return row
 
 
@@ -6724,6 +6801,13 @@ class TextRegionDetector:
                 if not (k == 0 and polys):
                     nxt.append(i)
             pending = nxt
+        # The detector box constrains plate discovery, including on bodywork of
+        # the same color. Rim and glyph evidence can recover a rotated strip
+        # even when the text detector returns only part of the registration.
+        for i, (crop, x1, y1) in info.items():
+            strip = plate_outline.lettering(crop)
+            if strip is not None:
+                results[i].append(strip + (x1, y1))
         self.last_sizes_many = [tuple(u) for u in used]
         return results
 
@@ -9055,6 +9139,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                                "which could not be loaded: %s" % reason)
     letter_stats = {"plates": 0, "masked": 0, "seconds": 0.0,
                     "sizes": {size: 0 for size in LETTER_SIZES}}
+    strip_tracker = plate_outline.StripTracker() if assisted else None
     scene_cuts, cut_sig, cut_idx = [], None, -1
     detect_scale = float(getattr(args, "detect_scale", 1.0) or 1.0)
     if args.ignore_regions:
@@ -9451,6 +9536,8 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
             "raw": [scan_progress.encode_detection(d) for d in raw],
             "cum": [list(p) for p in cum], "bands": [list(p) for p in bands],
             "scene_cuts": list(scene_cuts), "cut_idx": cut_idx,
+            "plate_motion": ([(q.tolist(), last) for q, last in strip_tracker.tracks]
+                             if strip_tracker is not None and strip_tracker.index == cut_idx else []),
             "letter_stats": {"plates": letter_stats["plates"], "masked": letter_stats["masked"],
                              "seconds": letter_stats["seconds"],
                              "sizes": [[k, v] for k, v in letter_stats["sizes"].items()]},
@@ -9536,6 +9623,10 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                 if cut_idx != int(frame_ref["index"]):
                     raise scan_progress.ProgressError("the saved progress is incomplete")
                 cut_sig = plate_letters.frame_signature(fr)
+                try:
+                    strip_tracker.restore(saved.get("plate_motion", []), fr, cut_idx)
+                except (TypeError, ValueError, OverflowError) as error:
+                    raise scan_progress.ProgressError("invalid saved plate motion") from error
             positioned = int(frame_ref["index"]) == idx - 1
         elif assisted and cut_idx >= 0:
             raise scan_progress.ProgressError("the saved progress is incomplete")
@@ -9771,12 +9862,31 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                 except Exception:
                     frame_letters, frame_sizes = [], []
                 letter_stats["seconds"] += time.perf_counter() - started
-            for plate_i, (px1, py1, px2, py2, pconf) in enumerate(plate_rows):
+            observations = [(r, (), True) for r in plate_rows]
+            if assisted and letters_on and "plate" in _psc:
+                polygons = [frame_letters[i] if i < len(frame_letters) else []
+                            for i in range(len(plate_rows))]
+                observations = strip_tracker.step(
+                    frame, idx, plate_rows, polygons, fps,
+                    bool(scene_cuts and scene_cuts[-1] == idx), plate_allowed)
+            for plate_i, (plate_box, polygons, direct) in enumerate(observations):
+                px1, py1, px2, py2, pconf = plate_box
+                if polygons:
+                    # A partially detected word may occupy only one end of the
+                    # tracked strip. Normalize all polygons against one box.
+                    points = np.concatenate(polygons)
+                    h, w = frame.shape[:2]
+                    union = (max(0, min(px1, math.floor(points[:,0].min()))),
+                             max(0, min(py1, math.floor(points[:,1].min()))),
+                             min(w, max(px2, math.ceil(points[:,0].max()))),
+                             min(h, max(py2, math.ceil(points[:,1].max()))))
+                    if plate_allowed(union):
+                        px1, py1, px2, py2 = union
                 row = Detection(
                     t_now, t_now + phold,
                     (int(px1 - cx), int(py1 - cy),
                      int(px2 - cx), int(py2 - cy)),
-                    "plate", "plate", round(pconf, 3), (cx, cy),
+                    "plate", "plate", float(pconf), (cx, cy),
                     dense=True)
                 if narrow_plate:
                     polygons, reason = [], ""
@@ -9807,19 +9917,17 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                                                narrow_frame_digest if normalized else None,
                                                normalized, getattr(args, "plate_narrow_margin", 0), reason)
                 elif assisted:
-                    letter_stats["plates"] += 1
+                    letter_stats["plates"] += int(direct)
                     if letters_on:
-                        polygons = (frame_letters[plate_i]
-                                    if plate_i < len(frame_letters) else [])
                         row.poly = _box_normalized_letters(row, cx, cy, polygons)
                         if row.poly:
-                            letter_stats["masked"] += 1
+                            letter_stats["masked"] += int(direct)
                             for size in (frame_sizes[plate_i]
                                          if plate_i < len(frame_sizes) else ()):
                                 letter_stats["sizes"][size] = letter_stats["sizes"].get(size, 0) + 1
                 if optional_policy:
                     row._plate_policy_evidence = MappingProxyType({
-                        "origin": "detection", "frame": idx,
+                        "origin": "detection" if direct else "visual_continuation", "frame": idx,
                         "geometry_valid": (row.cbox[0] < row.cbox[2]
                                            and row.cbox[1] < row.cbox[3])})
                 raw.append(row)
@@ -10432,6 +10540,26 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
         if _gap_cap["cap"] is not None:
             _gap_cap["cap"].release()
     n_tracks = assign_dense_tracks(detections)
+    if assisted and n_tracks:
+        def scope_allows(t, box):
+            scope = _scope_at(t)
+            zones = scope.get("plate")
+            return ("plate" in scope and (not zones or in_any_zone(box, zones))
+                    and not in_ignore_region(box, args.ignore_regions))
+
+        if checkpoint_stream is None:
+            reverse_cap = cv2.VideoCapture(args.video)
+        else:
+            from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
+            reverse_cap = ScanCapture(FrameStream(
+                checkpoint_stream.source, start_frame=checkpoint_start,
+                check_cancelled=checkpoint_stream.check_cancelled).__enter__())
+        try:
+            _backfill_plate_letters(detections, reverse_cap, fps,
+                                    checkpoint_start if checkpoint_stream else 0,
+                                    scene_cuts, scope_allows, cum, cb)
+        finally:
+            reverse_cap.release()
     if n_tracks:
         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
                f" per-frame samples grouped into {n_tracks} track(s) "
@@ -10441,7 +10569,7 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                "through the video (the slow part of a dense scan)…")
         if checkpoint_stream is None:
             n_gaps, n_lead, lead_s = smooth_dense_tracks(
-                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb)
+                detections, fps, args.video, cum=cum, win_start=win_start, cb=cb, letter_onset=assisted)
         else:
             from openscrub_internal.checkpoint_media import FrameStream, ScanCapture
             secondary = ScanCapture(FrameStream(
@@ -10451,9 +10579,19 @@ def _run_scan_impl(args, cb, stop_requested, main_capture, checkpoint_stream,
                 n_gaps, n_lead, lead_s = smooth_dense_tracks(
                     detections, fps, args.video, cum=cum,
                     win_start=max(win_start, checkpoint_start / fps), cb=cb,
-                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start)
+                    _checkpoint_capture=secondary, _checkpoint_start=checkpoint_start, letter_onset=assisted)
             finally:
                 secondary.release()
+        if assisted and scene_cuts:
+            # Grace padding from the dense smoother must end at a hard cut,
+            # including for tracks which have no observation in the next shot.
+            for row in detections:
+                if row.dense and row.category == "plate":
+                    shot = bisect_right(scene_cuts, round(row.last_seen * fps))
+                    if shot:
+                        row.t_start = max(row.t_start, scene_cuts[shot-1] / fps)
+                    if shot < len(scene_cuts):
+                        row.t_end = max(row.t_start, min(row.t_end, (scene_cuts[shot] - 1) / fps))
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "

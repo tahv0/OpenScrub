@@ -3,8 +3,8 @@ import math
 import cv2
 
 
-CROP_RECIPE = 'crop-v3'
-DETFRAME_RECIPE = 'detframe-v3'
+CROP_RECIPE = 'crop-v4'
+DETFRAME_RECIPE = 'detframe-v4'
 
 
 class ThumbnailDecodeError(ValueError):
@@ -203,7 +203,14 @@ def recipe_for_row(row, render_state, kind, *, bounded_timeline=False):
         if start < 0 or end < start or fps <= 0 or len(box) != 4 or box[2] <= box[0] or box[3] <= box[1] or not cum:
             raise ThumbnailRecipeError('invalid thumbnail recipe')
         times = (min(max(last, start), end), (start + end) / 2, min(start + .2, end))
-        if kind == 'detframe': times = times[:1]
+        dense_plate = row.get('dense') and row.get('category') == 'plate'
+        if kind == 'detframe' or dense_plate:
+            times = times[:1]
+
+        def ordinal(t):
+            # Dense plate sightings are stamped with frame_index / fps.
+            # Recover that ordinal even when the product rounds just below it.
+            return round(t * fps) if dense_plate else math.floor(t * fps)
         first, after = row.get('scan_frame_start'), row.get('scan_frame_end')
         has_bounds = 'scan_frame_start' in row or 'scan_frame_end' in row
         if has_bounds or bounded_timeline:
@@ -220,9 +227,9 @@ def recipe_for_row(row, render_state, kind, *, bounded_timeline=False):
                 high -= 1
             if low > high:
                 raise ThumbnailUnavailable('no authorized thumbnail frame')
-            indices = tuple(max(low, min(math.floor(t * fps), high)) for t in times)
+            indices = tuple(max(low, min(ordinal(t), high)) for t in times)
         else:
-            indices = tuple(max(0, min(math.floor(t * fps), len(cum) - 1)) for t in times)
+            indices = tuple(max(0, min(ordinal(t), len(cum) - 1)) for t in times)
         offsets = tuple(tuple(_number(v) for v in cum[k]) for k in indices)
         if any(len(offset) != 2 for offset in offsets): raise ThumbnailRecipeError('invalid thumbnail recipe')
         return Recipe(kind, box, times, indices, offsets, 24, 80 if kind == 'crop' else 84,
@@ -240,9 +247,13 @@ def crop_frame(frame, cbox, offset):
     y2 = min(h, max(0, int(cbox[3] + offset[1]) + pad))
     crop = frame[y1:y2, x1:x2].copy()
     if not crop.size: return None, False
-    inner = crop[pad:-pad or None, pad:-pad or None]
+    left = max(0, int(cbox[0] + offset[0]) - x1)
+    top = max(0, int(cbox[1] + offset[1]) - y1)
+    right = min(crop.shape[1], int(cbox[2] + offset[0]) - x1)
+    bottom = min(crop.shape[0], int(cbox[3] + offset[1]) - y1)
+    inner = crop[top:bottom, left:right]
     nonblank = bool(inner.size and float(inner.std()) > 8)
-    cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad, crop.shape[0] - pad), (0, 0, 255), 2)
+    cv2.rectangle(crop, (left, top), (right - 1, bottom - 1), (0, 0, 255), 2)
     return crop, nonblank
 
 

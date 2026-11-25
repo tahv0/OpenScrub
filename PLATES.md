@@ -203,7 +203,11 @@ plate would get a mask.
 
 **What it does.** On every frame with a detected plate the text model runs on the
 crop at 320 px; boxes whose outline is empty or implausible also run 640 and 224
-and the plausible outlines are unioned. The mask is stored with the plate and
+and the plausible outlines are unioned. The scan also estimates plate corners
+from a visible rim and a row of character-sized strokes. It samples the backing
+color inside the lettering to look for characters beyond a partial word. Local
+motion projects the strip forward and backward through short gaps within the
+same shot. Start a new scan to compute these polygons. The mask is stored with the plate and
 painted with the plate category's mode (blur, box, mosaic). Frames without their
 own mask borrow the nearest mask of the same plate within 1.0 s. A plate track
 that ends is joined to one starting within 1.0 s nearby at a similar size, and

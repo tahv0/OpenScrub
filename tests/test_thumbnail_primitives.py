@@ -315,3 +315,17 @@ def test_populated_retirement_claims_bounded_batches_and_preserves_pin(tmp_path)
     assert batch.paths == (first.path,)
     th.complete_cleanup_locked(state, batch, th.cleanup(batch))
     assert state.retirement is None and not list(tmp_path.iterdir())
+
+
+def test_dense_plate_crop_and_zoom_use_the_scored_frame():
+    fps = 30.
+    index = 123  # 123 / 30 * 30 rounds just below 123.
+    row = dict(t_start=index / fps, t_end=4.6, last_seen=index / fps,
+               cbox=[0, 95, 25, 100], dense=True, category='plate')
+    state = dict(fps=fps, cum=[[0, 0]] * 150)
+    for kind in ('crop', 'detframe'):
+        assert th.recipe_for_row(row, state, kind).indices == (index,)
+    image = np.zeros((100, 100, 3), np.uint8)
+    image[95:, :25, 1] = 255
+    crop, visible = th.crop_frame(image, row['cbox'], (0, 0))
+    assert visible and tuple(crop[-1, 0]) == (0, 0, 255)
